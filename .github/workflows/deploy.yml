@@ -41,9 +41,11 @@ jobs:
         working-directory: backend
         run: npm ci --prefer-offline --no-audit
 
-      - name: 🔍 Lint code
+      - name: Lint backend code
         working-directory: backend
-        run: npm run lint
+        run: |
+          npm install
+          npm run lint
 
       - name: 🏗️ TypeScript compile check
         working-directory: backend
