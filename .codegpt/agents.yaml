@@ -1,0 +1,31 @@
+agents:
+  - name: Architect_BoatRental
+    repository: https://github.com/intuit44/BoatBooking
+    branch: main
+    paths:
+      - README.md
+      - package.json
+      - shared/
+      - scripts/
+      - .gitignore
+      - .prettierrc
+      - .codegpt/agents.yaml
+
+  - name: Mobile_App_Agent
+    repository: https://github.com/intuit44/BoatBooking
+    branch: main
+    paths:
+      - mobile-app/
+
+  - name: AdminPanel_Agent
+    repository: https://github.com/intuit44/BoatBooking
+    branch: main
+    paths:
+      - admin-panel/
+
+  - name: AWS_Agent
+    repository: https://github.com/intuit44/BoatBooking
+    branch: main
+    paths:
+      - backend/
+      - amplify/
