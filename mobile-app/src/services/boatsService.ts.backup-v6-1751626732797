@@ -1,0 +1,363 @@
+import { generateClient } from 'aws-amplify/api';
+import { Boat, BoatFilters } from '../store/slices/boatsSlice';
+
+// Crear cliente GraphQL
+import { API, graphqlOperation } from 'aws-amplify';
+await API.graphql(graphqlOperation(XYZ));
+
+
+// GraphQL Queries
+const listBoats = /* GraphQL */ `
+  query ListBoats($filter: ModelBoatFilterInput, $limit: Int, $nextToken: String) {
+    listBoats(filter: $filter, limit: $limit, nextToken: $nextToken) {
+      items {
+        id
+        name
+        type
+        description
+        capacity
+        pricePerHour
+        pricePerDay
+        rating
+        reviews
+        images
+        location {
+          marina
+          state
+          coordinates {
+            latitude
+            longitude
+          }
+        }
+        specifications {
+          length
+          engine
+          fuel
+          year
+        }
+        amenities
+        owner {
+          id
+          name
+          phone
+          rating
+          verified
+        }
+        availability {
+          available
+          blockedDates
+        }
+        featured
+        createdAt
+        updatedAt
+      }
+      nextToken
+    }
+  }
+`;
+
+const getBoat = /* GraphQL */ `
+  query GetBoat($id: ID!) {
+    getBoat(id: $id) {
+      id
+      name
+      type
+      description
+      capacity
+      pricePerHour
+      pricePerDay
+      rating
+      reviews
+      images
+      location {
+        marina
+        state
+        coordinates {
+          latitude
+          longitude
+        }
+      }
+      specifications {
+        length
+        engine
+        fuel
+        year
+      }
+      amenities
+      owner {
+        id
+        name
+        phone
+        rating
+        verified
+      }
+      availability {
+        available
+        blockedDates
+      }
+      featured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+// GraphQL Mutations
+const createBoatMutation = /* GraphQL */ `
+  mutation CreateBoat($input: CreateBoatInput!) {
+    createBoat(input: $input) {
+      id
+      name
+      type
+      description
+      capacity
+      pricePerHour
+      pricePerDay
+      rating
+      reviews
+      images
+      location {
+        marina
+        state
+        coordinates {
+          latitude
+          longitude
+        }
+      }
+      specifications {
+        length
+        engine
+        fuel
+        year
+      }
+      amenities
+      owner {
+        id
+        name
+        phone
+        rating
+        verified
+      }
+      availability {
+        available
+        blockedDates
+      }
+      featured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+const updateBoatMutation = /* GraphQL */ `
+  mutation UpdateBoat($input: UpdateBoatInput!) {
+    updateBoat(input: $input) {
+      id
+      name
+      type
+      description
+      capacity
+      pricePerHour
+      pricePerDay
+      rating
+      reviews
+      images
+      location {
+        marina
+        state
+        coordinates {
+          latitude
+          longitude
+        }
+      }
+      specifications {
+        length
+        engine
+        fuel
+        year
+      }
+      amenities
+      owner {
+        id
+        name
+        phone
+        rating
+        verified
+      }
+      availability {
+        available
+        blockedDates
+      }
+      featured
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+const deleteBoatMutation = /* GraphQL */ `
+  mutation DeleteBoat($input: DeleteBoatInput!) {
+    deleteBoat(input: $input) {
+      id
+    }
+  }
+`;
+
+export class BoatsService {
+  // Obtener todos los botes
+  static async getAllBoats() {
+    try {
+      const response: any = await client.graphql({
+        query: listBoats
+      });
+      return {
+        success: true,
+        data: response.data.listBoats.items as Boat[],
+      };
+    } catch (error: any) {
+      console.error('Error fetching boats:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Buscar botes con filtros
+  static async searchBoats(filters: BoatFilters = {}) {
+    try {
+      // Construir filtro GraphQL
+      const filter: any = {};
+      
+      if (filters.type) {
+        filter.type = { eq: filters.type };
+      }
+      
+      if (filters.state) {
+        filter.location = { state: { eq: filters.state } };
+      }
+      
+      if (filters.capacity) {
+        filter.capacity = { gte: filters.capacity };
+      }
+      
+      if (filters.priceRange) {
+        filter.pricePerHour = {
+          between: filters.priceRange
+        };
+      }
+      
+      if (filters.search) {
+        filter.or = [
+          { name: { contains: filters.search } },
+          { description: { contains: filters.search } }
+        ];
+      }
+
+      const response: any = await client.graphql({
+        query: listBoats,
+        variables: { filter }
+      });
+      
+      return {
+        success: true,
+        data: response.data.listBoats.items as Boat[],
+      };
+    } catch (error: any) {
+      console.error('Error searching boats:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Obtener botes destacados
+  static async getFeaturedBoats() {
+    try {
+      const filter = {
+        featured: { eq: true }
+      };
+      
+      const response: any = await client.graphql({
+        query: listBoats,
+        variables: { filter, limit: 10 }
+      });
+      
+      return {
+        success: true,
+        data: response.data.listBoats.items as Boat[],
+      };
+    } catch (error: any) {
+      console.error('Error fetching featured boats:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Obtener bote por ID
+  static async getBoatById(boatId: string) {
+    try {
+      const response: any = await client.graphql({
+        query: getBoat,
+        variables: { id: boatId }
+      });
+      return {
+        success: true,
+        data: response.data.getBoat as Boat,
+      };
+    } catch (error: any) {
+      console.error('Error fetching boat by ID:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Crear nuevo bote
+  static async createBoat(boatData: Omit<Boat, 'id' | 'createdAt' | 'updatedAt'>) {
+    try {
+      const response: any = await client.graphql({
+        query: createBoatMutation,
+        variables: { input: boatData }
+      });
+      return {
+        success: true,
+        data: response.data.createBoat as Boat,
+      };
+    } catch (error: any) {
+      console.error('Error creating boat:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Actualizar bote
+  static async updateBoat(boatId: string, updates: Partial<Boat>) {
+    try {
+      const response: any = await client.graphql({
+        query: updateBoatMutation,
+        variables: {
+          input: {
+            id: boatId,
+            ...updates,
+          }
+        }
+      });
+      return {
+        success: true,
+        data: response.data.updateBoat as Boat,
+      };
+    } catch (error: any) {
+      console.error('Error updating boat:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Eliminar bote
+  static async deleteBoat(boatId: string) {
+    try {
+      const response: any = await client.graphql({
+        query: deleteBoatMutation,
+        variables: { input: { id: boatId } }
+      });
+      return {
+        success: true,
+        data: response.data.deleteBoat,
+      };
+    } catch (error: any) {
+      console.error('Error deleting boat:', error);
+      return { success: false, error: error.message };
+    }
+  }
+}

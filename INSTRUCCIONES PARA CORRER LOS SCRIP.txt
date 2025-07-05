@@ -1,0 +1,19 @@
+INSTRUCCIONES PARA CORRER LOS SCRIPTS 
+
+
+ amplify-migrator-pro.js
+
+# Ver ayuda
+node amplify-migrator-pro.js --help
+
+# Modo dry-run (recomendado primero)
+node amplify-migrator-pro.js --dry-run
+
+# Modo verbose con dry-run
+node amplify-migrator-pro.js --dry-run --verbose
+
+# Aplicar cambios
+node amplify-migrator-pro.js
+
+# Procesar una ruta específica
+node amplify-migrator-pro.js --path src/store --verbose

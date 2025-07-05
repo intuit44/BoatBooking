@@ -1,0 +1,103 @@
+Estrategia de Agentes Recomendada
+1. Agente Principal del Proyecto (Arquitecto)
+Contexto: Estructura completa del proyecto, arquitectura general, decisiones técnicas
+Archivos clave: 
+- README.md principal
+- package.json raíz
+- Documentación de arquitectura
+- Esquemas de base de datos
+2. Agente Frontend Mobile
+Contexto: React Native, Expo, navegación, componentes compartidos
+Directorios: 
+- /mobile-app
+- Componentes de UI compartidos
+- Configuración de Expo
+3. Agente Frontend Web
+Contexto: Next.js, MUI, panel administrativo
+Directorios:
+- /admin-panel
+- Configuración de Next.js
+- Componentes MUI personalizados
+4. Agente Backend & AWS
+Contexto: Lambda, GraphQL, Amplify, servicios AWS
+Directorios:
+- /backend
+- /amplify
+- Esquemas GraphQL
+- Configuración de servicios
+Configuración Sugerida para CodeGPT
+Para cada agente, incluye:
+
+Contexto del Sistema
+
+markdownEres un experto en [tecnología específica] trabajando en una aplicación de alquiler de barcos.
+La aplicación tiene las siguientes características principales:
+- [Lista de features]
+- [Stack tecnológico]
+- [Patrones de diseño utilizados]
+
+Conocimiento Específico
+
+markdown## Estructura de Archivos
+[Árbol de directorios relevante]
+
+## Convenciones del Proyecto
+- Nomenclatura de archivos
+- Estructura de componentes
+- Patrones de código
+
+## Dependencias Clave
+- [Lista de librerías principales y sus versiones]
+
+Reglas y Restricciones
+
+markdown- Siempre mantener consistencia con el estilo existente
+- Priorizar performance en mobile
+- Seguir las mejores prácticas de AWS
+- Mantener la seguridad en GraphQL
+Ejemplo de Prompt para Agente Backend:
+markdown# Agente Backend - Boat Rental App
+
+## Contexto
+Eres un experto en desarrollo backend especializado en:
+- AWS Lambda con Node.js
+- GraphQL con AWS AppSync
+- DynamoDB
+- Amplify CLI
+
+## Estructura del Proyecto
+backend/
+├── functions/
+│   ├── boats/
+│   ├── bookings/
+│   ├── users/
+│   └── payments/
+├── graphql/
+│   ├── schema.graphql
+│   └── resolvers/
+└── utils/
+
+## Convenciones
+- Funciones Lambda en TypeScript
+- Resolvers modulares por entidad
+- Validación con Joi
+- Manejo de errores centralizado
+
+## Tareas Principales
+1. Análisis y optimización de queries
+2. Refactorización de funciones Lambda
+3. Implementación de nuevos endpoints
+4. Mejora de seguridad y performance
+Ventajas de esta Estrategia
+
+Separación de Responsabilidades: Cada agente es experto en su dominio
+Contexto Manejable: No sobrecarga a los agentes con información irrelevante
+Colaboración: Puedes usar múltiples agentes en una misma sesión
+Mantenibilidad: Más fácil actualizar el contexto cuando cambia el proyecto
+
+Tips Adicionales
+
+Usa Referencias Cruzadas: Menciona en cada agente cómo interactúa con las otras partes
+Actualiza Regularmente: Mantén los prompts actualizados con cambios importantes
+Incluye Ejemplos: Añade snippets de código representativos
+Define el Tono: Especifica si quieres respuestas concisas o detalladas

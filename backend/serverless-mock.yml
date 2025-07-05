@@ -1,0 +1,70 @@
+service: boat-rental-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    CORS_ORIGIN: ${env:CORS_ORIGIN, '*'}
+
+functions:
+  # Auth Functions (mantener originales)
+  register:
+    handler: src/handlers/auth.register
+    events:
+      - http:
+          path: auth/register
+          method: post
+          cors: true
+
+  login:
+    handler: src/handlers/auth.login
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+
+  # Boat Functions - USANDO MOCK TEMPORALMENTE
+  getBoats:
+    handler: src/handlers/boats-mock.getBoats
+    events:
+      - http:
+          path: boats
+          method: get
+          cors: true
+
+  getBoatById:
+    handler: src/handlers/boats-mock.getBoatById
+    events:
+      - http:
+          path: boats/{id}
+          method: get
+          cors: true
+
+  getFeaturedBoats:
+    handler: src/handlers/boats-mock.getFeaturedBoats
+    events:
+      - http:
+          path: boats/featured
+          method: get
+          cors: true
+
+  searchBoats:
+    handler: src/handlers/boats-mock.searchBoats
+    events:
+      - http:
+          path: boats/search
+          method: post
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0

@@ -1,0 +1,354 @@
+service: boat-rental-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DYNAMODB_TABLE_USERS: ${self:service}-${self:provider.stage}-users
+    DYNAMODB_TABLE_BOATS: ${self:service}-${self:provider.stage}-boats
+    DYNAMODB_TABLE_BOOKINGS: ${self:service}-${self:provider.stage}-bookings
+    S3_BUCKET_IMAGES: ${self:service}-${self:provider.stage}-images
+    JWT_SECRET: ${env:JWT_SECRET, 'your-jwt-secret-key'}
+    CORS_ORIGIN: ${env:CORS_ORIGIN, '*'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_USERS}"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_BOATS}"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_BOOKINGS}"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_USERS}/index/*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_BOATS}/index/*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_BOOKINGS}/index/*"
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource:
+            - "arn:aws:s3:::${self:provider.environment.S3_BUCKET_IMAGES}/*"
+
+functions:
+  # Auth Functions
+  register:
+    handler: src/handlers/auth.register
+    events:
+      - http:
+          path: auth/register
+          method: post
+          cors: true
+
+  login:
+    handler: src/handlers/auth.login
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+
+  refreshToken:
+    handler: src/handlers/auth.refreshToken
+    events:
+      - http:
+          path: auth/refresh
+          method: post
+          cors: true
+
+  # User Functions
+  getProfile:
+    handler: src/handlers/users.getProfile
+    events:
+      - http:
+          path: users/profile
+          method: get
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  updateProfile:
+    handler: src/handlers/users.updateProfile
+    events:
+      - http:
+          path: users/profile
+          method: put
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  # Boat Functions
+  getBoats:
+    handler: src/handlers/boats.getBoats
+    events:
+      - http:
+          path: boats
+          method: get
+          cors: true
+
+  getBoatById:
+    handler: src/handlers/boats.getBoatById
+    events:
+      - http:
+          path: boats/{id}
+          method: get
+          cors: true
+
+  getFeaturedBoats:
+    handler: src/handlers/boats.getFeaturedBoats
+    events:
+      - http:
+          path: boats/featured
+          method: get
+          cors: true
+
+  searchBoats:
+    handler: src/handlers/boats.searchBoats
+    events:
+      - http:
+          path: boats/search
+          method: post
+          cors: true
+
+  createBoat:
+    handler: src/handlers/boats.createBoat
+    events:
+      - http:
+          path: boats
+          method: post
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  updateBoat:
+    handler: src/handlers/boats.updateBoat
+    events:
+      - http:
+          path: boats/{id}
+          method: put
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  deleteBoat:
+    handler: src/handlers/boats.deleteBoat
+    events:
+      - http:
+          path: boats/{id}
+          method: delete
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  # Booking Functions
+  createBooking:
+    handler: src/handlers/bookings.createBooking
+    events:
+      - http:
+          path: bookings
+          method: post
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  getUserBookings:
+    handler: src/handlers/bookings.getUserBookings
+    events:
+      - http:
+          path: bookings/user/{userId}
+          method: get
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  getBookingById:
+    handler: src/handlers/bookings.getBookingById
+    events:
+      - http:
+          path: bookings/{id}
+          method: get
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  updateBookingStatus:
+    handler: src/handlers/bookings.updateBookingStatus
+    events:
+      - http:
+          path: bookings/{id}/status
+          method: patch
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  cancelBooking:
+    handler: src/handlers/bookings.cancelBooking
+    events:
+      - http:
+          path: bookings/{id}/cancel
+          method: patch
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  # Payment Functions
+  processPayment:
+    handler: src/handlers/payments.processPayment
+    events:
+      - http:
+          path: payments/process
+          method: post
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  # File Upload Functions
+  uploadImage:
+    handler: src/handlers/uploads.uploadImage
+    events:
+      - http:
+          path: uploads/image
+          method: post
+          cors: true
+          authorizer:
+            name: authorizerFunc
+            resultTtlInSeconds: 0
+
+  # Authorizer Function
+  authorizerFunc:
+    handler: src/handlers/authorizer.handler
+
+resources:
+  Resources:
+    # DynamoDB Tables
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_USERS}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: EmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            BillingMode: PAY_PER_REQUEST
+        BillingMode: PAY_PER_REQUEST
+
+    BoatsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_BOATS}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: ownerId
+            AttributeType: S
+          - AttributeName: state
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: OwnerIndex
+            KeySchema:
+              - AttributeName: ownerId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            BillingMode: PAY_PER_REQUEST
+          - IndexName: StateIndex
+            KeySchema:
+              - AttributeName: state
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            BillingMode: PAY_PER_REQUEST
+        BillingMode: PAY_PER_REQUEST
+
+    BookingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_BOOKINGS}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: boatId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            BillingMode: PAY_PER_REQUEST
+          - IndexName: BoatIndex
+            KeySchema:
+              - AttributeName: boatId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            BillingMode: PAY_PER_REQUEST
+        BillingMode: PAY_PER_REQUEST
+
+    # S3 Bucket for Images
+    ImagesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKET_IMAGES}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0

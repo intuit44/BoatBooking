@@ -1,0 +1,111 @@
+# 🚫 Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.cache/
+dist/
+build/
+
+# 🧪 Tests
+coverage/
+jest-cache/
+.vitest/
+
+# 🛠️ IDEs
+.vscode/
+.idea/
+*.swp
+*.sublime*
+
+# 📱 React Native (Expo)
+.expo/
+.expo-shared/
+*.apk
+*.ipa
+*.jks
+android/
+ios/
+web-build/
+*.keystore
+*.iml
+
+# 🧩 TypeScript
+*.tsbuildinfo
+
+# 🧱 Amplify
+amplify/.config/local-*
+amplify/logs
+amplify/mock-data
+amplify/mock-api-resources
+amplify/backend/amplify-meta.json
+amplify/backend/.temp
+build/
+dist/
+node_modules/
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+amplifyconfiguration.dart
+amplify-build-config.json
+amplify-gradle-config.json
+amplifytools.xcconfig
+.secret-*
+**.sample
+
+
+# 🌐 Next.js
+.next/
+out/
+.vercel
+
+# 🖼️ OS Files
+*.log
+*.tmp
+*.temp
+*.DS_Store
+Thumbs.db
+desktop.ini
+.Spotlight-V100
+.Trashes
+
+# ⚙️ Git
+*.orig
+*.patch
+*.rej
+
+# 📦 Archives & dumps
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.bak
+*.sql
+*.dump
+
+# 💡 Env files (seguridad)
+.env
+.env.*
+!.env.example  # ← Excepción: template sin valores reales
+
+# 💥 Specific cache folders
+.eslintcache
+.cache/
+.parcel-cache/
+.turbo/
+
+# 📊 Logs específicos
+lerna-debug.log*
+.pnpm-debug.log*
+logs/
+*.log
+
+# 🔐 Certificados y keys
+*.pem
+*.p12
+*.key
+*.crt
+*.cer
+private/

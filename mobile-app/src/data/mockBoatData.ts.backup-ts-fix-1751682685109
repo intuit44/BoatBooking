@@ -1,0 +1,307 @@
+// mockBoatData.ts
+// Datos de prueba mejorados para evitar problemas con imágenes
+
+import { Boat } from '../store/slices/boatsSlice';
+
+export const mockBoats: Boat[] = [
+  {
+    id: '1',
+    name: 'Yacht Presidencial',
+    type: 'yacht',
+    description: 'Lujoso yacht de 45 pies perfecto para celebraciones especiales, eventos corporativos y paseos familiares. Cuenta con todas las comodidades modernas incluyendo aire acondicionado, sistema de sonido premium, cocina completa y espacios amplios para el máximo confort. Ideal para grupos que buscan una experiencia exclusiva en las aguas cristalinas de Venezuela.',
+    capacity: 12,
+    pricePerHour: 250,
+    pricePerDay: 1800,
+    rating: 4.9,
+    reviews: 47,
+    // URLs de placeholder que funcionan
+    images: [
+      'https://picsum.photos/800/600?random=1&boat',
+      'https://picsum.photos/800/600?random=2&yacht',
+      'https://picsum.photos/800/600?random=3&luxury',
+      'https://picsum.photos/800/600?random=4&marina'
+    ],
+    location: {
+      marina: 'Marina Bahía Redonda',
+      state: 'Nueva Esparta',
+      coordinates: {
+        latitude: 11.0019,
+        longitude: -63.8617
+      }
+    },
+    specifications: {
+      length: 45,
+      engine: '2x Caterpillar 550HP',
+      fuel: 'Diesel',
+      year: 2020
+    },
+    amenities: [
+      'Aire Acondicionado',
+      'Sistema de Sonido',
+      'Cocina Completa',
+      'Baño Privado',
+      'Nevera',
+      'Equipo de Snorkel',
+      'Chalecos Salvavidas',
+      'GPS Navigation'
+    ],
+    owner: {
+      id: 'owner1',
+      name: 'Carlos Mendoza',
+      phone: '+58-414-123-4567',
+      rating: 4.8,
+      verified: true
+    },
+    availability: {
+      available: true,
+      blockedDates: []
+    },
+    featured: true
+  },
+  {
+    id: '2',
+    name: 'Velero Caribeño',
+    type: 'sailboat',
+    description: 'Hermoso velero de 38 pies ideal para navegación recreativa y deportiva. Perfecto para quienes buscan una experiencia auténtica de navegación a vela en las costas venezolanas. Incluye instructor de vela opcional para principiantes.',
+    capacity: 8,
+    pricePerHour: 180,
+    pricePerDay: 1200,
+    rating: 4.7,
+    reviews: 32,
+    images: [
+      'https://picsum.photos/800/600?random=5&sailboat',
+      'https://picsum.photos/800/600?random=6&sailing',
+      'https://picsum.photos/800/600?random=7&caribbean'
+    ],
+    location: {
+      marina: 'Puerto La Cruz Marina',
+      state: 'Vargas',
+      coordinates: {
+        latitude: 10.4806,
+        longitude: -66.9036
+      }
+    },
+    specifications: {
+      length: 38,
+      engine: 'Vela + Motor auxiliar 40HP',
+      fuel: 'Gasolina',
+      year: 2018
+    },
+    amenities: [
+      'Velas Profesionales',
+      'Equipo de Navegación',
+      'Chalecos Salvavidas',
+      'Cocina Básica',
+      'Baño',
+      'Equipo de Pesca',
+      'Radio VHF'
+    ],
+    owner: {
+      id: 'owner2',
+      name: 'María Rodríguez',
+      phone: '+58-412-987-6543',
+      rating: 4.9,
+      verified: true
+    },
+    availability: {
+      available: true,
+      blockedDates: []
+    },
+    featured: true
+  },
+  {
+    id: '3',
+    name: 'Lancha Deportiva Speed',
+    type: 'motorboat',
+    description: 'Emocionante lancha deportiva de alta velocidad perfecta para deportes acuáticos, esquí acuático y paseos de adrenalina. Ideal para grupos jóvenes que buscan diversión y velocidad en el agua.',
+    capacity: 6,
+    pricePerHour: 150,
+    pricePerDay: 900,
+    rating: 4.6,
+    reviews: 28,
+    images: [
+      'https://picsum.photos/800/600?random=8&speedboat',
+      'https://picsum.photos/800/600?random=9&motorboat',
+      'https://picsum.photos/800/600?random=10&sports'
+    ],
+    location: {
+      marina: 'Marina Playa El Agua',
+      state: 'Nueva Esparta',
+      coordinates: {
+        latitude: 11.0834,
+        longitude: -63.7833
+      }
+    },
+    specifications: {
+      length: 28,
+      engine: 'Mercury 300HP',
+      fuel: 'Gasolina',
+      year: 2021
+    },
+    amenities: [
+      'Equipo de Esquí',
+      'Tabla de Wakeboard',
+      'Sistema de Sonido',
+      'Nevera Portátil',
+      'Toldo Solar',
+      'Equipo de Snorkel'
+    ],
+    owner: {
+      id: 'owner3',
+      name: 'José González',
+      phone: '+58-416-555-0123',
+      rating: 4.5,
+      verified: true
+    },
+    availability: {
+      available: true,
+      blockedDates: []
+    },
+    featured: false
+  },
+  {
+    id: '4',
+    name: 'Catamarán Tropical',
+    type: 'catamaran',
+    description: 'Espacioso catamarán de 42 pies con amplias zonas de descanso y estabilidad excepcional. Perfecto para familias y grupos grandes que buscan comodidad y espacio. Ideal para tours de día completo y celebraciones.',
+    capacity: 16,
+    pricePerHour: 300,
+    pricePerDay: 2200,
+    rating: 4.8,
+    reviews: 41,
+    images: [
+      'https://picsum.photos/800/600?random=11&catamaran',
+      'https://picsum.photos/800/600?random=12&tropical',
+      'https://picsum.photos/800/600?random=13&family'
+    ],
+    location: {
+      marina: 'Marina Coche',
+      state: 'Nueva Esparta',
+      coordinates: {
+        latitude: 10.7833,
+        longitude: -63.9833
+      }
+    },
+    specifications: {
+      length: 42,
+      engine: '2x Yamaha 150HP',
+      fuel: 'Gasolina',
+      year: 2019
+    },
+    amenities: [
+      'Doble Casco',
+      'Área de Barbacoa',
+      'Hamacas',
+      'Bar Interior',
+      'Baños Dobles',
+      'Ducha Exterior',
+      'Equipo de Música',
+      'Mesa de Comedor'
+    ],
+    owner: {
+      id: 'owner4',
+      name: 'Ana López',
+      phone: '+58-424-111-2233',
+      rating: 4.9,
+      verified: true
+    },
+    availability: {
+      available: true,
+      blockedDates: []
+    },
+    featured: true
+  },
+  {
+    id: '5',
+    name: 'Jet Ski Adventure',
+    type: 'jetski',
+    description: 'Moderna moto de agua de última generación para aventuras individuales o en pareja. Perfecta para explorar bahías y costas de manera rápida y emocionante.',
+    capacity: 2,
+    pricePerHour: 80,
+    pricePerDay: 400,
+    rating: 4.4,
+    reviews: 15,
+    images: [
+      'https://picsum.photos/800/600?random=14&jetski',
+      'https://picsum.photos/800/600?random=15&adventure'
+    ],
+    location: {
+      marina: 'Playa Caribe',
+      state: 'Falcón',
+      coordinates: {
+        latitude: 11.7,
+        longitude: -69.6
+      }
+    },
+    specifications: {
+      length: 12,
+      engine: 'Yamaha 110HP',
+      fuel: 'Gasolina',
+      year: 2022
+    },
+    amenities: [
+      'Chaleco Salvavidas',
+      'Compartimento Estanco',
+      'Sistema GPS',
+      'Espejo Retrovisor'
+    ],
+    owner: {
+      id: 'owner5',
+      name: 'Pedro Martín',
+      phone: '+58-426-789-0123',
+      rating: 4.3,
+      verified: true
+    },
+    availability: {
+      available: true,
+      blockedDates: []
+    },
+    featured: false
+  }
+];
+
+// Función para obtener boat por ID
+export const getBoatById = (id: string) => {
+  return mockBoats.find(boat => boat.id === id);
+};
+
+// Función para obtener boats destacados
+export const getFeaturedBoats = () => {
+  return mockBoats.filter(boat => boat.featured === true);
+};
+
+// Función para filtrar boats
+export const filterBoats = (filters: any) => {
+  let filteredBoats = [...mockBoats];
+
+  if (filters.type) {
+    filteredBoats = filteredBoats.filter(boat => boat.type === filters.type);
+  }
+
+  if (filters.state) {
+    filteredBoats = filteredBoats.filter(boat => boat.location.state === filters.state);
+  }
+
+  if (filters.capacity) {
+    filteredBoats = filteredBoats.filter(boat => boat.capacity >= filters.capacity);
+  }
+
+  if (filters.priceRange) {
+    const [min, max] = filters.priceRange;
+    filteredBoats = filteredBoats.filter(boat => 
+      boat.pricePerHour >= min && boat.pricePerHour <= max
+    );
+  }
+
+  if (filters.search) {
+    const searchLower = filters.search.toLowerCase();
+    filteredBoats = filteredBoats.filter(boat =>
+      boat.name.toLowerCase().includes(searchLower) ||
+      boat.description.toLowerCase().includes(searchLower) ||
+      boat.location.marina.toLowerCase().includes(searchLower) ||
+      boat.location.state.toLowerCase().includes(searchLower)
+    );
+  }
+
+  return filteredBoats;
+};

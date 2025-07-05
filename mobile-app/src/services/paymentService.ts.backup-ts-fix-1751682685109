@@ -1,0 +1,645 @@
+// src/services/paymentService.ts
+import { API, graphqlOperation } from 'aws-amplify';
+import { 
+  createPayment, 
+  updateBooking,
+  createNotification,
+  updatePayment 
+} from '../graphql/mutations';
+import { 
+  getBooking,
+  getPayment,
+  paymentsByUserId 
+} from '../graphql/queries';
+import { 
+  CreatePaymentInput,
+  UpdateBookingInput,
+  UpdatePaymentInput,
+  PaymentStatus,
+  BookingStatus,
+  Booking,
+  Payment
+} from '../API';
+import { PaymentConfig } from '../config/payment.config';
+
+// Tipos para los métodos de pago
+export interface PaymentData {
+  bookingId: string;
+  amount: number;
+  currency?: string;
+  paymentMethod: PaymentMethod;
+  referenceNumber?: string;
+  paymentData?: any;
+}
+
+export type PaymentMethod = 'zelle' | 'pago_movil' | 'binance' | 'cash' | 'stripe' | 'paypal' | 'apple_pay' | 'google_pay';
+
+export interface PaymentResult {
+  success: boolean;
+  payment?: Payment;
+  message: string;
+  transactionId?: string;
+  error?: string;
+}
+
+export interface ZellePaymentData extends PaymentData {
+  senderEmail: string;
+  referenceNumber: string;
+}
+
+export interface PagoMovilPaymentData extends PaymentData {
+  bankCode: string;
+  phoneNumber: string;
+  referenceNumber: string;
+  cedula: string;
+}
+
+export interface BinancePaymentData extends PaymentData {
+  transactionHash?: string;
+  walletAddress?: string;
+}
+
+export interface StripePaymentData extends PaymentData {
+  paymentIntentId?: string;
+  paymentMethodId?: string;
+  customerEmail?: string;
+}
+
+export interface PayPalPaymentData extends PaymentData {
+  orderId: string;
+  payerId?: string;
+  payerEmail?: string;
+}
+
+export interface ApplePayPaymentData extends PaymentData {
+  transactionIdentifier: string;
+  paymentData: any; // Apple Pay payment data object
+}
+
+export interface GooglePayPaymentData extends PaymentData {
+  googleTransactionId: string;
+  paymentToken: any; // Google Pay token
+}
+
+// URLs del backend - usa la configuración centralizada
+const API_ENDPOINT = PaymentConfig.API_ENDPOINT;
+
+export class PaymentService {
+  /**
+   * Procesa un pago genérico
+   */
+  static async processPayment(paymentData: PaymentData): Promise<PaymentResult> {
+    try {
+      // 1. Obtener información de la reserva
+      const bookingResult = await API.graphql(
+        graphqlOperation(getBooking, { id: paymentData.bookingId })
+      ) as any;
+      
+      const booking: Booking = bookingResult.data.getBooking;
+      
+      if (!booking) {
+        throw new Error('Reserva no encontrada');
+      }
+
+      // 2. Verificar que el pago no haya sido procesado
+      if (booking.paymentStatus === PaymentStatus.PAID) {
+        return {
+          success: false,
+          message: 'Esta reserva ya ha sido pagada',
+          error: 'ALREADY_PAID'
+        };
+      }
+
+      // 3. Crear registro de pago en GraphQL
+      const paymentInput: CreatePaymentInput = {
+        userId: booking.userId,
+        bookingId: booking.id,
+        amount: paymentData.amount || booking.totalAmount,
+        currency: paymentData.currency || 'USD',
+        paymentMethod: paymentData.paymentMethod,
+        status: PaymentStatus.PENDING,
+        transactionId: this.generateTransactionId(paymentData.paymentMethod)
+      };
+
+      const paymentResult = await API.graphql(
+        graphqlOperation(createPayment, { input: paymentInput })
+      ) as any;
+
+      const payment: Payment = paymentResult.data.createPayment;
+
+      // 4. Llamar al backend Lambda para procesar el pago
+      const lambdaResponse = await this.callPaymentLambda({
+        bookingId: booking.id,
+        paymentMethod: paymentData.paymentMethod,
+        referenceNumber: paymentData.referenceNumber,
+        paymentData: paymentData.paymentData,
+        amount: paymentData.amount || booking.totalAmount
+      });
+
+      // 5. Actualizar el estado según la respuesta
+      if (lambdaResponse.success) {
+        // Actualizar booking con estado de pago
+        const updateInput: UpdateBookingInput = {
+          id: booking.id,
+          paymentStatus: lambdaResponse.paymentStatus,
+          status: lambdaResponse.paymentStatus === PaymentStatus.PAID 
+            ? BookingStatus.CONFIRMED 
+            : booking.status
+        };
+
+        await API.graphql(
+          graphqlOperation(updateBooking, { input: updateInput })
+        );
+
+        // Actualizar payment con el estado final
+        const updatePaymentInput: UpdatePaymentInput = {
+          id: payment.id,
+          status: lambdaResponse.paymentStatus,
+          paidAt: lambdaResponse.paymentStatus === PaymentStatus.PAID 
+            ? new Date().toISOString() 
+            : null,
+          transactionId: lambdaResponse.transactionId || payment.transactionId
+        };
+
+        await API.graphql(
+          graphqlOperation(updatePayment, { input: updatePaymentInput })
+        );
+
+        // 6. Crear notificación para el usuario
+        await this.createPaymentNotification(
+          booking.userId,
+          lambdaResponse.paymentStatus,
+          booking.id
+        );
+
+        return {
+          success: true,
+          payment,
+          message: lambdaResponse.message,
+          transactionId: lambdaResponse.transactionId
+        };
+      } else {
+        throw new Error(lambdaResponse.message || 'Error procesando el pago');
+      }
+
+    } catch (error) {
+      console.error('Error procesando pago:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Error al procesar el pago',
+        error: error instanceof Error ? error.name : 'UNKNOWN_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Procesa pago con Zelle
+   */
+  static async processZellePayment(data: ZellePaymentData): Promise<PaymentResult> {
+    return this.processPayment({
+      ...data,
+      paymentMethod: 'zelle',
+      paymentData: {
+        senderEmail: data.senderEmail,
+        referenceNumber: data.referenceNumber,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  /**
+   * Procesa pago con Pago Móvil
+   */
+  static async processPagoMovilPayment(data: PagoMovilPaymentData): Promise<PaymentResult> {
+    return this.processPayment({
+      ...data,
+      paymentMethod: 'pago_movil',
+      paymentData: {
+        bankCode: data.bankCode,
+        phoneNumber: data.phoneNumber,
+        referenceNumber: data.referenceNumber,
+        cedula: data.cedula,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  /**
+   * Procesa pago con Binance Pay
+   */
+  static async processBinancePayment(data: BinancePaymentData): Promise<PaymentResult> {
+    return this.processPayment({
+      ...data,
+      paymentMethod: 'binance',
+      paymentData: {
+        transactionHash: data.transactionHash,
+        walletAddress: data.walletAddress,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  /**
+   * Procesa pago en efectivo
+   */
+  static async processCashPayment(data: PaymentData): Promise<PaymentResult> {
+    return this.processPayment({
+      ...data,
+      paymentMethod: 'cash',
+      paymentData: {
+        markedAsCash: true,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+
+  /**
+   * Procesa pago con Stripe
+   */
+  static async processStripePayment(data: StripePaymentData): Promise<PaymentResult> {
+    try {
+      // Aquí iría la integración con Stripe SDK
+      // Por ahora delegamos al backend
+      return this.processPayment({
+        ...data,
+        paymentMethod: 'stripe',
+        paymentData: {
+          paymentIntentId: data.paymentIntentId,
+          paymentMethodId: data.paymentMethodId,
+          customerEmail: data.customerEmail,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error procesando pago con Stripe:', error);
+      return {
+        success: false,
+        message: 'Error al procesar pago con tarjeta',
+        error: 'STRIPE_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Procesa pago con PayPal
+   */
+  static async processPayPalPayment(data: PayPalPaymentData): Promise<PaymentResult> {
+    try {
+      return this.processPayment({
+        ...data,
+        paymentMethod: 'paypal',
+        paymentData: {
+          orderId: data.orderId,
+          payerId: data.payerId,
+          payerEmail: data.payerEmail,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error procesando pago con PayPal:', error);
+      return {
+        success: false,
+        message: 'Error al procesar pago con PayPal',
+        error: 'PAYPAL_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Procesa pago con Apple Pay
+   */
+  static async processApplePayPayment(data: ApplePayPaymentData): Promise<PaymentResult> {
+    try {
+      // Verificar disponibilidad de Apple Pay
+      if (!this.isApplePayAvailable()) {
+        return {
+          success: false,
+          message: 'Apple Pay no está disponible en este dispositivo',
+          error: 'APPLE_PAY_NOT_AVAILABLE'
+        };
+      }
+
+      return this.processPayment({
+        ...data,
+        paymentMethod: 'apple_pay',
+        paymentData: {
+          transactionIdentifier: data.transactionIdentifier,
+          paymentData: data.paymentData,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error procesando pago con Apple Pay:', error);
+      return {
+        success: false,
+        message: 'Error al procesar pago con Apple Pay',
+        error: 'APPLE_PAY_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Procesa pago con Google Pay
+   */
+  static async processGooglePayPayment(data: GooglePayPaymentData): Promise<PaymentResult> {
+    try {
+      // Verificar disponibilidad de Google Pay
+      if (!this.isGooglePayAvailable()) {
+        return {
+          success: false,
+          message: 'Google Pay no está disponible en este dispositivo',
+          error: 'GOOGLE_PAY_NOT_AVAILABLE'
+        };
+      }
+
+      return this.processPayment({
+        ...data,
+        paymentMethod: 'google_pay',
+        paymentData: {
+          googleTransactionId: data.googleTransactionId,
+          paymentToken: data.paymentToken,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error procesando pago con Google Pay:', error);
+      return {
+        success: false,
+        message: 'Error al procesar pago con Google Pay',
+        error: 'GOOGLE_PAY_ERROR'
+      };
+    }
+  }
+
+  /**
+   * Verifica si Apple Pay está disponible
+   */
+  static isApplePayAvailable(): boolean {
+    // En React Native, usarías:
+    // return ApplePayButton.isApplePaySupported();
+    // Por ahora retornamos un placeholder
+    return typeof window !== 'undefined' && 
+           'ApplePaySession' in window && 
+           ApplePaySession.canMakePayments();
+  }
+
+  /**
+   * Verifica si Google Pay está disponible
+   */
+  static isGooglePayAvailable(): boolean {
+    // En React Native, usarías:
+    // return GooglePay.isReadyToPay();
+    // Por ahora retornamos un placeholder
+    return typeof window !== 'undefined' && 
+           'PaymentRequest' in window;
+  }
+
+  /**
+   * Obtiene los métodos de pago disponibles para el usuario
+   */
+  static async getAvailablePaymentMethods(): Promise<PaymentMethod[]> {
+    const methods: PaymentMethod[] = [
+      'zelle',
+      'pago_movil',
+      'binance',
+      'cash',
+      'stripe',
+      'paypal'
+    ];
+
+    // Verificar métodos nativos según la plataforma
+    if (this.isApplePayAvailable()) {
+      methods.push('apple_pay');
+    }
+
+    if (this.isGooglePayAvailable()) {
+      methods.push('google_pay');
+    }
+
+    return methods;
+  }
+
+  /**
+   * Valida el estado de un pago
+   */
+  static async validatePayment(paymentId: string): Promise<{
+    isValid: boolean;
+    status: PaymentStatus;
+    message: string;
+  }> {
+    try {
+      const result = await API.graphql(
+        graphqlOperation(getPayment, { id: paymentId })
+      ) as any;
+      
+      const payment: Payment = result.data.getPayment;
+      
+      if (!payment) {
+        return {
+          isValid: false,
+          status: PaymentStatus.FAILED,
+          message: 'Pago no encontrado'
+        };
+      }
+
+      return {
+        isValid: payment.status === PaymentStatus.PAID,
+        status: payment.status,
+        message: this.getPaymentStatusMessage(payment.status)
+      };
+
+    } catch (error) {
+      console.error('Error validando pago:', error);
+      return {
+        isValid: false,
+        status: PaymentStatus.FAILED,
+        message: 'Error al validar el pago'
+      };
+    }
+  }
+
+  /**
+   * Sube comprobante de pago
+   */
+  static async uploadPaymentProof(
+    paymentId: string, 
+    file: File | Blob
+  ): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      // Aquí implementarías la lógica de S3 para subir el archivo
+      // Por ahora retornamos un placeholder
+      console.log('Subiendo comprobante para pago:', paymentId);
+      
+      // TODO: Implementar upload a S3
+      // const uploadResult = await Storage.put(`payments/${paymentId}/proof`, file, {
+      //   contentType: file.type
+      // });
+
+      return {
+        success: true,
+        url: `https://your-s3-bucket.s3.amazonaws.com/payments/${paymentId}/proof`
+      };
+
+    } catch (error) {
+      console.error('Error subiendo comprobante:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error al subir comprobante'
+      };
+    }
+  }
+
+  /**
+   * Genera recibo de pago
+   */
+  static async generateReceipt(paymentId: string): Promise<{
+    success: boolean;
+    receiptUrl?: string;
+    error?: string;
+  }> {
+    try {
+      // Llamar a Lambda para generar PDF del recibo
+      const response = await fetch(`${API_ENDPOINT}/payments/${paymentId}/receipt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Agregar token de autenticación si es necesario
+        }
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        return {
+          success: true,
+          receiptUrl: result.receiptUrl
+        };
+      } else {
+        throw new Error(result.message || 'Error generando recibo');
+      }
+
+    } catch (error) {
+      console.error('Error generando recibo:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error al generar recibo'
+      };
+    }
+  }
+
+  /**
+   * Obtiene el historial de pagos de un usuario
+   */
+  static async getUserPaymentHistory(userId: string): Promise<Payment[]> {
+    try {
+      const result = await API.graphql(
+        graphqlOperation(paymentsByUserId, { 
+          userId,
+          sortDirection: 'DESC',
+          limit: 50
+        })
+      ) as any;
+
+      return result.data.paymentsByUserId.items || [];
+
+    } catch (error) {
+      console.error('Error obteniendo historial de pagos:', error);
+      return [];
+    }
+  }
+
+  // Métodos privados auxiliares
+
+  private static async callPaymentLambda(data: any): Promise<any> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/payments/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Agregar token de autenticación
+        },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        return {
+          success: true,
+          ...result
+        };
+      } else {
+        return {
+          success: false,
+          message: result.message || 'Error procesando pago'
+        };
+      }
+
+    } catch (error) {
+      console.error('Error llamando a Lambda:', error);
+      return {
+        success: false,
+        message: 'Error de conexión con el servidor'
+      };
+    }
+  }
+
+  private static async createPaymentNotification(
+    userId: string,
+    paymentStatus: PaymentStatus,
+    bookingId: string
+  ): Promise<void> {
+    try {
+      const title = paymentStatus === PaymentStatus.PAID 
+        ? '✅ Pago Confirmado' 
+        : '⏳ Pago Pendiente';
+        
+      const message = paymentStatus === PaymentStatus.PAID
+        ? 'Tu pago ha sido confirmado exitosamente. ¡Disfruta tu aventura!'
+        : 'Tu pago está pendiente de confirmación. Te notificaremos cuando esté listo.';
+
+      await API.graphql(
+        graphqlOperation(createNotification, {
+          input: {
+            userId,
+            title,
+            message,
+            type: 'PAYMENT',
+            read: false,
+            relatedId: bookingId,
+            actionUrl: `/bookings/${bookingId}`
+          }
+        })
+      );
+    } catch (error) {
+      console.error('Error creando notificación:', error);
+    }
+  }
+
+  private static generateTransactionId(method: PaymentMethod): string {
+    const prefix = {
+      zelle: 'ZLL',
+      pago_movil: 'PM',
+      binance: 'BNC',
+      cash: 'CSH',
+      stripe: 'STR',
+      paypal: 'PPL',
+      apple_pay: 'APL',
+      google_pay: 'GPL'
+    };
+
+    return `${prefix[method]}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private static getPaymentStatusMessage(status: PaymentStatus): string {
+    const messages = {
+      [PaymentStatus.PENDING]: 'Pago pendiente de confirmación',
+      [PaymentStatus.PAID]: 'Pago confirmado exitosamente',
+      [PaymentStatus.FAILED]: 'El pago no pudo ser procesado',
+      [PaymentStatus.REFUNDED]: 'El pago ha sido reembolsado',
+      [PaymentStatus.PARTIAL]: 'Pago parcial recibido'
+    };
+
+    return messages[status] || 'Estado de pago desconocido';
+  }
+}
