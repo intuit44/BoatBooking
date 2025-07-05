@@ -10,18 +10,32 @@ agents:
       - .gitignore
       - .prettierrc
       - .codegpt/agents.yaml
+    description: >
+      Agente principal encargado de la arquitectura general del proyecto, coordinación entre módulos,
+      estructura de carpetas, convenciones de código, estrategia de versiones, seguridad global y decisiones de infraestructura.
+      Tiene acceso a los archivos base del sistema y controla la coherencia entre agentes.
 
   - name: Mobile_App_Agent
     repository: https://github.com/intuit44/BoatBooking
     branch: main
     paths:
       - mobile-app/
+    description: >
+      Agente especializado en el desarrollo móvil con React Native + Expo.
+      Encargado del rendimiento, navegación, Redux Toolkit, UI responsive, integración con APIs, subida de imágenes,
+      validación de formularios, y soporte multiplataforma (Android, iOS, Web).
+      Responsable de detectar errores de tipado y renderizado en la app móvil.
 
   - name: AdminPanel_Agent
     repository: https://github.com/intuit44/BoatBooking
     branch: main
     paths:
       - admin-panel/
+    description: >
+      Agente responsable del panel administrativo web creado con Next.js + Material UI.
+      Su función incluye gestionar vistas protegidas, SSR, formularios de administración,
+      dashboards de control y seguridad del lado del cliente.
+      Se enfoca en experiencia del administrador, manejo de sesiones y filtros de datos.
 
   - name: AWS_Agent
     repository: https://github.com/intuit44/BoatBooking
@@ -29,3 +43,7 @@ agents:
     paths:
       - backend/
       - amplify/
+    description: >
+      Agente experto en el backend serverless. Gestiona funciones Lambda (TypeScript), GraphQL con AppSync,
+      DynamoDB, autenticación con Cognito, subida a S3, validación con Joi, despliegue con Serverless Framework
+      y flujos CI/CD. Se encarga también de la seguridad del backend y la conexión con servicios de AWS.
