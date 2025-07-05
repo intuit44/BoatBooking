@@ -87,8 +87,8 @@ desktop.ini
 
 # 💡 Env files (seguridad)
 .env
-.env.*
-!.env.example  # ← Excepción: template sin valores reales
+.env.*      # Ignora .env.local, .env.dev, etc.
+!.env.example  # <-- EXCEPCIÓN explícita
 
 # 💥 Specific cache folders
 .eslintcache

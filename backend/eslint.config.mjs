@@ -1,13 +1,39 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-import json from "@eslint/json";
-import { defineConfig } from "eslint/config";
+import js from '@eslint/js';
+import json from '@eslint/json';
 
-
-export default defineConfig([
-  { files: ["**/*.{js,mjs,cjs,ts,mts,cts}"], plugins: { js }, extends: ["js/recommended"] },
-  { files: ["**/*.{js,mjs,cjs,ts,mts,cts}"], languageOptions: { globals: globals.node } },
-  tseslint.configs.recommended,
-  { files: ["**/*.json"], plugins: { json }, language: "json/json", extends: ["json/recommended"] },
-]);
+export default [
+  js.configs.recommended,
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly'
+      }
+    }
+  },
+  {
+    files: ['**/*.json'],
+    ...json.configs.recommended,
+    rules: {
+      ...json.configs.recommended.rules
+    }
+  },
+  {
+    // IGNORAR ARCHIVOS GENERADOS
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      'coverage/**',
+      '.serverless/**',
+      'package-lock.json',  // ← IMPORTANTE
+      '*.log'
+    ]
+  }
+];

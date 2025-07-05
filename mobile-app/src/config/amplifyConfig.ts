@@ -5,7 +5,7 @@ import awsconfig from '../aws-exports';
 const amplifyConfig = {
   ...awsconfig,
   Analytics: {
-    disabled: true,
+    disabled: true, 
   },
   Storage: {
     S3: {

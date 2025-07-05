@@ -1,15 +1,21 @@
-const AWS = require('aws-sdk');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const { validateRegistration, validateLogin } = require('../utils/validators');
-const { createResponse, createError } = require('../utils/response');
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import { validateRegistration, validateLogin } from '../utils/validators.js';
+import { createResponse, createError } from '../utils/response.js';
 
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+// Configurar DynamoDB
+const client = new DynamoDBClient({});
+const dynamodb = DynamoDBDocumentClient.from(client);
+
 const USERS_TABLE = process.env.DYNAMODB_TABLE_USERS;
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Register new user
-exports.register = async (event) => {
+export const register = async (event) => {
   try {
     const body = JSON.parse(event.body);
     
@@ -20,14 +26,16 @@ exports.register = async (event) => {
     }
 
     // Check if user exists
-    const { Items: existingUsers } = await dynamodb.query({
+    const existingUsersCommand = new QueryCommand({
       TableName: USERS_TABLE,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: {
         ':email': body.email
       }
-    }).promise();
+    });
+
+    const { Items: existingUsers } = await dynamodb.send(existingUsersCommand);
 
     if (existingUsers && existingUsers.length > 0) {
       return createError(400, 'El usuario ya existe');
@@ -40,49 +48,76 @@ exports.register = async (event) => {
     // Create user object
     const user = {
       id: uuidv4(),
-      email: body.email,
+      email: body.email.toLowerCase(), // Normalizar email
       password: hashedPassword,
       name: body.name,
       phone: body.phone,
-      role: 'user',
+      role: body.role || 'user',
+      avatar: null,
+      emailVerified: false,
+      active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
     // Save user to DynamoDB
-    await dynamodb.put({
+    const putCommand = new PutCommand({
       TableName: USERS_TABLE,
-      Item: user
-    }).promise();
+      Item: user,
+      ConditionExpression: 'attribute_not_exists(id)' // Evitar sobrescribir
+    });
+
+    await dynamodb.send(putCommand);
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: JWT_EXPIRES_IN,
+        issuer: 'boat-rental-api'
+      }
     );
 
-    // Return success response
+    // Generate refresh token (opcional)
+    const refreshToken = jwt.sign(
+      { 
+        id: user.id,
+        type: 'refresh'
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: '30d'
+      }
+    );
+
+    // Return success response (sin incluir password)
+    const { password: _, ...userWithoutPassword } = user;
+    
     return createResponse(201, {
       message: '¡Usuario registrado exitosamente!',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phone: user.phone,
-        role: user.role
-      }
+      refreshToken,
+      user: userWithoutPassword
     });
 
   } catch (error) {
     console.error('Error en registro:', error);
+    
+    if (error.name === 'ConditionalCheckFailedException') {
+      return createError(409, 'El usuario ya existe');
+    }
+    
     return createError(500, 'Error al registrar usuario');
   }
 };
 
 // Login user
-exports.login = async (event) => {
+export const login = async (event) => {
   try {
     const body = JSON.parse(event.body);
     
@@ -93,14 +128,16 @@ exports.login = async (event) => {
     }
 
     // Find user by email
-    const { Items: users } = await dynamodb.query({
+    const queryCommand = new QueryCommand({
       TableName: USERS_TABLE,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: {
-        ':email': body.email
+        ':email': body.email.toLowerCase()
       }
-    }).promise();
+    });
+
+    const { Items: users } = await dynamodb.send(queryCommand);
 
     if (!users || users.length === 0) {
       return createError(401, 'Credenciales inválidas');
@@ -108,30 +145,60 @@ exports.login = async (event) => {
 
     const user = users[0];
 
+    // Check if user is active
+    if (!user.active) {
+      return createError(403, 'Usuario desactivado');
+    }
+
     // Verify password
     const validPassword = await bcrypt.compare(body.password, user.password);
     if (!validPassword) {
       return createError(401, 'Credenciales inválidas');
     }
 
-    // Generate JWT token
+    // Update last login
+    await dynamodb.send(new PutCommand({
+      TableName: USERS_TABLE,
+      Item: {
+        ...user,
+        lastLogin: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    }));
+
+    // Generate JWT tokens
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: JWT_EXPIRES_IN,
+        issuer: 'boat-rental-api'
+      }
+    );
+
+    const refreshToken = jwt.sign(
+      { 
+        id: user.id,
+        type: 'refresh'
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: '30d'
+      }
     );
 
     // Return success response
+    const { password: _, ...userWithoutPassword } = user;
+    
     return createResponse(200, {
       message: '¡Inicio de sesión exitoso!',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        phone: user.phone,
-        role: user.role
-      }
+      refreshToken,
+      user: userWithoutPassword
     });
 
   } catch (error) {
@@ -141,47 +208,78 @@ exports.login = async (event) => {
 };
 
 // Refresh token
-exports.refreshToken = async (event) => {
+export const refreshToken = async (event) => {
   try {
     const body = JSON.parse(event.body);
-    const { token } = body;
+    const { refreshToken } = body;
 
-    if (!token) {
-      return createError(400, 'Token no proporcionado');
+    if (!refreshToken) {
+      return createError(400, 'Refresh token no proporcionado');
     }
 
-    // Verify existing token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, JWT_SECRET);
+      
+      if (decoded.type !== 'refresh') {
+        return createError(401, 'Token inválido');
+      }
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        return createError(401, 'Refresh token expirado');
+      }
+      return createError(401, 'Token inválido');
+    }
 
     // Get user from database
-    const { Item: user } = await dynamodb.get({
+    const getCommand = new GetCommand({
       TableName: USERS_TABLE,
       Key: { id: decoded.id }
-    }).promise();
+    });
+
+    const { Item: user } = await dynamodb.send(getCommand);
 
     if (!user) {
       return createError(404, 'Usuario no encontrado');
     }
 
-    // Generate new token
+    if (!user.active) {
+      return createError(403, 'Usuario desactivado');
+    }
+
+    // Generate new tokens
     const newToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: JWT_EXPIRES_IN,
+        issuer: 'boat-rental-api'
+      }
+    );
+
+    const newRefreshToken = jwt.sign(
+      { 
+        id: user.id,
+        type: 'refresh'
+      },
+      JWT_SECRET,
+      { 
+        expiresIn: '30d'
+      }
     );
 
     return createResponse(200, {
       message: 'Token renovado exitosamente',
-      token: newToken
+      token: newToken,
+      refreshToken: newRefreshToken
     });
 
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return createError(401, 'Token inválido');
-    }
-    if (error.name === 'TokenExpiredError') {
-      return createError(401, 'Token expirado');
-    }
     console.error('Error en refresh token:', error);
     return createError(500, 'Error al renovar token');
   }
