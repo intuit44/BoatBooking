@@ -12,8 +12,8 @@
     "logs": "serverless logs -f hello",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "eslint src --ext .js --ignore-path .eslintignore",
-    "lint:fix": "eslint src --ext .js --fix --ignore-path .eslintignore",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "validate": "node scripts/validate-json.js"
   },
   "dependencies": {
