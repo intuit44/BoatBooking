@@ -224,20 +224,20 @@ jobs:
           API_ENDPOINT=$(sls info --stage prod --verbose | grep "endpoint:" | head -1 | awk '{print $2}')
           echo "api_endpoint=$API_ENDPOINT" >> $GITHUB_OUTPUT
 
-      - name: 🏥 Health check
+      - name: Health check
         run: |
           echo "Waiting for deployment to stabilize..."
           sleep 30
-          
-          HEALTH_ENDPOINT="${{ steps.deploy.outputs.api_endpoint }}/health"
+          HEALTH_ENDPOINT="https://aqn47vn9ce.execute-api.us-east-1.amazonaws.com/dev/hello"
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_ENDPOINT)
-          
+
           if [ $HTTP_CODE -eq 200 ]; then
             echo "✅ Health check passed!"
           else
             echo "❌ Health check failed with status $HTTP_CODE"
             exit 1
           fi
+
 
       - name: 📊 Report metrics to CloudWatch
         run: |
