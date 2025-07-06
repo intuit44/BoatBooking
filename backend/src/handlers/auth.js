@@ -1,10 +1,10 @@
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
-import { validateRegistration, validateLogin } from '../utils/validators.js';
-import { createResponse, createError } from '../utils/response.js';
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const { validateRegistration, validateLogin } = require('../utils/validators');
+const { createResponse, createError } = require('../utils/response');
 
 // Configurar DynamoDB
 const client = new DynamoDBClient({});
@@ -15,7 +15,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Register new user
-export const register = async (event) => {
+exports.register = async (event) => {
   try {
     const body = JSON.parse(event.body);
     
@@ -96,7 +96,7 @@ export const register = async (event) => {
     );
 
     // Return success response (sin incluir password)
-    const userWithoutPassword = (({ password, ...rest }) => rest)(user };
+    const { password, ...userWithoutPassword } = user;
     delete userWithoutPassword.password;
 
     
@@ -119,7 +119,7 @@ export const register = async (event) => {
 };
 
 // Login user
-export const login = async (event) => {
+exports.login = async (event) => {
   try {
     const body = JSON.parse(event.body);
     
@@ -194,7 +194,7 @@ export const login = async (event) => {
     );
 
     // Return success response
-    const userWithoutPassword = (({ password, ...rest }) => rest)(user;
+    const { password, ...userWithoutPassword } = user;
     
     return createResponse(200, {
       message: '¡Inicio de sesión exitoso!',

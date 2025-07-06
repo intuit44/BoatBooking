@@ -1,14 +1,16 @@
 ﻿service: boat-rental-backend
-
 frameworkVersion: "3"
 
 provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
-  stage: ${opt:stage, "dev"}
+  stage: ${opt:stage, 'dev'}
   environment:
     STAGE: ${self:provider.stage}
+    DYNAMODB_TABLE_USERS: UsersTable
+    JWT_SECRET: your-secret
+    JWT_EXPIRES_IN: 7d
 
 functions:
   hello:
@@ -19,8 +21,13 @@ functions:
           method: get
           cors: true
 
+  login:
+    handler: src/handlers/auth.login
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+
 resources:
-  Resources:
-    # Puedes agregar recursos de DynamoDB aquí más tarde
-    
-# NO PLUGINS POR AHORA - están causando conflictos
+  Resources: {}
