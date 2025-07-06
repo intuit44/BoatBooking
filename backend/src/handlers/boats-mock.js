@@ -1,4 +1,4 @@
-const { createResponse, createError } = require('../utils/response');
+import { createResponse, createError  } from '../utils/response';
 
 // Datos mock para desarrollo
 const mockBoats = [
@@ -251,7 +251,7 @@ const mockBoats = [
 ];
 
 // Get all boats with filters
-exports.getBoats = async (event) => {
+export const getBoats = async (event) => {
   try {
     const { state, type, minPrice, maxPrice, capacity, limit = 20 } = event.queryStringParameters || {};
     
@@ -289,7 +289,7 @@ exports.getBoats = async (event) => {
 };
 
 // Get boat by ID
-exports.getBoatById = async (event) => {
+export const getBoatById = async (event) => {
   try {
     const { id } = event.pathParameters;
 
@@ -308,7 +308,7 @@ exports.getBoatById = async (event) => {
 };
 
 // Get featured boats
-exports.getFeaturedBoats = async (event) => {
+export const getFeaturedBoats = async (event) => {
   try {
     const { limit = 10 } = event.queryStringParameters || {};
 
@@ -325,7 +325,7 @@ exports.getFeaturedBoats = async (event) => {
 };
 
 // Search boats
-exports.searchBoats = async (event) => {
+export const searchBoats = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { 

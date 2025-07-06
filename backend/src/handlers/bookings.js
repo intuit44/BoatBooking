@@ -1,15 +1,15 @@
-const AWS = require('aws-sdk');
-const { v4: uuidv4 } = require('uuid');
-const { validateBooking } = require('../utils/validators');
-const { createResponse, createError } = require('../utils/response');
-const { checkBoatAvailability } = require('../utils/availability');
+import AWS from 'aws-sdk';
+import { v4: uuidv4  } from 'uuid';
+import { validateBooking  } from '../utils/validators';
+import { createResponse, createError  } from '../utils/response';
+import { checkBoatAvailability  } from '../utils/availability';
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOOKINGS_TABLE = process.env.DYNAMODB_TABLE_BOOKINGS;
 const BOATS_TABLE = process.env.DYNAMODB_TABLE_BOATS;
 
 // Create new booking
-exports.createBooking = async (event) => {
+export const createBooking = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { user } = event.requestContext.authorizer;
@@ -97,7 +97,7 @@ exports.createBooking = async (event) => {
 };
 
 // Get user bookings
-exports.getUserBookings = async (event) => {
+export const getUserBookings = async (event) => {
   try {
     const { userId } = event.pathParameters;
     const { user } = event.requestContext.authorizer;
@@ -126,7 +126,7 @@ exports.getUserBookings = async (event) => {
 };
 
 // Get booking by ID
-exports.getBookingById = async (event) => {
+export const getBookingById = async (event) => {
   try {
     const { id } = event.pathParameters;
     const { user } = event.requestContext.authorizer;
@@ -155,7 +155,7 @@ exports.getBookingById = async (event) => {
 };
 
 // Update booking status
-exports.updateBookingStatus = async (event) => {
+export const updateBookingStatus = async (event) => {
   try {
     const { id } = event.pathParameters;
     const body = JSON.parse(event.body);
@@ -206,7 +206,7 @@ exports.updateBookingStatus = async (event) => {
 };
 
 // Cancel booking
-exports.cancelBooking = async (event) => {
+export const cancelBooking = async (event) => {
   try {
     const { id } = event.pathParameters;
     const { user } = event.requestContext.authorizer;

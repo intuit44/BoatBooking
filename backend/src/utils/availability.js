@@ -1,10 +1,10 @@
-const AWS = require('aws-sdk');
+import AWS from 'aws-sdk';
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOOKINGS_TABLE = process.env.DYNAMODB_TABLE_BOOKINGS;
 
 // Check if boat is available for given date/time range
-exports.checkBoatAvailability = async (boatId, startDate, endDate, startTime, endTime) => {
+export const checkBoatAvailability = async (boatId, startDate, endDate, startTime, endTime) => {
   try {
     // Query all bookings for this boat
     const result = await dynamodb.query({
@@ -48,7 +48,7 @@ exports.checkBoatAvailability = async (boatId, startDate, endDate, startTime, en
 };
 
 // Get available time slots for a boat on a specific date
-exports.getAvailableTimeSlots = async (boatId, date) => {
+export const getAvailableTimeSlots = async (boatId, date) => {
   try {
     // Query bookings for this boat on the specific date
     const result = await dynamodb.query({

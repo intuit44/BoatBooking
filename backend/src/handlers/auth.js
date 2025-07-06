@@ -96,7 +96,9 @@ export const register = async (event) => {
     );
 
     // Return success response (sin incluir password)
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = (({ password, ...rest }) => rest)(user };
+    delete userWithoutPassword.password;
+
     
     return createResponse(201, {
       message: '¡Usuario registrado exitosamente!',
@@ -192,7 +194,7 @@ export const login = async (event) => {
     );
 
     // Return success response
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = (({ password, ...rest }) => rest)(user;
     
     return createResponse(200, {
       message: '¡Inicio de sesión exitoso!',

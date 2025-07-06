@@ -1,12 +1,12 @@
-const AWS = require('aws-sdk');
-const { validatePayment } = require('../utils/validators');
-const { createResponse, createError } = require('../utils/response');
+import AWS from 'aws-sdk';
+import { validatePayment  } from '../utils/validators';
+import { createResponse, createError  } from '../utils/response';
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOOKINGS_TABLE = process.env.DYNAMODB_TABLE_BOOKINGS;
 
 // Process payment
-exports.processPayment = async (event) => {
+export const processPayment = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { user } = event.requestContext.authorizer;

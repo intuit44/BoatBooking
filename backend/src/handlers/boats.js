@@ -1,13 +1,13 @@
-const AWS = require('aws-sdk');
-const { v4: uuidv4 } = require('uuid');
-const { validateBoat } = require('../utils/validators');
-const { createResponse, createError } = require('../utils/response');
+import AWS from 'aws-sdk';
+import { v4: uuidv4  } from 'uuid';
+import { validateBoat  } from '../utils/validators';
+import { createResponse, createError  } from '../utils/response';
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOATS_TABLE = process.env.DYNAMODB_TABLE_BOATS;
 
 // Get all boats with pagination and filters
-exports.getBoats = async (event) => {
+export const getBoats = async (event) => {
   try {
     const { state, type, minPrice, maxPrice, capacity, limit = 20, lastKey } = event.queryStringParameters || {};
 
@@ -59,7 +59,7 @@ exports.getBoats = async (event) => {
 };
 
 // Get boat by ID
-exports.getBoatById = async (event) => {
+export const getBoatById = async (event) => {
   try {
     const { id } = event.pathParameters;
 
@@ -81,7 +81,7 @@ exports.getBoatById = async (event) => {
 };
 
 // Get featured boats
-exports.getFeaturedBoats = async (event) => {
+export const getFeaturedBoats = async (event) => {
   try {
     const { limit = 10 } = event.queryStringParameters || {};
 
@@ -103,7 +103,7 @@ exports.getFeaturedBoats = async (event) => {
 };
 
 // Search boats
-exports.searchBoats = async (event) => {
+export const searchBoats = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { 
@@ -174,7 +174,7 @@ exports.searchBoats = async (event) => {
 };
 
 // Create new boat (Admin/Owner only)
-exports.createBoat = async (event) => {
+export const createBoat = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { user } = event.requestContext.authorizer;
@@ -215,7 +215,7 @@ exports.createBoat = async (event) => {
 };
 
 // Update boat
-exports.updateBoat = async (event) => {
+export const updateBoat = async (event) => {
   try {
     const { id } = event.pathParameters;
     const body = JSON.parse(event.body);
@@ -266,7 +266,7 @@ exports.updateBoat = async (event) => {
 };
 
 // Delete boat
-exports.deleteBoat = async (event) => {
+export const deleteBoat = async (event) => {
   try {
     const { id } = event.pathParameters;
     const { user } = event.requestContext.authorizer;

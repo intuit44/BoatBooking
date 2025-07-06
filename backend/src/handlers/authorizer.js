@@ -1,5 +1,6 @@
-const jwt = require('jsonwebtoken');
-const AWS = require('aws-sdk');
+import jwt from 'jsonwebtoken';
+import AWS from 'aws-sdk';
+import { generatePolicy } from './policy.js';
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = process.env.DYNAMODB_TABLE_USERS;
@@ -33,7 +34,7 @@ const generatePolicy = (principalId, effect, resource, user) => {
 };
 
 // Authorizer handler
-exports.handler = async (event) => {
+export const handler = async (event) => {
   try {
     // Get token from Authorization header
     const token = event.authorizationToken;
