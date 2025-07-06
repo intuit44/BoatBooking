@@ -254,17 +254,6 @@ jobs:
           git tag -a "${{ env.DEPLOY_TAG }}" -m "Production deployment"
           git push origin "${{ env.DEPLOY_TAG }}"
 
-      - name: 📣 Notify Slack
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: |
-            Backend deployment to production ${{ job.status }}
-            Commit: ${{ github.event.head_commit.message }}
-            API: ${{ steps.deploy.outputs.api_endpoint }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
 
   # 5️⃣ Cleanup Preview Environments
   cleanup-preview:
