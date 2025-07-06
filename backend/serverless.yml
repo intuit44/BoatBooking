@@ -8,9 +8,23 @@ provider:
   stage: ${opt:stage, 'dev'}
   environment:
     STAGE: ${self:provider.stage}
-    DYNAMODB_TABLE_USERS: UsersTable
-    JWT_SECRET: your-secret
+    DYNAMODB_TABLE_USERS: ${self:service}-${self:provider.stage}-users
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     JWT_EXPIRES_IN: 7d
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-${self:provider.stage}-users"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-${self:provider.stage}-users/index/*"
 
 functions:
   hello:
@@ -20,7 +34,15 @@ functions:
           path: hello
           method: get
           cors: true
-
+  
+  register:
+    handler: src/handlers/auth.register
+    events:
+      - http:
+          path: auth/register
+          method: post
+          cors: true
+  
   login:
     handler: src/handlers/auth.login
     events:
@@ -30,4 +52,24 @@ functions:
           cors: true
 
 resources:
-  Resources: {}
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-users
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: EmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
