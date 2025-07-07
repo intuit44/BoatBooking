@@ -12,6 +12,7 @@ provider:
     JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     DYNAMODB_TABLE_BOATS: ${self:service}-${self:provider.stage}-boats
     DYNAMODB_TABLE_BOOKINGS: ${self:service}-${self:provider.stage}-bookings
+    
 
     JWT_EXPIRES_IN: 7d
   iam:
