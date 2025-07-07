@@ -1,0 +1,6 @@
+modules:
+  - name: simbolico
+    path: backend/simbolico
+    tags: [simbolico, flask, agentes, gpt, comandos]
+    include:
+      - "**/*.py"
