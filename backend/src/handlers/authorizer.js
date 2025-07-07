@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
-import AWS from 'aws-sdk';
-import { generatePolicy } from './policy.js';
+const jwt = require('jsonwebtoken');
+const AWS = require('aws-sdk');
+const { generatePolicy } = require('./policy.js');
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const USERS_TABLE = process.env.DYNAMODB_TABLE_USERS;

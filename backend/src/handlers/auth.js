@@ -122,7 +122,7 @@ exports.register = async (event) => {
 exports.login = async (event) => {
   try {
     const body = JSON.parse(event.body);
-    
+
     // Validate input
     const { error } = validateLogin(body);
     if (error) {
@@ -158,16 +158,6 @@ exports.login = async (event) => {
       return createError(401, 'Credenciales inválidas');
     }
 
-    // Update last login
-    await dynamodb.send(new PutCommand({
-      TableName: USERS_TABLE,
-      Item: {
-        ...user,
-        lastLogin: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    }));
-
     // Generate JWT tokens
     const token = jwt.sign(
       { 
@@ -195,7 +185,7 @@ exports.login = async (event) => {
 
     // Return success response
     const { password, ...userWithoutPassword } = user;
-    
+
     return createResponse(200, {
       message: '¡Inicio de sesión exitoso!',
       token,

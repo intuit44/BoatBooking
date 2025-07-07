@@ -6,7 +6,7 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOOKINGS_TABLE = process.env.DYNAMODB_TABLE_BOOKINGS;
 
 // Process payment
-export const processPayment = async (event) => {
+exports.processPayment = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { user } = event.requestContext.authorizer;
@@ -86,6 +86,35 @@ export const processPayment = async (event) => {
     console.error('Error procesando pago:', error);
     return createError(500, 'Error al procesar pago');
   }
+};
+
+exports.getPaymentStatus = async (event) => {
+  try {
+    const bookingId = event.pathParameters.bookingId;
+    const { Item: booking } = await dynamodb.get({
+      TableName: BOOKINGS_TABLE,
+      Key: { id: bookingId }
+    }).promise();
+
+    if (!booking) {
+      return createError(404, 'Reserva no encontrada');
+    }
+
+    return createResponse(200, {
+      paymentStatus: booking.paymentStatus,
+      paymentReference: booking.paymentReference,
+      paymentProcessedAt: booking.paymentProcessedAt
+    });
+  } catch (error) {
+    console.error('Error obteniendo estado de pago:', error);
+    return createError(500, 'Error al obtener estado de pago');
+  }
+};
+
+exports.refundPayment = async (event) => {
+  // Implement refund logic here
+  return createError(501, 'Funcionalidad de reembolso no implementada');
+
 };
 
 // Process Zelle payment

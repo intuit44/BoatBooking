@@ -1,7 +1,7 @@
-import AWS from 'aws-sdk';
-import { v4: uuidv4  } from 'uuid';
-import { validateBoat  } from '../utils/validators';
-import { createResponse, createError  } from '../utils/response';
+const AWS = require('aws-sdk');
+const { v4: uuidv4 } = require('uuid');
+const { validateBoat } = require('../utils/validators');
+const { createResponse, createError } = require('../utils/response');
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const BOATS_TABLE = process.env.DYNAMODB_TABLE_BOATS;
