@@ -112,9 +112,68 @@ exports.getPaymentStatus = async (event) => {
 };
 
 exports.refundPayment = async (event) => {
-  // Implement refund logic here
-  return createError(501, 'Funcionalidad de reembolso no implementada');
+  try {
+    const body = JSON.parse(event.body);
+    const { bookingId } = body;
+    const { user } = event.requestContext.authorizer;
 
+    // Validate bookingId
+    if (!bookingId) {
+      return createError(400, 'bookingId es requerido');
+    }
+
+    // Get booking
+    const { Item: booking } = await dynamodb.get({
+      TableName: BOOKINGS_TABLE,
+      Key: { id: bookingId }
+    }).promise();
+
+    if (!booking) {
+      return createError(404, 'Reserva no encontrada');
+    }
+
+    // Check authorization
+    if (user.role !== 'admin' && user.id !== booking.userId) {
+      return createError(403, 'No tienes permisos para reembolsar este pago');
+    }
+
+    // Check if already refunded
+    if (booking.paymentStatus === 'refunded') {
+      return createError(400, 'El pago ya ha sido reembolsado');
+    }
+
+    // Only allow refund if paid
+    if (booking.paymentStatus !== 'paid') {
+      return createError(400, 'Solo se pueden reembolsar pagos ya procesados');
+    }
+
+    // Simulate refund processing (in real case, integrate with payment provider)
+    const refundTransactionId = `refund_${Date.now()}`;
+
+    // Update booking with refund info
+    const updatedBooking = {
+      ...booking,
+      paymentStatus: 'refunded',
+      refundTransactionId,
+      refundedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await dynamodb.put({
+      TableName: BOOKINGS_TABLE,
+      Item: updatedBooking
+    }).promise();
+
+    return createResponse(200, {
+      message: 'Reembolso procesado exitosamente',
+      booking: updatedBooking,
+      refundTransactionId
+    });
+
+  } catch (error) {
+    console.error('Error procesando reembolso:', error);
+    return createError(500, 'Error al procesar reembolso');
+  }
 };
 
 // Process Zelle payment

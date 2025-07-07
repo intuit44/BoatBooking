@@ -261,7 +261,8 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
-        
+  
+    # Add the BookingsTable resource 
     BookingsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -282,5 +283,30 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
+
+
+  resources:
+    Resources:
+      PaymentsTable:
+        Type: AWS::DynamoDB::Table
+        Properties:
+          TableName: ${self:provider.environment.DYNAMODB_TABLE_PAYMENTS}
+          AttributeDefinitions:
+            - AttributeName: id
+              AttributeType: S
+            - AttributeName: bookingId
+              AttributeType: S
+          KeySchema:
+            - AttributeName: id
+              KeyType: HASH
+          GlobalSecondaryIndexes:
+            - IndexName: BookingIndex
+              KeySchema:
+                - AttributeName: bookingId
+                  KeyType: HASH
+              Projection:
+                ProjectionType: ALL
+          BillingMode: PAY_PER_REQUEST
+
 
     
