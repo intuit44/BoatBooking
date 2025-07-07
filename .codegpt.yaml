@@ -5,22 +5,3 @@ modules:
     include:
       - "**/*.py"
 
-  - name: mobile-app-core
-    path: mobile-app/src
-    tags: [mobile, react-native, redux, navigation, core]
-    include:
-      - "App.tsx"
-      - "store/**/*.ts"
-      - "navigation/**/*.tsx"
-
-  - name: mobile-app-screens
-    path: mobile-app/src/screens
-    tags: [mobile, screens, ui, components]
-    include:
-      - "**/*.tsx"
-
-  - name: mobile-app-services
-    path: mobile-app/src/services
-    tags: [mobile, services, api, business-logic]
-    include:
-      - "**/*.ts"
