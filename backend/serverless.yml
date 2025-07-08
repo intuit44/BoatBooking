@@ -1,19 +1,29 @@
 ﻿service: boat-rental-backend
 frameworkVersion: "3"
 
+plugins:
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: api.remeocci.org
+    basePath: v1
+    stage: prod
+    createRoute53Record: true
+    certificateName: '*.remeocci.org'
+
 provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
-  stage: prod
+  stage: ${opt:stage, 'dev'}
   environment:
     STAGE: ${self:provider.stage}
     DYNAMODB_TABLE_USERS: ${self:service}-${self:provider.stage}-users
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     DYNAMODB_TABLE_BOATS: ${self:service}-${self:provider.stage}-boats
     DYNAMODB_TABLE_BOOKINGS: ${self:service}-${self:provider.stage}-bookings
-    DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments
-    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
-    EXPO_PUBLIC_API_ENDPOINT: https://api.remeocci.org/v1
+    DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments # Add this line
     JWT_EXPIRES_IN: 7d
   iam:
     role:
@@ -50,7 +60,7 @@ functions:
           path: boats
           method: get
           cors: true
-
+          
   getBoatById:
     handler: src/handlers/boats.getBoatById
     events:
@@ -58,7 +68,7 @@ functions:
           path: boats/{id}
           method: get
           cors: true
-
+          
   createBoat:
     handler: src/handlers/boats.createBoat
     events:
@@ -67,7 +77,7 @@ functions:
           method: post
           cors: true
           authorizer: authorizer
-
+          
   updateBoat:
     handler: src/handlers/boats.updateBoat
     events:
@@ -76,7 +86,7 @@ functions:
           method: put
           cors: true
           authorizer: authorizer
-
+          
   deleteBoat:
     handler: src/handlers/boats.deleteBoat
     events:
@@ -85,7 +95,7 @@ functions:
           method: delete
           cors: true
           authorizer: authorizer
-
+          
   getFeaturedBoats:
     handler: src/handlers/boats.getFeaturedBoats
     events:
@@ -93,7 +103,7 @@ functions:
           path: boats/featured
           method: get
           cors: true
-
+          
   searchBoats:
     handler: src/handlers/boats.searchBoats
     events:
@@ -110,7 +120,7 @@ functions:
           method: post
           cors: true
           authorizer: authorizer
-
+          
   getUserBookings:
     handler: src/handlers/bookings.getUserBookings
     events:
@@ -119,7 +129,7 @@ functions:
           method: get
           cors: true
           authorizer: authorizer
-
+          
   getBookingById:
     handler: src/handlers/bookings.getBookingById
     events:
@@ -128,7 +138,7 @@ functions:
           method: get
           cors: true
           authorizer: authorizer
-
+          
   updateBookingStatus:
     handler: src/handlers/bookings.updateBookingStatus
     events:
@@ -137,7 +147,7 @@ functions:
           method: put
           cors: true
           authorizer: authorizer
-
+          
   cancelBooking:
     handler: src/handlers/bookings.cancelBooking
     events:
@@ -157,14 +167,14 @@ functions:
           authorizer: authorizer
 
   getPaymentStatus:
-    handler: src/handlers/payments.getPaymentStatus
-    events:
-      - http:
-          path: payments/{id}/status
-          method: get
-          cors: true
-          authorizer: authorizer
-
+      handler: src/handlers/payments.getPaymentStatus
+      events:
+        - http:
+            path: payments/{id}/status
+            method: get
+            cors: true
+            authorizer: authorizer
+  
   refundPayment:
     handler: src/handlers/payments.refundPayment
     events:
@@ -197,7 +207,7 @@ functions:
           path: auth/register
           method: post
           cors: true
-
+  
   login:
     handler: src/handlers/auth.login
     events:
@@ -249,7 +259,7 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
-
+  
     BookingsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -291,13 +301,3 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
-
-plugins:
-  - serverless-domain-manager
-custom:
-  customDomain:
-    domainName: api.remeocci.org
-    basePath: v1
-    stage: prod
-    createRoute53Record: true
-    certificateName: '*.remeocci.org'
