@@ -14,8 +14,6 @@ provider:
     DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments
     JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     EXPO_PUBLIC_API_ENDPOINT: https://api.remeocci.org/v1
-    
-
     JWT_EXPIRES_IN: 7d
   iam:
     role:
@@ -52,7 +50,7 @@ functions:
           path: boats
           method: get
           cors: true
-          
+
   getBoatById:
     handler: src/handlers/boats.getBoatById
     events:
@@ -60,7 +58,7 @@ functions:
           path: boats/{id}
           method: get
           cors: true
-          
+
   createBoat:
     handler: src/handlers/boats.createBoat
     events:
@@ -69,7 +67,7 @@ functions:
           method: post
           cors: true
           authorizer: authorizer
-          
+
   updateBoat:
     handler: src/handlers/boats.updateBoat
     events:
@@ -78,7 +76,7 @@ functions:
           method: put
           cors: true
           authorizer: authorizer
-          
+
   deleteBoat:
     handler: src/handlers/boats.deleteBoat
     events:
@@ -87,7 +85,7 @@ functions:
           method: delete
           cors: true
           authorizer: authorizer
-          
+
   getFeaturedBoats:
     handler: src/handlers/boats.getFeaturedBoats
     events:
@@ -95,7 +93,7 @@ functions:
           path: boats/featured
           method: get
           cors: true
-          
+
   searchBoats:
     handler: src/handlers/boats.searchBoats
     events:
@@ -103,19 +101,7 @@ functions:
           path: boats/search
           method: post
           cors: true
-  
 
-custom:
-  customDomain:
-    domainName: api.remeocci.org
-    basePath: v1
-    stage: prod
-    createRoute53Record: true
-    certificateName: '*.remeocci.org'
-
-
-  # Agregar a backend/serverless.yml
-  # ...
   createBooking:
     handler: src/handlers/bookings.createBooking
     events:
@@ -124,7 +110,7 @@ custom:
           method: post
           cors: true
           authorizer: authorizer
-          
+
   getUserBookings:
     handler: src/handlers/bookings.getUserBookings
     events:
@@ -133,7 +119,7 @@ custom:
           method: get
           cors: true
           authorizer: authorizer
-          
+
   getBookingById:
     handler: src/handlers/bookings.getBookingById
     events:
@@ -142,7 +128,7 @@ custom:
           method: get
           cors: true
           authorizer: authorizer
-          
+
   updateBookingStatus:
     handler: src/handlers/bookings.updateBookingStatus
     events:
@@ -151,7 +137,7 @@ custom:
           method: put
           cors: true
           authorizer: authorizer
-          
+
   cancelBooking:
     handler: src/handlers/bookings.cancelBooking
     events:
@@ -161,8 +147,6 @@ custom:
           cors: true
           authorizer: authorizer
 
-
-  # Agregar a backend/serverless.yml
   processPayment:
     handler: src/handlers/payments.processPayment
     events:
@@ -173,14 +157,14 @@ custom:
           authorizer: authorizer
 
   getPaymentStatus:
-      handler: src/handlers/payments.getPaymentStatus
-      events:
-        - http:
-            path: payments/{id}/status
-            method: get
-            cors: true
-            authorizer: authorizer
-  
+    handler: src/handlers/payments.getPaymentStatus
+    events:
+      - http:
+          path: payments/{id}/status
+          method: get
+          cors: true
+          authorizer: authorizer
+
   refundPayment:
     handler: src/handlers/payments.refundPayment
     events:
@@ -189,8 +173,6 @@ custom:
           method: post
           cors: true
           authorizer: authorizer
-  
-
 
   authorizer:
     handler: src/handlers/authorizer.handler
@@ -199,8 +181,6 @@ custom:
           path: /authorizer
           method: post
           cors: true
-          
-
 
   refreshToken:
     handler: src/handlers/auth.refreshToken
@@ -210,9 +190,6 @@ custom:
           method: post
           cors: true
 
-  
-
-  
   register:
     handler: src/handlers/auth.register
     events:
@@ -220,7 +197,7 @@ custom:
           path: auth/register
           method: post
           cors: true
-  
+
   login:
     handler: src/handlers/auth.login
     events:
@@ -314,5 +291,13 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
+
 plugins:
   - serverless-domain-manager
+custom:
+  customDomain:
+    domainName: api.remeocci.org
+    basePath: v1
+    stage: prod
+    createRoute53Record: true
+    certificateName: '*.remeocci.org'
