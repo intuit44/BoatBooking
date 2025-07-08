@@ -119,6 +119,10 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: [validate, build-and-scan]
     runs-on: ubuntu-latest
+    environment:
+      name: preview
+      
+      url: ${{ steps.deploy.outputs.api_endpoint }}
     defaults:
       run:
         working-directory: backend
@@ -140,7 +144,7 @@ jobs:
       - name: 🚀 Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: 
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
@@ -172,6 +176,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [validate, build-and-scan]
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.api_endpoint }}
     defaults:
       run:
         working-directory: backend
@@ -207,10 +214,9 @@ jobs:
         run: npm install -g serverless@3
 
       - name: 🏷️ Create deployment tag
-        id: create-tag
         run: |
           DEPLOY_TAG="deploy-$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::8}"
-          echo "deploy_tag=$DEPLOY_TAG" >> $GITHUB_OUTPUT
+          echo "DEPLOY_TAG=$DEPLOY_TAG" >> $GITHUB_ENV
 
       - name: 🚀 Deploy to production
         id: deploy
@@ -233,6 +239,7 @@ jobs:
             exit 1
           fi
 
+
       - name: 📊 Report metrics to CloudWatch
         run: |
           aws cloudwatch put-metric-data \
@@ -245,8 +252,9 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git tag -a "${{ steps.create-tag.outputs.deploy_tag }}" -m "Production deployment"
-          git push origin "${{ steps.create-tag.outputs.deploy_tag }}"
+          git tag -a "${{ env.DEPLOY_TAG }}" -m "Production deployment"
+          git push origin "${{ env.DEPLOY_TAG }}"
+
 
   # 5️⃣ Cleanup Preview Environments
   cleanup-preview:
