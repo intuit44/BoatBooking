@@ -66,6 +66,7 @@ export function RegisterScreen({ navigation, onSwitchToLogin, onRegisterSuccess 
       Alert.alert('Éxito', '¡Cuenta creada exitosamente!');
       onRegisterSuccess?.();
     } catch (error) {
+      console.error("Error en el registro:", error);
       Alert.alert('Error', 'No se pudo crear la cuenta');
     }
   };

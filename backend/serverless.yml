@@ -5,13 +5,15 @@ provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
-  stage: ${opt:stage, 'dev'}
+  stage: prod
   environment:
     STAGE: ${self:provider.stage}
     DYNAMODB_TABLE_USERS: ${self:service}-${self:provider.stage}-users
-    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     DYNAMODB_TABLE_BOATS: ${self:service}-${self:provider.stage}-boats
     DYNAMODB_TABLE_BOOKINGS: ${self:service}-${self:provider.stage}-bookings
+    DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
+    EXPO_PUBLIC_API_ENDPOINT: https://api.remeocci.org/v1
     
 
     JWT_EXPIRES_IN: 7d
@@ -101,6 +103,15 @@ functions:
           path: boats/search
           method: post
           cors: true
+  
+
+custom:
+  customDomain:
+    domainName: api.remeocci.org
+    basePath: v1
+    stage: prod
+    createRoute53Record: true
+    certificateName: '*.remeocci.org'
 
 
   # Agregar a backend/serverless.yml
@@ -261,8 +272,7 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
-  
-    # Add the BookingsTable resource 
+
     BookingsTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -284,29 +294,25 @@ resources:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
 
-
-  resources:
-    Resources:
-      PaymentsTable:
-        Type: AWS::DynamoDB::Table
-        Properties:
-          TableName: ${self:provider.environment.DYNAMODB_TABLE_PAYMENTS}
-          AttributeDefinitions:
-            - AttributeName: id
-              AttributeType: S
-            - AttributeName: bookingId
-              AttributeType: S
-          KeySchema:
-            - AttributeName: id
-              KeyType: HASH
-          GlobalSecondaryIndexes:
-            - IndexName: BookingIndex
-              KeySchema:
-                - AttributeName: bookingId
-                  KeyType: HASH
-              Projection:
-                ProjectionType: ALL
-          BillingMode: PAY_PER_REQUEST
-
-
-    
+    PaymentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-payments
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: bookingId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BookingIndex
+            KeySchema:
+              - AttributeName: bookingId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+plugins:
+  - serverless-domain-manager
