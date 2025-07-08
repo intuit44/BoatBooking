@@ -10,6 +10,7 @@ custom:
     basePath: v1
     stage: prod
     createRoute53Record: true
+    hostedZone: remeocci.org          # 🔥 ESTA LÍNEA es la clave
     certificateName: '*.remeocci.org'
 
 provider:
