@@ -1,0 +1,27 @@
+{
+    "agent_name": "Azure Foundry BoatBooking Agent",
+    "deployment_info": {
+        "name": "gpt-35-turbo-instruct",
+        "type": "Standard",
+        "created_by": "yellowstone413g@gmail.com",
+        "provisioning_state": "Succeeded",
+        "model_version": "0914",
+        "lifecycle_status": "GenerallyAvailable",
+        "retirement_date": "2025-07-15T20:00:00Z"
+    },
+    "rate_limits": {
+        "tokens_per_minute": 1000,
+        "requests_per_minute": 6
+    },
+    "capabilities": [
+        "code_generation",
+        "code_analysis",
+        "debugging",
+        "boat_booking_domain_expertise"
+    ],
+    "context_paths": [
+        "mobile-app/src",
+        "backend/src",
+        "admin-panel/src"
+    ]
+}

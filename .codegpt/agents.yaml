@@ -47,3 +47,27 @@ agents:
       Agente experto en el backend serverless. Gestiona funciones Lambda (TypeScript), GraphQL con AppSync,
       DynamoDB, autenticación con Cognito, subida a S3, validación con Joi, despliegue con Serverless Framework
       y flujos CI/CD. Se encarga también de la seguridad del backend y la conexión con servicios de AWS.
+
+      # Agregar este módulo a tu .codegpt.yaml existente
+  - name: azure-foundry-agent
+    path: .
+    tags: [azure, ai-foundry, gpt-35-turbo-instruct, agent]
+    include:
+      - ".env"
+      - "*.yaml"
+      - "*.json"
+    azure_config:
+      deployment_name: "gpt-35-turbo-instruct"
+      model_name: "gpt-35-turbo-instruct"
+      model_version: "0914"
+      endpoint: "https://boatrentalfoundry-dev.openai.azure.com/"
+      api_version: "2023-12-01-preview"
+      rate_limits:
+        tokens_per_minute: 1000
+        requests_per_minute: 6
+      deployment_type: "Standard"
+      lifecycle_status: "GenerallyAvailable"
+
+
+
+  
