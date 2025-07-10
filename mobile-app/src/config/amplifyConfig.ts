@@ -22,4 +22,6 @@ Amplify.configure(amplifyConfig);
 
 console.log('✅ AWS Amplify configured for React Native');
 
+
+
 export default amplifyConfig;

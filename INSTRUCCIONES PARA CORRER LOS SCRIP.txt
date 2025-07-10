@@ -1,7 +1,17 @@
 INSTRUCCIONES PARA CORRER LOS SCRIPTS 
 
 
- amplify-migrator-pro.js
+1-📋 Cómo Usar:
+node fix-all-dependencies.js
+
+
+
+Luego ejecuta esto desde tu carpeta backend/:
+PS C:\ProyectosSimbolicos\boat-rental-app\backend> npx serverless create_domain --stage prod
+
+
+2-📋 Cómo Usar:
+amplify-migrator-pro.js
 
 # Ver ayuda
 node amplify-migrator-pro.js --help
@@ -17,3 +27,90 @@ node amplify-migrator-pro.js
 
 # Procesar una ruta específica
 node amplify-migrator-pro.js --path src/store --verbose
+
+
+
+💡 Ventajas del script pro:
+
+Seguro: Modo dry-run para revisar antes
+Completo: Detecta TODOS los problemas v6→v5
+Inteligente: Transforma parámetros automáticamente
+Informativo: Reporte detallado con sugerencias
+Flexible: Procesa rutas específicas
+
+
+
+
+
+
+
+
+
+🎯 Ejemplo de salida en dry-run:
+
+🔧 AWS AMPLIFY v6 → v5 MIGRATOR PRO
+======================================================================
+🔍 Modo DRY RUN - No se modificarán archivos
+
+📁 Procesando: mobile-app
+📦 AWS Amplify version actual: ^6.0.0
+
+⚠️  Detectado Amplify v6 - El código será migrado a sintaxis v5
+
+📝 Cambios realizados:
+  
+  src/store/slices/authSlice.ts:
+    Import: import { signUp, signIn } from 'aws-amplify/auth' → import { Auth } from 'aws-amplify'
+    Método: signUp() → Auth.signUp() (3 usos)
+    Método: signIn() → Auth.signIn() (2 usos)
+
+⚠️  ADVERTENCIAS CRÍTICAS:
+
+  src/api/graphql.ts:
+    generateClient() es específico de v6 y no tiene equivalente directo en v5
+    💡 Usar API.graphql() directamente con graphqlOperation()
+
+🎨 COMPONENTES UI NO DISPONIBLES:
+
+  src/screens/AuthScreen.tsx:
+    useAuthenticator: useAuthenticator requiere @aws-amplify/ui-react v2.x que no es compatible con Amplify v5
+    💡 Crear componentes de autenticación personalizados
+
+
+
+
+
+
+3-📋 Cómo Usar:
+# 1. Guarda el script como amplify-v5-fixer-pro.js
+# 2. Dale permisos de ejecución
+chmod +x amplify-v5-fixer-pro.js
+
+# 3. Ejecuta desde la raíz del proyecto
+node amplify-v5-fixer-pro.js
+
+
+🎯 Lo que hace el script:
+Busca automáticamente en:
+
+mobile-app/src/services/
+mobile-app/src/store/slices/
+web-app/src/services/ (si existe)
+admin-dashboard/src/services/ (si existe)
+
+
+Procesa archivos .ts, .tsx, .js, .jsx
+Aplica transformaciones inteligentes:
+
+Detecta patrones complejos multi-línea
+Preserva el formato y la indentación
+Maneja variables dinámicas correctamente
+
+
+Genera backups con timestamp único
+Muestra un reporte detallado con:
+
+Archivos modificados
+Cambios específicos realizados
+Estadísticas completas
+Errores si los hay

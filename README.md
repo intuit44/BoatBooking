@@ -119,6 +119,9 @@ Bcrypt ^2.4.3 para encriptación
 Joi ^17.11.0 para validación
 📦 Dependencias Instaladas (974 packages)
 
+
+
+
 {
   "aws-sdk": "^2.1490.0",
   "bcryptjs": "^2.4.3",

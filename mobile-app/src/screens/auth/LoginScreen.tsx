@@ -18,12 +18,17 @@ import {
 } from 'react-native-paper';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginUser } from '../../store/slices/authSlice';
-// Importar RootState desde el store
 import { RootState } from '../../store/store';
+import { StackScreenProps } from '@react-navigation/stack';
+import { useNavigation } from '@react-navigation/native';
 
-interface Props {
-  navigation: any;
-}
+type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+};
+
+type Props = StackScreenProps<AuthStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
@@ -32,6 +37,9 @@ export function LoginScreen({ navigation }: Props) {
 
   const dispatch = useAppDispatch();
   const { isLoading, error } = useAppSelector((state: RootState) => state.auth);
+
+  // Hook adicional para navegación más flexible
+  const rootNavigation = useNavigation();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -49,6 +57,42 @@ export function LoginScreen({ navigation }: Props) {
   const handleDemoLogin = () => {
     setEmail('demo@boatrental.ve');
     setPassword('demo123');
+  };
+
+  const handleForgotPassword = () => {
+    try {
+      // Intentar navegación directa primero
+      navigation.navigate('ForgotPassword');
+    } catch (error) {
+      // Si falla, intentar con el navegador raíz
+      try {
+        (rootNavigation as any).navigate('Auth', { screen: 'ForgotPassword' });
+      } catch (secondError) {
+        // Si ambos fallan, mostrar alerta
+        Alert.alert(
+          'Navegación no disponible',
+          'La pantalla de recuperación de contraseña no está disponible en este momento.'
+        );
+      }
+    }
+  };
+
+  const handleRegister = () => {
+    try {
+      // Intentar navegación directa primero
+      navigation.navigate('Register');
+    } catch (error) {
+      // Si falla, intentar con el navegador raíz
+      try {
+        (rootNavigation as any).navigate('Auth', { screen: 'Register' });
+      } catch (secondError) {
+        // Si ambos fallan, mostrar alerta
+        Alert.alert(
+          'Navegación no disponible',
+          'La pantalla de registro no está disponible en este momento.'
+        );
+      }
+    }
   };
 
   return (
@@ -115,7 +159,7 @@ export function LoginScreen({ navigation }: Props) {
 
             <Button
               mode="text"
-              onPress={() => navigation.navigate('ForgotPassword')}
+              onPress={handleForgotPassword}
               style={styles.linkButton}
             >
               ¿Olvidaste tu contraseña?
@@ -123,7 +167,7 @@ export function LoginScreen({ navigation }: Props) {
 
             <Button
               mode="text"
-              onPress={() => navigation.navigate('Register')}
+              onPress={handleRegister}
               style={styles.linkButton}
             >
               ¿No tienes cuenta? Regístrate
@@ -203,4 +247,3 @@ const styles = StyleSheet.create({
 
 // Exportación por defecto para compatibilidad
 export default LoginScreen;
-

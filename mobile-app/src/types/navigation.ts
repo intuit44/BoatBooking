@@ -1,6 +1,6 @@
 import { NavigationProp, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StackScreenProps } from '@react-navigation/stack';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -10,6 +10,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
   Search: {
     search?: string;
     state?: string;
@@ -40,9 +41,9 @@ export type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList
 export type ProfileScreenRouteProp = RouteProp<RootStackParamList, 'Profile'>;
 
 // Screen Props types
-export type BoatDetailsScreenProps = NativeStackScreenProps<RootStackParamList, 'BoatDetails'>;
-export type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
-export type SearchScreenProps = NativeStackScreenProps<RootStackParamList, 'Search'>;
-export type BookingScreenProps = NativeStackScreenProps<RootStackParamList, 'Booking'>;
-export type PaymentScreenProps = NativeStackScreenProps<RootStackParamList, 'Payment'>;
-export type ProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+export type BoatDetailsScreenProps = StackScreenProps<RootStackParamList, 'BoatDetails'>;
+export type HomeScreenProps = StackScreenProps<RootStackParamList, 'Home'>;
+export type SearchScreenProps = StackScreenProps<RootStackParamList, 'Search'>;
+export type BookingScreenProps = StackScreenProps<RootStackParamList, 'Booking'>;
+export type PaymentScreenProps = StackScreenProps<RootStackParamList, 'Payment'>;
+export type ProfileScreenProps = StackScreenProps<RootStackParamList, 'Profile'>;
