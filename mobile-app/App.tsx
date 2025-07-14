@@ -86,7 +86,7 @@ export default function App() {
   }, []);
 
   // Primero probemos con un componente simple
-  const TESTING = true; // Cambia esto a false cuando funcione
+  const TESTING = false; // Cambia esto a false cuando funcione
 
   if (TESTING) {
     console.log('🧪 Rendering test component');

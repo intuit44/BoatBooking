@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AuthNavigator } from './AuthNavigator';  // ✅ Usar el archivo separado
+
 console.log('🔧 [AppNavigator] Iniciando importación de pantallas...');
-import { AuthNavigator } from './AuthNavigator';
 // Importar hooks del store
 let useAppSelector: any;
 try {
@@ -124,24 +125,9 @@ export type BottomTabParamList = {
   Profile: undefined;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
-// Stack de autenticación
-function AuthNavigator() {
-  console.log('🎯 [AuthNavigator] Renderizando navegador de autenticación');
-  return (
-    <AuthStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-    </AuthStack.Navigator>
-  );
-}
 
 // Navegador de pestañas inferior
 function BottomTabNavigator() {
@@ -203,7 +189,7 @@ export function AppNavigator() {
   console.log('🎯 [AppNavigator] Renderizando navegador principal');
 
   let isAuthenticated = false;
-  let isLoading = true;
+  let isLoading = false;
 
   // Intentar obtener el estado de autenticación
   if (useAppSelector) {
