@@ -1,5 +1,5 @@
 // Crear respuesta exitosa con CORS headers
-export const createResponse = (statusCode, body) => {
+const createResponse = (statusCode, body) => {
   return {
     statusCode,
     headers: {
@@ -14,7 +14,7 @@ export const createResponse = (statusCode, body) => {
 };
 
 // Crear respuesta de error
-export const createError = (statusCode, message, details = null) => {
+const createError = (statusCode, message, details = null) => {
   const errorBody = {
     error: true,
     message,
@@ -26,4 +26,9 @@ export const createError = (statusCode, message, details = null) => {
   }
 
   return createResponse(statusCode, errorBody);
+};
+
+module.exports = {
+  createResponse,
+  createError
 };

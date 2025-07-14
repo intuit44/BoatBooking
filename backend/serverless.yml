@@ -7,7 +7,7 @@ plugins:
 custom:
   customDomain:
     domainName: api.remeocci.org
-    basePath: v1
+    basePath: ''
     stage: prod
     createRoute53Record: true
     hostedZone: remeocci.org         
@@ -24,8 +24,9 @@ provider:
     JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-in-production'}
     DYNAMODB_TABLE_BOATS: ${self:service}-${self:provider.stage}-boats
     DYNAMODB_TABLE_BOOKINGS: ${self:service}-${self:provider.stage}-bookings
-    DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments # Add this line
+    DYNAMODB_TABLE_PAYMENTS: ${self:service}-${self:provider.stage}-payments
     JWT_EXPIRES_IN: 7d
+    FROM_EMAIL: ${env:FROM_EMAIL, 'noreply@remeocci.org'}
   iam:
     role:
       statements:
@@ -44,6 +45,11 @@ provider:
             - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-${self:provider.stage}-boats/index/*"
             - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-${self:provider.stage}-bookings"
             - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-${self:provider.stage}-bookings/index/*"
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource: "*"
 
 functions:
   hello:
@@ -214,6 +220,22 @@ functions:
     events:
       - http:
           path: auth/login
+          method: post
+          cors: true
+
+  sendVerificationCode:
+    handler: src/handlers/auth.sendVerificationCode
+    events:
+      - http:
+          path: auth/send-verification-code
+          method: post
+          cors: true
+
+  resetPassword:
+    handler: src/handlers/auth.resetPassword
+    events:
+      - http:
+          path: auth/reset-password
           method: post
           cors: true
 

@@ -1,18 +1,26 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { validateRegistration, validateLogin } = require('../utils/validators');
 const { createResponse, createError } = require('../utils/response');
 
-// Configurar DynamoDB
+// Configurar DynamoDB y SES
 const client = new DynamoDBClient({});
 const dynamodb = DynamoDBDocumentClient.from(client);
+const sesClient = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 const USERS_TABLE = process.env.DYNAMODB_TABLE_USERS;
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const FROM_EMAIL = process.env.FROM_EMAIL;
+
+// Validar FROM_EMAIL al iniciar
+if (!FROM_EMAIL) {
+  console.error('ERROR: FROM_EMAIL no está configurado');
+}
 
 // Register new user
 exports.register = async (event) => {
@@ -121,11 +129,20 @@ exports.register = async (event) => {
 // Login user
 exports.login = async (event) => {
   try {
+    console.log('🔍 LOGIN REQUEST:', {
+      headers: event.headers,
+      body: event.body,
+      table: USERS_TABLE
+    });
+
     const body = JSON.parse(event.body);
+    console.log('📧 Email recibido:', body.email);
+    console.log('🔑 Password recibido:', body.password ? '[PRESENTE]' : '[AUSENTE]');
 
     // Validate input
     const { error } = validateLogin(body);
     if (error) {
+      console.log('❌ Error de validación:', error.details[0].message);
       return createError(400, error.details[0].message);
     }
 
@@ -139,22 +156,36 @@ exports.login = async (event) => {
       }
     });
 
+    console.log('🔍 Buscando usuario con email:', body.email.toLowerCase());
     const { Items: users } = await dynamodb.send(queryCommand);
+    console.log('👥 Usuarios encontrados:', users ? users.length : 0);
 
     if (!users || users.length === 0) {
+      console.log('❌ Usuario no encontrado en DB');
       return createError(401, 'Credenciales inválidas');
     }
 
     const user = users[0];
+    console.log('👤 Usuario encontrado:', {
+      id: user.id,
+      email: user.email,
+      active: user.active,
+      hasPassword: !!user.password
+    });
 
     // Check if user is active
     if (!user.active) {
+      console.log('❌ Usuario desactivado');
       return createError(403, 'Usuario desactivado');
     }
 
     // Verify password
+    console.log('🔐 Verificando contraseña...');
     const validPassword = await bcrypt.compare(body.password, user.password);
+    console.log('🔐 Contraseña válida:', validPassword);
+    
     if (!validPassword) {
+      console.log('❌ Contraseña incorrecta');
       return createError(401, 'Credenciales inválidas');
     }
 
@@ -193,14 +224,20 @@ exports.login = async (event) => {
       user: userWithoutPassword
     });
 
+    console.log('✅ Login exitoso para:', user.email);
+
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error('❌ Error crítico en login:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    }); 
     return createError(500, 'Error al iniciar sesión');
   }
 };
 
 // Refresh token
-export const refreshToken = async (event) => {
+exports.refreshToken = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const { refreshToken } = body;
@@ -274,5 +311,158 @@ export const refreshToken = async (event) => {
   } catch (error) {
     console.error('Error en refresh token:', error);
     return createError(500, 'Error al renovar token');
+  }
+};
+
+// Send verification code
+exports.sendVerificationCode = async (event) => {
+  try {
+    const body = JSON.parse(event.body);
+    const { email } = body;
+
+    if (!email) {
+      return createError(400, 'Email es requerido');
+    }
+
+    if (!FROM_EMAIL) {
+      return createError(500, 'Configuración de email no disponible');
+    }
+
+    // Verificar si el usuario existe
+    const queryCommand = new QueryCommand({
+      TableName: USERS_TABLE,
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: {
+        ':email': email.toLowerCase()
+      }
+    });
+
+    const { Items: users } = await dynamodb.send(queryCommand);
+    if (!users || users.length === 0) {
+      return createError(404, 'Usuario no encontrado');
+    }
+
+    const user = users[0];
+    
+    // Generar código de 6 dígitos
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
+
+    // Guardar código en DynamoDB
+    const updateCommand = new UpdateCommand({
+      TableName: USERS_TABLE,
+      Key: { id: user.id },
+      UpdateExpression: 'SET verificationCode = :code, codeExpiresAt = :expires',
+      ExpressionAttributeValues: {
+        ':code': verificationCode,
+        ':expires': expiresAt
+      }
+    });
+
+    await dynamodb.send(updateCommand);
+
+    // Enviar email con SES
+    const emailParams = {
+      Source: FROM_EMAIL,
+      Destination: {
+        ToAddresses: [email]
+      },
+      Message: {
+        Subject: {
+          Data: 'Código de Verificación - BoatRental Venezuela',
+          Charset: 'UTF-8'
+        },
+        Body: {
+          Text: {
+            Data: `Tu código de verificación es: ${verificationCode}\n\nEste código expira en 15 minutos.`,
+            Charset: 'UTF-8'
+          },
+          Html: {
+            Data: `
+              <h2>Código de Verificación</h2>
+              <p>Tu código de verificación es:</p>
+              <h1 style="color: #007bff; font-size: 32px;">${verificationCode}</h1>
+              <p>Este código expira en 15 minutos.</p>
+              <p>Si no solicitaste este código, ignora este email.</p>
+            `,
+            Charset: 'UTF-8'
+          }
+        }
+      }
+    };
+
+    await sesClient.send(new SendEmailCommand(emailParams));
+
+    return createResponse(200, {
+      message: 'Código de verificación enviado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error enviando código:', error);
+    return createError(500, 'Error al enviar código de verificación');
+  }
+};
+
+// Reset password with verification code
+exports.resetPassword = async (event) => {
+  try {
+    const body = JSON.parse(event.body);
+    const { email, verificationCode, newPassword } = body;
+
+    if (!email || !verificationCode || !newPassword) {
+      return createError(400, 'Email, código y nueva contraseña son requeridos');
+    }
+
+    // Buscar usuario
+    const queryCommand = new QueryCommand({
+      TableName: USERS_TABLE,
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: {
+        ':email': email.toLowerCase()
+      }
+    });
+
+    const { Items: users } = await dynamodb.send(queryCommand);
+    if (!users || users.length === 0) {
+      return createError(404, 'Usuario no encontrado');
+    }
+
+    const user = users[0];
+
+    // Verificar código
+    if (!user.verificationCode || user.verificationCode !== verificationCode) {
+      return createError(400, 'Código de verificación inválido');
+    }
+
+    // Verificar expiración
+    if (!user.codeExpiresAt || new Date() > new Date(user.codeExpiresAt)) {
+      return createError(400, 'Código de verificación expirado');
+    }
+
+    // Hash nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Actualizar contraseña y limpiar código
+    const updateCommand = new UpdateCommand({
+      TableName: USERS_TABLE,
+      Key: { id: user.id },
+      UpdateExpression: 'SET password = :password REMOVE verificationCode, codeExpiresAt',
+      ExpressionAttributeValues: {
+        ':password': hashedPassword
+      }
+    });
+
+    await dynamodb.send(updateCommand);
+
+    return createResponse(200, {
+      message: 'Contraseña actualizada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error reseteando contraseña:', error);
+    return createError(500, 'Error al resetear contraseña');
   }
 };

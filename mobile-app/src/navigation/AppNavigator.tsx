@@ -1,305 +1,262 @@
-// src/navigation/AppNavigator.tsx
 import React from 'react';
-import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Animated, Easing } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-import { useAppSelector } from '../store/hooks';
-import { RootState } from '../store/store';
-
-// Importar pantallas
-import { HomeScreen } from '../screens/home/HomeScreen';
-// import { SearchScreen } from '../screens/search/SearchScreen';
-// import BoatDetailsScreen from '../screens/boats/BoatDetailsScreen';
-// import { BookingScreen } from '../screens/booking/BookingScreen';
-// import { ProfileScreen } from '../screens/profile/ProfileScreen';
-// import { PaymentScreen } from '../screens/payment/PaymentScreen';
-
-// Importar AuthNavigator en lugar de AuthScreen
+console.log('🔧 [AppNavigator] Iniciando importación de pantallas...');
 import { AuthNavigator } from './AuthNavigator';
+// Importar hooks del store
+let useAppSelector: any;
+try {
+  const hooks = require('../store/hooks');
+  useAppSelector = hooks.useAppSelector;
+  console.log('✅ [AppNavigator] Hooks importados correctamente');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar hooks:', error);
+}
 
-// Pantallas temporales para evitar errores
-const SearchScreen = () => <HomeScreen />;
-const BoatDetailsScreen = () => <HomeScreen />;
-const BookingScreen = () => <HomeScreen />;
-const ProfileScreen = () => <HomeScreen />;
-const PaymentScreen = () => <HomeScreen />;
+// Importar las pantallas con manejo de errores
+let HomeScreen: any, SearchScreen: any, BookingsScreen: any, ProfileScreen: any;
+let BoatDetailsScreen: any, BookingScreen: any, PaymentScreen: any;
+let LoginScreen: any, RegisterScreen: any, ForgotPasswordScreen: any;
+
+try {
+  HomeScreen = require('../screens/home/HomeScreen').default;
+  console.log('✅ [AppNavigator] HomeScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar HomeScreen:', error);
+  HomeScreen = () => <View><Text>Error cargando HomeScreen</Text></View>;
+}
+
+try {
+  const searchModule = require('../screens/search/SearchScreen');
+  SearchScreen = searchModule.SearchScreen || searchModule.default;
+  console.log('✅ [AppNavigator] SearchScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar SearchScreen:', error);
+  SearchScreen = () => <View><Text>Error cargando SearchScreen</Text></View>;
+}
+
+try {
+  const bookingsModule = require('../screens/bookings/BookingsScreen');
+  BookingsScreen = bookingsModule.BookingsScreen || bookingsModule.default;
+  console.log('✅ [AppNavigator] BookingsScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar BookingsScreen:', error);
+  BookingsScreen = () => <View><Text>Error cargando BookingsScreen</Text></View>;
+}
+
+try {
+  const profileModule = require('../screens/profile/ProfileScreen');
+  ProfileScreen = profileModule.ProfileScreen || profileModule.default;
+  console.log('✅ [AppNavigator] ProfileScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar ProfileScreen:', error);
+  ProfileScreen = () => <View><Text>Error cargando ProfileScreen</Text></View>;
+}
+
+try {
+  BoatDetailsScreen = require('../screens/boats/BoatDetailsScreen').default;
+  console.log('✅ [AppNavigator] BoatDetailsScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar BoatDetailsScreen:', error);
+  BoatDetailsScreen = () => <View><Text>Error cargando BoatDetailsScreen</Text></View>;
+}
+
+try {
+  const bookingModule = require('../screens/booking/BookingScreen');
+  BookingScreen = bookingModule.BookingScreen || bookingModule.default;
+  console.log('✅ [AppNavigator] BookingScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar BookingScreen:', error);
+  BookingScreen = () => <View><Text>Error cargando BookingScreen</Text></View>;
+}
+
+try {
+  const paymentModule = require('../screens/payment/PaymentScreen');
+  PaymentScreen = paymentModule.PaymentScreen || paymentModule.default;
+  console.log('✅ [AppNavigator] PaymentScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar PaymentScreen:', error);
+  PaymentScreen = () => <View><Text>Error cargando PaymentScreen</Text></View>;
+}
+
+try {
+  LoginScreen = require('../screens/auth/LoginScreen').default;
+  console.log('✅ [AppNavigator] LoginScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar LoginScreen:', error);
+  LoginScreen = () => <View><Text>Error cargando LoginScreen</Text></View>;
+}
+
+try {
+  RegisterScreen = require('../screens/auth/RegisterScreen').default;
+  console.log('✅ [AppNavigator] RegisterScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar RegisterScreen:', error);
+  RegisterScreen = () => <View><Text>Error cargando RegisterScreen</Text></View>;
+}
+
+try {
+  ForgotPasswordScreen = require('../screens/auth/ForgotPasswordScreen').default;
+  console.log('✅ [AppNavigator] ForgotPasswordScreen importado');
+} catch (error) {
+  console.error('❌ [AppNavigator] Error al importar ForgotPasswordScreen:', error);
+  ForgotPasswordScreen = () => <View><Text>Error cargando ForgotPasswordScreen</Text></View>;
+}
 
 // Tipos de navegación
 export type RootStackParamList = {
+  Auth: undefined;
   Main: undefined;
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
   BoatDetails: { boatId: string };
   Booking: { boatId: string };
-  Auth: undefined;
   Payment: { bookingId: string };
 };
 
-export type MainTabParamList = {
+export type BottomTabParamList = {
   Home: undefined;
-  Search: any;
+  Search: undefined;
+  Bookings: undefined;
   Profile: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<MainTabParamList>();
+const Tab = createBottomTabNavigator<BottomTabParamList>();
 
-// Componente para proteger rutas autenticadas
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAppSelector((state: RootState) => state.auth);
-
-  if (!isAuthenticated) {
-    return <AuthNavigator />;
-  }
-
-  return <>{children}</>;
-}
-
-// Transición personalizada para pantallas principales
-const slideFromRightTransition = {
-  gestureEnabled: true,
-  gestureDirection: 'horizontal' as const,
-  transitionSpec: {
-    open: {
-      animation: 'timing' as const,
-      config: {
-        duration: 350,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-      },
-    },
-    close: {
-      animation: 'timing' as const,
-      config: {
-        duration: 300,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-      },
-    },
-  },
-  cardStyleInterpolator: ({ current, next, layouts }: any) => {
-    const translateX = current.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [layouts.screen.width, 0],
-    });
-
-    const opacity = current.progress.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0, 0.5, 1],
-    });
-
-    const scale = current.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.9, 1],
-    });
-
-    return {
-      cardStyle: {
-        opacity,
-        transform: [{ translateX }, { scale }],
-      },
-      overlayStyle: {
-        opacity: current.progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 0.1],
-        }),
-      },
-    };
-  },
-};
-
-// Transición para modales
-const modalTransition = {
-  presentation: 'modal' as const,
-  gestureEnabled: true,
-  gestureDirection: 'vertical' as const,
-  transitionSpec: {
-    open: {
-      animation: 'timing' as const,
-      config: {
-        duration: 350,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-      },
-    },
-    close: {
-      animation: 'timing' as const,
-      config: {
-        duration: 300,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-      },
-    },
-  },
-  cardStyleInterpolator: ({ current }: any) => {
-    const translateY = current.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [600, 0],
-    });
-
-    const opacity = current.progress.interpolate({
-      inputRange: [0, 0.3, 1],
-      outputRange: [0, 0.8, 1],
-    });
-
-    return {
-      cardStyle: {
-        opacity,
-        transform: [{ translateY }],
-      },
-      overlayStyle: {
-        opacity: current.progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 0.3],
-        }),
-      },
-    };
-  },
-};
-
-type MaterialIconName = keyof typeof MaterialCommunityIcons.glyphMap;
-
-// Tab Navigator con animaciones
-function MainTabNavigator() {
+// Stack de autenticación
+function AuthNavigator() {
+  console.log('🎯 [AuthNavigator] Renderizando navegador de autenticación');
   return (
-    <ProtectedRoute>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: MaterialIconName;
-
-            if (route.name === 'Home') {
-              iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'Search') {
-              iconName = 'magnify';
-            } else if (route.name === 'Profile') {
-              iconName = focused ? 'account' : 'account-outline';
-            } else {
-              iconName = 'home';
-            }
-
-            return (
-              <MaterialCommunityIcons
-                name={iconName}
-                size={size}
-                color={color}
-              />
-            );
-          },
-
-          tabBarActiveTintColor: '#0066CC',
-          tabBarInactiveTintColor: '#666',
-          tabBarStyle: {
-            backgroundColor: '#fff',
-            borderTopWidth: 1,
-            borderTopColor: '#E0E0E0',
-            elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            paddingTop: 8,
-            paddingBottom: 8,
-            height: 70,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-            marginBottom: 4,
-          },
-          tabBarItemStyle: {
-            paddingVertical: 4,
-          },
-        })}
-      >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            tabBarLabel: 'Inicio',
-          }}
-        />
-        <Tab.Screen
-          name="Search"
-          component={SearchScreen}
-          options={{
-            tabBarLabel: 'Buscar',
-          }}
-        />
-        <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            tabBarLabel: 'Perfil',
-          }}
-        />
-      </Tab.Navigator>
-    </ProtectedRoute>
+    <AuthStack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Register" component={RegisterScreen} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    </AuthStack.Navigator>
   );
 }
 
-// Stack Navigator principal con transiciones mejoradas
-export function AppNavigator() {
+// Navegador de pestañas inferior
+function BottomTabNavigator() {
+  console.log('🎯 [BottomTabNavigator] Renderizando navegador de pestañas');
   return (
-    <Stack.Navigator
-      initialRouteName="Main"
+    <Tab.Navigator
       screenOptions={{
-        headerShown: false, // 👈 Ocultar headers por defecto
-        ...slideFromRightTransition,
+        tabBarActiveTintColor: '#0066CC',
+        tabBarInactiveTintColor: 'gray',
+        headerShown: false,
       }}
     >
-      {/* Tab Navigator principal */}
-      <Stack.Screen
-        name="Main"
-        component={MainTabNavigator}
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
         options={{
-          headerShown: false,
+          tabBarLabel: 'Inicio',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="home" color={color} size={size} />
+          ),
         }}
       />
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          tabBarLabel: 'Buscar',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="magnify" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Bookings"
+        component={BookingsScreen}
+        options={{
+          tabBarLabel: 'Reservas',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="calendar" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Perfil',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="account" color={color} size={size} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
-      {/* Pantallas con transición desde la derecha */}
-      <Stack.Screen
-        name="BoatDetails"
-        component={BoatDetailsScreen}
-        options={{
-          headerShown: true,
-          headerTitle: 'Detalles de la Embarcación',
-          headerBackTitleVisible: false,
-          ...slideFromRightTransition,
-        }}
-      />
+// Navegador principal
+export function AppNavigator() {
+  console.log('🎯 [AppNavigator] Renderizando navegador principal');
 
-      <Stack.Screen
-        name="Booking"
-        component={BookingScreen}
-        options={{
-          headerShown: true,
-          headerTitle: 'Reservar',
-          headerBackTitleVisible: false,
-          ...slideFromRightTransition,
-        }}
-      />
+  let isAuthenticated = false;
+  let isLoading = true;
 
-      {/* Pantallas modales */}
-      <Stack.Screen
-        name="Auth"
-        component={AuthNavigator}
-        options={{
-          headerShown: false,
-          ...modalTransition,
-        }}
-      />
+  // Intentar obtener el estado de autenticación
+  if (useAppSelector) {
+    try {
+      const authState = useAppSelector((state: any) => state.auth);
+      isAuthenticated = authState?.isAuthenticated || false;
+      isLoading = authState?.isLoading || false;
+      console.log('🔐 [AppNavigator] Estado de auth:', { isAuthenticated, isLoading });
+    } catch (error) {
+      console.error('❌ [AppNavigator] Error al obtener estado de auth:', error);
+      isLoading = false;
+    }
+  } else {
+    console.warn('⚠️ [AppNavigator] useAppSelector no disponible, usando valores por defecto');
+    isLoading = false;
+  }
 
-      <Stack.Screen
-        name="Payment"
-        component={PaymentScreen}
-        options={{
-          headerShown: true,
-          headerTitle: 'Pago',
-          ...modalTransition,
-        }}
-      />
+  if (isLoading) {
+    console.log('⏳ [AppNavigator] Mostrando pantalla de carga de auth');
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0066CC" />
+        <Text style={{ marginTop: 10 }}>Verificando autenticación...</Text>
+      </View>
+    );
+  }
+
+  console.log(`🔄 [AppNavigator] Renderizando stack: ${isAuthenticated ? 'Main' : 'Auth'}`);
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!isAuthenticated ? (
+        <Stack.Screen name="Auth" component={AuthNavigator} />
+      ) : (
+        <>
+          <Stack.Screen name="Main" component={BottomTabNavigator} />
+          <Stack.Screen
+            name="BoatDetails"
+            component={BoatDetailsScreen}
+            options={{ headerShown: true, title: 'Detalles del Barco' }}
+          />
+          <Stack.Screen
+            name="Booking"
+            component={BookingScreen}
+            options={{ headerShown: true, title: 'Reservar' }}
+          />
+          <Stack.Screen
+            name="Payment"
+            component={PaymentScreen}
+            options={{ headerShown: true, title: 'Pago' }}
+          />
+        </>
+      )}
     </Stack.Navigator>
   );
 }
-
-// Exportación por defecto para compatibilidad
-export default AppNavigator;

@@ -1,0 +1,27 @@
+{
+  "unknown": {
+    "versionFramework": "4.17.1",
+    "dashboard": {
+      "isEnabledForService": false,
+      "requiredAuthentication": true,
+      "orgFeaturesInUse": null,
+      "orgObservabilityIntegrations": null,
+      "serviceAppId": null,
+      "serviceProvider": null,
+      "instanceParameters": null
+    },
+    "command": [
+      "login"
+    ],
+    "options": {},
+    "orgId": "5280df4e-8a8a-4d61-b579-b5243f7fa123",
+    "orgName": "boatbooking",
+    "userId": "nvjy9F2CMVYgRzRbVc",
+    "userName": "boatbooking",
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}

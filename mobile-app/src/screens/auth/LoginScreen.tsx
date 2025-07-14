@@ -48,7 +48,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleDemoLogin = () => {
     setEmail('demo@boatrental.ve');
-    setPassword('demo123');
+    setPassword('demo123456');
   };
 
   return (

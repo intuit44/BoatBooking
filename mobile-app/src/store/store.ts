@@ -7,10 +7,23 @@ import bookingsReducer from './slices/bookingsSlice';
 
 export const store = configureStore({
   reducer: {
-    boats: boatsReducer,
     auth: authReducer,
+    boats: boatsReducer,
     bookings: bookingsReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // Ignorar estas acciones para AsyncStorage
+        ignoredActions: [
+          'auth/login/fulfilled',
+          'auth/register/fulfilled',
+          'auth/checkAuthStatus/fulfilled',
+        ],
+        // Ignorar estos paths en el estado
+        ignoredPaths: ['auth.user'],
+      },
+    }),
 });
 
 export type AppDispatch = typeof store.dispatch;

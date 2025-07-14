@@ -1,6 +1,61 @@
 INTEGRACION AZURE/codeGPT
 
 
+
+COMANDOS PARA INICIO DE EMULADOR CONFIG
+
+emulator -avd "Medium_Phone_API_36.0" `
+  -no-audio `
+  -no-snapshot `
+  -no-boot-anim `
+  -gpu swiftshader_indirect `
+  -memory 4096 `
+  -partition-size 2047 `
+  -feature WindowsHypervisorPlatform
+
+
+
+🚀 Comando Definitivo para Iniciar
+emulator -avd "Medium_Phone_API_36.0" -no-snapshot -no-boot-anim -delay-adb -no-snapshot-save
+
+
+Optimización Final de GPU:
+powershell
+# Agrega estos parámetros adicionales
+emulator -avd "Medium_Phone_API_36.0" -gpu swiftshader_indirect -no-snapshot -no-boot-anim -partition-size 2047
+
+
+# Ejecuta el emulador deshabilitando audio completamente (óptimo para desarrollo)
+emulator -avd "Medium_Phone_API_36.0" -no-audio -no-snapshot -no-boot-anim
+
+
+
+
+Y PARA VERIFICAR ESPECIFICACIONES
+adb shell dumpsys gfxinfo
+adb shell cat /proc/meminfo
+
+
+
+emulator -avd "Medium_Phone_API_36.0" -memory 4096 -gpu swiftshader_indirect -no-audio -no-snapshot -partition-size 2047 -no-boot-anim -skip-adb-auth
+emulator -avd "Medium_Phone_API_36.0" -memory 8192 -gpu swiftshader_indirect -no-audio -no-snapshot -partition-size 2047
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Medium_Phone_API_36.0 -no-snapshot-load
+
+
+✅ 1. Asegúrate de estar en la carpeta raíz de tu proyecto
+cd C:\ProyectosSimbolicos\boat-rental-app
+
+PS C:\ProyectosSimbolicos\boat-rental-app\mobile-app> npm run start
+
+
+✅ 2. Activa el entorno virtual
+.venv\Scripts\Activate
+
+
+az version
+
+
+
 CONFIGURAR DESPUES DE ESTABILIZAR AZURE Y CODE GPT
 
 por ejemplo en mi caso de uso sabiendo en el poryecto que ando si fueras tu especificamente que ramas o vertebras desplegarias mediante Azure tomando en cuenta que tiene muchos herramientas y virtudes que codeGPT no tiene y como buscarias conseguir el mayor probecho en desde codeGPT sabiendo el proyecto en que ando pero toma en cuenta que hare otros proyectos y por lo tanto requeriria del uso cruzado una por la genracion de codigo el otro por el despliegue y gibernacion real del modelo?
@@ -297,3 +352,5 @@ if (instruction.includes("modificar función") || instruction.includes("escribe 
    use("llama-3-70b");
 }
 
+
+Cannot read properties of undefined (reading 'id')

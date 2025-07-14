@@ -1,5 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Auth } from 'aws-amplify';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_ENDPOINT || 'https://sb3qdlv3j3.execute-api.us-east-1.amazonaws.com/prod';
 
 interface User {
   id: string;
@@ -19,9 +21,29 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true, // Cambiar a true inicialmente
   error: null,
 };
+
+// Check for existing auth token on app start
+export const checkAuthStatus = createAsyncThunk(
+  'auth/checkAuthStatus',
+  async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const userStr = await AsyncStorage.getItem('userData');
+      
+      if (token && userStr) {
+        const user = JSON.parse(userStr);
+        return { user, isAuthenticated: true };
+      }
+      
+      return { user: null, isAuthenticated: false };
+    } catch (error) {
+      return { user: null, isAuthenticated: false };
+    }
+  }
+);
 
 export const registerUser = createAsyncThunk(
   'auth/registerUser',
@@ -30,24 +52,23 @@ export const registerUser = createAsyncThunk(
     thunkAPI
   ) => {
     try {
-      const result = await Auth.signUp({
-        username: email,
-        password,
-        attributes: {
-          email,
-          phone_number: phone,
-          name,
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ name, email, phone, password }),
       });
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al registrar usuario');
+      }
+
       return {
-        user: {
-          id: result.userSub || '',
-          email,
-          name,
-          phone,
-          role: 'user',
-        },
+        user: data.user,
+        needsConfirmation: true,
       };
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.message || 'Error al registrar usuario');
@@ -59,7 +80,20 @@ export const confirmSignup = createAsyncThunk(
   'auth/confirmSignup',
   async ({ email, code }: { email: string; code: string }, thunkAPI) => {
     try {
-      await Auth.confirmSignUp(email, code);
+      const response = await fetch(`${API_BASE_URL}/auth/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, code }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al confirmar registro');
+      }
+
       return true;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.message || 'Error al confirmar registro');
@@ -71,76 +105,37 @@ export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async ({ email, password }: { email: string; password: string }, thunkAPI) => {
     try {
-      const user = await Auth.signIn(email, password);
-      const attributes = await Auth.currentAuthenticatedUser();
+      console.log('🔍 Intentando login con:', { email, apiUrl: API_BASE_URL });
+      
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      console.log('📡 Response status:', response.status);
+      const data = await response.json();
+      console.log('📦 Response data:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al iniciar sesión');
+      }
+
+      // Guardar token y datos del usuario en AsyncStorage
+      await AsyncStorage.setItem('authToken', data.token);
+      await AsyncStorage.setItem('refreshToken', data.refreshToken || '');
+      await AsyncStorage.setItem('userData', JSON.stringify(data.user));
       
       return {
-        user: {
-          id: user.username || '',
-          email: attributes.attributes?.email || email,
-          name: attributes.attributes?.name || '',
-          phone: attributes.attributes?.phone_number || '',
-          role: 'user',
-        },
-        token: user.signInUserSession?.idToken?.jwtToken || '',
+        user: data.user,
+        token: data.token,
+        refreshToken: data.refreshToken,
       };
     } catch (error: any) {
+      console.error('❌ Error en login:', error);
       return thunkAPI.rejectWithValue(error.message || 'Error al iniciar sesión');
-    }
-  }
-);
-
-export const resendConfirmationCode = createAsyncThunk(
-  'auth/resendConfirmationCode',
-  async (email: string, thunkAPI) => {
-    try {
-      await Auth.resendSignUp(email);
-      return true;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'Error al reenviar código');
-    }
-  }
-);
-
-export const forgotPassword = createAsyncThunk(
-  'auth/forgotPassword',
-  async (email: string, thunkAPI) => {
-    try {
-      await Auth.forgotPassword(email);
-      return true;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'Error al solicitar restablecimiento');
-    }
-  }
-);
-
-export const forgotPasswordSubmit = createAsyncThunk(
-  'auth/forgotPasswordSubmit',
-  async (
-    { email, code, newPassword }: { email: string; code: string; newPassword: string },
-    thunkAPI
-  ) => {
-    try {
-      await Auth.forgotPasswordSubmit(email, code, newPassword);
-      return true;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'Error al restablecer contraseña');
-    }
-  }
-);
-
-export const changePassword = createAsyncThunk(
-  'auth/changePassword',
-  async (
-    { oldPassword, newPassword }: { oldPassword: string; newPassword: string },
-    thunkAPI
-  ) => {
-    try {
-      const user = await Auth.currentAuthenticatedUser();
-      await Auth.changePassword(user, oldPassword, newPassword);
-      return true;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'Error al cambiar contraseña');
     }
   }
 );
@@ -149,28 +144,11 @@ export const signOutUser = createAsyncThunk(
   'auth/signOut',
   async (_, thunkAPI) => {
     try {
-      await Auth.signOut();
+      // Limpiar AsyncStorage
+      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData']);
       return true;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.message || 'Error al cerrar sesión');
-    }
-  }
-);
-
-export const fetchCurrentUser = createAsyncThunk(
-  'auth/fetchCurrentUser',
-  async (_, thunkAPI) => {
-    try {
-      const user = await Auth.currentAuthenticatedUser();
-      return {
-        id: user.username,
-        email: user.attributes?.email || '',
-        name: user.attributes?.name || '',
-        phone: user.attributes?.phone_number || '',
-        role: 'user',
-      };
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'No hay usuario autenticado');
     }
   }
 );
@@ -186,15 +164,33 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.error = null;
+      // Limpiar AsyncStorage
+      AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData']);
     },
     updateProfile: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
       }
     },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.isLoading = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
+      // Check Auth Status
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = action.payload.isAuthenticated;
+      })
+      .addCase(checkAuthStatus.rejected, (state) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
+      })
       // Register User
       .addCase(registerUser.pending, (state) => {
         state.isLoading = true;
@@ -236,54 +232,6 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Resend Confirmation Code
-      .addCase(resendConfirmationCode.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(resendConfirmationCode.fulfilled, (state) => {
-        state.isLoading = false;
-      })
-      .addCase(resendConfirmationCode.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      // Forgot Password
-      .addCase(forgotPassword.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(forgotPassword.fulfilled, (state) => {
-        state.isLoading = false;
-      })
-      .addCase(forgotPassword.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      // Forgot Password Submit
-      .addCase(forgotPasswordSubmit.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(forgotPasswordSubmit.fulfilled, (state) => {
-        state.isLoading = false;
-      })
-      .addCase(forgotPasswordSubmit.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      // Change Password
-      .addCase(changePassword.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(changePassword.fulfilled, (state) => {
-        state.isLoading = false;
-      })
-      .addCase(changePassword.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
       // Sign Out
       .addCase(signOutUser.pending, (state) => {
         state.isLoading = true;
@@ -297,24 +245,9 @@ const authSlice = createSlice({
       .addCase(signOutUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
-      })
-      // Fetch Current User
-      .addCase(fetchCurrentUser.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = true;
-      })
-      .addCase(fetchCurrentUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-        state.isAuthenticated = false;
       });
   },
 });
 
-export const { clearError, logout, updateProfile } = authSlice.actions;
+export const { clearError, logout, updateProfile, setLoading } = authSlice.actions;
 export default authSlice.reducer;
