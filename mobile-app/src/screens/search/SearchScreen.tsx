@@ -1,327 +1,139 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
-import {
   Text,
-  Card,
-  Title,
-  Paragraph,
-  Searchbar,
-  Chip,
-  Button,
-  Modal,
-  Portal,
-  Surface,
-} from 'react-native-paper';
-import { CustomSlider } from '../../components/CustomSlider';
-import { useAppDispatch } from '../../store/hooks';
-import { AppDispatch, RootState } from '../../store/store';
-import { fetchBoats, setFilters, Boat } from '../../store/slices/boatsSlice';
-import { useAppSelector } from '../../store/hooks';
-interface Props {
-  navigation: any;
-  route: any;
-}
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  FlatList
+} from 'react-native';
 
-// ✅ Definir el tipo localmente para evitar problemas de importación
-interface LocalBoatFilters {
-  state: string;
-  type: string;
-  priceRange: [number, number];
-  capacity: number;
-  search: string;
-}
-
-const auth = useAppSelector(state => state.auth);
-const STATES = ['Nueva Esparta', 'Vargas', 'Falcón', 'Sucre'];
-const BOAT_TYPES = [
-  { value: 'yacht', label: 'Yates' },
-  { value: 'sailboat', label: 'Veleros' },
-  { value: 'motorboat', label: 'Lanchas' },
-  { value: 'catamaran', label: 'Catamaranes' },
-  { value: 'jetski', label: 'Motos de Agua' },
+// Datos de barcos expandidos para búsqueda
+const allBoats = [
+  { id: '1', name: 'Sea Explorer', price: 150, type: 'Yate', capacity: 8, location: 'Puerto Marina', image: '🛥️', rating: 4.8 },
+  { id: '2', name: 'Ocean Breeze', price: 200, type: 'Velero', capacity: 6, location: 'Bahía Azul', image: '⛵', rating: 4.9 },
+  { id: '3', name: 'Wave Rider', price: 120, type: 'Lancha', capacity: 4, location: 'Costa Norte', image: '🚤', rating: 4.7 },
+  { id: '4', name: 'Blue Horizon', price: 180, type: 'Catamarán', capacity: 12, location: 'Puerto Marina', image: '⛵', rating: 4.6 },
+  { id: '5', name: 'Speed Demon', price: 250, type: 'Lancha', capacity: 6, location: 'Bahía Azul', image: '🚤', rating: 4.8 },
+  { id: '6', name: 'Calm Waters', price: 90, type: 'Velero', capacity: 4, location: 'Costa Norte', image: '⛵', rating: 4.5 },
 ];
 
-export function SearchScreen({ navigation, route }: Props) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [tempFilters, setTempFilters] = useState<LocalBoatFilters>({
-    state: '',
-    type: '',
-    priceRange: [0, 1000],
-    capacity: 1,
-    search: '',
-  });
-
-  const dispatch = useAppDispatch();
-  const { boats, isLoading, filters } = useAppSelector((state: RootState) => state.boats);
-
-  useEffect(() => {
-    if (route.params) {
-      const newFilters = { ...filters, ...route.params };
-      dispatch(setFilters(newFilters));
-      setTempFilters(newFilters as LocalBoatFilters);
-    }
-    dispatch(fetchBoats(filters));
-  }, []);
-
-  const handleSearch = () => {
-    // ✅ Usar casting para evitar errores de TypeScript
-    const updatedFilters = { ...filters, search: searchQuery } as any;
-    dispatch(setFilters(updatedFilters));
-    dispatch(fetchBoats(updatedFilters));
-  };
-
-  const applyFilters = () => {
-    dispatch(setFilters(tempFilters as any));
-    dispatch(fetchBoats(tempFilters));
-    setShowFilters(false);
-  };
-
-  const clearFilters = () => {
-    const emptyFilters: LocalBoatFilters = {
-      state: '',
-      type: '',
-      priceRange: [0, 1000],
-      capacity: 1,
-      search: '',
-    };
-    setTempFilters(emptyFilters);
-    dispatch(setFilters(emptyFilters as any));
-    dispatch(fetchBoats(emptyFilters));
-    setShowFilters(false);
-  };
-
-  const renderBoatItem = ({ item }: { item: Boat }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('BoatDetails', { boatId: item.id })}
-    >
-      <Card style={styles.boatCard}>
-        <View style={styles.cardContent}>
-          <Image source={{ uri: item.images[0] }} style={styles.boatImage} />
-          <View style={styles.boatInfo}>
-            <Title style={styles.boatName}>{item.name}</Title>
-            <Paragraph style={styles.boatLocation}>
-              📍 {item.location.marina}, {item.location.state}
-            </Paragraph>
-            <View style={styles.boatDetails}>
-              <Chip icon="account-group" compact style={styles.capacityChip}>
-                {item.capacity}
-              </Chip>
-              <Text style={styles.boatType}>
-                {BOAT_TYPES.find(t => t.value === item.type)?.label}
-              </Text>
-            </View>
-            <View style={styles.priceRow}>
-              <Text style={styles.price}>${item.pricePerHour}/hora</Text>
-              <View style={styles.rating}>
-                <Text style={styles.ratingText}>⭐ {item.rating}</Text>
-              </View>
-            </View>
-          </View>
+function BoatSearchCard({ boat, onPress }) {
+  return (
+    <TouchableOpacity style={styles.boatCard} onPress={onPress}>
+      <Text style={styles.boatEmoji}>{boat.image}</Text>
+      <View style={styles.boatInfo}>
+        <View style={styles.boatHeader}>
+          <Text style={styles.boatName}>{boat.name}</Text>
+          <Text style={styles.boatPrice}>${boat.price}/día</Text>
         </View>
-      </Card>
+        <Text style={styles.boatType}>{boat.type} • {boat.capacity} personas</Text>
+        <Text style={styles.boatLocation}>📍 {boat.location}</Text>
+        <Text style={styles.boatRating}>⭐ {boat.rating}</Text>
+      </View>
     </TouchableOpacity>
   );
+}
 
-  const activeFiltersCount = Object.values(filters).filter(value =>
-    value && value !== '' && (Array.isArray(value) ? value[0] !== 0 || value[1] !== 1000 : true)
-  ).length;
+export default function SearchScreen() {
+  const [searchText, setSearchText] = useState('');
+  const [selectedType, setSelectedType] = useState('Todos');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  // Filtrar barcos
+  const filteredBoats = allBoats.filter(boat => {
+    const matchesSearch = boat.name.toLowerCase().includes(searchText.toLowerCase()) ||
+                         boat.location.toLowerCase().includes(searchText.toLowerCase());
+    const matchesType = selectedType === 'Todos' || boat.type === selectedType;
+    const matchesPrice = !maxPrice || boat.price <= parseInt(maxPrice);
+    
+    return matchesSearch && matchesType && matchesPrice;
+  });
+
+  const boatTypes = ['Todos', 'Yate', 'Velero', 'Lancha', 'Catamarán'];
+
+  console.log('✅ SearchScreen cargado correctamente');
 
   return (
-    <View style={styles.container}>
-      {/* Search Header */}
-      <View style={styles.searchHeader}>
-        <Searchbar
-          placeholder="Buscar botes, yates, lanchas..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          onSubmitEditing={handleSearch}
-          style={styles.searchbar}
-        />
-        <Button
-          mode="outlined"
-          onPress={() => setShowFilters(true)}
-          style={styles.filterButton}
-          icon="filter-variant"
-        >
-          Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
-        </Button>
+    <ScrollView style={styles.container}>
+      {/* Header de búsqueda */}
+      <View style={styles.header}>
+        <Text style={styles.title}>🔍 Buscar Barcos</Text>
+        <Text style={styles.subtitle}>Encuentra tu aventura perfecta</Text>
       </View>
 
-      {/* Active Filters */}
-      {activeFiltersCount > 0 && (
-        <View style={styles.activeFilters}>
-          {filters.state && (
-            <Chip
-              onClose={() => dispatch(setFilters({ ...filters, state: '' } as any))}
-              style={styles.filterChip}
-            >
-              📍 {filters.state}
-            </Chip>
-          )}
-          {filters.type && (
-            <Chip
-              onClose={() => dispatch(setFilters({ ...filters, type: '' } as any))}
-              style={styles.filterChip}
-            >
-              🛥️ {BOAT_TYPES.find(t => t.value === filters.type)?.label}
-            </Chip>
-          )}
-          {(filters.capacity && filters.capacity > 1) && (
-            <Chip
-              onClose={() => dispatch(setFilters({ ...filters, capacity: 1 } as any))}
-              style={styles.filterChip}
-            >
-              👥 {filters.capacity}+ personas
-            </Chip>
-          )}
-          {(filters as any).search && (
-            <Chip
-              onClose={() => dispatch(setFilters({ ...filters, search: '' } as any))}
-              style={styles.filterChip}
-            >
-              🔍 "{(filters as any).search}"
-            </Chip>
-          )}
+      {/* Formulario de búsqueda */}
+      <View style={styles.searchForm}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Nombre o Ubicación</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Ej: Sea Explorer, Puerto Marina..."
+            value={searchText}
+            onChangeText={setSearchText}
+          />
         </View>
-      )}
 
-      {/* Results */}
-      <FlatList
-        data={boats}
-        renderItem={renderBoatItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.resultsList}
-        showsVerticalScrollIndicator={false}
-        refreshing={isLoading}
-        onRefresh={() => dispatch(fetchBoats(filters))}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>🔍 No se encontraron embarcaciones</Text>
-            <Text style={styles.emptySubtext}>
-              Intenta ajustar tus filtros de búsqueda
-            </Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Tipo de Barco</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.typeButtons}>
+              {boatTypes.map(type => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.typeButton,
+                    selectedType === type && styles.selectedTypeButton
+                  ]}
+                  onPress={() => setSelectedType(type)}
+                >
+                  <Text style={[
+                    styles.typeButtonText,
+                    selectedType === type && styles.selectedTypeButtonText
+                  ]}>
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Precio Máximo ($/día)</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Ej: 200"
+            value={maxPrice}
+            onChangeText={setMaxPrice}
+            keyboardType="numeric"
+          />
+        </View>
+      </View>
+
+      {/* Resultados */}
+      <View style={styles.results}>
+        <Text style={styles.resultsTitle}>
+          📊 {filteredBoats.length} barcos encontrados
+        </Text>
+        
+        {filteredBoats.map(boat => (
+          <BoatSearchCard
+            key={boat.id}
+            boat={boat}
+            onPress={() => console.log('Barco seleccionado:', boat.name)}
+          />
+        ))}
+
+        {filteredBoats.length === 0 && (
+          <View style={styles.noResults}>
+            <Text style={styles.noResultsText}>😔 No se encontraron barcos</Text>
+            <Text style={styles.noResultsSubtext}>Intenta ajustar tus filtros</Text>
           </View>
-        }
-      />
-
-      {/* Filters Modal */}
-      <Portal>
-        <Modal
-          visible={showFilters}
-          onDismiss={() => setShowFilters(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
-          <Surface style={styles.filtersModal}>
-            <Title style={styles.modalTitle}>Filtros de Búsqueda</Title>
-
-            {/* State Filter */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Estado</Text>
-              <View style={styles.chipContainer}>
-                {STATES.map((state) => (
-                  <Chip
-                    key={state}
-                    selected={tempFilters.state === state}
-                    onPress={() => setTempFilters({
-                      ...tempFilters,
-                      state: tempFilters.state === state ? '' : state
-                    })}
-                    style={styles.filterOptionChip}
-                  >
-                    {state}
-                  </Chip>
-                ))}
-              </View>
-            </View>
-
-            {/* Boat Type Filter */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>Tipo de Embarcación</Text>
-              <View style={styles.chipContainer}>
-                {BOAT_TYPES.map((type) => (
-                  <Chip
-                    key={type.value}
-                    selected={tempFilters.type === type.value}
-                    onPress={() => setTempFilters({
-                      ...tempFilters,
-                      type: tempFilters.type === type.value ? '' : type.value
-                    })}
-                    style={styles.filterOptionChip}
-                  >
-                    {type.label}
-                  </Chip>
-                ))}
-              </View>
-            </View>
-
-            {/* Price Range */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>
-                Precio por hora: ${tempFilters.priceRange[0]} - ${tempFilters.priceRange[1]}
-              </Text>
-              <CustomSlider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={1000}
-                value={tempFilters.priceRange[1]}
-                onValueChange={(value: number) => setTempFilters({
-                  ...tempFilters,
-                  priceRange: [tempFilters.priceRange[0], Math.round(value)]
-                })}
-                step={50}
-                minimumTrackTintColor="#0066CC"
-                maximumTrackTintColor="#d3d3d3"
-              />
-            </View>
-
-            {/* Capacity */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>
-                Capacidad mínima: {tempFilters.capacity} personas
-              </Text>
-              <CustomSlider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={20}
-                value={tempFilters.capacity}
-                onValueChange={(value: number) => setTempFilters({
-                  ...tempFilters,
-                  capacity: Math.round(value)
-                })}
-                step={1}
-                minimumTrackTintColor="#0066CC"
-                maximumTrackTintColor="#d3d3d3"
-              />
-            </View>
-
-            {/* Modal Actions */}
-            <View style={styles.modalActions}>
-              <Button
-                mode="outlined"
-                onPress={clearFilters}
-                style={styles.modalButton}
-              >
-                Limpiar
-              </Button>
-              <Button
-                mode="contained"
-                onPress={applyFilters}
-                style={styles.modalButton}
-              >
-                Aplicar
-              </Button>
-            </View>
-          </Surface>
-        </Modal>
-      </Portal>
-    </View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -330,142 +142,133 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  searchHeader: {
+  header: {
+    padding: 20,
+    backgroundColor: '#0066CC',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#e3f2fd',
+  },
+  searchForm: {
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  typeButtons: {
     flexDirection: 'row',
-    padding: 16,
-    paddingTop: 60,
-    gap: 12,
+    gap: 10,
   },
-  searchbar: {
-    flex: 1,
-  },
-  filterButton: {
-    alignSelf: 'center',
-  },
-  activeFilters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  typeButton: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#0066CC',
+    backgroundColor: '#fff',
   },
-  filterChip: {
-    backgroundColor: '#E3F2FD',
+  selectedTypeButton: {
+    backgroundColor: '#0066CC',
   },
-  resultsList: {
-    padding: 16,
+  typeButtonText: {
+    color: '#0066CC',
+    fontWeight: 'bold',
+  },
+  selectedTypeButtonText: {
+    color: '#fff',
+  },
+  results: {
+    padding: 20,
+  },
+  resultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
   },
   boatCard: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  cardContent: {
     flexDirection: 'row',
-    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  boatImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
+  boatEmoji: {
+    fontSize: 40,
+    marginRight: 16,
   },
   boatInfo: {
     flex: 1,
-    marginLeft: 12,
+  },
+  boatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   boatName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  boatPrice: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#0066CC',
+  },
+  boatType: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
   boatLocation: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  boatDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  capacityChip: {
-    backgroundColor: '#E8F5E8',
-  },
-  boatType: {
-    fontSize: 12,
-    color: '#666',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0066CC',
-  },
-  rating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
+  boatRating: {
     fontSize: 14,
-    fontWeight: '600',
+    color: '#ff9800',
   },
-  emptyState: {
+  noResults: {
     alignItems: 'center',
-    paddingVertical: 60,
+    padding: 40,
   },
-  emptyText: {
+  noResultsText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#666',
     marginBottom: 8,
   },
-  emptySubtext: {
+  noResultsSubtext: {
     fontSize: 14,
     color: '#999',
-  },
-  modalContainer: {
-    margin: 20,
-  },
-  filtersModal: {
-    padding: 20,
-    borderRadius: 12,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  filterSection: {
-    marginBottom: 20,
-  },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  filterOptionChip: {
-    marginBottom: 8,
-  },
-  slider: {
-    marginTop: 8,
-    height: 40,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
   },
 });

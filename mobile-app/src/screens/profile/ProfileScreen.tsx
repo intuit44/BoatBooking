@@ -1,304 +1,261 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+﻿import React, { useState } from 'react';
 import {
+  View,
   Text,
-  Card,
-  Title,
-  Paragraph,
-  Button,
-  Avatar,
-  List,
-  Switch,
-  Divider,
-  Surface,
-  IconButton,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   TextInput,
-  Dialog,
-  Portal,
-} from 'react-native-paper';
-import { useAppDispatch } from '../../store/hooks';
-import { AppDispatch, RootState } from '../../store/store';
-import { logout, updateProfile } from '../../store/slices/authSlice';
-import { useSelector } from 'react-redux';
+  Alert,
+  Switch
+} from 'react-native';
 
-interface Props {
-  navigation: any;
+// Datos del usuario de ejemplo
+const userData = {
+  name: 'Juan Pérez',
+  email: 'juan.perez@email.com',
+  phone: '+1 234 567 8900',
+  location: 'Miami, FL',
+  memberSince: '2023',
+  totalBookings: 12,
+  favoritesCount: 8,
+  profileImage: '👤'
+};
+
+function ProfileSection({ title, children }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionContent}>
+        {children}
+      </View>
+    </View>
+  );
 }
 
-export function ProfileScreen({ navigation }: Props) {
-  const dispatch = useAppDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
+function ProfileItem({ icon, label, value, onPress, editable = false }) {
+  return (
+    <TouchableOpacity 
+      style={styles.profileItem} 
+      onPress={onPress}
+      disabled={!onPress && !editable}
+    >
+      <Text style={styles.profileIcon}>{icon}</Text>
+      <View style={styles.profileItemContent}>
+        <Text style={styles.profileLabel}>{label}</Text>
+        <Text style={styles.profileValue}>{value}</Text>
+      </View>
+      {(onPress || editable) && (
+        <Text style={styles.profileArrow}>›</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
 
-  const [notifications, setNotifications] = useState(true);
-  const [locationServices, setLocationServices] = useState(true);
-  const [emailMarketing, setEmailMarketing] = useState(false);
-  const [editDialogVisible, setEditDialogVisible] = useState(false);
-  const [editData, setEditData] = useState({
-    name: user?.name || '',
-    phone: user?.phone || '',
-    email: user?.email || '',
-  });
+export default function ProfileScreen() {
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [locationEnabled, setLocationEnabled] = useState(true);
+  const [user, setUser] = useState(userData);
 
-  const handleLogout = () => {
+  const handleEditProfile = () => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
+      'Editar Perfil',
+      'Función de edición en desarrollo',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleChangePassword = () => {
+    Alert.alert(
+      'Cambiar Contraseña',
+      'Se enviará un enlace a tu email',
       [
         { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar Sesión',
-          style: 'destructive',
-          onPress: () => dispatch(logout())
-        },
+        { text: 'Enviar', onPress: () => console.log('Enlace enviado') }
       ]
     );
   };
 
-  const handleSaveProfile = () => {
-    dispatch(updateProfile(editData));
-    setEditDialogVisible(false);
-    Alert.alert('Éxito', 'Perfil actualizado correctamente');
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro de que quieres cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cerrar Sesión', style: 'destructive', onPress: () => console.log('Logout') }
+      ]
+    );
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+  const handleSupport = () => {
+    Alert.alert(
+      'Soporte',
+      'Contacta con nosotros:\n📧 support@boatrental.com\n📞 +1 800 BOATS',
+      [{ text: 'OK' }]
+    );
   };
+
+  console.log('✅ ProfileScreen cargado correctamente');
 
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
-      <Surface style={styles.header}>
-        <View style={styles.headerContent}>
-          <Title style={styles.headerTitle}>👤 Mi Perfil</Title>
-          <IconButton
-            icon="cog"
-            size={24}
-            onPress={() => {/* TODO: Settings */ }}
-          />
-        </View>
-      </Surface>
-
-      {/* Profile Card */}
-      <Card style={styles.profileCard}>
-        <Card.Content>
-          <View style={styles.profileHeader}>
-            <Avatar.Text
-              size={80}
-              label={getInitials(user?.name || 'Usuario')}
-              style={styles.avatar}
-            />
-            <View style={styles.profileInfo}>
-              <Title style={styles.userName}>{user?.name || 'Usuario'}</Title>
-              <Paragraph style={styles.userEmail}>{user?.email}</Paragraph>
-              <Paragraph style={styles.userPhone}>📱 {user?.phone}</Paragraph>
-            </View>
-            <IconButton
-              icon="pencil"
-              size={20}
-              onPress={() => setEditDialogVisible(true)}
-            />
-          </View>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Reservas</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>4.8</Text>
-              <Text style={styles.statLabel}>⭐ Rating</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>2</Text>
-              <Text style={styles.statLabel}>Años</Text>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card style={styles.actionsCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>🚀 Acciones Rápidas</Title>
-          <View style={styles.quickActions}>
-            <Button
-              mode="contained"
-              icon="calendar-plus"
-              onPress={() => navigation.navigate('Search')}
-              style={styles.quickButton}
-            >
-              Nueva Reserva
-            </Button>
-            <Button
-              mode="outlined"
-              icon="history"
-              onPress={() => navigation.navigate('Bookings')}
-              style={styles.quickButton}
-            >
-              Mis Reservas
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Menu Options */}
-      <Card style={styles.menuCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>⚙️ Configuración</Title>
-
-          <List.Item
-            title="Notificaciones Push"
-            description="Recibir alertas de reservas y ofertas"
-            left={props => <List.Icon {...props} icon="bell" />}
-            right={() => (
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-              />
-            )}
-          />
-
-          <Divider />
-
-          <List.Item
-            title="Servicios de Ubicación"
-            description="Encontrar marinas cercanas"
-            left={props => <List.Icon {...props} icon="map-marker" />}
-            right={() => (
-              <Switch
-                value={locationServices}
-                onValueChange={setLocationServices}
-              />
-            )}
-          />
-
-          <Divider />
-
-          <List.Item
-            title="Marketing por Email"
-            description="Ofertas especiales y promociones"
-            left={props => <List.Icon {...props} icon="email" />}
-            right={() => (
-              <Switch
-                value={emailMarketing}
-                onValueChange={setEmailMarketing}
-              />
-            )}
-          />
-        </Card.Content>
-      </Card>
-
-      {/* Support & Info */}
-      <Card style={styles.menuCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>🆘 Soporte</Title>
-
-          <List.Item
-            title="Centro de Ayuda"
-            description="Preguntas frecuentes y guías"
-            left={props => <List.Icon {...props} icon="help-circle" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {/* TODO: Help Center */ }}
-          />
-
-          <Divider />
-
-          <List.Item
-            title="Contactar Soporte"
-            description="Chat en vivo y WhatsApp"
-            left={props => <List.Icon {...props} icon="message" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {/* TODO: Contact Support */ }}
-          />
-
-          <Divider />
-
-          <List.Item
-            title="Términos y Condiciones"
-            description="Políticas de uso y privacidad"
-            left={props => <List.Icon {...props} icon="file-document" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {/* TODO: Terms */ }}
-          />
-
-          <Divider />
-
-          <List.Item
-            title="Calificar App"
-            description="Ayúdanos a mejorar"
-            left={props => <List.Icon {...props} icon="star" />}
-            right={props => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {/* TODO: Rate App */ }}
-          />
-        </Card.Content>
-      </Card>
-
-      {/* App Info */}
-      <Card style={styles.infoCard}>
-        <Card.Content>
-          <View style={styles.appInfo}>
-            <Text style={styles.appName}>🛥️ Boat Rentals Venezuela</Text>
-            <Text style={styles.appVersion}>Versión 1.0.0</Text>
-            <Text style={styles.appDescription}>
-              La mejor app para alquilar embarcaciones en Venezuela 🇻🇪
-            </Text>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Logout Button */}
-      <View style={styles.logoutContainer}>
-        <Button
-          mode="outlined"
-          icon="logout"
-          onPress={handleLogout}
-          style={styles.logoutButton}
-          textColor="#F44336"
-        >
-          Cerrar Sesión
-        </Button>
+      <View style={styles.header}>
+        <Text style={styles.title}>👤 Mi Perfil</Text>
+        <Text style={styles.subtitle}>Gestiona tu cuenta y preferencias</Text>
       </View>
 
-      {/* Edit Profile Dialog */}
-      <Portal>
-        <Dialog visible={editDialogVisible} onDismiss={() => setEditDialogVisible(false)}>
-          <Dialog.Title>✏️ Editar Perfil</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label="Nombre Completo"
-              value={editData.name}
-              onChangeText={(text) => setEditData({ ...editData, name: text })}
-              mode="outlined"
-              style={styles.dialogInput}
-            />
-            <TextInput
-              label="Teléfono"
-              value={editData.phone}
-              onChangeText={(text) => setEditData({ ...editData, phone: text })}
-              mode="outlined"
-              keyboardType="phone-pad"
-              style={styles.dialogInput}
-            />
-            <TextInput
-              label="Email"
-              value={editData.email}
-              onChangeText={(text) => setEditData({ ...editData, email: text })}
-              mode="outlined"
-              keyboardType="email-address"
-              style={styles.dialogInput}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setEditDialogVisible(false)}>Cancelar</Button>
-            <Button onPress={handleSaveProfile}>Guardar</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      {/* Profile Card */}
+      <View style={styles.profileCard}>
+        <Text style={styles.profileAvatar}>{user.profileImage}</Text>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{user.name}</Text>
+          <Text style={styles.profileEmail}>{user.email}</Text>
+          <Text style={styles.profileMember}>Miembro desde {user.memberSince}</Text>
+        </View>
+        <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+          <Text style={styles.editButtonText}>Editar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{user.totalBookings}</Text>
+          <Text style={styles.statLabel}>Reservas</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{user.favoritesCount}</Text>
+          <Text style={styles.statLabel}>Favoritos</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>4.8</Text>
+          <Text style={styles.statLabel}>Rating</Text>
+        </View>
+      </View>
+
+      {/* Information Section */}
+      <ProfileSection title="📋 Información Personal">
+        <ProfileItem
+          icon="📧"
+          label="Email"
+          value={user.email}
+          onPress={handleEditProfile}
+        />
+        <ProfileItem
+          icon="📱"
+          label="Teléfono"
+          value={user.phone}
+          onPress={handleEditProfile}
+        />
+        <ProfileItem
+          icon="📍"
+          label="Ubicación"
+          value={user.location}
+          onPress={handleEditProfile}
+        />
+        <ProfileItem
+          icon="🔒"
+          label="Contraseña"
+          value="••••••••"
+          onPress={handleChangePassword}
+        />
+      </ProfileSection>
+
+      {/* Preferences Section */}
+      <ProfileSection title="⚙️ Preferencias">
+        <View style={styles.preferenceItem}>
+          <View style={styles.preferenceInfo}>
+            <Text style={styles.preferenceIcon}>🔔</Text>
+            <View>
+              <Text style={styles.preferenceLabel}>Notificaciones</Text>
+              <Text style={styles.preferenceDescription}>Recibir ofertas y actualizaciones</Text>
+            </View>
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            trackColor={{ false: '#ccc', true: '#0066CC' }}
+          />
+        </View>
+
+        <View style={styles.preferenceItem}>
+          <View style={styles.preferenceInfo}>
+            <Text style={styles.preferenceIcon}>📍</Text>
+            <View>
+              <Text style={styles.preferenceLabel}>Ubicación</Text>
+              <Text style={styles.preferenceDescription}>Permitir acceso a ubicación</Text>
+            </View>
+          </View>
+          <Switch
+            value={locationEnabled}
+            onValueChange={setLocationEnabled}
+            trackColor={{ false: '#ccc', true: '#0066CC' }}
+          />
+        </View>
+      </ProfileSection>
+
+      {/* Quick Actions */}
+      <ProfileSection title="🚀 Acciones Rápidas">
+        <ProfileItem
+          icon="⭐"
+          label="Mis Favoritos"
+          value="Ver barcos guardados"
+          onPress={() => console.log('Favoritos')}
+        />
+        <ProfileItem
+          icon="📅"
+          label="Historial de Reservas"
+          value="Ver todas las reservas"
+          onPress={() => console.log('Historial')}
+        />
+        <ProfileItem
+          icon="💳"
+          label="Métodos de Pago"
+          value="Gestionar tarjetas"
+          onPress={() => console.log('Pagos')}
+        />
+        <ProfileItem
+          icon="🎁"
+          label="Programa de Lealtad"
+          value="Ver beneficios"
+          onPress={() => console.log('Lealtad')}
+        />
+      </ProfileSection>
+
+      {/* Support Section */}
+      <ProfileSection title="🛟 Soporte">
+        <ProfileItem
+          icon="❓"
+          label="Centro de Ayuda"
+          value="Preguntas frecuentes"
+          onPress={handleSupport}
+        />
+        <ProfileItem
+          icon="📞"
+          label="Contactar Soporte"
+          value="Obtener ayuda personalizada"
+          onPress={handleSupport}
+        />
+        <ProfileItem
+          icon="⭐"
+          label="Calificar la App"
+          value="Déjanos tu opinión"
+          onPress={() => console.log('Rating')}
+        />
+      </ProfileSection>
+
+      {/* Logout */}
+      <View style={styles.logoutContainer}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>🚪 Cerrar Sesión</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Boat Rental App v1.0.0</Text>
+        <Text style={styles.footerText}>© 2025 Todos los derechos reservados</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -309,62 +266,88 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
-    elevation: 4,
-    backgroundColor: 'white',
+    padding: 20,
+    backgroundColor: '#0066CC',
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 60,
-  },
-  headerTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#e3f2fd',
   },
   profileCard: {
-    margin: 16,
-    elevation: 4,
-  },
-  profileHeader: {
     flexDirection: 'row',
+    backgroundColor: '#fff',
+    margin: 20,
+    padding: 20,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  avatar: {
-    backgroundColor: '#0066CC',
+  profileAvatar: {
+    fontSize: 48,
+    marginRight: 16,
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 30,
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 16,
   },
-  userName: {
+  profileName: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
-  userEmail: {
+  profileEmail: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  userPhone: {
+  profileMember: {
+    fontSize: 12,
+    color: '#999',
+  },
+  editButton: {
+    backgroundColor: '#0066CC',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
     fontSize: 14,
-    color: '#666',
   },
   statsContainer: {
     flexDirection: 'row',
+    paddingHorizontal: 20,
     justifyContent: 'space-around',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    marginBottom: 20,
   },
   statItem: {
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#0066CC',
   },
@@ -373,62 +356,106 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  actionsCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    elevation: 2,
+  section: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+    paddingHorizontal: 20,
     marginBottom: 12,
   },
-  quickActions: {
+  sectionContent: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  profileItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickButton: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  menuCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    elevation: 2,
-  },
-  infoCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#E3F2FD',
-    elevation: 2,
-  },
-  appInfo: {
     alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  appName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0066CC',
-    marginBottom: 4,
-  },
-  appVersion: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  appDescription: {
-    fontSize: 14,
-    color: '#666',
+  profileIcon: {
+    fontSize: 20,
+    marginRight: 16,
+    width: 24,
     textAlign: 'center',
   },
-  logoutContainer: {
+  profileItemContent: {
+    flex: 1,
+  },
+  profileLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  profileValue: {
+    fontSize: 14,
+    color: '#666',
+  },
+  profileArrow: {
+    fontSize: 20,
+    color: '#ccc',
+  },
+  preferenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
-    paddingBottom: 32,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  preferenceInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  preferenceIcon: {
+    fontSize: 20,
+    marginRight: 16,
+    width: 24,
+    textAlign: 'center',
+  },
+  preferenceLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  preferenceDescription: {
+    fontSize: 12,
+    color: '#666',
+  },
+  logoutContainer: {
+    padding: 20,
   },
   logoutButton: {
-    borderColor: '#F44336',
+    backgroundColor: '#F44336',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
   },
-  dialogInput: {
-    marginBottom: 12,
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  footer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
   },
 });

@@ -1,11 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-
-// NO importar Amplify directamente al inicio
-// import './amplify-config'; // ← ESTE ES EL PROBLEMA
-
-let BoatRentalAPI = null;
-let amplifyConfigured = false;
+import './amplify-config'; // Configurar Amplify
+import BoatRentalAPI from './src/services/api';
 
 // Importar las 4 pantallas migradas
 let HomeScreen, SearchScreen, BookingsScreen, ProfileScreen;
@@ -42,77 +38,23 @@ try {
   ProfileScreen = null;
 }
 
-// Función para configurar Amplify de forma SEGURA
-const configureAmplifyAsync = async () => {
-  try {
-    console.log('🔧 Intentando configurar Amplify...');
-    
-    // Importar Amplify de forma dinámica
-    const { Amplify } = await import('aws-amplify');
-    const awsExports = await import('./src/aws-exports');
-    
-    const amplifyConfig = {
-      ...awsExports.default,
-      Analytics: {
-        disabled: true,
-      },
-    };
-    
-    console.log('📋 Configuración AWS:', JSON.stringify(amplifyConfig, null, 2));
-    
-    Amplify.configure(amplifyConfig);
-    console.log('✅ Amplify configurado exitosamente');
-    
-    // Ahora importar el API
-    const APIModule = await import('./src/services/api');
-    BoatRentalAPI = APIModule.default;
-    
-    amplifyConfigured = true;
-    return { success: true, message: 'Amplify configurado' };
-  } catch (error) {
-    console.log('❌ Error configurando Amplify:', error);
-    amplifyConfigured = false;
-    return { success: false, message: error.message, error };
-  }
-};
-
 // Función para probar la conexión API
 const testAPIConnection = async () => {
   try {
-    if (!amplifyConfigured) {
-      Alert.alert('⚠️ Configurando...', 'Configurando Amplify primero...');
-      
-      const result = await configureAmplifyAsync();
-      
-      if (!result.success) {
-        Alert.alert(
-          '❌ Error de Configuración', 
-          `No se pudo configurar Amplify:\n${result.message}`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
-    
-    if (!BoatRentalAPI) {
-      Alert.alert('❌ Error', 'API no disponible');
-      return;
-    }
-    
-    Alert.alert('🔄 Probando...', 'Conectando con AWS...');
+    Alert.alert('🔄 Probando...', 'Conectando con AWS Amplify...');
     
     const result = await BoatRentalAPI.testConnection();
     
     if (result.success) {
       Alert.alert(
         '✅ Conexión Exitosa', 
-        `¡Conectado a AWS!\n${result.message}`,
+        'La app se conectó correctamente a AWS Amplify!\n\nPuedes revisar los logs en la consola.',
         [{ text: 'Genial!' }]
       );
     } else {
       Alert.alert(
         '❌ Error de Conexión', 
-        `Error: ${result.message}`,
+        result.message + '\n\nRevisa la configuración de AWS.',
         [{ text: 'OK' }]
       );
     }
@@ -125,7 +67,7 @@ const testAPIConnection = async () => {
   }
 };
 
-// Componente simple con indicador de estado
+// Componente simple como fallback
 function SimpleScreen({ title, emoji, subtitle }) {
   return (
     <View style={styles.screen}>
@@ -133,24 +75,9 @@ function SimpleScreen({ title, emoji, subtitle }) {
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
       
-      {/* Estado de Amplify */}
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusLabel}>Estado de Amplify:</Text>
-        <Text style={[styles.statusText, amplifyConfigured ? styles.statusSuccess : styles.statusPending]}>
-          {amplifyConfigured ? '✅ Configurado' : '⏳ Pendiente'}
-        </Text>
-      </View>
-      
-      {/* Botones de prueba */}
+      {/* Botón de prueba API solo en HomeScreen */}
       {title === 'Inicio' && (
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.configButton}
-            onPress={configureAmplifyAsync}
-          >
-            <Text style={styles.configButtonText}>⚙️ Configurar Amplify</Text>
-          </TouchableOpacity>
-          
           <TouchableOpacity 
             style={styles.testButton}
             onPress={testAPIConnection}
@@ -159,7 +86,7 @@ function SimpleScreen({ title, emoji, subtitle }) {
           </TouchableOpacity>
           
           <Text style={styles.infoText}>
-            Configuración segura paso a paso
+            Toca para probar la conexión con AWS Amplify
           </Text>
         </View>
       )}
@@ -169,25 +96,26 @@ function SimpleScreen({ title, emoji, subtitle }) {
 
 function SimpleNavigator() {
   const [currentScreen, setCurrentScreen] = React.useState('home');
-  const [appReady, setAppReady] = useState(false);
 
+  // Probar conexión al iniciar la app
   useEffect(() => {
-    console.log('🚀 App iniciada - Modo SEGURO');
-    setAppReady(true);
+    console.log('🚀 App iniciada - Amplify configurado');
+    // Dar tiempo para que la app se estabilice antes de probar
+    setTimeout(async () => {
+      console.log('🔗 Probando conexión automática...');
+      try {
+        const result = await BoatRentalAPI.testConnection();
+        console.log('📊 Resultado conexión automática:', result);
+      } catch (error) {
+        console.log('⚠️ Error en conexión automática:', error.message);
+      }
+    }, 3000);
   }, []);
-
-  if (!appReady) {
-    return (
-      <View style={styles.loadingScreen}>
-        <Text style={styles.loadingText}>🔄 Cargando...</Text>
-      </View>
-    );
-  }
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'home':
-        return HomeScreen ? <HomeScreen /> : <SimpleScreen title="Inicio" emoji="🏠" subtitle="Bienvenido a Boat Rental - Modo Seguro" />;
+        return HomeScreen ? <HomeScreen /> : <SimpleScreen title="Inicio" emoji="🏠" subtitle="Bienvenido a Boat Rental" />;
       case 'search':
         return SearchScreen ? <SearchScreen /> : <SimpleScreen title="Buscar" emoji="🔍" subtitle="Encuentra tu barco ideal" />;
       case 'bookings':
@@ -195,7 +123,7 @@ function SimpleNavigator() {
       case 'profile':
         return ProfileScreen ? <ProfileScreen /> : <SimpleScreen title="Perfil" emoji="👤" subtitle="Tu información personal" />;
       default:
-        return <SimpleScreen title="Inicio" emoji="🏠" subtitle="Bienvenido a Boat Rental - Modo Seguro" />;
+        return <SimpleScreen title="Inicio" emoji="🏠" subtitle="Bienvenido a Boat Rental" />;
     }
   };
 
@@ -237,7 +165,7 @@ function SimpleNavigator() {
 }
 
 export default function App() {
-  console.log('🚀 App SEGURO - Amplify carga bajo demanda');
+  console.log('🚀 App COMPLETO + AMPLIFY - Fase 1 Lista');
   
   return <SimpleNavigator />;
 }
@@ -249,16 +177,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  loadingScreen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    fontSize: 20,
-    color: '#0066CC',
   },
   screen: {
     flex: 1,
@@ -281,53 +199,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  statusContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  statusLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  statusText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  statusSuccess: {
-    color: '#28a745',
-  },
-  statusPending: {
-    color: '#ffc107',
+    marginBottom: 30,
   },
   buttonContainer: {
     alignItems: 'center',
-  },
-  configButton: {
-    backgroundColor: '#6f42c1',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  configButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   testButton: {
     backgroundColor: '#0066CC',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   testButtonText: {
     color: '#fff',

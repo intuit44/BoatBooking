@@ -3,110 +3,33 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AuthNavigator } from './AuthNavigator';  // ✅ Usar el archivo separado
 
-console.log('🔧 [AppNavigator] Iniciando importación de pantallas...');
-// Importar hooks del store
-let useAppSelector: any;
-try {
-  const hooks = require('../store/hooks');
-  useAppSelector = hooks.useAppSelector;
-  console.log('✅ [AppNavigator] Hooks importados correctamente');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar hooks:', error);
-}
+// ===================================
+// IMPORTACIONES ESTÁTICAS (HERMES-COMPATIBLE)
+// ===================================
 
-// Importar las pantallas con manejo de errores
-let HomeScreen: any, SearchScreen: any, BookingsScreen: any, ProfileScreen: any;
-let BoatDetailsScreen: any, BookingScreen: any, PaymentScreen: any;
-let LoginScreen: any, RegisterScreen: any, ForgotPasswordScreen: any;
+// Hooks del store
+import { useAppSelector } from '../store/hooks';
 
-try {
-  HomeScreen = require('../screens/home/HomeScreen').default;
-  console.log('✅ [AppNavigator] HomeScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar HomeScreen:', error);
-  HomeScreen = () => <View><Text>Error cargando HomeScreen</Text></View>;
-}
+// Navegador de autenticación
+import { AuthNavigator } from './AuthNavigator';
 
-try {
-  const searchModule = require('../screens/search/SearchScreen');
-  SearchScreen = searchModule.SearchScreen || searchModule.default;
-  console.log('✅ [AppNavigator] SearchScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar SearchScreen:', error);
-  SearchScreen = () => <View><Text>Error cargando SearchScreen</Text></View>;
-}
+// Pantallas principales
+import HomeScreen from '../screens/home/HomeScreen';
+import SearchScreen from '../screens/search/SearchScreen';
+import BookingsScreen from '../screens/bookings/BookingsScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
 
-try {
-  const bookingsModule = require('../screens/bookings/BookingsScreen');
-  BookingsScreen = bookingsModule.BookingsScreen || bookingsModule.default;
-  console.log('✅ [AppNavigator] BookingsScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar BookingsScreen:', error);
-  BookingsScreen = () => <View><Text>Error cargando BookingsScreen</Text></View>;
-}
+// Pantallas de detalles y booking
+import BoatDetailsScreen from '../screens/boats/BoatDetailsScreen';
+import { BookingScreen } from '../screens/booking/BookingScreen';
+import { PaymentScreen } from '../screens/payment/PaymentScreen';
 
-try {
-  const profileModule = require('../screens/profile/ProfileScreen');
-  ProfileScreen = profileModule.ProfileScreen || profileModule.default;
-  console.log('✅ [AppNavigator] ProfileScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar ProfileScreen:', error);
-  ProfileScreen = () => <View><Text>Error cargando ProfileScreen</Text></View>;
-}
+console.log('✅ [AppNavigator] Todas las pantallas importadas estáticamente');
 
-try {
-  BoatDetailsScreen = require('../screens/boats/BoatDetailsScreen').default;
-  console.log('✅ [AppNavigator] BoatDetailsScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar BoatDetailsScreen:', error);
-  BoatDetailsScreen = () => <View><Text>Error cargando BoatDetailsScreen</Text></View>;
-}
-
-try {
-  const bookingModule = require('../screens/booking/BookingScreen');
-  BookingScreen = bookingModule.BookingScreen || bookingModule.default;
-  console.log('✅ [AppNavigator] BookingScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar BookingScreen:', error);
-  BookingScreen = () => <View><Text>Error cargando BookingScreen</Text></View>;
-}
-
-try {
-  const paymentModule = require('../screens/payment/PaymentScreen');
-  PaymentScreen = paymentModule.PaymentScreen || paymentModule.default;
-  console.log('✅ [AppNavigator] PaymentScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar PaymentScreen:', error);
-  PaymentScreen = () => <View><Text>Error cargando PaymentScreen</Text></View>;
-}
-
-try {
-  LoginScreen = require('../screens/auth/LoginScreen').default;
-  console.log('✅ [AppNavigator] LoginScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar LoginScreen:', error);
-  LoginScreen = () => <View><Text>Error cargando LoginScreen</Text></View>;
-}
-
-try {
-  RegisterScreen = require('../screens/auth/RegisterScreen').default;
-  console.log('✅ [AppNavigator] RegisterScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar RegisterScreen:', error);
-  RegisterScreen = () => <View><Text>Error cargando RegisterScreen</Text></View>;
-}
-
-try {
-  ForgotPasswordScreen = require('../screens/auth/ForgotPasswordScreen').default;
-  console.log('✅ [AppNavigator] ForgotPasswordScreen importado');
-} catch (error) {
-  console.error('❌ [AppNavigator] Error al importar ForgotPasswordScreen:', error);
-  ForgotPasswordScreen = () => <View><Text>Error cargando ForgotPasswordScreen</Text></View>;
-}
-
-// Tipos de navegación
+// ===================================
+// TIPOS DE NAVEGACIÓN
+// ===================================
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
@@ -125,13 +48,15 @@ export type BottomTabParamList = {
   Profile: undefined;
 };
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
-
-// Navegador de pestañas inferior
+// ===================================
+// NAVEGADOR DE PESTAÑAS INFERIOR
+// ===================================
 function BottomTabNavigator() {
   console.log('🎯 [BottomTabNavigator] Renderizando navegador de pestañas');
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -184,31 +109,22 @@ function BottomTabNavigator() {
   );
 }
 
-// Navegador principal
+// ===================================
+// NAVEGADOR PRINCIPAL
+// ===================================
 export function AppNavigator() {
   console.log('🎯 [AppNavigator] Renderizando navegador principal');
 
-  let isAuthenticated = false;
-  let isLoading = false;
+  // Obtener estado de autenticación usando hook estático
+  const authState = useAppSelector((state: any) => state?.auth);
+  const isAuthenticated = authState?.isAuthenticated || false;
+  const isLoading = authState?.isLoading || false;
 
-  // Intentar obtener el estado de autenticación
-  if (useAppSelector) {
-    try {
-      const authState = useAppSelector((state: any) => state.auth);
-      isAuthenticated = authState?.isAuthenticated || false;
-      isLoading = authState?.isLoading || false;
-      console.log('🔐 [AppNavigator] Estado de auth:', { isAuthenticated, isLoading });
-    } catch (error) {
-      console.error('❌ [AppNavigator] Error al obtener estado de auth:', error);
-      isLoading = false;
-    }
-  } else {
-    console.warn('⚠️ [AppNavigator] useAppSelector no disponible, usando valores por defecto');
-    isLoading = false;
-  }
+  console.log('🔐 [AppNavigator] Estado de auth:', { isAuthenticated, isLoading });
 
+  // Pantalla de carga
   if (isLoading) {
-    console.log('⏳ [AppNavigator] Mostrando pantalla de carga de auth');
+    console.log('⏳ [AppNavigator] Mostrando pantalla de carga');
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#0066CC" />
@@ -229,17 +145,29 @@ export function AppNavigator() {
           <Stack.Screen
             name="BoatDetails"
             component={BoatDetailsScreen}
-            options={{ headerShown: true, title: 'Detalles del Barco' }}
+            options={{
+              headerShown: true,
+              title: 'Detalles del Barco',
+              headerBackTitle: 'Atrás'
+            }}
           />
           <Stack.Screen
             name="Booking"
             component={BookingScreen}
-            options={{ headerShown: true, title: 'Reservar' }}
+            options={{
+              headerShown: true,
+              title: 'Reservar',
+              headerBackTitle: 'Atrás'
+            }}
           />
           <Stack.Screen
             name="Payment"
             component={PaymentScreen}
-            options={{ headerShown: true, title: 'Pago' }}
+            options={{
+              headerShown: true,
+              title: 'Pago',
+              headerBackTitle: 'Atrás'
+            }}
           />
         </>
       )}
