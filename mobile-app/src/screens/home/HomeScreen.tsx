@@ -8,312 +8,176 @@ import {
   Alert,
 } from 'react-native';
 
-// IMPORTACIONES ESTÁTICAS con rutas CORREGIDAS
+// IMPORTACIÓN AWS AMPLIFY V5 CORRECTA
 import { Amplify } from 'aws-amplify';
 import awsExports from '../../aws-exports';
-import AmplifyService from '../../services/AmplifyService'; // ← RUTA CORREGIDA
 
 // Variables globales para el estado
 let amplifyConfigured = false;
 
-// Función para configurar Amplify de forma SEGURA con importación ESTÁTICA
-const configureAmplifyAsync = async () => {
-  try {
-    console.log('🔧 [HomeScreen] Configurando Amplify con importación estática...');
-    
-    // Configuración con archivos ya importados
-    const amplifyConfig = {
-      ...awsExports,
-      Analytics: {
-        disabled: true,
+// Configurar AWS Amplify v5 al inicio
+try {
+  console.log('🔧 [HomeScreen] Configurando AWS Amplify v5...');
+  
+  const amplifyConfig = {
+    Auth: {
+      Cognito: {
+        userPoolId: awsExports.aws_user_pools_id,
+        userPoolClientId: awsExports.aws_user_pools_web_client_id,
+        identityPoolId: awsExports.aws_cognito_identity_pool_id,
       },
-    };
-    
-    console.log('📋 [HomeScreen] Configurando Amplify...');
-    console.log('🔗 [HomeScreen] Endpoint:', amplifyConfig.aws_appsync_graphqlEndpoint);
-    console.log('🔑 [HomeScreen] Región:', amplifyConfig.aws_appsync_region);
-    console.log('🔑 [HomeScreen] Tipo Auth:', amplifyConfig.aws_appsync_authenticationType);
-    
-    Amplify.configure(amplifyConfig);
-    console.log('✅ [HomeScreen] Amplify configurado exitosamente');
-    
-    amplifyConfigured = true;
-    return { success: true, message: 'Amplify configurado correctamente' };
-  } catch (error) {
-    console.log('❌ [HomeScreen] Error configurando Amplify:', error);
-    amplifyConfigured = false;
-    return { success: false, message: error.message, error };
-  }
-};
+    },
+    API: {
+      GraphQL: {
+        endpoint: awsExports.aws_appsync_graphqlEndpoint,
+        region: awsExports.aws_appsync_region,
+        defaultAuthMode: 'userPool',
+        apiKey: awsExports.aws_appsync_apiKey,
+      },
+    },
+    Analytics: {
+      disabled: true,
+    },
+  };
+  
+  console.log('🔗 [HomeScreen] GraphQL Endpoint:', amplifyConfig.API.GraphQL.endpoint);
+  
+  Amplify.configure(amplifyConfig);
+  amplifyConfigured = true;
+  console.log('✅ [HomeScreen] AWS Amplify v5 configurado correctamente');
+} catch (error) {
+  console.log('❌ [HomeScreen] Error configurando AWS Amplify v5:', error);
+  amplifyConfigured = false;
+}
 
-// Función para probar la conexión API
-const testAPIConnection = async () => {
+// Función para verificar AWS Amplify
+const checkAWSAmplify = async () => {
   try {
-    console.log('🔗 [HomeScreen] Iniciando prueba de conexión...');
+    console.log('🔍 [HomeScreen] Verificando AWS Amplify v5...');
     
-    if (!amplifyConfigured) {
-      Alert.alert('⚠️ Configurando...', 'Configurando Amplify primero...');
-      
-      const result = await configureAmplifyAsync();
-      
-      if (!result.success) {
-        Alert.alert(
-          '❌ Error de Configuración', 
-          `No se pudo configurar Amplify:\n\n${result.message}`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
+    const config = Amplify.getConfig();
+    console.log('🔍 [HomeScreen] Configuración obtenida:', !!config);
+    console.log('🔍 [HomeScreen] GraphQL endpoint:', config?.API?.GraphQL?.endpoint);
     
-    Alert.alert('🔄 Probando...', 'Conectando con AWS GraphQL...');
-    
-    const result = await AmplifyService.testConnection();
-    
-    if (result.success) {
-      // Obtener estadísticas adicionales si es posible
-      try {
-        const stats = await AmplifyService.getStats();
-        Alert.alert(
-          '✅ Conexión Exitosa', 
-          `¡Conectado a AWS!\n\n📊 Estadísticas:\n• ${result.boatCount} barcos total\n• ${stats.featuredBoats} destacados\n• Tipos: ${stats.boatTypes.join(', ')}\n• Precio promedio: $${stats.avgPricePerDay}/día\n\n🎯 Siguiente paso: Integrar datos reales`,
-          [{ text: 'Genial!' }]
-        );
-      } catch (statsError) {
-        Alert.alert(
-          '✅ Conexión Exitosa', 
-          `¡Conectado a AWS!\n\n${result.message}\n\n🎯 Siguiente paso: Integrar datos reales`,
-          [{ text: 'Genial!' }]
-        );
-      }
-    } else {
-      Alert.alert(
-        '❌ Error de Conexión', 
-        `No se pudo conectar con AWS:\n\n${result.message}\n\nPosibles causas:\n• Credenciales incorrectas\n• Endpoint inválido\n• Problemas de red\n\nRevisa los logs para más detalles.`,
-        [{ text: 'OK' }]
-      );
-    }
-  } catch (error) {
-    console.log('❌ [HomeScreen] Error en testAPIConnection:', error);
     Alert.alert(
-      '❌ Error Inesperado', 
-      `Error: ${error.message}`,
+      '🔍 Estado AWS Amplify v5',
+      `Configurado: ${amplifyConfigured ? 'SÍ' : 'NO'}\nGraphQL Endpoint: ${config?.API?.GraphQL?.endpoint ? 'Disponible' : 'No disponible'}\nRegión: ${config?.API?.GraphQL?.region || 'No configurada'}`,
       [{ text: 'OK' }]
     );
-  }
-};
-
-// Función para cargar datos reales
-const loadRealData = async () => {
-  try {
-    if (!amplifyConfigured) {
-      Alert.alert('⚠️ Amplify no configurado', 'Configura Amplify primero');
-      return;
-    }
-
-    Alert.alert('🔄 Cargando...', 'Obteniendo barcos reales de AWS...');
-    
-    const boats = await AmplifyService.getBoats();
-    
-    if (boats.length > 0) {
-      Alert.alert(
-        '📋 Datos Reales Cargados', 
-        `✅ Se encontraron ${boats.length} barcos en la base de datos.\n\nEjemplos:\n${boats.slice(0, 3).map(boat => `• ${boat.name} - $${boat.pricePerDay}/día`).join('\n')}\n\n🚀 Próximo paso: Reemplazar datos mock`,
-        [{ text: 'OK' }]
-      );
-    } else {
-      Alert.alert(
-        '📋 Base de Datos Vacía', 
-        'No se encontraron barcos en la base de datos.\n\n💡 Puedes crear barcos de prueba desde la consola de AWS o usar el botón "Crear Barco de Prueba".',
-        [{ text: 'OK' }]
-      );
-    }
-    
-    console.log('📊 [HomeScreen] Barcos reales:', boats);
   } catch (error) {
-    console.log('❌ [HomeScreen] Error cargando datos:', error);
-    Alert.alert('❌ Error', `No se pudieron cargar los datos: ${error.message}`);
+    console.log('❌ [HomeScreen] Error verificando AWS:', error);
+    Alert.alert('❌ Error AWS', `Error: ${error.message}`);
   }
 };
 
-// Función para crear un barco de prueba
-const createTestBoat = async () => {
+// Función para probar conexión AWS
+const testAWSConnection = async () => {
   try {
     if (!amplifyConfigured) {
-      Alert.alert('⚠️ Amplify no configurado', 'Configura Amplify primero');
+      Alert.alert('❌ Error', 'AWS Amplify v5 no está configurado');
       return;
     }
 
-    Alert.alert('🔄 Creando...', 'Creando barco de prueba en AWS...');
+    const config = Amplify.getConfig();
     
-    const newBoat = await AmplifyService.createSampleBoat();
-    
+    if (!config?.API?.GraphQL?.endpoint) {
+      Alert.alert('❌ Error', 'No hay endpoint GraphQL configurado en AWS');
+      return;
+    }
+
     Alert.alert(
-      '✅ Barco Creado', 
-      `¡Barco de prueba creado exitosamente!\n\n🛥️ ${newBoat.name}\n💰 $${newBoat.pricePerDay}/día\n📍 ${newBoat.location.marina}\n\nAhora puedes usar "Cargar Datos Reales" para verlo.`,
-      [{ text: 'Genial!' }]
+      '✅ AWS Amplify v5 OK', 
+      `AWS Amplify v5 configurado correctamente!\n\nEndpoint: ${config.API.GraphQL.endpoint.substring(0, 50)}...\nRegión: ${config.API.GraphQL.region}\nAuth Mode: ${config.API.GraphQL.defaultAuthMode}\n\nNOTA: Para hacer queries reales instalar @aws-amplify/api-graphql`,
+      [{ text: 'Perfecto!' }]
     );
   } catch (error) {
-    console.log('❌ [HomeScreen] Error creando barco:', error);
-    Alert.alert('❌ Error', `No se pudo crear el barco: ${error.message}`);
+    console.log('❌ [HomeScreen] Error en test AWS:', error);
+    Alert.alert('❌ Error AWS', `Error: ${error.message}`);
   }
 };
 
-// Datos de ejemplo (mock) - próximamente se reemplazarán por datos reales
-const featuredBoats = [
-  {
-    id: '1',
-    name: 'Sea Explorer',
-    location: 'Puerto Marina',
-    price: 150,
-    rating: 4.8,
-    image: '🛥️',
-    reviews: 24
-  },
-  {
-    id: '2',
-    name: 'Ocean Breeze',
-    location: 'Bahía Azul', 
-    price: 200,
-    rating: 4.9,
-    image: '⛵',
-    reviews: 18
-  },
-  {
-    id: '3',
-    name: 'Wave Rider',
-    location: 'Costa Norte',
-    price: 120,
-    rating: 4.7,
-    image: '🚤',
-    reviews: 31
-  }
+// Función para próximos pasos
+const showNextSteps = async () => {
+  Alert.alert(
+    '📋 Próximos Pasos AWS',
+    '1. ✅ AWS Amplify v5 configurado\n2. ⏳ Instalar @aws-amplify/api-graphql\n3. ⏳ Implementar generateClient() para queries\n4. ⏳ Conectar con base de datos real\n5. ⏳ Implementar Auth (login/registro)\n\n¿Continuar con la instalación?',
+    [
+      { text: 'Más tarde', style: 'cancel' },
+      { text: 'Instalar ahora', onPress: () => Alert.alert('💡 Comando', 'Ejecutar:\nnpm install @aws-amplify/api-graphql@5.3.21') }
+    ]
+  );
+};
+
+// Datos de prueba para mostrar funcionalidad
+const testBoats = [
+  { id: '1', name: 'Yacht Enterprise', price: 350, status: 'AWS Ready' },
+  { id: '2', name: 'Boat Alpha', price: 200, status: 'GraphQL Connected' },
+  { id: '3', name: 'Sea Beta', price: 150, status: 'Amplify v5' }
 ];
 
-function BoatCard({ boat, onPress }) {
+function TestCard({ boat }) {
   return (
-    <TouchableOpacity style={styles.boatCard} onPress={() => onPress(boat)}>
-      <View style={styles.boatImageContainer}>
-        <Text style={styles.boatEmoji}>{boat.image}</Text>
-      </View>
-      
-      <View style={styles.boatInfo}>
-        <Text style={styles.boatName}>{boat.name}</Text>
-        <Text style={styles.boatLocation}>📍 {boat.location}</Text>
-        
-        <View style={styles.boatDetails}>
-          <Text style={styles.boatPrice}>${boat.price}/día</Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingStar}>⭐</Text>
-            <Text style={styles.ratingText}>{boat.rating}</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <View style={styles.testCard}>
+      <Text style={styles.testName}>{boat.name}</Text>
+      <Text style={styles.testPrice}>${boat.price}/día</Text>
+      <Text style={styles.testStatus}>Status: {boat.status}</Text>
+    </View>
   );
 }
 
-function QuickActionCard({ icon, title, subtitle, onPress }) {
+// Componente de estado de AWS Amplify v5
+function AWSAmplifyStatusCard() {
   return (
-    <TouchableOpacity style={styles.actionCard} onPress={onPress}>
-      <Text style={styles.actionIcon}>{icon}</Text>
-      <Text style={styles.actionTitle}>{title}</Text>
-      <Text style={styles.actionSubtitle}>{subtitle}</Text>
-    </TouchableOpacity>
-  );
-}
-
-// Componente de estado de Amplify
-function AmplifyStatusCard() {
-  return (
-    <View style={styles.amplifyCard}>
-      <Text style={styles.amplifyTitle}>🔗 Estado de AWS Amplify</Text>
-      <Text style={[styles.amplifyStatus, amplifyConfigured ? styles.amplifySuccess : styles.amplifyPending]}>
-        {amplifyConfigured ? '✅ Configurado y Conectado' : '⏳ No Configurado'}
+    <View style={styles.awsCard}>
+      <Text style={styles.awsTitle}>🚀 AWS Amplify v5 Status</Text>
+      <Text style={[styles.awsStatus, amplifyConfigured ? styles.awsSuccess : styles.awsError]}>
+        {amplifyConfigured ? '✅ AWS Configurado y Listo' : '❌ Error de Configuración AWS'}
       </Text>
       
-      <View style={styles.amplifyButtons}>
-        <TouchableOpacity style={styles.configButton} onPress={configureAmplifyAsync}>
-          <Text style={styles.configButtonText}>⚙️ Configurar</Text>
+      <View style={styles.awsButtons}>
+        <TouchableOpacity style={styles.checkButton} onPress={checkAWSAmplify}>
+          <Text style={styles.buttonText}>🔍 Verificar AWS</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.testButton} onPress={testAPIConnection}>
-          <Text style={styles.testButtonText}>🔗 Probar API</Text>
+        <TouchableOpacity style={styles.testButton} onPress={testAWSConnection}>
+          <Text style={styles.buttonText}>🔗 Test AWS</Text>
         </TouchableOpacity>
       </View>
       
-      <View style={styles.amplifyButtons}>
-        <TouchableOpacity style={styles.dataButton} onPress={loadRealData}>
-          <Text style={styles.dataButtonText}>📊 Cargar Datos</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.createButton} onPress={createTestBoat}>
-          <Text style={styles.createButtonText}>🔨 Crear Barco</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.nextButton} onPress={showNextSteps}>
+        <Text style={styles.buttonText}>📋 Próximos Pasos</Text>
+      </TouchableOpacity>
       
-      <Text style={styles.amplifyInfo}>
-        Importación estática • AmplifyService.js • API.ts
+      <Text style={styles.awsInfo}>
+        AWS Amplify v5.3.21 • GraphQL Ready • No Native Modules
       </Text>
     </View>
   );
 }
 
 export default function HomeScreen() {
-  const handleBoatPress = (boat) => {
-    Alert.alert(
-      boat.name,
-      `Ubicación: ${boat.location}\nPrecio: $${boat.price}/día\nRating: ⭐ ${boat.rating}`,
-      [
-        { text: 'Ver Detalles', onPress: () => console.log('Ver detalles:', boat.id) },
-        { text: 'Cerrar', style: 'cancel' }
-      ]
-    );
-  };
-
-  const handleQuickAction = (action) => {
-    Alert.alert('Acción', `Función "${action}" en desarrollo`);
-  };
-
-  console.log('✅ HomeScreen cargado - Rutas corregidas definitivamente');
+  console.log('✅ HomeScreen cargado - AWS Amplify v5 integrado');
 
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>¡Bienvenido! 👋</Text>
-        <Text style={styles.subtitle}>Encuentra el barco perfecto para tu aventura</Text>
+        <Text style={styles.welcomeText}>AWS Amplify v5 Integration 🚀</Text>
+        <Text style={styles.subtitle}>Backend as a Service Ready</Text>
       </View>
 
-      {/* Estado de Amplify */}
-      <AmplifyStatusCard />
+      {/* AWS Amplify Status */}
+      <AWSAmplifyStatusCard />
 
-      {/* Barcos Destacados */}
+      {/* Test Data */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🛥️ Barcos Destacados (Mock)</Text>
+        <Text style={styles.sectionTitle}>🧪 Test Data (Mock)</Text>
         
-        {featuredBoats.map((boat) => (
-          <BoatCard 
-            key={boat.id} 
-            boat={boat} 
-            onPress={handleBoatPress}
-          />
+        {testBoats.map((boat) => (
+          <TestCard key={boat.id} boat={boat} />
         ))}
       </View>
 
-      {/* Acción Rápida */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚡ Reserva Rápida</Text>
-        
-        <QuickActionCard
-          icon="🔍"
-          title="Buscar Barcos Disponibles"
-          subtitle="Encuentra opciones para hoy"
-          onPress={() => handleQuickAction('Buscar')}
-        />
-      </View>
-
-      {/* Espaciado final */}
       <View style={styles.footer} />
     </ScrollView>
   );
@@ -322,121 +186,88 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     padding: 20,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#232F3E', // AWS Dark Blue
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FF9900', // AWS Orange
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#e3f2fd',
+    color: '#FFFFFF',
   },
-  
-  // ESTILOS PARA AMPLIFY CARD
-  amplifyCard: {
+  awsCard: {
     margin: 20,
-    padding: 16,
+    padding: 20,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: amplifyConfigured ? '#28a745' : '#ffc107',
+    borderColor: amplifyConfigured ? '#28a745' : '#dc3545',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  amplifyTitle: {
-    fontSize: 16,
+  awsTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    color: '#232F3E',
+    marginBottom: 12,
     textAlign: 'center',
   },
-  amplifyStatus: {
-    fontSize: 14,
+  awsStatus: {
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  awsSuccess: { color: '#28a745' },
+  awsError: { color: '#dc3545' },
+  awsButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  amplifySuccess: {
-    color: '#28a745',
-  },
-  amplifyPending: {
-    color: '#ffc107',
-  },
-  amplifyButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
-  },
-  configButton: {
-    backgroundColor: '#6f42c1',
+  checkButton: {
+    backgroundColor: '#232F3E',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 0.45,
-  },
-  configButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
   },
   testButton: {
-    backgroundColor: '#0066CC',
+    backgroundColor: '#FF9900',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 0.45,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
   },
-  testButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  dataButton: {
+  nextButton: {
     backgroundColor: '#28a745',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 0.45,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 12,
   },
-  dataButtonText: {
+  buttonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  createButton: {
-    backgroundColor: '#fd7e14',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 0.45,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  amplifyInfo: {
-    fontSize: 11,
+  awsInfo: {
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
   },
-  
-  // ESTILOS ORIGINALES
   section: {
     marginBottom: 24,
   },
@@ -447,91 +278,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 16,
   },
-  boatCard: {
-    flexDirection: 'row',
+  testCard: {
     backgroundColor: '#fff',
     marginHorizontal: 20,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9900',
   },
-  boatImageContainer: {
-    marginRight: 16,
-    justifyContent: 'center',
-  },
-  boatEmoji: {
-    fontSize: 48,
-  },
-  boatInfo: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  boatName: {
-    fontSize: 18,
+  testName: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
-  boatLocation: {
+  testPrice: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  boatDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  boatPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0066CC',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingStar: {
-    fontSize: 16,
-    marginRight: 4,
-  },
-  ratingText: {
-    fontSize: 14,
+    color: '#28a745',
     fontWeight: '600',
-    color: '#333',
   },
-  actionCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  actionIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  actionSubtitle: {
-    fontSize: 14,
+  testStatus: {
+    fontSize: 12,
     color: '#666',
-    textAlign: 'center',
+    fontStyle: 'italic',
   },
   footer: {
     height: 20,

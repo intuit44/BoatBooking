@@ -1,11 +1,18 @@
 ﻿// src/services/api.js
-import { API, graphqlOperation } from 'aws-amplify';
 import { listBoats } from '../graphql/queries';
 import { createBoat } from '../graphql/mutations';
 
+let API, graphqlOperation;
+
 class BoatRentalAPI {
+  static init({ API: apiInstance, graphqlOperation: gqlOp }) {
+    API = apiInstance;
+    graphqlOperation = gqlOp;
+  }
+
   // Función de prueba - obtener barcos
   static async getBoats() {
+    if (!API || !graphqlOperation) throw new Error('API no inicializado');
     try {
       console.log('🔍 Intentando obtener barcos desde API...');
       const result = await API.graphql(graphqlOperation(listBoats));
