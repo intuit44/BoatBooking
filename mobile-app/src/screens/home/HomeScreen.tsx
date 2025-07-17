@@ -10,6 +10,12 @@ import {
   SafeAreaView,
 } from 'react-native';
 
+// ✅ ES6 IMPORTS - AWS Amplify v6
+import { Amplify } from 'aws-amplify';
+import { generateClient } from 'aws-amplify/api';
+import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import awsExports from '../../aws-exports';
+
 
 // =============================================================================
 // TIPOS PARA SUPRIMIR ERRORES TYPESCRIPT
@@ -54,33 +60,18 @@ let modulesLoaded = false;
 let graphqlClient = null;
 let configurationError = null;
 
-// Módulos AWS
-let Amplify, generateClient, getCurrentUser, fetchAuthSession;
-let awsExports: AWSExports = {};
-
-// Inicialización con require() que funcionaba
+// Inicialización con ES6 imports
 if (!amplifyInitialized) {
   console.log('🔄 [HomeScreen] Cargando módulos AWS Amplify v6...');
 
   try {
-    // Cargar módulos con require() (FUNCIONABA)
-    const amplifyCore = require('aws-amplify');
-    Amplify = amplifyCore.Amplify;
+    // ✅ Los módulos ya están importados con ES6
     console.log('✅ [HomeScreen] Amplify core cargado');
-
-    const amplifyApi = require('aws-amplify/api');
-    generateClient = amplifyApi.generateClient;
     console.log('✅ [HomeScreen] API GraphQL cargado');
-
-    const amplifyAuth = require('aws-amplify/auth');
-    getCurrentUser = amplifyAuth.getCurrentUser;
-    fetchAuthSession = amplifyAuth.fetchAuthSession;
     console.log('✅ [HomeScreen] Auth cargado');
 
-    // Cargar aws-exports con protección
+    // Validar aws-exports con protección
     try {
-      const awsExportsModule = require('../../aws-exports');
-      awsExports = awsExportsModule?.default || awsExportsModule || {};
       console.log('✅ [HomeScreen] aws-exports cargado');
       // @ts-ignore - awsExports runtime properties
       console.log('🔗 [HomeScreen] GraphQL Endpoint:', awsExports.aws_appsync_graphqlEndpoint ? 'Configurado' : 'No disponible');
@@ -88,12 +79,14 @@ if (!amplifyInitialized) {
       console.log('🔐 [HomeScreen] User Pool:', awsExports.aws_user_pools_id ? 'Configurado' : 'No disponible');
     } catch (awsError) {
       console.warn('⚠️ [HomeScreen] aws-exports no disponible:', awsError.message);
-      awsExports = {
+      // Fallback configuration si aws-exports falla
+      const fallbackConfig = {
         aws_project_region: 'us-east-1',
         aws_user_pools_id: 'fallback-pool',
         aws_user_pools_web_client_id: 'fallback-client',
         aws_appsync_graphqlEndpoint: 'https://fallback.amazonaws.com/graphql'
       };
+      // Note: En este caso usaríamos fallbackConfig para Amplify.configure()
     }
 
     modulesLoaded = true;
@@ -254,12 +247,12 @@ const testBoats = [
 
 function TestCard({ boat }) {
   console.log('🚀 [HomeScreen] RETURN STATEMENT - About to render JSX');
-  console.log('📋 [HomeScreen] Component state:', { 
-    modulesLoaded, 
-    amplifyConfigured, 
-    hasClient: !!graphqlClient 
+  console.log('📋 [HomeScreen] Component state:', {
+    modulesLoaded,
+    amplifyConfigured,
+    hasClient: !!graphqlClient
   });
-  
+
   return (
     <View style={styles.testCard}>
       <View style={styles.cardHeader}>
