@@ -1,0 +1,13 @@
+{
+    "AppSyncApiName": "boatrentallapp",
+    "DynamoDBBillingMode": "PAY_PER_REQUEST",
+    "DynamoDBEnableServerSideEncryption": false,
+    "AuthCognitoUserPoolId": {
+        "Fn::GetAtt": [
+            "authboatrentallapp31507f7c",
+            "Outputs.UserPoolId"
+        ]
+    },
+    "S3DeploymentBucket": "amplify-boatrentallapp-dev-8193e-deployment",
+    "S3DeploymentRootKey": "amplify-appsync-files/806d997b999916d210951936b8bdaefc05cf13f1"
+}

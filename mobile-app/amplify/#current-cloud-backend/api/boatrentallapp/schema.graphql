@@ -1,0 +1,298 @@
+# Configuración de autorización global (temporal para desarrollo)
+input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
+
+# Enums para tipos específicos
+enum BoatType {
+  YACHT
+  SAILBOAT
+  MOTORBOAT
+  CATAMARAN
+  JETSKI
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  IN_PROGRESS
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIAL
+}
+
+enum UserRole {
+  GUEST
+  OWNER
+  ADMIN
+}
+
+# Tipos personalizados para objetos anidados
+type Location {
+  marina: String!
+  state: String!
+  coordinates: Coordinates!
+}
+
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+}
+
+type Specifications {
+  length: Float!
+  engine: String!
+  fuel: String!
+  year: Int!
+}
+
+type Availability {
+  available: Boolean!
+  blockedDates: [String!]!
+}
+
+type ContactInfo {
+  name: String!
+  email: String!
+  phone: String!
+}
+
+type Quote {
+  subtotal: Float!
+  taxes: Float!
+  serviceFee: Float!
+  totalAmount: Float!
+  currency: String!
+}
+
+# Modelo: User (extendido de Cognito)
+type User @model @auth(rules: [
+  { allow: owner, ownerField: "id" },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  email: String! @index(name: "byEmail")
+  name: String!
+  phone: String
+  role: UserRole!
+  verified: Boolean!
+  rating: Float
+  profileImage: String
+  
+  # Información adicional
+  dateOfBirth: AWSDate
+  address: String
+  emergencyContact: ContactInfo
+  
+  # Relaciones
+  ownedBoats: [Boat] @hasMany(indexName: "byOwner", fields: ["id"])
+  bookings: [Booking] @hasMany(indexName: "byUser", fields: ["id"])
+  reservations: [Reservation] @hasMany(indexName: "byUser", fields: ["id"])
+  reviews: [Review] @hasMany(indexName: "byUser", fields: ["id"])
+  payments: [Payment] @hasMany(indexName: "byUser", fields: ["id"])
+  notifications: [Notification] @hasMany(indexName: "byUser", fields: ["id"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo principal: Boat
+type Boat @model @auth(rules: [
+  { allow: public, operations: [read] },
+  { allow: owner, ownerField: "ownerId", operations: [create, update, delete] },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  name: String! @index(name: "byName")
+  type: BoatType! @index(name: "byType")
+  description: String!
+  capacity: Int!
+  pricePerHour: Float!
+  pricePerDay: Float!
+  rating: Float
+  reviews: Int
+  images: [String!]!
+  location: Location!
+  specifications: Specifications!
+  amenities: [String!]!
+  availability: Availability!
+  featured: Boolean!
+  ownerId: ID! @index(name: "byOwner")
+  
+  # Relaciones
+  owner: User @belongsTo(fields: ["ownerId"])
+  bookings: [Booking] @hasMany(indexName: "byBoat", fields: ["id"])
+  reservations: [Reservation] @hasMany(indexName: "byBoat", fields: ["id"])
+  boatReviews: [Review] @hasMany(indexName: "byBoat", fields: ["id"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo: Booking (reservas confirmadas)
+type Booking @model @auth(rules: [
+  { allow: owner, ownerField: "userId" },
+  { allow: owner, ownerField: "boatOwnerId" },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  userId: ID! @index(name: "byUser")
+  boatId: ID! @index(name: "byBoat")
+  boatOwnerId: ID! # Para que el dueño del bote pueda ver la reserva
+  
+  # Fechas y duración
+  startDate: AWSDateTime!
+  endDate: AWSDateTime!
+  totalHours: Int!
+  totalDays: Int!
+  
+  # Precios
+  pricePerHour: Float!
+  pricePerDay: Float!
+  totalAmount: Float!
+  
+  # Estados
+  status: BookingStatus! @index(name: "byStatus")
+  paymentStatus: PaymentStatus!
+  
+  # Información adicional
+  guestCount: Int!
+  specialRequests: String
+  
+  # Relaciones
+  user: User @belongsTo(fields: ["userId"])
+  boat: Boat @belongsTo(fields: ["boatId"])
+  payment: Payment @hasOne
+  review: Review @hasOne
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo: Reservation (reservas temporales)
+type Reservation @model @auth(rules: [
+  { allow: owner, ownerField: "userId" },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  userId: ID! @index(name: "byUser")
+  boatId: ID! @index(name: "byBoat")
+  
+  # Fechas y duración
+  startDate: AWSDateTime!
+  endDate: AWSDateTime!
+  totalHours: Int!
+  totalDays: Int!
+  
+  # Información del huésped
+  guestCount: Int!
+  specialRequests: String
+  contactInfo: ContactInfo!
+  
+  # Cotización
+  quote: Quote!
+  
+  # Estado y expiración
+  status: String! # pending, confirmed, expired, cancelled
+  expiresAt: AWSDateTime!
+  
+  # Relaciones
+  user: User @belongsTo(fields: ["userId"])
+  boat: Boat @belongsTo(fields: ["boatId"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo: Payment
+type Payment @model @auth(rules: [
+  { allow: owner, ownerField: "userId" },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  userId: ID! @index(name: "byUser")
+  bookingId: ID! @index(name: "byBooking")
+  
+  # Información del pago
+  amount: Float!
+  currency: String!
+  paymentMethod: String! # card, transfer, cash, etc.
+  paymentProvider: String # stripe, paypal, etc.
+  transactionId: String
+  
+  # Estado
+  status: PaymentStatus! @index(name: "byStatus")
+  
+  # Fechas
+  paidAt: AWSDateTime
+  refundedAt: AWSDateTime
+  
+  # Relaciones
+  user: User @belongsTo(fields: ["userId"])
+  booking: Booking @belongsTo(fields: ["bookingId"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo: Review
+type Review @model @auth(rules: [
+  { allow: owner, ownerField: "userId" },
+  { allow: public, operations: [read] },
+  { allow: groups, groups: ["admin"] }
+]) {
+  id: ID!
+  userId: ID! @index(name: "byUser")
+  boatId: ID! @index(name: "byBoat")
+  bookingId: ID! @index(name: "byBooking")
+  
+  # Calificación y comentario
+  rating: Int! # 1-5
+  comment: String
+  images: [String!]
+  
+  # Calificaciones específicas
+  cleanlinessRating: Int
+  communicationRating: Int
+  accuracyRating: Int
+  valueRating: Int
+  
+  # Estado
+  approved: Boolean!
+  
+  # Relaciones
+  user: User @belongsTo(fields: ["userId"])
+  boat: Boat @belongsTo(fields: ["boatId"])
+  booking: Booking @belongsTo(fields: ["bookingId"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Modelo: Notification
+type Notification @model @auth(rules: [
+  { allow: owner, ownerField: "userId" }
+]) {
+  id: ID!
+  userId: ID! @index(name: "byUser")
+  
+  title: String!
+  message: String!
+  type: String! # booking, payment, review, etc.
+  read: Boolean!
+  
+  # Datos adicionales
+  relatedId: String # ID del booking, payment, etc.
+  actionUrl: String
+  
+  # Relación
+  user: User @belongsTo(fields: ["userId"])
+  
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}

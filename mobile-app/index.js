@@ -21,7 +21,9 @@ try {
   App = () => null; // Fallback
 }
 
+console.log('🔥 [Index] ===== INDEX.JS EJECUTADO =====');
 console.log('🚀 [Index] Iniciando con AWS Amplify v6 Ultra Robusto...');
+console.log('📱 [Index] Registrando componente principal...');
 
 // Registro correcto de la aplicación
 AppRegistry.registerComponent('main', () => App);

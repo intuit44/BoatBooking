@@ -253,6 +253,13 @@ const testBoats = [
 // =============================================================================
 
 function TestCard({ boat }) {
+  console.log('🚀 [HomeScreen] RETURN STATEMENT - About to render JSX');
+  console.log('📋 [HomeScreen] Component state:', { 
+    modulesLoaded, 
+    amplifyConfigured, 
+    hasClient: !!graphqlClient 
+  });
+  
   return (
     <View style={styles.testCard}>
       <View style={styles.cardHeader}>
@@ -355,7 +362,10 @@ class AWSStatusCard extends React.Component {
 // =============================================================================
 
 export default function HomeScreen() {
-  console.log('✅ [HomeScreen] Renderizando (RESTORED require)');
+  console.log('🚨 [HomeScreen] ===== RENDER FUNCTION EJECUTADA =====');
+  console.log('🎯 [HomeScreen] Timestamp:', new Date().toISOString());
+  console.log('📊 [HomeScreen] Props recibidas:', arguments.length);
+  console.log('🔥 [HomeScreen] CONFIRMACIÓN RENDER - Component ejecutándose');
 
   return (
     <SafeAreaView style={styles.container}>

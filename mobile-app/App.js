@@ -22,6 +22,8 @@ import HomeScreen from './src/screens/home/HomeScreen';
 console.log('🚀 [App] Iniciando con AWS Amplify v6 Ultra Robusto...');
 
 export default function App() {
+  console.log('🔥 [App] ===== APP FUNCTION EJECUTADA =====');
+  console.log('🎯 [App] Timestamp:', new Date().toISOString());
   console.log('✅ [App] Iniciando render con protecciones Hermes...');
   
   // Protección adicional contra errores Hermes en render
@@ -32,7 +34,10 @@ export default function App() {
       console.log('🎯 [App] App montada exitosamente');
     }, []);
 
-    return (
+    console.log('🚀 [App] RETURN STATEMENT - About to render App JSX');
+  console.log('📦 [App] Rendering: SafeAreaProvider > PaperProvider > NavigationContainer > HomeScreen');
+  
+  return (
     <SafeAreaProvider>
       <PaperProvider>
         <NavigationContainer>

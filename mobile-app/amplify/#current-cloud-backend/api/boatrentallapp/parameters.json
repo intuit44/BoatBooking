@@ -1,0 +1,12 @@
+{
+  "AppSyncApiName": "boatrentallapp",
+  "DynamoDBBillingMode": "PAY_PER_REQUEST",
+  "DynamoDBEnableServerSideEncryption": false,
+  "AuthCognitoUserPoolId": {
+    "Fn::GetAtt": [
+      "authboatrentallapp31507f7c",
+      "Outputs.UserPoolId"
+    ]
+  },
+  "AuthModeLastUpdated": "2025-07-02T18:54:56.099Z"
+}

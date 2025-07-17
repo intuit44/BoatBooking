@@ -1,0 +1,280 @@
+{
+  "providers": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-boatrentallapp-dev-8193e-authRole",
+      "UnauthRoleArn": "arn:aws:iam::196659657091:role/amplify-boatrentallapp-dev-8193e-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::196659657091:role/amplify-boatrentallapp-dev-8193e-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
+      "UnauthRoleName": "amplify-boatrentallapp-dev-8193e-unauthRole",
+      "StackName": "amplify-boatrentallapp-dev-8193e",
+      "StackId": "arn:aws:cloudformation:us-east-1:196659657091:stack/amplify-boatrentallapp-dev-8193e/c60a84e0-5578-11f0-a1fe-12bc65ee7ef1",
+      "AmplifyAppId": "dgmkgh1p5rdzp",
+      "AuthTriggerTemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/auth/auth-trigger-cloudformation-template.json"
+    }
+  },
+  "storage": {},
+  "auth": {
+    "boatrentallapp31507f7c": {
+      "service": "Cognito",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [
+        {
+          "category": "function",
+          "resourceName": "boatrentallapp31507f7cDefineAuthChallenge",
+          "triggerProvider": "Cognito",
+          "attributes": [
+            "Arn",
+            "Name"
+          ]
+        },
+        {
+          "category": "function",
+          "resourceName": "boatrentallapp31507f7cCreateAuthChallenge",
+          "triggerProvider": "Cognito",
+          "attributes": [
+            "Arn",
+            "Name"
+          ]
+        },
+        {
+          "category": "function",
+          "resourceName": "boatrentallapp31507f7cVerifyAuthChallengeResponse",
+          "triggerProvider": "Cognito",
+          "attributes": [
+            "Arn",
+            "Name"
+          ]
+        },
+        {
+          "category": "function",
+          "resourceName": "boatrentallapp31507f7cPostConfirmation",
+          "triggerProvider": "Cognito",
+          "attributes": [
+            "Arn",
+            "Name"
+          ]
+        }
+      ],
+      "customAuth": true,
+      "frontendAuthConfig": {
+        "socialProviders": [
+          "FACEBOOK",
+          "GOOGLE"
+        ],
+        "usernameAttributes": [
+          "EMAIL"
+        ],
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyMinLength": 8,
+          "passwordPolicyCharacters": []
+        },
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/auth/boatrentallapp31507f7c-cloudformation-template.json",
+        "logicalId": "authboatrentallapp31507f7c"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "output": {
+        "UserPoolId": "us-east-1_HNMjTVYHf",
+        "AppClientIDWeb": "1938tu69kg0lggmd7d5brenrkv",
+        "AppClientID": "3vb6fpla1jtvuv1r46e863dnk4",
+        "IdentityPoolId": "us-east-1:04f3873c-2acf-4e81-b298-e9e63a75c27a",
+        "UserPoolArn": "arn:aws:cognito-idp:us-east-1:196659657091:userpool/us-east-1_HNMjTVYHf",
+        "IdentityPoolName": "boatrentallapp31507f7c_identitypool_31507f7c__dev",
+        "UserPoolName": "boatrentallapp31507f7c_userpool_31507f7c",
+        "HostedUIDomain": "boatbooking-dev",
+        "OAuthMetadata": "{\"AllowedOAuthFlows\":[\"code\"],\"AllowedOAuthScopes\":[\"phone\",\"email\",\"openid\",\"profile\",\"aws.cognito.signin.user.admin\"],\"CallbackURLs\":[\"exp://localhost:19000/--/\",\"myapp://callback:/\"],\"LogoutURLs\":[\"exp://localhost:19000/--/signout/\",\"myapp://signout/\"]}",
+        "GoogleWebClient": "818290824360-ssf5e0gik6sdjn8920elcs6erdksu19a.apps.googleusercontent.com",
+        "FacebookWebClient": "1006091971437165"
+      },
+      "lastPushDirHash": "/tsYNLXG9vjpNqZ/e8+WbvCf7Qg="
+    },
+    "userPoolGroups": {
+      "service": "Cognito-UserPool-Groups",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [
+        {
+          "category": "auth",
+          "resourceName": "boatrentallapp31507f7c",
+          "attributes": [
+            "UserPoolId",
+            "AppClientIDWeb",
+            "AppClientID",
+            "IdentityPoolId"
+          ]
+        }
+      ],
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/auth/userPoolGroups-cloudformation-template.json",
+        "logicalId": "authuserPoolGroups"
+      },
+      "output": {
+        "ownerGroupRole": "arn:aws:iam::196659657091:role/us-east-1_HNMjTVYHf-ownerGroupRole",
+        "adminGroupRole": "arn:aws:iam::196659657091:role/us-east-1_HNMjTVYHf-adminGroupRole"
+      },
+      "lastPushDirHash": "qNbC7SAMmZHh+tUXWO/bR9lslXs="
+    }
+  },
+  "api": {
+    "boatrentallapp": {
+      "service": "AppSync",
+      "providerPlugin": "awscloudformation",
+      "dependsOn": [
+        {
+          "category": "auth",
+          "resourceName": "boatrentallapp31507f7c",
+          "attributes": [
+            "UserPoolId"
+          ]
+        }
+      ],
+      "output": {
+        "authConfig": {
+          "defaultAuthentication": {
+            "authenticationType": "AMAZON_COGNITO_USER_POOLS",
+            "userPoolConfig": {
+              "userPoolId": "authboatrentallapp31507f7c"
+            }
+          },
+          "additionalAuthenticationProviders": [
+            {
+              "authenticationType": "API_KEY",
+              "apiKeyConfig": {
+                "apiKeyExpirationDays": 365,
+                "apiKeyExpirationDate": "2026-07-02T18:54:54.802Z",
+                "description": "public access for reading boat listing"
+              }
+            }
+          ]
+        },
+        "GraphQLAPIIdOutput": "xhdlom4m7neyhgl6yzlkssso3i",
+        "GraphQLAPIEndpointOutput": "https://ohbbyciajjeh7escpecdcxgy3a.appsync-api.us-east-1.amazonaws.com/graphql",
+        "GraphQLAPIKeyOutput": "da2-kfmyhpfrgnb47izqmkhcbzumeu"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/api/cloudformation-template.json",
+        "logicalId": "apiboatrentallapp"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "lastPushDirHash": "4QiUq4jvpcsr8EQ+ye9qYh950wk="
+    }
+  },
+  "function": {
+    "boatrentallapp31507f7cDefineAuthChallenge": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda",
+      "lastBuildTimeStamp": "2025-07-02T18:56:32.420Z",
+      "lastBuildType": "PROD",
+      "lastPackageTimeStamp": "2025-07-02T18:56:32.460Z",
+      "distZipFilename": "boatrentallapp31507f7cDefineAuthChallenge-504b2f4761336e684e47-build.zip",
+      "s3Bucket": {
+        "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
+        "s3Key": "amplify-builds/boatrentallapp31507f7cDefineAuthChallenge-504b2f4761336e684e47-build.zip"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/function/boatrentallapp31507f7cDefineAuthChallenge-cloudformation-template.json",
+        "logicalId": "functionboatrentallapp31507f7cDefineAuthChallenge"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "output": {
+        "LambdaExecutionRoleArn": "arn:aws:iam::196659657091:role/boatrentallapp31507f7cDefineAuthChallenge-dev",
+        "Region": "us-east-1",
+        "Arn": "arn:aws:lambda:us-east-1:196659657091:function:boatrentallapp31507f7cDefineAuthChallenge-dev",
+        "Name": "boatrentallapp31507f7cDefineAuthChallenge-dev",
+        "LambdaExecutionRole": "boatrentallapp31507f7cDefineAuthChallenge-dev"
+      },
+      "lastPushDirHash": "KaNAWwF777NqH+TeaNeHjECYJLw="
+    },
+    "boatrentallapp31507f7cCreateAuthChallenge": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda",
+      "lastBuildTimeStamp": "2025-07-02T18:56:33.191Z",
+      "lastBuildType": "PROD",
+      "lastPackageTimeStamp": "2025-07-02T18:56:33.211Z",
+      "distZipFilename": "boatrentallapp31507f7cCreateAuthChallenge-6b765175367674684c68-build.zip",
+      "s3Bucket": {
+        "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
+        "s3Key": "amplify-builds/boatrentallapp31507f7cCreateAuthChallenge-6b765175367674684c68-build.zip"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/function/boatrentallapp31507f7cCreateAuthChallenge-cloudformation-template.json",
+        "logicalId": "functionboatrentallapp31507f7cCreateAuthChallenge"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "output": {
+        "LambdaExecutionRoleArn": "arn:aws:iam::196659657091:role/boatrentallapp31507f7cCreateAuthChallenge-dev",
+        "Region": "us-east-1",
+        "Arn": "arn:aws:lambda:us-east-1:196659657091:function:boatrentallapp31507f7cCreateAuthChallenge-dev",
+        "Name": "boatrentallapp31507f7cCreateAuthChallenge-dev",
+        "LambdaExecutionRole": "boatrentallapp31507f7cCreateAuthChallenge-dev"
+      },
+      "lastPushDirHash": "qHVwLD1CeUJZelAUE8oV1FCHj8w="
+    },
+    "boatrentallapp31507f7cVerifyAuthChallengeResponse": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda",
+      "lastBuildTimeStamp": "2025-07-02T18:56:34.254Z",
+      "lastBuildType": "PROD",
+      "lastPackageTimeStamp": "2025-07-02T18:56:34.664Z",
+      "distZipFilename": "boatrentallapp31507f7cVerifyAuthChallengeResponse-47735137426965565a4f-build.zip",
+      "s3Bucket": {
+        "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
+        "s3Key": "amplify-builds/boatrentallapp31507f7cVerifyAuthChallengeResponse-47735137426965565a4f-build.zip"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/function/boatrentallapp31507f7cVerifyAuthChallengeResponse-cloudformation-template.json",
+        "logicalId": "functionboatrentallapp31507f7cVerifyAuthChallengeResponse"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "output": {
+        "LambdaExecutionRoleArn": "arn:aws:iam::196659657091:role/boatrentallapp31507f7cVerifyAuthChallengeResponse-dev",
+        "Region": "us-east-1",
+        "Arn": "arn:aws:lambda:us-east-1:196659657091:function:boatrentallapp31507f7cVerifyAuthChallengeResponse-dev",
+        "Name": "boatrentallapp31507f7cVerifyAuthChallengeResponse-dev",
+        "LambdaExecutionRole": "boatrentallapp31507f7cVerifyAuthChallengeResponse-dev"
+      },
+      "lastPushDirHash": "Q4fkgqeo3JmuTA4MAB6zKAH+YcA="
+    },
+    "boatrentallapp31507f7cPostConfirmation": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda",
+      "lastBuildTimeStamp": "2025-07-02T18:56:35.958Z",
+      "lastBuildType": "PROD",
+      "lastPackageTimeStamp": "2025-07-02T18:56:36.339Z",
+      "distZipFilename": "boatrentallapp31507f7cPostConfirmation-67324459706270746e48-build.zip",
+      "s3Bucket": {
+        "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
+        "s3Key": "amplify-builds/boatrentallapp31507f7cPostConfirmation-67324459706270746e48-build.zip"
+      },
+      "providerMetadata": {
+        "s3TemplateURL": "https://s3.amazonaws.com/amplify-boatrentallapp-dev-8193e-deployment/amplify-cfn-templates/function/boatrentallapp31507f7cPostConfirmation-cloudformation-template.json",
+        "logicalId": "functionboatrentallapp31507f7cPostConfirmation"
+      },
+      "lastPushTimeStamp": "2025-07-02T19:06:36.993Z",
+      "output": {
+        "LambdaExecutionRoleArn": "arn:aws:iam::196659657091:role/boatrentallapp31507f7cPostConfirmation-dev",
+        "Region": "us-east-1",
+        "Arn": "arn:aws:lambda:us-east-1:196659657091:function:boatrentallapp31507f7cPostConfirmation-dev",
+        "Name": "boatrentallapp31507f7cPostConfirmation-dev",
+        "LambdaExecutionRole": "boatrentallapp31507f7cPostConfirmation-dev"
+      },
+      "lastPushDirHash": "JMdVhWbtvAtUUuk42+0sqLuJ91I="
+    }
+  }
+}
