@@ -22,13 +22,17 @@ import HomeScreen from './src/screens/home/HomeScreen';
 console.log('🚀 [App] Iniciando con AWS Amplify v6 Ultra Robusto...');
 
 export default function App() {
-  console.log('✅ [App] Renderizando app principal');
+  console.log('✅ [App] Iniciando render con protecciones Hermes...');
   
-  useEffect(() => {
-    console.log('🎯 [App] App montada exitosamente');
-  }, []);
+  // Protección adicional contra errores Hermes en render
+  try {
+    console.log('✅ [App] Renderizando app principal');
+    
+    useEffect(() => {
+      console.log('🎯 [App] App montada exitosamente');
+    }, []);
 
-  return (
+    return (
     <SafeAreaProvider>
       <PaperProvider>
         <NavigationContainer>
@@ -37,5 +41,18 @@ export default function App() {
         </NavigationContainer>
       </PaperProvider>
     </SafeAreaProvider>
-  );
+    );
+} catch (error) {
+    console.error('❌ [App] Error en render:', error);
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' }}>
+          <Text style={{ fontSize: 18, color: '#e74c3c', textAlign: 'center', margin: 20 }}>
+            ❌ Error de Render{'\n'}
+            Verificar logs de consola
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 }
