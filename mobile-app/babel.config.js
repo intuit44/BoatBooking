@@ -5,7 +5,7 @@
       [
         'babel-preset-expo',
         {
-          jsxRuntime: 'classic',
+          jsxRuntime: 'automatic',
         },
       ],
     ],

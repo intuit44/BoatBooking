@@ -232,16 +232,6 @@ const showNextSteps = async () => {
 };
 
 // =============================================================================
-// DATOS ESTÁTICOS
-// =============================================================================
-
-const testBoats = [
-  { id: '1', name: 'Enterprise v6', price: 350, status: amplifyConfigured ? 'AWS Ready ✅' : 'AWS Pending ⚠️' },
-  { id: '2', name: 'Alpha GraphQL', price: 200, status: graphqlClient ? 'GraphQL Ready ✅' : 'GraphQL Pending ⚠️' },
-  { id: '3', name: 'Beta Auth', price: 150, status: getCurrentUser ? 'Auth Ready ✅' : 'Auth Pending ⚠️' }
-];
-
-// =============================================================================
 // COMPONENTES (SIMPLES)
 // =============================================================================
 
@@ -351,7 +341,7 @@ class AWSStatusCard extends React.Component {
 }
 
 // =============================================================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL CON PROTECCIÓN CONTRA ERRORES
 // =============================================================================
 
 export default function HomeScreen() {
@@ -360,36 +350,109 @@ export default function HomeScreen() {
   console.log('📊 [HomeScreen] Props recibidas:', arguments.length);
   console.log('🔥 [HomeScreen] CONFIRMACIÓN RENDER - Component ejecutándose');
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContent}>
-        <Text style={styles.title}>🚤 Boat Rental v6</Text>
-        <Text style={styles.subtitle}>AWS Amplify v6 + React Native 0.79.5</Text>
+  // ✅ MOVER testBoats AQUÍ DENTRO para evitar evaluación durante carga de módulo
+  const testBoats = React.useMemo(() => {
+    try {
+      return [
+        {
+          id: '1',
+          name: 'Enterprise v6',
+          price: 350,
+          status: amplifyConfigured ? 'AWS Ready ✅' : 'AWS Pending ⚠️'
+        },
+        {
+          id: '2',
+          name: 'Alpha GraphQL',
+          price: 200,
+          status: graphqlClient ? 'GraphQL Ready ✅' : 'GraphQL Pending ⚠️'
+        },
+        {
+          id: '3',
+          name: 'Beta Auth',
+          price: 150,
+          status: (typeof getCurrentUser === 'function') ? 'Auth Ready ✅' : 'Auth Pending ⚠️'
+        }
+      ];
+    } catch (error) {
+      console.error('❌ [HomeScreen] Error creando testBoats:', error);
+      return [
+        { id: '1', name: 'Fallback Boat', price: 100, status: 'Error ❌' }
+      ];
+    }
+  }, [amplifyConfigured, graphqlClient]);
 
-        <AWSStatusCard />
+  // ✅ Error boundary simple con try-catch
+  try {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollContent}>
+          <Text style={styles.title}>🚤 Boat Rental v6</Text>
+          <Text style={styles.subtitle}>AWS Amplify v6 + React Native 0.79.5</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📋 Boats Status Dashboard</Text>
-          {testBoats.map((boat) => (
-            <TestCard key={boat.id} boat={boat} />
-          ))}
-        </View>
+          <AWSStatusCard />
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>📊 Sistema Status</Text>
-          <Text style={styles.infoText}>
-            ✅ Hermes JavaScript Engine{'\n'}
-            ✅ React Native 0.79.5 New Architecture{'\n'}
-            ✅ Polyfills optimizados para Hermes{'\n'}
-            ✅ AWS Amplify v6.6.0 Ultra Robusto{'\n'}
-            ✅ TypeScript strict mode{'\n'}
-            {amplifyConfigured ? '✅' : '⚠️'} AWS Modules {modulesLoaded ? 'Loaded' : 'Pending'}{'\n'}
-            {graphqlClient ? '✅' : '⚠️'} GraphQL Client Ready
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>📋 Boats Status Dashboard</Text>
+            {testBoats.map((boat) => (
+              <TestCard key={boat.id} boat={boat} />
+            ))}
+          </View>
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>📊 Sistema Status</Text>
+            <Text style={styles.infoText}>
+              ✅ Hermes JavaScript Engine{'\n'}
+              ✅ React Native 0.79.5 New Architecture{'\n'}
+              ✅ Polyfills optimizados para Hermes{'\n'}
+              ✅ AWS Amplify v6.6.0 Ultra Robusto{'\n'}
+              ✅ TypeScript strict mode{'\n'}
+              {amplifyConfigured ? '✅' : '⚠️'} AWS Modules {modulesLoaded ? 'Loaded' : 'Pending'}{'\n'}
+              {graphqlClient ? '✅' : '⚠️'} GraphQL Client Ready{'\n'}
+              {(typeof getCurrentUser === 'function') ? '✅' : '⚠️'} getCurrentUser Function
+            </Text>
+          </View>
+
+          {/* ✅ INFORMACIÓN DE DEBUG */}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>🔍 Debug Info</Text>
+            <Text style={styles.infoText}>
+              • Amplify: {typeof Amplify}{'\n'}
+              • generateClient: {typeof generateClient}{'\n'}
+              • getCurrentUser: {typeof getCurrentUser}{'\n'}
+              • fetchAuthSession: {typeof fetchAuthSession}{'\n'}
+              • awsExports: {typeof awsExports}{'\n'}
+              • modulesLoaded: {modulesLoaded ? 'true' : 'false'}{'\n'}
+              • amplifyConfigured: {amplifyConfigured ? 'true' : 'false'}
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  } catch (renderError) {
+    console.error('❌ [HomeScreen] Error crítico en render:', renderError);
+
+    // ✅ FALLBACK UI para prevenir pantalla negra
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.scrollContent, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={[styles.title, { color: '#e74c3c' }]}>❌ Error de Renderizado</Text>
+          <Text style={styles.subtitle}>
+            Error: {renderError?.message || 'Desconocido'}{'\n\n'}
+            Por favor revisa los logs para más detalles.
           </Text>
+          <TouchableOpacity
+            style={[styles.testButton, styles.primaryButton, { marginTop: 20 }]}
+            onPress={() => {
+              console.log('🔄 [HomeScreen] Intentando recargar...');
+              // Aquí podrías triggear un reload o navegación
+            }}
+          >
+            <Text style={styles.buttonText}>🔄 Reintentar</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
+  }
 }
 
 // =============================================================================
