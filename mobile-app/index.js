@@ -1,18 +1,27 @@
 ﻿/**
- * Boat Rental App - Entry Point
+ * Boat Rental App - Entry Point Ultra Robusto
+ * AWS Amplify v6 + React Native 0.79.5 Compatible
  */
 
-// IMPORTANTE: Cargar polyfill ANTES de cualquier otra cosa
+// CRÍTICO: Polyfills ANTES que cualquier import
 import './polyfill';
 
-// Polyfills requeridos para React Native + AWS
+// Polyfills requeridos para AWS v6
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
 import { AppRegistry } from 'react-native';
-import App from './App';
 
-console.log('🚀 [Index] Iniciando app con polyfills...');
+// Importación defensiva de App
+let App;
+try {
+  App = require('./App').default;
+} catch (error) {
+  console.error('❌ Error cargando App:', error);
+  App = () => null; // Fallback
+}
 
-// SOLUCIÓN: Usar nombre fijo en lugar de leer desde app.json
+console.log('🚀 [Index] Iniciando con AWS Amplify v6 Ultra Robusto...');
+
+// Registro correcto de la aplicación
 AppRegistry.registerComponent('main', () => App);

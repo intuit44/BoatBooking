@@ -1,38 +1,22 @@
-﻿const {getDefaultConfig} = require('@react-native/metro-config');
+﻿const { getDefaultConfig } = require('expo/metro-config');
 
-/**
- * Metro configuration for React Native Bare Workflow + AWS Amplify
- * https://facebook.github.io/metro/docs/configuration
- */
 const config = getDefaultConfig(__dirname);
 
-// Configuración específica para AWS Amplify en React Native
+// Configuración para AWS Amplify v6 + polyfills
 config.resolver.alias = {
-  ...config.resolver.alias,
-  // Polyfills para APIs de Node.js
   crypto: 'crypto-browserify',
   stream: 'stream-browserify',
-  buffer: '@craftzdog/react-native-buffer',
-  process: 'process',
-  path: 'path-browserify',
+  buffer: 'buffer',
   util: 'util',
+  path: 'path-browserify',
+  events: 'events',  // ✅ AGREGADO: polyfill events
+  process: 'process',
 };
 
-// Extensiones de archivo soportadas
-config.resolver.sourceExts = [
-  ...config.resolver.sourceExts,
-  'cjs', // Para compatibilidad con algunos paquetes de AWS
-];
+// Extensiones de archivo
+config.resolver.sourceExts = ['js', 'jsx', 'ts', 'tsx', 'json'];
 
-// Configuración del transformer
-config.transformer.getTransformOptions = async () => ({
-  transform: {
-    experimentalImportSupport: false,
-    inlineRequires: true,
-  },
-});
-
-// Ignorar módulos problemáticos
-config.resolver.blacklistRE = /node_modules\/.*\/node_modules\/react-native\/.*/;
+// Configuración para React Native
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
 module.exports = config;

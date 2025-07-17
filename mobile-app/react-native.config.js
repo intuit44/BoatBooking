@@ -1,11 +1,14 @@
 ﻿module.exports = {
   dependencies: {
-    // Excluir completamente @aws-amplify/react-native del autolinking
-    '@aws-amplify/react-native': {
+    'react-native-vector-icons': {
       platforms: {
         android: null,
-        ios: null,
-      },
-    },
+        ios: null
+      }
+    }
   },
+  project: {
+    ios: {},
+    android: {}
+  }
 };

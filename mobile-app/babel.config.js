@@ -1,29 +1,38 @@
-﻿module.exports = {
-  presets: ['@react-native/babel-preset'],
-  plugins: [
-    // Plugins necesarios para AWS Amplify v5 en React Native
-    ['@babel/plugin-proposal-class-properties', { loose: true }],
-    ['@babel/plugin-transform-classes', { loose: true }],
-    ['@babel/plugin-transform-runtime', { 
-      helpers: true, 
-      regenerator: false 
-    }],
-    [
-      'module-resolver',
-      {
-        alias: {
-          // Polyfills para crypto y otras APIs de Node.js
-          crypto: 'crypto-browserify',
-          stream: 'stream-browserify',
-          buffer: '@craftzdog/react-native-buffer',
-          process: 'process',
-          path: 'path-browserify',
-          util: 'util',
-          // Alias específicos para Amplify v5
-          'aws-amplify/api': '@aws-amplify/api',
-          'aws-amplify/core': '@aws-amplify/core',
+﻿module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: [
+      [
+        'babel-preset-expo',
+        {
+          jsxRuntime: 'classic',
         },
-      },
+      ],
     ],
-  ],
+    plugins: [
+      [
+        '@babel/plugin-transform-runtime',
+        {
+          regenerator: false,
+        },
+      ],
+      [
+        'module-resolver',
+        {
+          alias: {
+            crypto: 'crypto-browserify',
+            stream: 'stream-browserify',
+            buffer: 'buffer',
+          },
+        },
+      ],
+      // PROTECCIÓN ESPECÍFICA HERMES
+      [
+        '@babel/plugin-proposal-class-properties',
+        {
+          loose: true,
+        },
+      ],
+    ],
+  };
 };

@@ -1,0 +1,34 @@
+﻿// SINTAXIS KOTLIN DSL CORRECTA PARA GRADLE
+// ========================================
+
+// IMPORTS NECESARIOS
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+// CONFIGURACIÓN KOTLIN CORRECTA
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        // ✅ CORRECTO: usar KotlinVersion directamente
+        apiVersion.set(KotlinVersion.KOTLIN_1_7)
+        
+        // ✅ CORRECTO: usar JvmTarget directamente
+        jvmTarget.set(JvmTarget.JVM_11)
+        
+        // ✅ CORRECTO: usar .set() para propiedades
+        allWarningsAsErrors.set(
+            project.properties["enableWarningsAsErrors"]?.toString()?.toBoolean() ?: false
+        )
+    }
+}
+
+// CONFIGURACIÓN JAVA (alternativa a toolchain)
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// ❌ INCORRECTO: NO usar estos patrones
+// org.jetbrains.kotlin.config.KotlinVersion.KOTLIN_1_7
+// org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_7
+// allWarningsAsErrors = (sin .set())

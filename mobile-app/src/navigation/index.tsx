@@ -1,29 +1,20 @@
-// File: mobile-app/src/navigation/index.tsx
+﻿// File: mobile-app/src/navigation/index.tsx
+// CORREGIDO: Sin Redux, solo exports simples
 
 import React from 'react';
-import { useAppSelector } from '../store/hooks';
-import { RootState } from '../store/store';
 
+// Exports simples sin Redux
 export { default as AppNavigator } from './AppNavigator';
 export { default as AuthNavigator } from './AuthNavigator';
 
-// AGREGAR ESTE COMPONENTE PRINCIPAL:
+// RootNavigator simplificado (sin Redux)
 export const RootNavigator = () => {
-    const { isAuthenticated, isLoading } = useAppSelector((state: RootState) => state.auth);
-
-    console.log('🚦 RootNavigator status:', { isAuthenticated, isLoading });
-
-    if (isLoading) {
-        return null;
-    }
-
-    if (isAuthenticated) {
-        console.log('🔐 Mostrando AppNavigator');
-        const { AppNavigator } = require('./AppNavigator');
-        return <AppNavigator />;
-    } else {
-        console.log('👤 Mostrando AuthNavigator');
-        const { AuthNavigator } = require('./AuthNavigator');
-        return <AuthNavigator />;
-    }
+    console.log('🚦 [RootNavigator] Iniciando navegación simplificada');
+    
+    // Por ahora, siempre mostrar AppNavigator
+    // TODO: Implementar lógica de autenticación cuando sea necesario
+    const { default: AppNavigator } = require('./AppNavigator');
+    return <AppNavigator />;
 };
+
+console.log('✅ [Navigation/Index] Navegación simplificada cargada');
