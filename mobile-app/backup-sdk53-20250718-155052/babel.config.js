@@ -1,4 +1,4 @@
-module.exports = function (api) {
+﻿module.exports = function (api) {
   api.cache(true);
   return {
     presets: [
@@ -33,6 +33,8 @@ module.exports = function (api) {
           loose: true,
         },
       ],
+      // Removido @babel/plugin-transform-operators (no existe)
+      // Solo plugins que existen realmente
     ],
   };
 };

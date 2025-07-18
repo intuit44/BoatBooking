@@ -1,0 +1,292 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { BookingsService } from '../../services/bookingsService';
+
+export interface Booking {
+  id: string;
+  boatId: string;
+  boatName: string;
+  boatImage: string;
+  userId: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  totalHours: number;
+  pricePerHour: number;
+  totalPrice: number;
+  currency: 'USD' | 'VES';
+  paymentMethod: 'zelle' | 'cash' | 'transfer';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  bookingStatus: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+  guests: number;
+  specialRequests?: string;
+  contactInfo: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  marina: {
+    name: string;
+    address: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  confirmedAt?: string;
+  cancelledAt?: string;
+}
+
+interface AvailabilityResult {
+  isAvailable: boolean;
+  conflictingBookings: Booking[];
+}
+
+interface BookingsState {
+  bookings: Booking[];
+  selectedBooking: Booking | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+const initialState: BookingsState = {
+  bookings: [],
+  selectedBooking: null,
+  isLoading: false,
+  error: null,
+};
+
+// Async Thunks para DynamoDB
+export const fetchUserBookings = createAsyncThunk(
+  'bookings/fetchUserBookings',
+  async (userId: string) => {
+    const result = await BookingsService.getBookingsByUser(userId) as unknown as { success: boolean; data: Booking[] };
+    if (!result || typeof result !== 'object' || !('success' in result) || !result.success) {
+      throw new Error('Failed to fetch user bookings');
+    }
+    return result.data as Booking[];
+  }
+);
+
+export const fetchBookingById = createAsyncThunk(
+  'bookings/fetchBookingById',
+  async (bookingId: string) => {
+    const result = await BookingsService.getBookingById(bookingId) as { success: boolean; data: Booking };
+    if (!result.success) {
+      throw new Error('Failed to fetch booking details');
+    }
+    return result.data as Booking;
+  }
+);
+
+export const createBooking = createAsyncThunk(
+  'bookings/createBooking',
+  async (bookingData: Omit<Booking, 'id' | 'createdAt'>) => {
+    // Verificar disponibilidad primero
+    const availabilityResult = await BookingsService.checkAvailability(
+      bookingData.boatId,
+      bookingData.startDate,
+      bookingData.endDate
+    );
+
+    if (!availabilityResult || typeof availabilityResult !== 'object' || !('success' in availabilityResult)) {
+      throw new Error('Failed to check boat availability');
+    }
+
+    if (!availabilityResult.success) {
+      throw new Error('Failed to check boat availability');
+    }
+    
+    const availability: AvailabilityResult = {
+      isAvailable: (availabilityResult as any).available,
+      conflictingBookings: (availabilityResult as any).conflictingBookings || [],
+    };
+    if (!availability.isAvailable) {
+      throw new Error('Boat is not available for the selected dates');
+    }
+    
+    // Crear la reserva
+    const result = await BookingsService.createBooking(bookingData);
+    if (!result.success) {
+      throw new Error('Failed to create booking');
+    }
+    return result.data as Booking;
+  }
+);
+
+export const updateBookingStatus = createAsyncThunk(
+  'bookings/updateBookingStatus',
+  async ({ bookingId, status }: { bookingId: string; status: string }) => {
+    const result = await BookingsService.updateBookingStatus(bookingId, status);
+    if (!result.success) {
+      throw new Error('Failed to update booking status');
+    }
+    return result.data as Booking;
+  }
+);
+
+export const cancelBooking = createAsyncThunk(
+  'bookings/cancelBooking',
+  async (bookingId: string) => {
+    const result = await BookingsService.cancelBooking(bookingId);
+    if (!result.success) {
+      throw new Error('Failed to cancel booking');
+    }
+    return result.data as Booking;
+  }
+);
+
+export const confirmBooking = createAsyncThunk(
+  'bookings/confirmBooking',
+  async (bookingId: string) => {
+    const result = await BookingsService.updateBookingStatus(bookingId, "confirmed");
+    if (!result.success) {
+      throw new Error('Failed to confirm booking');
+    }
+    return result.data as Booking;
+  }
+);
+
+export const checkBoatAvailability = createAsyncThunk(
+  'bookings/checkBoatAvailability',
+  async ({ boatId, startDate, endDate }: { boatId: string; startDate: string; endDate: string }) => {
+    const result = await BookingsService.checkAvailability(boatId, startDate, endDate);
+    if (!result.success) {
+      throw new Error('Failed to check boat availability');
+    }
+    return { isAvailable: (result as any).available, conflictingBookings: (result as any).conflictingBookings } as AvailabilityResult;
+  }
+);
+
+const bookingsSlice = createSlice({
+  name: 'bookings',
+  initialState,
+  reducers: {
+    setSelectedBooking: (state, action: PayloadAction<Booking | null>) => {
+      state.selectedBooking = action.payload;
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
+    updateBookingInList: (state, action: PayloadAction<Booking>) => {
+      const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+      if (index !== -1) {
+        state.bookings[index] = action.payload;
+      }
+    },
+  },
+  extraReducers: (builder) => {
+    // Fetch User Bookings
+    builder
+      .addCase(fetchUserBookings.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserBookings.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.bookings = action.payload;
+      })
+      .addCase(fetchUserBookings.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to fetch bookings';
+      });
+
+    // Fetch Booking by ID
+    builder
+      .addCase(fetchBookingById.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchBookingById.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.selectedBooking = action.payload;
+      })
+      .addCase(fetchBookingById.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to fetch booking details';
+      });
+
+    // Create Booking
+    builder
+      .addCase(createBooking.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(createBooking.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.bookings.unshift(action.payload); // Add to beginning
+      })
+      .addCase(createBooking.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to create booking';
+      });
+
+    // Update Booking Status
+    builder
+      .addCase(updateBookingStatus.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateBookingStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+        if (index !== -1) {
+          state.bookings[index] = action.payload;
+        }
+        if (state.selectedBooking?.id === action.payload.id) {
+          state.selectedBooking = action.payload;
+        }
+      })
+      .addCase(updateBookingStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to update booking status';
+      });
+
+    // Cancel Booking
+    builder
+      .addCase(cancelBooking.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(cancelBooking.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+        if (index !== -1) {
+          state.bookings[index] = action.payload;
+        }
+        if (state.selectedBooking?.id === action.payload.id) {
+          state.selectedBooking = action.payload;
+        }
+      })
+      .addCase(cancelBooking.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to cancel booking';
+      });
+
+    // Confirm Booking
+    builder
+      .addCase(confirmBooking.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(confirmBooking.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const index = state.bookings.findIndex(booking => booking.id === action.payload.id);
+        if (index !== -1) {
+          state.bookings[index] = action.payload;
+        }
+        if (state.selectedBooking?.id === action.payload.id) {
+          state.selectedBooking = action.payload;
+        }
+      })
+      .addCase(confirmBooking.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to confirm booking';
+      });
+  },
+});
+
+export const { setSelectedBooking, clearError, updateBookingInList } = bookingsSlice.actions;
+export default bookingsSlice.reducer;
