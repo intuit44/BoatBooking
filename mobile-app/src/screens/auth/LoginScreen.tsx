@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import {
   Text,
@@ -15,23 +16,31 @@ import {
   Title,
   Paragraph,
   Divider,
+  ActivityIndicator,
 } from 'react-native-paper';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { loginUser } from '../../store/slices/authSlice';
-// Importar RootState desde el store
-import { RootState } from '../../store/store';
+
+// AWS Amplify Auth v6
+import { signIn, signUp, confirmSignUp } from 'aws-amplify/auth';
+
+console.log('✅ [LoginScreen] Component loaded');
 
 interface Props {
-  navigation: any;
+  navigation?: any;
+  onLoginSuccess?: () => void;
 }
 
-export function LoginScreen({ navigation }: Props) {
+export default function LoginScreen({ navigation, onLoginSuccess }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
 
-  const dispatch = useAppDispatch();
-  const { isLoading, error } = useAppSelector((state: RootState) => state.auth);
+  // Demo data
+  const handleDemoLogin = () => {
+    setEmail('demo@boatrental.com');
+    setPassword('demo123456');
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,112 +48,219 @@ export function LoginScreen({ navigation }: Props) {
       return;
     }
 
+    setIsLoading(true);
     try {
-      await dispatch(loginUser({ email, password })).unwrap();
-    } catch (error) {
-      Alert.alert('Error', 'Credenciales incorrectas');
+      console.log('🔐 [LoginScreen] Intentando login con AWS Amplify Auth v6...');
+      
+      const result = await signIn({
+        username: email,
+        password: password
+      });
+
+      console.log('✅ [LoginScreen] Login exitoso:', result);
+      
+      Alert.alert(
+        '✅ Login Exitoso',
+        `¡Bienvenido!\n\nEmail: ${email}\nEstado: Autenticado correctamente`,
+        [
+          {
+            text: 'Continuar',
+            onPress: () => {
+              onLoginSuccess?.();
+              navigation?.navigate?.('Home');
+            }
+          }
+        ]
+      );
+
+    } catch (error: any) {
+      console.error('❌ [LoginScreen] Error en login:', error);
+      
+      let errorMessage = 'Error de autenticación';
+      if (error.name === 'UserNotConfirmedException') {
+        errorMessage = 'Usuario no confirmado. Revisa tu email.';
+      } else if (error.name === 'NotAuthorizedException') {
+        errorMessage = 'Credenciales incorrectas';
+      } else if (error.name === 'UserNotFoundException') {
+        errorMessage = 'Usuario no encontrado';
+      }
+      
+      Alert.alert('❌ Error de Login', errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = () => {
-    setEmail('demo@boatrental.ve');
-    setPassword('demo123456');
+  const handleRegister = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('📝 [LoginScreen] Intentando registro con AWS Amplify Auth v6...');
+      
+      const result = await signUp({
+        username: email,
+        password: password,
+        options: {
+          userAttributes: {
+            email: email
+          }
+        }
+      });
+
+      console.log('✅ [LoginScreen] Registro exitoso:', result);
+      
+      Alert.alert(
+        '✅ Registro Exitoso',
+        `¡Cuenta creada!\n\nEmail: ${email}\n\nRevisa tu email para confirmar la cuenta.`,
+        [{ text: 'OK', onPress: () => setMode('login') }]
+      );
+
+    } catch (error: any) {
+      console.error('❌ [LoginScreen] Error en registro:', error);
+      
+      let errorMessage = 'Error en el registro';
+      if (error.name === 'UsernameExistsException') {
+        errorMessage = 'El email ya está registrado';
+      } else if (error.name === 'InvalidPasswordException') {
+        errorMessage = 'La contraseña no cumple los requisitos';
+      }
+      
+      Alert.alert('❌ Error de Registro', errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (mode === 'login') {
+      handleLogin();
+    } else {
+      handleRegister();
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Title style={styles.title}>🛥️ BoatRental</Title>
-          <Paragraph style={styles.subtitle}>
-            Alquila embarcaciones en Venezuela
-          </Paragraph>
-        </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.header}>
+            <Title style={styles.title}>🛥️ BoatRental</Title>
+            <Paragraph style={styles.subtitle}>
+              {mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
+            </Paragraph>
+          </View>
 
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title style={styles.cardTitle}>Iniciar Sesión</Title>
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.cardTitle}>
+                {mode === 'login' ? '🔐 Login' : '📝 Registro'}
+              </Title>
 
-            <TextInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              mode="outlined"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
+              <TextInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                mode="outlined"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.input}
+                disabled={isLoading}
+              />
 
-            <TextInput
-              label="Contraseña"
-              value={password}
-              onChangeText={setPassword}
-              mode="outlined"
-              secureTextEntry={!showPassword}
-              right={
-                <TextInput.Icon
-                  icon={showPassword ? 'eye-off' : 'eye'}
-                  onPress={() => setShowPassword(!showPassword)}
-                />
-              }
-              style={styles.input}
-            />
+              <TextInput
+                label="Contraseña"
+                value={password}
+                onChangeText={setPassword}
+                mode="outlined"
+                secureTextEntry={!showPassword}
+                right={
+                  <TextInput.Icon
+                    icon={showPassword ? 'eye-off' : 'eye'}
+                    onPress={() => setShowPassword(!showPassword)}
+                  />
+                }
+                style={styles.input}
+                disabled={isLoading}
+              />
 
-            <Button
-              mode="contained"
-              onPress={handleLogin}
-              loading={isLoading}
-              disabled={isLoading}
-              style={styles.button}
-            >
-              Iniciar Sesión
-            </Button>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#0066CC" />
+                  <Text style={styles.loadingText}>
+                    {mode === 'login' ? 'Iniciando sesión...' : 'Creando cuenta...'}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Button
+                    mode="contained"
+                    onPress={handleSubmit}
+                    style={styles.button}
+                  >
+                    {mode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                  </Button>
 
-            <Divider style={styles.divider} />
+                  {mode === 'login' && (
+                    <>
+                      <Divider style={styles.divider} />
+                      <Button
+                        mode="outlined"
+                        onPress={handleDemoLogin}
+                        style={styles.demoButton}
+                      >
+                        🚀 Usar Demo
+                      </Button>
+                    </>
+                  )}
 
-            <Button
-              mode="outlined"
-              onPress={handleDemoLogin}
-              style={styles.demoButton}
-            >
-              🚀 Probar Demo
-            </Button>
+                  <Button
+                    mode="text"
+                    onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
+                    style={styles.linkButton}
+                  >
+                    {mode === 'login' 
+                      ? '¿No tienes cuenta? Regístrate' 
+                      : '¿Ya tienes cuenta? Inicia sesión'
+                    }
+                  </Button>
 
-            <Button
-              mode="text"
-              onPress={() => navigation.navigate('ForgotPassword')}
-              style={styles.linkButton}
-            >
-              ¿Olvidaste tu contraseña?
-            </Button>
+                  <Button
+                    mode="text"
+                    onPress={() => navigation?.goBack?.()}
+                    style={styles.linkButton}
+                  >
+                    ← Volver al Inicio
+                  </Button>
+                </>
+              )}
+            </Card.Content>
+          </Card>
 
-            <Button
-              mode="text"
-              onPress={() => navigation.navigate('Register')}
-              style={styles.linkButton}
-            >
-              ¿No tienes cuenta? Regístrate
-            </Button>
-          </Card.Content>
-        </Card>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            🇻🇪 Hecho en Venezuela con ❤️
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              🚀 AWS Amplify v6 Auth • Hermes Compatible
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f7fa',
+  },
+  keyboardContainer: {
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -158,22 +274,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#0066CC',
+    color: '#2c3e50',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#7f8c8d',
     textAlign: 'center',
   },
   card: {
     elevation: 4,
     marginBottom: 20,
+    borderRadius: 12,
   },
   cardTitle: {
     textAlign: 'center',
     marginBottom: 20,
-    color: '#333',
+    color: '#2c3e50',
   },
   input: {
     marginBottom: 16,
@@ -191,16 +308,21 @@ const styles = StyleSheet.create({
   linkButton: {
     marginTop: 10,
   },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
   footer: {
     alignItems: 'center',
     marginTop: 20,
   },
   footerText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#95a5a6',
   },
 });
-
-// Exportación por defecto para compatibilidad
-export default LoginScreen;
-

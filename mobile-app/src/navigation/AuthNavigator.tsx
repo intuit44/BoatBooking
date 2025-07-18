@@ -1,41 +1,73 @@
-// File: mobile-app/src/navigation/AuthNavigator.tsx
-import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import { LoginScreen } from '../screens/auth/LoginScreen';
-import { RegisterScreen } from '../screens/auth/RegisterScreen';
-import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
-import { useAppSelector } from '../store/hooks';
-import { RootState } from '../store/store';
-import { HomeScreen } from '../screens/home/HomeScreen';
+﻿import React from 'react';
+import { View, Text } from 'react-native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+// Screens
+import LoginScreen from '../screens/auth/LoginScreen';
+
+console.log('✅ [AuthNavigator] AuthNavigator cargado');
+
+// ===================================
+// TIPOS DE NAVEGACIÓN AUTH
+// ===================================
 export type AuthStackParamList = {
-    Login: undefined;
-    Register: undefined;
-    ForgotPassword: undefined;
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
 };
 
-const Stack = createStackNavigator<AuthStackParamList>();
+const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated } = useAppSelector((state: RootState) => state.auth);
-
-    if (isAuthenticated) {
-        return <HomeScreen />;
-    }
-
-    return <>{children}</>;
+// ===================================
+// SCREEN PLACEHOLDERS SIMPLES
+// ===================================
+function RegisterScreen() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' }}>
+      <Text style={{ fontSize: 18, fontWeight: 'bold' }}>📝 Registro</Text>
+      <Text style={{ marginTop: 10, color: '#666' }}>Pantalla de registro (próximamente)</Text>
+    </View>
+  );
 }
 
-export const AuthNavigator = () => {
-    return (
-        <AuthGuard>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="Login" component={LoginScreen} />
-                <Stack.Screen name="Register" component={RegisterScreen} />
-                <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            </Stack.Navigator>
-        </AuthGuard>
-    );
-};
+function ForgotPasswordScreen() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' }}>
+      <Text style={{ fontSize: 18, fontWeight: 'bold' }}>🔐 Recuperar Contraseña</Text>
+      <Text style={{ marginTop: 10, color: '#666' }}>Pantalla de recuperación (próximamente)</Text>
+    </View>
+  );
+}
 
-export default AuthNavigator;
+// ===================================
+// NAVEGADOR DE AUTENTICACIÓN
+// ===================================
+export default function AuthNavigator() {
+  console.log('🔐 [AuthNavigator] Renderizando navegador de auth');
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right'
+      }}
+      initialRouteName="Login"
+    >
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ title: 'Iniciar Sesión' }}
+      />
+      <Stack.Screen
+        name="Register"
+        component={RegisterScreen}
+        options={{ title: 'Crear Cuenta' }}
+      />
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{ title: 'Recuperar Contraseña' }}
+      />
+    </Stack.Navigator>
+  );
+}

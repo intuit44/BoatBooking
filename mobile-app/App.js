@@ -19,7 +19,6 @@ import { Provider as PaperProvider } from 'react-native-paper';
 
 // Importar HomeScreen directamente para evitar problemas de navegación
 import HomeScreen from './src/screens/home/HomeScreen';
-
 console.log('🚀 [App] Iniciando con AWS Amplify v6 Ultra Robusto...');
 
 export default function App() {
