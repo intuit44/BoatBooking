@@ -11,9 +11,8 @@ import {
 } from 'react-native';
 
 // ✅ ES6 IMPORTS - AWS Amplify v6
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
-import awsExports from '../../aws-exports';
+// Centralized Amplify configuration
+import { graphqlClient, amplifyConfigured } from '@/services/AmplifyService';
 
 
 
@@ -23,23 +22,8 @@ import awsExports from '../../aws-exports';
 console.log('✅ [Render] HomeScreen va a iniciar render (RESTORED)');
 
 // =============================================================================
-// INICIALIZACIÓN AWS AMPLIFY V6 (SIMPLE)
-// =============================================================================
-
-let amplifyConfigured: boolean = false;
-let graphqlClient: ReturnType<typeof generateClient> | null = null;
-
-if (!amplifyConfigured) {
-  try {
-    // Configuración estándar para nativo
-    Amplify.configure(awsExports);
-    graphqlClient = generateClient();
-    amplifyConfigured = true;
-    console.log('✅ [HomeScreen] AWS Amplify v6 configurado exitosamente');
-  } catch (error) {
-    console.error('❌ [HomeScreen] Error inicializando AWS:', error);
-  }
-}
+// INICIALIZACIÓN AWS AMPLIFY V6 (CENTRALIZADA)
+// La configuración se realiza una sola vez en AmplifyService
 
 // =============================================================================
 // LOGINSCREEN SIMPLE INTEGRADO
@@ -135,9 +119,8 @@ export default function HomeScreen() {
 
   const checkAWSStatus = () => {
     const status = `✅ AWS Amplify v6: ${amplifyConfigured ? 'Configurado' : 'Error'}
-🔗 generateClient: ${typeof generateClient === 'function' ? 'Disponible' : 'No disponible'}  
+🔗 GraphQL Client: ${graphqlClient ? 'Disponible' : 'No disponible'}
 🔐 getCurrentUser: ${userLoggedIn ? 'Usuario logueado' : 'No logueado'}
-📊 GraphQL Client: ${graphqlClient ? 'Creado' : 'Error'}
 📋 Estado: ${amplifyConfigured ? 'Listo para desarrollo' : 'Configuración requerida'}`;
 
     Alert.alert('🔍 Estado AWS Amplify v6', status);
