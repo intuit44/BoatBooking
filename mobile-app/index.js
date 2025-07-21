@@ -1,6 +1,6 @@
 ﻿/**
- * Boat Rental App - Entry Point para Expo SDK 51
- * AWS Amplify v6 + React Native 0.74.5 + Expo 51.0.28
+ * Boat Rental App - Entry Point para Expo SDK 53
+ * AWS Amplify v6 + React Native 0.79.5 + Expo 53
  */
 
 // CRÍTICO: Polyfills ANTES que cualquier import
@@ -10,8 +10,8 @@ import './polyfill';
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
-console.log('🔥 [Index] ===== INDEX.JS SDK 51 EJECUTADO =====');
-console.log('🚀 [Index] Iniciando con AWS Amplify v6 + Expo SDK 51...');
+console.log('🔥 [Index] ===== INDEX.JS SDK 53 EJECUTADO =====');
+console.log('🚀 [Index] Iniciando con AWS Amplify v6 + Expo SDK 53...');
 console.log('🎯 [Index] Timestamp:', new Date().toISOString());
 
 // Verificación crítica de global antes de continuar
@@ -33,7 +33,7 @@ console.log('🔍 [Index] Global status:', {
   window: typeof global?.window !== 'undefined'
 });
 
-// EXPO SDK 51: Importación del método correcto para registro
+// EXPO SDK 53: Importación del método correcto para registro
 import { registerRootComponent } from 'expo';
 
 // Importación defensiva de App
@@ -52,10 +52,10 @@ try {
   };
 }
 
-console.log('📱 [Index] Registrando componente con Expo SDK 51 registerRootComponent...');
+console.log('📱 [Index] Registrando componente con Expo SDK 53 registerRootComponent...');
 
-// EXPO SDK 51: Registro correcto usando registerRootComponent
+// EXPO SDK 53: Registro correcto usando registerRootComponent
 registerRootComponent(App);
 
-console.log('✅ [Index] Component registered successfully with Expo SDK 51');
+console.log('✅ [Index] Component registered successfully with Expo SDK 53');
 console.log('🎉 [Index] Index.js execution completed');
