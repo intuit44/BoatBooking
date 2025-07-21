@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "KEYVAULT_NAME": "mlfoundrkeyvault2d2a4754",
+    "GITHUB_TOKEN": "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"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*"
+  }
+}

@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  SafeAreaView,
   Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // ✅ ES6 IMPORTS - AWS Amplify v6
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
-import { getCurrentUser } from 'aws-amplify/auth';
 import awsExports from '../../aws-exports';
+
+
+
+// Importar configuración específica para web - comentado temporalmente
+// import { configureAmplifyForWeb, getWebClient } from '../../config/amplify-web-config';
 
 console.log('✅ [Render] HomeScreen va a iniciar render (RESTORED)');
 
@@ -22,11 +26,12 @@ console.log('✅ [Render] HomeScreen va a iniciar render (RESTORED)');
 // INICIALIZACIÓN AWS AMPLIFY V6 (SIMPLE)
 // =============================================================================
 
-let amplifyConfigured = false;
-let graphqlClient = null;
+let amplifyConfigured: boolean = false;
+let graphqlClient: ReturnType<typeof generateClient> | null = null;
 
 if (!amplifyConfigured) {
   try {
+    // Configuración estándar para nativo
     Amplify.configure(awsExports);
     graphqlClient = generateClient();
     amplifyConfigured = true;
@@ -39,8 +44,13 @@ if (!amplifyConfigured) {
 // =============================================================================
 // LOGINSCREEN SIMPLE INTEGRADO
 // =============================================================================
+type SimpleLoginScreen = {
+  visible: boolean;
+  onClose: () => void;
+  onLoginSuccess: () => void;
+};
 
-function SimpleLoginScreen({ visible, onClose, onLoginSuccess }) {
+function SimpleLoginScreen({ visible, onClose, onLoginSuccess, }: SimpleLoginScreen) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -125,8 +135,8 @@ export default function HomeScreen() {
 
   const checkAWSStatus = () => {
     const status = `✅ AWS Amplify v6: ${amplifyConfigured ? 'Configurado' : 'Error'}
-🔗 generateClient: ${generateClient ? 'Disponible' : 'No disponible'}  
-🔐 getCurrentUser: ${getCurrentUser ? 'Disponible' : 'No disponible'}
+🔗 generateClient: ${typeof generateClient === 'function' ? 'Disponible' : 'No disponible'}  
+🔐 getCurrentUser: ${userLoggedIn ? 'Usuario logueado' : 'No logueado'}
 📊 GraphQL Client: ${graphqlClient ? 'Creado' : 'Error'}
 📋 Estado: ${amplifyConfigured ? 'Listo para desarrollo' : 'Configuración requerida'}`;
 
@@ -150,8 +160,9 @@ export default function HomeScreen() {
       id: '3',
       name: 'Beta Auth',
       price: 150,
-      status: getCurrentUser ? 'Auth Ready ✅' : 'Auth Pending ⚠️'
+      status: userLoggedIn ? 'Auth Ready ✅' : 'Auth Pending ⚠️'
     }
+
   ];
 
   return (

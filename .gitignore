@@ -14,7 +14,7 @@ jest-cache/
 .vitest/
 
 # 🛠️ IDEs
-.vscode/
+
 .idea/
 *.swp
 *.sublime*

@@ -1,54 +1,35 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { BoatsService } from '../../services/boatsService';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { generateClient } from 'aws-amplify/api';
+import { ModelSortDirection } from '../../API';
+import {
+  createBoat as createBoatMutation,
+  deleteBoat as deleteBoatMutation,
+  updateBoat as updateBoatMutation
+} from '../../graphql/mutations';
+import {
+  boatsByType,
+  getBoat,
+  listBoats
+} from '../../graphql/queries';
 
-export interface Boat {
-  id: string;
-  name: string;
-  type: 'yacht' | 'sailboat' | 'motorboat' | 'catamaran' | 'jetski';
-  description: string;
-  capacity: number;
-  pricePerHour: number;
-  pricePerDay: number;
-  rating: number;
-  reviews: number;
-  images: string[];
-  location: {
-    marina: string;
-    state: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  specifications: {
-    length: number;
-    engine: string;
-    fuel: string;
-    year: number;
-  };
-  amenities: string[];
-  owner: {
-    id: string;
-    name: string;
-    phone: string;
-    rating: number;
-    email: string;
-    verified: boolean;
-  };
-  availability: {
-    available: boolean;
-    blockedDates: string[];
-  };
-  featured: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
+sortDirection: ModelSortDirection.DESC
+// Importar tipos generados automáticamente
+import * as APITypes from '../../API';
 
+// =============================================================================
+// INTERFACES Y TIPOS CORREGIDOS
+// =============================================================================
 
+// Usar los tipos generados de GraphQL para mayor compatibilidad
+export type Boat = APITypes.Boat;
+export type BoatType = APITypes.BoatType;
+export type CreateBoatInput = APITypes.CreateBoatInput;
+export type UpdateBoatInput = APITypes.UpdateBoatInput;
 
+// Mantener interfaz personalizada para filtros de la UI
 export interface BoatFilters {
   state?: string;
-  type?: string;
+  type?: BoatType; // Usar tipo GraphQL
   priceRange?: [number, number];
   capacity?: number;
   search?: string;
@@ -62,6 +43,8 @@ interface BoatsState {
   filters: BoatFilters;
   isLoading: boolean;
   error: string | null;
+  totalCount?: number;
+  nextToken?: string;
 }
 
 const initialState: BoatsState = {
@@ -71,74 +54,253 @@ const initialState: BoatsState = {
   filters: {},
   isLoading: false,
   error: null,
+  totalCount: 0,
+  nextToken: undefined,
 };
 
-// Async Thunks para DynamoDB
+// =============================================================================
+// GRAPHQL CLIENT INSTANCE
+// =============================================================================
+
+const graphqlClient = generateClient();
+
+// =============================================================================
+// ASYNC THUNKS CON TIPOS CORREGIDOS
+// =============================================================================
+
+/**
+ * Buscar barcos con filtros usando GraphQL
+ */
 export const fetchBoats = createAsyncThunk(
   'boats/fetchBoats',
-  async (filters: BoatFilters = {}) => {
-    const result = await BoatsService.searchBoats(filters);
-    if (!result.success) {
-      throw new Error('Failed to fetch boats');
+  async (params: { filters?: BoatFilters; limit?: number; nextToken?: string } = {}) => {
+    const { filters = {}, limit = 20, nextToken } = params;
+    
+    try {
+      // Construir filtro GraphQL usando tipos correctos
+      const graphqlFilter: APITypes.ModelBoatFilterInput = {};
+      
+      if (filters.type) {
+        graphqlFilter.type = { eq: filters.type };
+      }
+      
+      if (filters.capacity) {
+        graphqlFilter.capacity = { gte: filters.capacity };
+      }
+      
+      if (filters.priceRange) {
+        graphqlFilter.pricePerDay = {
+          between: filters.priceRange
+        };
+      }
+      
+      if (filters.search) {
+        graphqlFilter.or = [
+          { name: { contains: filters.search } },
+          { description: { contains: filters.search } }
+        ];
+      }
+      
+      if (filters.featured !== undefined) {
+        graphqlFilter.featured = { eq: filters.featured };
+      }
+
+      const result = await graphqlClient.graphql({
+        query: listBoats,
+        variables: {
+          filter: Object.keys(graphqlFilter).length > 0 ? graphqlFilter : undefined,
+          limit,
+          nextToken
+        },
+      });
+
+      return {
+        boats: result.data.listBoats.items.filter((item): item is Boat => item !== null),
+        nextToken: result.data.listBoats.nextToken,
+        totalCount: result.data.listBoats.items.length
+      };
+    } catch (error: any) {
+      console.error('Error fetching boats:', error);
+      throw new Error(error.message || 'Failed to fetch boats');
     }
-    return result.data as Boat[];
   }
 );
 
+/**
+ * Obtener barcos destacados - Usar filtro en lugar de GSI que no existe
+ */
 export const fetchFeaturedBoats = createAsyncThunk(
   'boats/fetchFeaturedBoats',
-  async () => {
-    const result = await BoatsService.getFeaturedBoats();
-    if (!result.success) {
-      throw new Error('Failed to fetch featured boats');
+  async (limit: number = 10) => {
+    try {
+      const result = await graphqlClient.graphql({
+        query: listBoats,
+        variables: {
+          filter: {
+            featured: { eq: true }
+          },
+          limit
+        },
+      });
+
+      return result.data.listBoats.items.filter((item): item is Boat => item !== null);
+    } catch (error: any) {
+      console.error('Error fetching featured boats:', error);
+      throw new Error(error.message || 'Failed to fetch featured boats');
     }
-    return result.data as Boat[];
   }
 );
 
+/**
+ * Obtener barco por ID
+ */
 export const fetchBoatById = createAsyncThunk(
   'boats/fetchBoatById',
   async (boatId: string) => {
-    const result = await BoatsService.getBoatById(boatId);
-    if (!result.success) {
-      throw new Error('Failed to fetch boat details');
+    try {
+      const result = await graphqlClient.graphql({
+        query: getBoat,
+        variables: {
+          id: boatId
+        },
+      });
+
+      if (!result.data.getBoat) {
+        throw new Error('Boat not found');
+      }
+
+      return result.data.getBoat;
+    } catch (error: any) {
+      console.error('Error fetching boat by ID:', error);
+      throw new Error(error.message || 'Failed to fetch boat details');
     }
-    return result.data as Boat;
   }
 );
 
+/**
+ * Buscar barcos por tipo usando GSI
+ */
+export const fetchBoatsByType = createAsyncThunk(
+  'boats/fetchBoatsByType',
+  async (params: { type: BoatType; limit?: number; nextToken?: string }) => {
+    const { type, limit = 20, nextToken } = params;
+    
+    try {
+      const result = await graphqlClient.graphql({
+        query: boatsByType,
+        variables: {
+          type,
+          limit,
+          nextToken,
+          sortDirection: ModelSortDirection.DESC
+        },
+      });
+
+      return {
+        boats: result.data.boatsByType.items.filter((item): item is Boat => item !== null),
+        nextToken: result.data.boatsByType.nextToken
+      };
+    } catch (error: any) {
+      console.error('Error fetching boats by type:', error);
+      throw new Error(error.message || 'Failed to fetch boats by type');
+    }
+  }
+);
+
+/**
+ * Crear nuevo barco
+ */
 export const createBoat = createAsyncThunk(
   'boats/createBoat',
-  async (boatData: Omit<Boat, 'id' | 'createdAt'>) => {
-    const result = await BoatsService.createBoat(boatData);
-    if (!result.success) {
-      throw new Error('Failed to create boat');
+  async (boatData: Omit<CreateBoatInput, 'id'> & { ownerId: string }) => {
+    try {
+      const input: CreateBoatInput = {
+        ...boatData,
+        // Asegurar que los campos requeridos estén presentes
+        rating: boatData.rating || 0,
+        reviews: boatData.reviews || 0,
+        featured: boatData.featured || false,
+      };
+
+      const result = await graphqlClient.graphql({
+        query: createBoatMutation,
+        variables: {
+          input
+        },
+      });
+
+      if (!result.data.createBoat) {
+        throw new Error('Failed to create boat');
+      }
+
+      return result.data.createBoat;
+    } catch (error: any) {
+      console.error('Error creating boat:', error);
+      throw new Error(error.message || 'Failed to create boat');
     }
-    return result.data as Boat;
   }
 );
 
+/**
+ * Actualizar barco existente
+ */
 export const updateBoat = createAsyncThunk(
   'boats/updateBoat',
-  async ({ boatId, updates }: { boatId: string; updates: Partial<Boat> }) => {
-    const result = await BoatsService.updateBoat(boatId, updates);
-    if (!result.success) {
-      throw new Error('Failed to update boat');
+  async (params: { boatId: string; updates: Partial<UpdateBoatInput> }) => {
+    const { boatId, updates } = params;
+    
+    try {
+      const input: UpdateBoatInput = {
+        id: boatId,
+        ...updates
+      };
+
+      const result = await graphqlClient.graphql({
+        query: updateBoatMutation,
+        variables: {
+          input
+        },
+      });
+
+      if (!result.data.updateBoat) {
+        throw new Error('Failed to update boat');
+      }
+
+      return result.data.updateBoat;
+    } catch (error: any) {
+      console.error('Error updating boat:', error);
+      throw new Error(error.message || 'Failed to update boat');
     }
-    return result.data as Boat;
   }
 );
 
+/**
+ * Eliminar barco
+ */
 export const deleteBoat = createAsyncThunk(
   'boats/deleteBoat',
   async (boatId: string) => {
-    const result = await BoatsService.deleteBoat(boatId);
-    if (!result.success) {
-      throw new Error('Failed to delete boat');
+    try {
+      const result = await graphqlClient.graphql({
+        query: deleteBoatMutation,
+        variables: {
+          input: {
+            id: boatId
+          }
+        },
+      });
+
+      return boatId;
+    } catch (error: any) {
+      console.error('Error deleting boat:', error);
+      throw new Error(error.message || 'Failed to delete boat');
     }
-    return boatId;
   }
 );
+
+// =============================================================================
+// SLICE DEFINITION
+// =============================================================================
 
 const boatsSlice = createSlice({
   name: 'boats',
@@ -156,9 +318,22 @@ const boatsSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearBoats: (state) => {
+      state.boats = [];
+      state.nextToken = undefined;
+    },
+    appendBoats: (state, action: PayloadAction<Boat[]>) => {
+      // Para paginación - agregar más barcos sin reemplazar
+      state.boats = [...state.boats, ...action.payload];
+    },
+    resetState: (state) => {
+      return initialState;
+    },
   },
   extraReducers: (builder) => {
-    // Fetch Boats
+    // =============================================================================
+    // FETCH BOATS
+    // =============================================================================
     builder
       .addCase(fetchBoats.pending, (state) => {
         state.isLoading = true;
@@ -166,14 +341,18 @@ const boatsSlice = createSlice({
       })
       .addCase(fetchBoats.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.boats = action.payload;
+        state.boats = action.payload.boats;
+        state.nextToken = action.payload.nextToken;
+        state.totalCount = action.payload.totalCount;
       })
       .addCase(fetchBoats.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to fetch boats';
       });
 
-    // Fetch Featured Boats
+    // =============================================================================
+    // FETCH FEATURED BOATS
+    // =============================================================================
     builder
       .addCase(fetchFeaturedBoats.pending, (state) => {
         state.isLoading = true;
@@ -188,7 +367,9 @@ const boatsSlice = createSlice({
         state.error = action.error.message || 'Failed to fetch featured boats';
       });
 
-    // Fetch Boat by ID
+    // =============================================================================
+    // FETCH BOAT BY ID
+    // =============================================================================
     builder
       .addCase(fetchBoatById.pending, (state) => {
         state.isLoading = true;
@@ -197,13 +378,39 @@ const boatsSlice = createSlice({
       .addCase(fetchBoatById.fulfilled, (state, action) => {
         state.isLoading = false;
         state.selectedBoat = action.payload;
+        
+        // También actualizar en la lista si existe
+        const index = state.boats.findIndex(boat => boat.id === action.payload.id);
+        if (index !== -1) {
+          state.boats[index] = action.payload;
+        }
       })
       .addCase(fetchBoatById.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to fetch boat details';
       });
 
-    // Create Boat
+    // =============================================================================
+    // FETCH BOATS BY TYPE
+    // =============================================================================
+    builder
+      .addCase(fetchBoatsByType.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchBoatsByType.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.boats = action.payload.boats;
+        state.nextToken = action.payload.nextToken;
+      })
+      .addCase(fetchBoatsByType.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Failed to fetch boats by type';
+      });
+
+    // =============================================================================
+    // CREATE BOAT
+    // =============================================================================
     builder
       .addCase(createBoat.pending, (state) => {
         state.isLoading = true;
@@ -211,14 +418,21 @@ const boatsSlice = createSlice({
       })
       .addCase(createBoat.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.boats.push(action.payload);
+        state.boats.unshift(action.payload); // Agregar al inicio
+        
+        // Si es destacado, también agregarlo a featuredBoats
+        if (action.payload.featured) {
+          state.featuredBoats.unshift(action.payload);
+        }
       })
       .addCase(createBoat.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to create boat';
       });
 
-    // Update Boat
+    // =============================================================================
+    // UPDATE BOAT
+    // =============================================================================
     builder
       .addCase(updateBoat.pending, (state) => {
         state.isLoading = true;
@@ -226,10 +440,27 @@ const boatsSlice = createSlice({
       })
       .addCase(updateBoat.fulfilled, (state, action) => {
         state.isLoading = false;
+        
+        // Actualizar en boats
         const index = state.boats.findIndex(boat => boat.id === action.payload.id);
         if (index !== -1) {
           state.boats[index] = action.payload;
         }
+        
+        // Actualizar en featuredBoats si aplica
+        const featuredIndex = state.featuredBoats.findIndex(boat => boat.id === action.payload.id);
+        if (action.payload.featured && featuredIndex === -1) {
+          // Agregar a featured si ahora es destacado
+          state.featuredBoats.push(action.payload);
+        } else if (!action.payload.featured && featuredIndex !== -1) {
+          // Remover de featured si ya no es destacado
+          state.featuredBoats.splice(featuredIndex, 1);
+        } else if (featuredIndex !== -1) {
+          // Actualizar en featured
+          state.featuredBoats[featuredIndex] = action.payload;
+        }
+        
+        // Actualizar selectedBoat si es el mismo
         if (state.selectedBoat?.id === action.payload.id) {
           state.selectedBoat = action.payload;
         }
@@ -239,7 +470,9 @@ const boatsSlice = createSlice({
         state.error = action.error.message || 'Failed to update boat';
       });
 
-    // Delete Boat
+    // =============================================================================
+    // DELETE BOAT
+    // =============================================================================
     builder
       .addCase(deleteBoat.pending, (state) => {
         state.isLoading = true;
@@ -247,7 +480,14 @@ const boatsSlice = createSlice({
       })
       .addCase(deleteBoat.fulfilled, (state, action) => {
         state.isLoading = false;
+        
+        // Remover de boats
         state.boats = state.boats.filter(boat => boat.id !== action.payload);
+        
+        // Remover de featuredBoats
+        state.featuredBoats = state.featuredBoats.filter(boat => boat.id !== action.payload);
+        
+        // Limpiar selectedBoat si es el mismo
         if (state.selectedBoat?.id === action.payload) {
           state.selectedBoat = null;
         }
@@ -259,5 +499,45 @@ const boatsSlice = createSlice({
   },
 });
 
-export const { setFilters, clearFilters, setSelectedBoat, clearError } = boatsSlice.actions;
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export const { 
+  setFilters, 
+  clearFilters, 
+  setSelectedBoat, 
+  clearError,
+  clearBoats,
+  appendBoats,
+  resetState
+} = boatsSlice.actions;
+
 export default boatsSlice.reducer;
+
+// =============================================================================
+// SELECTORS CON TIPOS CORREGIDOS
+// =============================================================================
+
+export const selectAllBoats = (state: { boats: BoatsState }) => state.boats.boats;
+export const selectFeaturedBoats = (state: { boats: BoatsState }) => state.boats.featuredBoats;
+export const selectSelectedBoat = (state: { boats: BoatsState }) => state.boats.selectedBoat;
+export const selectBoatsLoading = (state: { boats: BoatsState }) => state.boats.isLoading;
+export const selectBoatsError = (state: { boats: BoatsState }) => state.boats.error;
+export const selectBoatsFilters = (state: { boats: BoatsState }) => state.boats.filters;
+export const selectHasMoreBoats = (state: { boats: BoatsState }) => !!state.boats.nextToken;
+
+// =============================================================================
+// HELPER TYPES PARA USO EN COMPONENTES
+// =============================================================================
+
+export type BoatTypeOptions = BoatType;
+
+// Enum values para usar en componentes
+export const BoatTypeEnum = APITypes.BoatType;
+
+// Helper para convertir string a BoatType
+export const stringToBoatType = (type: string): BoatType => {
+  const upperType = type.toUpperCase() as keyof typeof BoatTypeEnum;
+  return BoatTypeEnum[upperType] || BoatTypeEnum.YACHT;
+};

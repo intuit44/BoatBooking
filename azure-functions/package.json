@@ -1,0 +1,19 @@
+{
+  "name": "boat-rental-agent-functions",
+  "version": "1.0.0",
+  "description": "Azure Functions for Boat Rental TSX Agent",
+  "main": "index.js",
+  "scripts": {
+    "start": "func start",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "@azure/keyvault-secrets": "^4.7.0",
+    "@azure/identity": "^4.0.0",
+    "@azure/storage-blob": "^12.17.0",
+    "@azure/data-tables": "^13.2.2",
+    "@octokit/rest": "^20.0.2"
+  },
+  "devDependencies": {}
+}

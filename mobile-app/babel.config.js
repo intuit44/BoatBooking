@@ -20,7 +20,10 @@ module.exports = function (api) {
       [
         'module-resolver',
         {
+          root: ['./src'],
           alias: {
+            '@': './src',
+            '@/components': './src/components',
             crypto: 'crypto-browserify',
             stream: 'stream-browserify',
             buffer: 'buffer',
