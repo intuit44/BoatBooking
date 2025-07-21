@@ -1,37 +1,35 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  TouchableOpacity,
-  Linking,
-  Share,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Dimensions,
+  Linking,
   RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import {
-  Text,
-  Card,
-  Title,
-  Paragraph,
   Button,
+  Card,
   Chip,
   Divider,
-  Surface,
   IconButton,
-  Modal,
-  Portal,
   List,
-  Avatar,
+  Modal,
+  Paragraph,
+  Portal,
   ProgressBar,
-  useTheme,
+  Surface,
+  Text,
+  Title,
+  useTheme
 } from 'react-native-paper';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchBoatById } from '../../store/slices/boatsSlice';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BoatDetailsScreenProps } from '../../types/navigation';
 
 // Importar RootState desde el store global
@@ -40,15 +38,14 @@ import { RootState } from '../../store/store';
 // Importar componentes de animación
 import { FadeInView } from '../../components/animations/FadeInView';
 import { SlideTransition } from '../../components/animations/SlideTransition';
-import { ScaleAnimation } from '../../components/animations/ScaleAnimation';
 
 // Importar componentes de galería
-import { ImageGallery } from '../../components/gallery/ImageGallery';
 import { AnimatedImageCarousel } from '../../components/gallery/AnimatedImageCarousel';
+import { ImageGallery } from '../../components/gallery/ImageGallery';
 
 
 // ELIMINA ESTE BLOQUE COMPLETO:
-/*
+
 interface AuthState {
   user: {
     id: string;
@@ -71,7 +68,7 @@ interface RootState {
   auth: AuthState;
   boats: BoatsState;
 }
-*/
+
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAP_HEIGHT = 200;
