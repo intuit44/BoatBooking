@@ -36,3 +36,5 @@ modules:
     tags: [backend, utilities, helpers]
     include:
       - "**/*.js"
+    references:
+        - .codegpt/agents.yaml

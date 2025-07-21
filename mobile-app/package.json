@@ -4,6 +4,7 @@
   "scripts": {
     "clear": "expo start --clear",
     "ios": "expo run:ios",
+    "test": "jest",
     "web": "expo start --web",
     "android": "expo run:android",
     "start": "expo start"
