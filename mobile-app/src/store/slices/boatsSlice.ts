@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { generateClient } from 'aws-amplify/api';
+import { graphqlClient } from '@/services/AmplifyService';
 import { ModelSortDirection } from '../../API';
 import {
   createBoat as createBoatMutation,
@@ -59,10 +59,8 @@ const initialState: BoatsState = {
 };
 
 // =============================================================================
-// GRAPHQL CLIENT INSTANCE
+// GRAPHQL CLIENT INSTANCE (imported from AmplifyService)
 // =============================================================================
-
-const graphqlClient = generateClient();
 
 // =============================================================================
 // ASYNC THUNKS CON TIPOS CORREGIDOS
