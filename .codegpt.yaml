@@ -38,3 +38,39 @@ modules:
       - "**/*.js"
     references:
         - .codegpt/agents.yaml
+
+  - name: mobile-app-config
+    path: mobile-app/
+    tags: [config, amplify, expo, aws]
+    include:
+      - "*.json"
+      - "*.js"
+      - "amplify/**"
+      - "aws-exports.js"
+      - "amplifyconfiguration.json"
+      - ".env.example"
+      - "amplify-v6-complete-fix.js"
+      - "amplify-migrator-pro.js"
+      - "polyfills/**/*.ts"
+
+  - name: graphql-api
+    path: mobile-app/src/graphql
+    tags: [graphql, api, queries, mutations]
+    include:
+      - "**/*.ts"
+
+  - name: shared-types
+    path: mobile-app/src/types
+    tags: [types, shared, api]
+    include:
+      - "**/*.ts"
+
+  - name: config-files
+    path: mobile-app/
+    tags: [config, json, env]
+    include:
+    - "*.json"
+    - ".env.example"
+    - "tsconfig.json"
+    - "babel.config.js"
+    - "metro.config.js"
