@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
   Alert,
+  ScrollView,
+  StyleSheet,
+  View,
 } from 'react-native';
-import {
-  Text,
-  Card,
-  Title,
-  Paragraph,
-  Button,
-  TextInput,
-  Surface,
-  Divider,
-  Chip,
-} from 'react-native-paper';
 import { Calendar } from 'react-native-calendars';
-import { AppDispatch, RootState, } from '../../store/store';
-import { createBooking } from '../../store/slices/bookingsSlice';
-import { Boat } from '../../store/slices/boatsSlice';
+import {
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Surface,
+  Text,
+  TextInput,
+  Title
+} from 'react-native-paper';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { Boat } from '../../store/slices/boatsSlice';
+import { createBooking } from '../../store/slices/bookingsSlice';
+import { RootState } from '../../store/store';
 
 
 interface Props {
@@ -103,12 +102,17 @@ export function BookingScreen({ navigation, route }: Props) {
   };
 
   const handleContinueToPayment = async () => {
-    if (!validateBooking()) return;
+    // ✅ Verificaciones de seguridad con valores por defecto
+    const defaultImage = 'https://picsum.photos/800/600?random=boat&default';
+    const defaultMarina = 'Marina no especificada';
+    const defaultState = 'Estado no especificado';
+    const defaultCoordinates = { latitude: 0, longitude: 0 };
 
     const bookingData = {
       boatId: boat.id,
       boatName: boat.name,
-      boatImage: boat.images[0],
+      // ✅ Usar optional chaining con fallback
+      boatImage: boat.images?.[0] ?? defaultImage,
       userId: user?.id || '',
       startDate: selectedDate,
       endDate: selectedDate,
@@ -125,9 +129,10 @@ export function BookingScreen({ navigation, route }: Props) {
       specialRequests,
       contactInfo,
       marina: {
-        name: boat.location.marina,
-        address: `${boat.location.marina}, ${boat.location.state}`,
-        coordinates: boat.location.coordinates,
+        // ✅ Usar optional chaining con valores por defecto
+        name: boat.location?.marina ?? defaultMarina,
+        address: `${boat.location?.marina ?? defaultMarina}, ${boat.location?.state ?? defaultState}`,
+        coordinates: boat.location?.coordinates ?? defaultCoordinates,
       },
     };
 
@@ -146,6 +151,9 @@ export function BookingScreen({ navigation, route }: Props) {
     },
   };
 
+  // ✅ También aplicar en otras partes del componente donde uses location
+  const displayLocation = `${boat.location?.marina ?? 'Marina no especificada'}, ${boat.location?.state ?? 'Estado no especificado'}`;
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Boat Summary */}
@@ -155,7 +163,7 @@ export function BookingScreen({ navigation, route }: Props) {
             <View style={styles.boatInfo}>
               <Title style={styles.boatName}>{boat.name}</Title>
               <Text style={styles.boatLocation}>
-                📍 {boat.location.marina}, {boat.location.state}
+                📍 {displayLocation}
               </Text>
             </View>
             <View style={styles.priceInfo}>
