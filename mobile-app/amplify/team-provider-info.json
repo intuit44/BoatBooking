@@ -27,7 +27,7 @@
         },
         "boatrentallapp31507f7cCreateAuthChallenge": {
           "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
-          "s3Key": "amplify-builds/boatrentallapp31507f7cCreateAuthChallenge-6b765175367674684c68-build.zip"
+          "s3Key": "amplify-builds/boatrentallapp31507f7cCreateAuthChallenge-3651544757676e476751-build.zip"
         },
         "boatrentallapp31507f7cVerifyAuthChallengeResponse": {
           "RECAPTCHASECRET": "6Ld0OHQrAAAAAOLdhj04wRX5nzuxbjtVkmrB78LH",

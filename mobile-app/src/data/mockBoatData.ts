@@ -1,13 +1,14 @@
 // mockBoatData.ts
 // Datos de prueba mejorados para evitar problemas con imágenes
 
+import { BoatType, UserRole } from '@/API';
 import { Boat } from '../store/slices/boatsSlice';
 
 export const mockBoats: Boat[] = [
   {
     id: '1',
     name: 'Yacht Presidencial',
-    type: 'yacht',
+    type: BoatType.YACHT,
     description: 'Lujoso yacht de 45 pies perfecto para celebraciones especiales, eventos corporativos y paseos familiares. Cuenta con todas las comodidades modernas incluyendo aire acondicionado, sistema de sonido premium, cocina completa y espacios amplios para el máximo confort. Ideal para grupos que buscan una experiencia exclusiva en las aguas cristalinas de Venezuela.',
     capacity: 12,
     pricePerHour: 250,
@@ -26,14 +27,17 @@ export const mockBoats: Boat[] = [
       state: 'Nueva Esparta',
       coordinates: {
         latitude: 11.0019,
-        longitude: -63.8617
-      }
+        longitude: -63.8617,
+        __typename: 'Coordinates'
+      },
+      __typename: 'Location'
     },
     specifications: {
       length: 45,
       engine: '2x Caterpillar 550HP',
       fuel: 'Diesel',
-      year: 2020
+      year: 2020,
+      __typename: 'Specifications'
     },
     amenities: [
       'Aire Acondicionado',
@@ -51,18 +55,27 @@ export const mockBoats: Boat[] = [
       phone: '+58-414-123-4567',
       rating: 4.8,
       email: "owner@example.com",
-      verified: true
+      verified: true,
+      __typename: 'User',
+      role: UserRole.GUEST,
+      createdAt: '',
+      updatedAt: ''
     },
     availability: {
       available: true,
-      blockedDates: []
+      blockedDates: [],
+      __typename: 'Availability'
     },
-    featured: true
+    featured: true,
+    __typename: 'Boat',
+    ownerId: 'owner1',
+    createdAt: '2024-01-15T10:00:00.000Z',
+    updatedAt: '2024-01-15T10:00:00.000Z'
   },
   {
     id: '2',
     name: 'Velero Caribeño',
-    type: 'sailboat',
+    type: BoatType.SAILBOAT,
     description: 'Hermoso velero de 38 pies ideal para navegación recreativa y deportiva. Perfecto para quienes buscan una experiencia auténtica de navegación a vela en las costas venezolanas. Incluye instructor de vela opcional para principiantes.',
     capacity: 8,
     pricePerHour: 180,
@@ -79,14 +92,17 @@ export const mockBoats: Boat[] = [
       state: 'Vargas',
       coordinates: {
         latitude: 10.4806,
-        longitude: -66.9036
-      }
+        longitude: -66.9036,
+        __typename: 'Coordinates'
+      },
+      __typename: 'Location'
     },
     specifications: {
       length: 38,
       engine: 'Vela + Motor auxiliar 40HP',
       fuel: 'Gasolina',
-      year: 2018
+      year: 2018,
+      __typename: 'Specifications'
     },
     amenities: [
       'Velas Profesionales',
@@ -103,18 +119,27 @@ export const mockBoats: Boat[] = [
       phone: '+58-412-987-6543',
       rating: 4.9,
       email: "owner@example.com",
-      verified: true
+      verified: true,
+      __typename: 'User',
+      role: UserRole.GUEST,
+      createdAt: '',
+      updatedAt: ''
     },
     availability: {
       available: true,
-      blockedDates: []
+      blockedDates: [],
+      __typename: 'Availability'
     },
-    featured: true
+    featured: true,
+    __typename: 'Boat',
+    ownerId: '',
+    createdAt: '',
+    updatedAt: ''
   },
   {
     id: '3',
     name: 'Lancha Deportiva Speed',
-    type: 'motorboat',
+    type: BoatType.MOTORBOAT,
     description: 'Emocionante lancha deportiva de alta velocidad perfecta para deportes acuáticos, esquí acuático y paseos de adrenalina. Ideal para grupos jóvenes que buscan diversión y velocidad en el agua.',
     capacity: 6,
     pricePerHour: 150,
@@ -131,14 +156,17 @@ export const mockBoats: Boat[] = [
       state: 'Nueva Esparta',
       coordinates: {
         latitude: 11.0834,
-        longitude: -63.7833
-      }
+        longitude: -63.7833,
+        __typename: 'Coordinates'
+      },
+      __typename: 'Location'
     },
     specifications: {
       length: 28,
       engine: 'Mercury 300HP',
       fuel: 'Gasolina',
-      year: 2021
+      year: 2021,
+      __typename: 'Specifications'
     },
     amenities: [
       'Equipo de Esquí',
@@ -154,18 +182,27 @@ export const mockBoats: Boat[] = [
       phone: '+58-416-555-0123',
       rating: 4.5,
       email: "owner@example.com",
-      verified: true
+      verified: true,
+      __typename: 'User',
+      role: UserRole.GUEST,
+      createdAt: '',
+      updatedAt: ''
     },
     availability: {
       available: true,
-      blockedDates: []
+      blockedDates: [],
+      __typename: 'Availability'
     },
-    featured: false
+    featured: false,
+    __typename: 'Boat',
+    ownerId: '',
+    createdAt: '',
+    updatedAt: ''
   },
   {
     id: '4',
     name: 'Catamarán Tropical',
-    type: 'catamaran',
+    type: BoatType.CATAMARAN,
     description: 'Espacioso catamarán de 42 pies con amplias zonas de descanso y estabilidad excepcional. Perfecto para familias y grupos grandes que buscan comodidad y espacio. Ideal para tours de día completo y celebraciones.',
     capacity: 16,
     pricePerHour: 300,
@@ -182,14 +219,17 @@ export const mockBoats: Boat[] = [
       state: 'Nueva Esparta',
       coordinates: {
         latitude: 10.7833,
-        longitude: -63.9833
-      }
+        longitude: -63.9833,
+        __typename: 'Coordinates'
+      },
+      __typename: 'Location'
     },
     specifications: {
       length: 42,
       engine: '2x Yamaha 150HP',
       fuel: 'Gasolina',
-      year: 2019
+      year: 2019,
+      __typename: 'Specifications'
     },
     amenities: [
       'Doble Casco',
@@ -207,18 +247,27 @@ export const mockBoats: Boat[] = [
       phone: '+58-424-111-2233',
       rating: 4.9,
       email: "owner@example.com",
-      verified: true
+      verified: true,
+      __typename: 'User',
+      role: UserRole.GUEST,
+      createdAt: '',
+      updatedAt: ''
     },
     availability: {
       available: true,
-      blockedDates: []
+      blockedDates: [],
+      __typename: 'Availability'
     },
-    featured: true
+    featured: true,
+    __typename: 'Boat',
+    ownerId: '',
+    createdAt: '',
+    updatedAt: ''
   },
   {
     id: '5',
     name: 'Jet Ski Adventure',
-    type: 'jetski',
+    type: BoatType.JETSKI,
     description: 'Moderna moto de agua de última generación para aventuras individuales o en pareja. Perfecta para explorar bahías y costas de manera rápida y emocionante.',
     capacity: 2,
     pricePerHour: 80,
@@ -234,14 +283,17 @@ export const mockBoats: Boat[] = [
       state: 'Falcón',
       coordinates: {
         latitude: 11.7,
-        longitude: -69.6
-      }
+        longitude: -69.6,
+        __typename: 'Coordinates'
+      },
+      __typename: 'Location'
     },
     specifications: {
       length: 12,
       engine: 'Yamaha 110HP',
       fuel: 'Gasolina',
-      year: 2022
+      year: 2022,
+      __typename: 'Specifications'
     },
     amenities: [
       'Chaleco Salvavidas',
@@ -255,13 +307,22 @@ export const mockBoats: Boat[] = [
       phone: '+58-426-789-0123',
       rating: 4.3,
       email: "owner@example.com",
-      verified: true
+      verified: true,
+      __typename: 'User',
+      role: UserRole.GUEST,
+      createdAt: '',
+      updatedAt: ''
     },
     availability: {
       available: true,
-      blockedDates: []
+      blockedDates: [],
+      __typename: 'Availability'
     },
-    featured: false
+    featured: false,
+    __typename: 'Boat',
+    ownerId: '',
+    createdAt: '',
+    updatedAt: ''
   }
 ];
 

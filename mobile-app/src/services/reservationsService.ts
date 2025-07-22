@@ -1,6 +1,9 @@
-import { API, graphqlOperation } from 'aws-amplify';
+// ✅ AWS Amplify v6 - Nuevos imports
+import type { GraphQLResult } from '@aws-amplify/api-graphql';
+import { generateClient } from 'aws-amplify/api';
 
-// Crear cliente GraphQL
+// ✅ Crear cliente GraphQL
+const client = generateClient();
 
 // Interfaces para reservas temporales (antes de confirmar booking)
 export interface ReservationRequest {
@@ -32,6 +35,51 @@ export interface ReservationQuote {
   serviceFee: number;
   totalAmount: number;
   currency: string;
+}
+
+export interface Reservation {
+  id: string;
+  userId: string;
+  boatId: string;
+  startDate: string;
+  endDate: string;
+  totalHours: number;
+  totalDays: number;
+  guestCount: number;
+  specialRequests?: string;
+  contactInfo: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  quote: {
+    subtotal: number;
+    taxes: number;
+    serviceFee: number;
+    totalAmount: number;
+    currency: string;
+  };
+  status: string;
+  expiresAt: string;
+  boat?: {
+    id: string;
+    name: string;
+    type: string;
+    images: string[];
+    location: {
+      marina: string;
+      state: string;
+    };
+    pricePerHour: number;
+    pricePerDay: number;
+    owner?: {
+      id: string;
+      name: string;
+      phone: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 // GraphQL Queries para reservas temporales
@@ -256,7 +304,7 @@ export class ReservationsService {
     };
   }
 
-  // Crear reserva temporal (válida por 30 minutos)
+  // ✅ Crear reserva temporal (válida por 30 minutos) - Nueva sintaxis v6
   static async createReservation(reservationData: ReservationRequest) {
     try {
       // Calcular fecha de expiración (30 minutos)
@@ -269,11 +317,14 @@ export class ReservationsService {
         expiresAt: expiresAt.toISOString(),
       };
 
-      const response: any = await API.graphql(graphqlOperation(createReservationMutation, { input }));
+      const response = await client.graphql({
+        query: createReservationMutation,
+        variables: { input }
+      }) as GraphQLResult<{ createReservation: Reservation }>;
 
       return {
         success: true,
-        data: response.data.createReservation,
+        data: response.data?.createReservation,
       };
     } catch (error: any) {
       console.error('Error creating reservation:', error);
@@ -281,14 +332,17 @@ export class ReservationsService {
     }
   }
 
-  // Obtener reserva por ID
+  // ✅ Obtener reserva por ID - Nueva sintaxis v6
   static async getReservationById(reservationId: string) {
     try {
-      const response: any = await API.graphql(graphqlOperation(getReservation, { id: reservationId }));
+      const response = await client.graphql({
+        query: getReservation,
+        variables: { id: reservationId }
+      }) as GraphQLResult<{ getReservation: Reservation }>;
 
       return {
         success: true,
-        data: response.data.getReservation,
+        data: response.data?.getReservation,
       };
     } catch (error: any) {
       console.error('Error fetching reservation:', error);
@@ -296,7 +350,7 @@ export class ReservationsService {
     }
   }
 
-  // Obtener reservas por usuario
+  // ✅ Obtener reservas por usuario - Nueva sintaxis v6
   static async getReservationsByUser(userId: string, status?: string) {
     try {
       const filter: any = {
@@ -307,11 +361,14 @@ export class ReservationsService {
         filter.status = { eq: status };
       }
 
-      const response: any = await API.graphql(graphqlOperation(listReservations, { filter }));
+      const response = await client.graphql({
+        query: listReservations,
+        variables: { filter }
+      }) as GraphQLResult<{ listReservations: { items: Reservation[] } }>;
 
       return {
         success: true,
-        data: response.data.listReservations.items,
+        data: response.data?.listReservations.items || [],
       };
     } catch (error: any) {
       console.error('Error fetching user reservations:', error);
@@ -319,21 +376,22 @@ export class ReservationsService {
     }
   }
 
-  // Confirmar reserva (convertir a booking)
+  // ✅ Confirmar reserva (convertir a booking) - Nueva sintaxis v6
   static async confirmReservation(reservationId: string) {
     try {
-      const response: any = await API.graphql(
-        graphqlOperation(updateReservationMutation, {
+      const response = await client.graphql({
+        query: updateReservationMutation,
+        variables: {
           input: {
             id: reservationId,
             status: 'confirmed'
           }
-        })
-      );
+        }
+      }) as GraphQLResult<{ updateReservation: Reservation }>;
 
       return {
         success: true,
-        data: response.data.updateReservation,
+        data: response.data?.updateReservation,
       };
     } catch (error: any) {
       console.error('Error confirming reservation:', error);
@@ -341,22 +399,23 @@ export class ReservationsService {
     }
   }
 
-  // Cancelar reserva
+  // ✅ Cancelar reserva - Nueva sintaxis v6
   static async cancelReservation(reservationId: string, reason?: string) {
     try {
-      const response: any = await API.graphql(
-        graphqlOperation(updateReservationMutation, {
+      const response = await client.graphql({
+        query: updateReservationMutation,
+        variables: {
           input: {
             id: reservationId,
             status: 'cancelled',
             specialRequests: reason ? `Cancelled: ${reason}` : 'Cancelled by user'
           }
-        })
-      );
+        }
+      }) as GraphQLResult<{ updateReservation: Reservation }>;
 
       return {
         success: true,
-        data: response.data.updateReservation,
+        data: response.data?.updateReservation,
       };
     } catch (error: any) {
       console.error('Error cancelling reservation:', error);
@@ -364,7 +423,7 @@ export class ReservationsService {
     }
   }
 
-  // Extender tiempo de reserva
+  // ✅ Extender tiempo de reserva - Nueva sintaxis v6
   static async extendReservation(reservationId: string, additionalMinutes: number = 15) {
     try {
       // Obtener reserva actual
@@ -377,18 +436,19 @@ export class ReservationsService {
       const currentExpiry = new Date(reservationResult.data.expiresAt);
       const newExpiry = new Date(currentExpiry.getTime() + (additionalMinutes * 60 * 1000));
 
-      const response: any = await API.graphql(
-        graphqlOperation(updateReservationMutation, {
+      const response = await client.graphql({
+        query: updateReservationMutation,
+        variables: {
           input: {
             id: reservationId,
             expiresAt: newExpiry.toISOString()
           }
-        })
-      );
+        }
+      }) as GraphQLResult<{ updateReservation: Reservation }>;
 
       return {
         success: true,
-        data: response.data.updateReservation,
+        data: response.data?.updateReservation,
       };
     } catch (error: any) {
       console.error('Error extending reservation:', error);
@@ -396,7 +456,7 @@ export class ReservationsService {
     }
   }
 
-  // Limpiar reservas expiradas
+  // ✅ Limpiar reservas expiradas - Nueva sintaxis v6
   static async cleanupExpiredReservations() {
     try {
       const now = new Date().toISOString();
@@ -405,20 +465,24 @@ export class ReservationsService {
         status: { eq: 'pending' }
       };
 
-      const response: any = await API.graphql(graphqlOperation(listReservations, { filter }));
+      const response = await client.graphql({
+        query: listReservations,
+        variables: { filter }
+      }) as GraphQLResult<{ listReservations: { items: Reservation[] } }>;
 
-      const expiredReservations = response.data.listReservations.items;
+      const expiredReservations = response.data?.listReservations.items || [];
 
       // Marcar como expiradas
-      const updatePromises = expiredReservations.map((reservation: any) =>
-        API.graphql(
-        graphqlOperation(updateReservationMutation, {
+      const updatePromises = expiredReservations.map((reservation: Reservation) =>
+        client.graphql({
+          query: updateReservationMutation,
+          variables: {
             input: {
               id: reservation.id,
               status: 'expired'
             }
-          })
-      )
+          }
+        })
       );
 
       await Promise.all(updatePromises);
@@ -433,16 +497,17 @@ export class ReservationsService {
     }
   }
 
-  // Eliminar reserva
+  // ✅ Eliminar reserva - Nueva sintaxis v6
   static async deleteReservation(reservationId: string) {
     try {
-      const response: any = await API.graphql(
-        graphqlOperation(deleteReservationMutation, { input: { id: reservationId } })
-      );
+      const response = await client.graphql({
+        query: deleteReservationMutation,
+        variables: { input: { id: reservationId } }
+      }) as GraphQLResult<{ deleteReservation: { id: string } }>;
 
       return {
         success: true,
-        data: response.data.deleteReservation,
+        data: response.data?.deleteReservation,
       };
     } catch (error: any) {
       console.error('Error deleting reservation:', error);
@@ -450,15 +515,93 @@ export class ReservationsService {
     }
   }
 
-  // Verificar si una reserva está expirada
+  // ✅ Verificar si una reserva está expirada
   static isReservationExpired(expiresAt: string): boolean {
     return new Date() > new Date(expiresAt);
   }
 
-  // Obtener tiempo restante de una reserva
+  // ✅ Obtener tiempo restante de una reserva
   static getTimeRemaining(expiresAt: string): number {
     const now = new Date().getTime();
     const expiry = new Date(expiresAt).getTime();
     return Math.max(0, expiry - now);
+  }
+
+  // ✅ Obtener reservas activas por usuario
+  static async getActiveReservationsByUser(userId: string) {
+    try {
+      const now = new Date().toISOString();
+      const filter = {
+        userId: { eq: userId },
+        and: [
+          { expiresAt: { gt: now } },
+          { status: { eq: 'pending' } }
+        ]
+      };
+
+      const response = await client.graphql({
+        query: listReservations,
+        variables: { filter }
+      }) as GraphQLResult<{ listReservations: { items: Reservation[] } }>;
+
+      return {
+        success: true,
+        data: response.data?.listReservations.items || [],
+      };
+    } catch (error: any) {
+      console.error('Error fetching active reservations:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ✅ Convertir reserva a booking
+  static async convertReservationToBooking(reservationId: string) {
+    try {
+      // Primero obtener la reserva
+      const reservationResult = await this.getReservationById(reservationId);
+      
+      if (!reservationResult.success || !reservationResult.data) {
+        return { success: false, error: 'Reservation not found' };
+      }
+
+      const reservation = reservationResult.data;
+
+      // Verificar que no esté expirada
+      if (this.isReservationExpired(reservation.expiresAt)) {
+        return { success: false, error: 'Reservation has expired' };
+      }
+
+      // TODO: Aquí llamarías al BookingsService para crear el booking real
+      // const bookingData = {
+      //   userId: reservation.userId,
+      //   boatId: reservation.boatId,
+      //   startDate: reservation.startDate,
+      //   endDate: reservation.endDate,
+      //   totalHours: reservation.totalHours,
+      //   totalDays: reservation.totalDays,
+      //   guestCount: reservation.guestCount,
+      //   specialRequests: reservation.specialRequests,
+      //   contactInfo: reservation.contactInfo,
+      //   totalAmount: reservation.quote.totalAmount,
+      //   currency: reservation.quote.currency
+      // };
+
+      // const bookingResult = await BookingsService.createBooking(bookingData);
+
+      // Por ahora solo marcamos como confirmada
+      const confirmedReservation = await this.confirmReservation(reservationId);
+
+      return {
+        success: true,
+        data: {
+          reservation: confirmedReservation.data,
+          // booking: bookingResult.data // Cuando implementes BookingsService
+        }
+      };
+
+    } catch (error: any) {
+      console.error('Error converting reservation to booking:', error);
+      return { success: false, error: error.message };
+    }
   }
 }

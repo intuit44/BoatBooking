@@ -37,44 +37,12 @@ import { RootState } from '../../store/store';
 
 // Importar componentes de animación
 import { FadeInView } from '../../components/animations/FadeInView';
-import { SlideTransition } from '../../components/animations/SlideTransition';
-
-// Importar componentes de galería
-import { AnimatedImageCarousel } from '../../components/gallery/AnimatedImageCarousel';
-import { ImageGallery } from '../../components/gallery/ImageGallery';
-
-
-// ELIMINA ESTE BLOQUE COMPLETO:
-
-interface AuthState {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-  } | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-}
-
-interface BoatsState {
-  selectedBoat: Boat | null;
-  isLoading: boolean;
-  error: string | null;
-}
-
-// RootState para el store
-interface RootState {
-  auth: AuthState;
-  boats: BoatsState;
-}
-
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAP_HEIGHT = 200;
 const IMAGE_HEIGHT = 250;
 
-const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route }) => { // <--- CAMBIA ESTA LÍNEA
+const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route }) => {
   const { boatId } = route.params;
   const theme = useTheme();
   const dispatch = useAppDispatch();
@@ -92,7 +60,7 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
   const { selectedBoat: boat, isLoading, error } = useAppSelector(
     (state: RootState) => state.boats
   );
-  const { user } = useAppSelector((state: RootState) => state.auth);
+  const user = null; // Temporal - implementar cuando se agregue auth al store
 
   // Cargar datos del bote
   useEffect(() => {
@@ -130,16 +98,22 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
     setShowContactModal(true);
   }, [user, navigation]);
 
-  const handlePhoneCall = useCallback((phoneNumber: string) => {
-    if (phoneNumber) {
+  // ✅ FIX: Verificar que el phoneNumber no sea null/undefined
+  const handlePhoneCall = useCallback((phoneNumber?: string | null) => {
+    if (phoneNumber && phoneNumber.trim()) {
       Linking.openURL(`tel:${phoneNumber}`);
+    } else {
+      Alert.alert('Error', 'Número de teléfono no disponible');
     }
   }, []);
 
-  const handleWhatsApp = useCallback((phoneNumber: string) => {
-    if (phoneNumber) {
-      const message = `Hola, estoy interesado en tu embarcación ${boat?.name}`;
+  // ✅ FIX: Verificar que el phoneNumber no sea null/undefined
+  const handleWhatsApp = useCallback((phoneNumber?: string | null) => {
+    if (phoneNumber && phoneNumber.trim() && boat?.name) {
+      const message = `Hola, estoy interesado en tu embarcación ${boat.name}`;
       Linking.openURL(`whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`);
+    } else {
+      Alert.alert('Error', 'Número de teléfono no disponible');
     }
   }, [boat]);
 
@@ -153,6 +127,21 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
     await dispatch(fetchBoatById(boatId));
     setRefreshing(false);
   }, [boatId, dispatch]);
+
+  // Callback para abrir el mapa en la app de mapas del dispositivo
+  const openInMaps = useCallback(() => {
+    if (boat?.location?.coordinates) {
+      const { latitude, longitude } = boat.location.coordinates;
+      const label = encodeURIComponent(`${boat.name} - ${boat.location.marina}`);
+      
+      // URL universal que funciona en iOS y Android
+      const url = `https://maps.google.com/?q=${latitude},${longitude}&z=15&t=m&hl=es&label=${label}`;
+      
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'No se pudo abrir el mapa');
+      });
+    }
+  }, [boat]);
 
   // Memoizar cálculos pesados
   const priceDisplay = useMemo(() => {
@@ -220,20 +209,33 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
       >
         {/* Galería de imágenes */}
         <FadeInView delay={0}>
-          <AnimatedImageCarousel
-            images={boat.images || []}
-            boatName={boat.name}
-            boatType={boat.type}
-            onImagePress={() => setShowGallery(true)}
-            onIndexChange={setCurrentImageIndex}
-            totalImages={totalImages}
-          />
+          <View style={styles.imageContainer}>
+            {boat.images && boat.images.length > 0 ? (
+              <TouchableOpacity onPress={() => setShowGallery(true)}>
+                <Card style={styles.imageCard}>
+                  <Card.Cover source={{ uri: boat.images[0] }} style={styles.mainImage} />
+                  <View style={styles.imageIndicator}>
+                    <Text style={styles.imageCounter}>
+                      {currentImageIndex + 1} / {totalImages}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            ) : (
+              <Card style={styles.imageCard}>
+                <Card.Cover 
+                  source={{ uri: 'https://picsum.photos/800/600?random=boat' }} 
+                  style={styles.mainImage} 
+                />
+              </Card>
+            )}
+          </View>
         </FadeInView>
 
         {/* Contenido principal */}
         <View style={styles.content}>
           {/* Header con título y precio */}
-          <SlideTransition direction="right" delay={100}>
+          <FadeInView delay={100}>
             <Surface style={styles.headerSurface} elevation={1}>
               <View style={styles.headerContent}>
                 <View style={styles.titleContainer}>
@@ -261,10 +263,10 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
                 </Text>
               </View>
             </Surface>
-          </SlideTransition>
+          </FadeInView>
 
           {/* Acciones rápidas */}
-          <SlideTransition direction="left" delay={200}>
+          <FadeInView delay={200}>
             <View style={styles.actionButtons}>
               <Button
                 mode="contained"
@@ -289,7 +291,7 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
                 onPress={toggleFavorite}
               />
             </View>
-          </SlideTransition>
+          </FadeInView>
 
           <Divider style={styles.divider} />
 
@@ -340,36 +342,68 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
             </Card>
           </FadeInView>
 
-          {/* Ubicación */}
+          {/* Ubicación con Mapa */}
           {boat.location && (
             <FadeInView delay={500}>
               <Card style={styles.card}>
                 <Card.Content>
-                  <Title style={styles.sectionTitle}>Ubicación</Title>
-                  <Paragraph>{boat.location.marina}</Paragraph>
+                  <View style={styles.locationHeader}>
+                    <Title style={styles.sectionTitle}>Ubicación</Title>
+                    <IconButton
+                      icon="map-marker-outline"
+                      size={24}
+                      onPress={openInMaps}
+                      mode="contained-tonal"
+                    />
+                  </View>
+                  <Paragraph style={styles.locationMarina}>{boat.location.marina}</Paragraph>
                   <Paragraph style={styles.locationState}>{boat.location.state}</Paragraph>
                 </Card.Content>
-                <MapView
-                  provider={PROVIDER_GOOGLE}
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: boat.location.coordinates.latitude,
-                    longitude: boat.location.coordinates.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                >
-                  <Marker
-                    coordinate={{
+                
+                {/* Google Maps integrado */}
+                <TouchableOpacity onPress={openInMaps} activeOpacity={0.8}>
+                  <MapView
+                    provider={PROVIDER_GOOGLE}
+                    style={styles.map}
+                    initialRegion={{
                       latitude: boat.location.coordinates.latitude,
                       longitude: boat.location.coordinates.longitude,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
                     }}
-                    title={boat.name}
-                    description={boat.location.marina}
-                  />
-                </MapView>
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                    pitchEnabled={false}
+                    rotateEnabled={false}
+                    mapType="standard"
+                    showsUserLocation={false}
+                    showsMyLocationButton={false}
+                    showsCompass={false}
+                    showsScale={false}
+                    showsBuildings={true}
+                    showsTraffic={false}
+                    showsIndoors={false}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: boat.location.coordinates.latitude,
+                        longitude: boat.location.coordinates.longitude,
+                      }}
+                      title={boat.name}
+                      description={`${boat.location.marina} - ${boat.location.state}`}
+                      pinColor={theme.colors.primary}
+                    />
+                  </MapView>
+                  
+                  {/* Overlay para indicar que el mapa es interactivo */}
+                  <View style={styles.mapOverlay}>
+                    <Surface style={styles.mapButton} elevation={2}>
+                      <Text style={[styles.mapButtonText, { color: theme.colors.primary }]}>
+                        Abrir en Mapas
+                      </Text>
+                    </Surface>
+                  </View>
+                </TouchableOpacity>
               </Card>
             </FadeInView>
           )}
@@ -409,8 +443,8 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
             </FadeInView>
           )}
 
-          {/* Reseñas */}
-          {boat.rating !== undefined && (
+          {/* ✅ FIX: Verificar que boat.rating no sea null/undefined */}
+          {boat.rating != null && boat.rating !== undefined && (
             <FadeInView delay={700}>
               <Card style={styles.card}>
                 <TouchableOpacity onPress={() => setShowReviews(!showReviews)}>
@@ -448,21 +482,21 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
             <>
               <List.Item
                 title="Llamar"
-                description={boat.owner.phone}
+                description={boat.owner.phone || 'No disponible'}
                 left={props => <List.Icon {...props} icon="phone" />}
-                onPress={() => boat.owner && handlePhoneCall(boat.owner.phone)}
+                onPress={() => handlePhoneCall(boat.owner?.phone)}
               />
               <List.Item
                 title="WhatsApp"
                 description="Enviar mensaje"
                 left={props => <List.Icon {...props} icon="whatsapp" />}
-                onPress={() => boat.owner && handleWhatsApp(boat.owner.phone)}
+                onPress={() => handleWhatsApp(boat.owner?.phone)}
               />
               <List.Item
                 title="Email"
-                description={boat.owner.email}
+                description={boat.owner.email || 'No disponible'}
                 left={props => <List.Icon {...props} icon="email" />}
-                onPress={() => boat.owner && Linking.openURL(`mailto:${boat.owner.email}`)}
+                onPress={() => boat.owner?.email && Linking.openURL(`mailto:${boat.owner.email}`)}
               />
             </>
           )}
@@ -476,6 +510,7 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
         </Modal>
 
         {/* Modal de galería */}
+        {/* ImageGallery component not available - implement later
         {showGallery && boat.images && boat.images.length > 0 && (
           <ImageGallery
             images={boat.images}
@@ -486,6 +521,7 @@ const BoatDetailsScreen: React.FC<BoatDetailsScreenProps> = ({ navigation, route
             totalImages={boat.images.length}
           />
         )}
+        */}
       </Portal>
     </>
   );
@@ -509,6 +545,16 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 24,
   },
+  imageContainer: {
+    margin: 16,
+  },
+  imageCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  mainImage: {
+    height: IMAGE_HEIGHT,
+  },
   imageIndicator: {
     position: 'absolute',
     top: IMAGE_HEIGHT - 30,
@@ -517,6 +563,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
+  },
+  imageCounter: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   headerSurface: {
     margin: 16,
@@ -574,13 +625,39 @@ const styles = StyleSheet.create({
   readMoreButton: {
     marginTop: 8,
   },
+  locationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationMarina: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   locationState: {
     marginTop: 4,
     opacity: 0.7,
+    marginBottom: 16,
   },
   map: {
     height: MAP_HEIGHT,
-    marginTop: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+  },
+  mapButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  mapButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   availabilityContainer: {
     flexDirection: 'row',

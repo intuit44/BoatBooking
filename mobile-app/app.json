@@ -13,13 +13,21 @@
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
-      "package": "com.boatrental.app"
+      "package": "com.boatrental.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyATgQqS58W5dIHLa2NGK4WgVmvng9YTjQ0"
+        }
+      }
     },
     "name": "Boat Rental App",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.boatrental.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyATgQqS58W5dIHLa2NGK4WgVmvng9YTjQ0"
+      }
     },
     "slug": "boat-rental-app",
     "icon": "./assets/icon.png",

@@ -1,17 +1,41 @@
-﻿import React, { useState } from 'react';
+﻿import { ReactNode, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
   Alert,
-  Switch
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
+// ✅ Interfaces para definir tipos
+interface UserData {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  memberSince: string;
+  totalBookings: number;
+  favoritesCount: number;
+  profileImage: string;
+}
+
+interface ProfileSectionProps {
+  title: string;
+  children: ReactNode;
+}
+
+interface ProfileItemProps {
+  icon: string;
+  label: string;
+  value: string;
+  onPress?: () => void;
+  editable?: boolean;
+}
+
 // Datos del usuario de ejemplo
-const userData = {
+const userData: UserData = {
   name: 'Juan Pérez',
   email: 'juan.perez@email.com',
   phone: '+1 234 567 8900',
@@ -22,7 +46,8 @@ const userData = {
   profileImage: '👤'
 };
 
-function ProfileSection({ title, children }) {
+// ✅ Componente ProfileSection con tipos
+function ProfileSection({ title, children }: ProfileSectionProps) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -33,7 +58,8 @@ function ProfileSection({ title, children }) {
   );
 }
 
-function ProfileItem({ icon, label, value, onPress, editable = false }) {
+// ✅ Componente ProfileItem con tipos
+function ProfileItem({ icon, label, value, onPress, editable = false }: ProfileItemProps) {
   return (
     <TouchableOpacity 
       style={styles.profileItem} 
@@ -52,12 +78,18 @@ function ProfileItem({ icon, label, value, onPress, editable = false }) {
   );
 }
 
-export default function ProfileScreen() {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [locationEnabled, setLocationEnabled] = useState(true);
-  const [user, setUser] = useState(userData);
+// ✅ Interface para props del componente principal
+interface ProfileScreenProps {
+  navigation?: any; // Opcional si no siempre se pasa
+}
 
-  const handleEditProfile = () => {
+export default function ProfileScreen({ navigation }: ProfileScreenProps = {}) {
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [locationEnabled, setLocationEnabled] = useState<boolean>(true);
+  const [user, setUser] = useState<UserData>(userData);
+
+  // ✅ Handlers con tipos explícitos
+  const handleEditProfile = (): void => {
     Alert.alert(
       'Editar Perfil',
       'Función de edición en desarrollo',
@@ -65,7 +97,7 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = (): void => {
     Alert.alert(
       'Cambiar Contraseña',
       'Se enviará un enlace a tu email',
@@ -76,7 +108,7 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     Alert.alert(
       'Cerrar Sesión',
       '¿Estás seguro de que quieres cerrar sesión?',
@@ -87,7 +119,7 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleSupport = () => {
+  const handleSupport = (): void => {
     Alert.alert(
       'Soporte',
       'Contacta con nosotros:\n📧 support@boatrental.com\n📞 +1 800 BOATS',
@@ -95,10 +127,53 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleNavigateToFavorites = (): void => {
+    if (navigation) {
+      navigation.navigate('Favorites');
+    } else {
+      console.log('Favoritos');
+    }
+  };
+
+  const handleNavigateToBookings = (): void => {
+    if (navigation) {
+      navigation.navigate('Bookings');
+    } else {
+      console.log('Historial');
+    }
+  };
+
+  const handleNavigateToPayments = (): void => {
+    if (navigation) {
+      navigation.navigate('PaymentMethods');
+    } else {
+      console.log('Pagos');
+    }
+  };
+
+  const handleLoyaltyProgram = (): void => {
+    Alert.alert(
+      'Programa de Lealtad',
+      'Gana puntos con cada reserva y disfruta de descuentos exclusivos',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleRateApp = (): void => {
+    Alert.alert(
+      'Calificar la App',
+      '¿Te gusta nuestra app? ¡Califícanos en la tienda!',
+      [
+        { text: 'Más tarde' },
+        { text: 'Calificar', onPress: () => console.log('Rating') }
+      ]
+    );
+  };
+
   console.log('✅ ProfileScreen cargado correctamente');
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>👤 Mi Perfil</Text>
@@ -176,6 +251,7 @@ export default function ProfileScreen() {
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
             trackColor={{ false: '#ccc', true: '#0066CC' }}
+            thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
 
@@ -191,6 +267,7 @@ export default function ProfileScreen() {
             value={locationEnabled}
             onValueChange={setLocationEnabled}
             trackColor={{ false: '#ccc', true: '#0066CC' }}
+            thumbColor={locationEnabled ? '#fff' : '#f4f3f4'}
           />
         </View>
       </ProfileSection>
@@ -201,25 +278,25 @@ export default function ProfileScreen() {
           icon="⭐"
           label="Mis Favoritos"
           value="Ver barcos guardados"
-          onPress={() => console.log('Favoritos')}
+          onPress={handleNavigateToFavorites}
         />
         <ProfileItem
           icon="📅"
           label="Historial de Reservas"
           value="Ver todas las reservas"
-          onPress={() => console.log('Historial')}
+          onPress={handleNavigateToBookings}
         />
         <ProfileItem
           icon="💳"
           label="Métodos de Pago"
           value="Gestionar tarjetas"
-          onPress={() => console.log('Pagos')}
+          onPress={handleNavigateToPayments}
         />
         <ProfileItem
           icon="🎁"
           label="Programa de Lealtad"
           value="Ver beneficios"
-          onPress={() => console.log('Lealtad')}
+          onPress={handleLoyaltyProgram}
         />
       </ProfileSection>
 
@@ -241,7 +318,7 @@ export default function ProfileScreen() {
           icon="⭐"
           label="Calificar la App"
           value="Déjanos tu opinión"
-          onPress={() => console.log('Rating')}
+          onPress={handleRateApp}
         />
       </ProfileSection>
 
@@ -452,6 +529,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     padding: 20,
+    paddingBottom: 40,
   },
   footerText: {
     fontSize: 12,

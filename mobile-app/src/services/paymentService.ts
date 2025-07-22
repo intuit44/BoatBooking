@@ -1,26 +1,35 @@
 // src/services/paymentService.ts
-import { API, graphqlOperation } from 'aws-amplify';
-import { 
-  createPayment, 
-  updateBooking,
-  createNotification,
-  updatePayment 
-} from '../graphql/mutations';
-import { 
-  getBooking,
-  getPayment,
-  paymentsByUserId 
-} from '../graphql/queries';
-import { 
-  CreatePaymentInput,
-  UpdateBookingInput,
-  UpdatePaymentInput,
-  PaymentStatus,
-  BookingStatus,
+// ✅ AWS Amplify v6 - Nuevos imports
+import type { GraphQLResult } from '@aws-amplify/api-graphql';
+import { generateClient } from 'aws-amplify/api';
+import {
   Booking,
-  Payment
+  BookingStatus,
+  CreatePaymentInput,
+  ModelSortDirection // ✅ Agregar import del enum
+  ,
+
+  Payment,
+  PaymentStatus,
+  UpdateBookingInput,
+  UpdatePaymentInput
 } from '../API';
 import { PaymentConfig } from '../config/payment.config';
+import {
+  createNotification,
+  createPayment,
+  updateBooking,
+  updatePayment
+} from '../graphql/mutations';
+import {
+  getBooking,
+  getPayment,
+  paymentsByUserId
+} from '../graphql/queries';
+
+// ✅ Crear cliente GraphQL
+const client = generateClient();
+
 // Declaración global para ApplePaySession (solo disponible en Safari)
 declare global {
   interface Window {
@@ -99,12 +108,13 @@ export class PaymentService {
    */
   static async processPayment(paymentData: PaymentData): Promise<PaymentResult> {
     try {
-      // 1. Obtener información de la reserva
-      const bookingResult = await API.graphql(
-        graphqlOperation(getBooking, { id: paymentData.bookingId })
-      ) as any;
+      // 1. Obtener información de la reserva - ✅ Nueva sintaxis v6
+      const bookingResult = await client.graphql({
+        query: getBooking,
+        variables: { id: paymentData.bookingId }
+      }) as GraphQLResult<{ getBooking: Booking }>;
       
-      const booking: Booking = bookingResult.data.getBooking;
+      const booking: Booking = bookingResult.data?.getBooking!;
       
       if (!booking) {
         throw new Error('Reserva no encontrada');
@@ -119,7 +129,7 @@ export class PaymentService {
         };
       }
 
-      // 3. Crear registro de pago en GraphQL
+      // 3. Crear registro de pago en GraphQL - ✅ Nueva sintaxis v6
       const paymentInput: CreatePaymentInput = {
         userId: booking.userId,
         bookingId: booking.id,
@@ -130,11 +140,12 @@ export class PaymentService {
         transactionId: this.generateTransactionId(paymentData.paymentMethod)
       };
 
-      const paymentResult = await API.graphql(
-        graphqlOperation(createPayment, { input: paymentInput })
-      ) as any;
+      const paymentResult = await client.graphql({
+        query: createPayment,
+        variables: { input: paymentInput }
+      }) as GraphQLResult<{ createPayment: Payment }>;
 
-      const payment: Payment = paymentResult.data.createPayment;
+      const payment: Payment = paymentResult.data?.createPayment!;
 
       // 4. Llamar al backend Lambda para procesar el pago
       const lambdaResponse = await this.callPaymentLambda({
@@ -147,7 +158,7 @@ export class PaymentService {
 
       // 5. Actualizar el estado según la respuesta
       if (lambdaResponse.success) {
-        // Actualizar booking con estado de pago
+        // Actualizar booking con estado de pago - ✅ Nueva sintaxis v6
         const updateInput: UpdateBookingInput = {
           id: booking.id,
           paymentStatus: lambdaResponse.paymentStatus,
@@ -156,11 +167,12 @@ export class PaymentService {
             : booking.status
         };
 
-        await API.graphql(
-          graphqlOperation(updateBooking, { input: updateInput })
-        );
+        await client.graphql({
+          query: updateBooking,
+          variables: { input: updateInput }
+        });
 
-        // Actualizar payment con el estado final
+        // Actualizar payment con el estado final - ✅ Nueva sintaxis v6
         const updatePaymentInput: UpdatePaymentInput = {
           id: payment.id,
           status: lambdaResponse.paymentStatus,
@@ -170,9 +182,10 @@ export class PaymentService {
           transactionId: lambdaResponse.transactionId || payment.transactionId
         };
 
-        await API.graphql(
-          graphqlOperation(updatePayment, { input: updatePaymentInput })
-        );
+        await client.graphql({
+          query: updatePayment,
+          variables: { input: updatePaymentInput }
+        });
 
         // 6. Crear notificación para el usuario
         await this.createPaymentNotification(
@@ -346,7 +359,7 @@ export class PaymentService {
       };
     }
   }
-
+  
   /**
    * Procesa pago con Google Pay
    */
@@ -429,7 +442,7 @@ export class PaymentService {
   }
 
   /**
-   * Valida el estado de un pago
+   * Valida el estado de un pago - ✅ Nueva sintaxis v6
    */
   static async validatePayment(paymentId: string): Promise<{
     isValid: boolean;
@@ -437,11 +450,12 @@ export class PaymentService {
     message: string;
   }> {
     try {
-      const result = await API.graphql(
-        graphqlOperation(getPayment, { id: paymentId })
-      ) as any;
+      const result = await client.graphql({
+        query: getPayment,
+        variables: { id: paymentId }
+      }) as GraphQLResult<{ getPayment: Payment }>;
       
-      const payment: Payment = result.data.getPayment;
+      const payment: Payment = result.data?.getPayment!;
       
       if (!payment) {
         return {
@@ -479,9 +493,14 @@ export class PaymentService {
       // Por ahora retornamos un placeholder
       console.log('Subiendo comprobante para pago:', paymentId);
       
-      // TODO: Implementar upload a S3
-      // const uploadResult = await Storage.put(`payments/${paymentId}/proof`, file, {
-      //   contentType: file.type
+      // TODO: Implementar upload a S3 con nueva sintaxis
+      // import { uploadData } from 'aws-amplify/storage';
+      // const uploadResult = await uploadData({
+      //   key: `payments/${paymentId}/proof`,
+      //   data: file,
+      //   options: {
+      //     contentType: file.type
+      //   }
       // });
 
       return {
@@ -537,19 +556,20 @@ export class PaymentService {
   }
 
   /**
-   * Obtiene el historial de pagos de un usuario
+   * Obtiene el historial de pagos de un usuario - ✅ Nueva sintaxis v6
    */
   static async getUserPaymentHistory(userId: string): Promise<Payment[]> {
     try {
-      const result = await API.graphql(
-        graphqlOperation(paymentsByUserId, { 
+      const result = await client.graphql({
+        query: paymentsByUserId,
+        variables: {
           userId,
-          sortDirection: 'DESC',
+          sortDirection: ModelSortDirection.DESC, // ✅ Usar el enum en lugar de string
           limit: 50
-        })
-      ) as any;
+        }
+      }) as GraphQLResult<{ paymentsByUserId: { items: Payment[] } }>;
 
-      return result.data.paymentsByUserId.items || [];
+      return result.data?.paymentsByUserId.items || [];
 
     } catch (error) {
       console.error('Error obteniendo historial de pagos:', error);
@@ -607,8 +627,9 @@ export class PaymentService {
         ? 'Tu pago ha sido confirmado exitosamente. ¡Disfruta tu aventura!'
         : 'Tu pago está pendiente de confirmación. Te notificaremos cuando esté listo.';
 
-      await API.graphql(
-        graphqlOperation(createNotification, {
+      await client.graphql({
+        query: createNotification,
+        variables: {
           input: {
             userId,
             title,
@@ -618,8 +639,8 @@ export class PaymentService {
             relatedId: bookingId,
             actionUrl: `/bookings/${bookingId}`
           }
-        })
-      );
+        }
+      });
     } catch (error) {
       console.error('Error creando notificación:', error);
     }

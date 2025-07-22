@@ -1,441 +1,360 @@
-﻿import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
+﻿import {
+  Alert,
   ScrollView,
-  TouchableOpacity,
-  Alert
+  StyleSheet,
+  View
 } from 'react-native';
+import {
+  Button,
+  Card,
+  Chip,
+  Surface,
+  Text,
+  Title,
+} from 'react-native-paper';
+import { useAppSelector } from '../../store/hooks';
+import { Booking } from '../../store/slices/bookingsSlice';
+import { RootState } from '../../store/store';
 
-// Datos de reservas de ejemplo
-const sampleBookings = [
-  {
-    id: '1',
-    boatName: 'Sea Explorer',
-    boatImage: '🛥️',
-    date: '2025-07-20',
-    time: '10:00 AM',
-    duration: '4 horas',
-    price: 150,
-    status: 'confirmada',
-    location: 'Puerto Marina',
-    guests: 6
-  },
-  {
-    id: '2',
-    boatName: 'Ocean Breeze',
-    boatImage: '⛵',
-    date: '2025-07-25',
-    time: '2:00 PM',
-    duration: '6 horas',
-    price: 200,
-    status: 'pendiente',
-    location: 'Bahía Azul',
-    guests: 4
-  },
-  {
-    id: '3',
-    boatName: 'Wave Rider',
-    boatImage: '🚤',
-    date: '2025-07-15',
-    time: '9:00 AM',
-    duration: '3 horas',
-    price: 120,
-    status: 'completada',
-    location: 'Costa Norte',
-    guests: 2
-  }
-];
+// ✅ Interface para props de BookingCard
+interface BookingCardProps {
+  booking: Booking;
+  onPress: (booking: Booking) => void;
+  onCancel: (booking: Booking) => void;
+}
 
-function BookingCard({ booking, onPress, onCancel }) {
-  const getStatusColor = (status) => {
+// ✅ Interface para props del componente principal
+interface BookingsScreenProps {
+  navigation: any; // O usa el tipo específico de navigation si lo tienes
+}
+
+// ✅ Función BookingCard con tipos explícitos
+function BookingCard({ booking, onPress, onCancel }: BookingCardProps) {
+  // ✅ Función con tipo explícito para el parámetro
+  const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'confirmada': return '#4CAF50';
-      case 'pendiente': return '#FF9800';
-      case 'completada': return '#2196F3';
-      case 'cancelada': return '#F44336';
-      default: return '#666';
+      case 'confirmed':
+        return '#4CAF50';
+      case 'pending':
+        return '#FF9800';
+      case 'cancelled':
+        return '#F44336';
+      case 'completed':
+        return '#2196F3';
+      case 'active':
+        return '#9C27B0';
+      default:
+        return '#757575';
     }
   };
 
-  const getStatusText = (status) => {
+  // ✅ Función con tipo explícito para el parámetro
+  const getStatusText = (status: string): string => {
     switch (status) {
-      case 'confirmada': return '✅ Confirmada';
-      case 'pendiente': return '⏳ Pendiente';
-      case 'completada': return '🎉 Completada';
-      case 'cancelada': return '❌ Cancelada';
-      default: return status;
+      case 'confirmed':
+        return 'Confirmado';
+      case 'pending':
+        return 'Pendiente';
+      case 'cancelled':
+        return 'Cancelado';
+      case 'completed':
+        return 'Completado';
+      case 'active':
+        return 'Activo';
+      default:
+        return 'Desconocido';
     }
   };
 
   return (
-    <TouchableOpacity style={styles.bookingCard} onPress={onPress}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.boatEmoji}>{booking.boatImage}</Text>
-        <View style={styles.headerInfo}>
-          <Text style={styles.boatName}>{booking.boatName}</Text>
-          <Text style={[styles.status, { color: getStatusColor(booking.status) }]}>
-            {getStatusText(booking.status)}
-          </Text>
+    <Card style={styles.bookingCard}>
+      <Card.Content>
+        <View style={styles.bookingHeader}>
+          <View style={styles.bookingInfo}>
+            <Title style={styles.boatName}>{booking.boatName}</Title>
+            <Text style={styles.bookingDate}>
+              📅 {new Date(booking.startDate).toLocaleDateString('es-ES')}
+            </Text>
+            <Text style={styles.bookingTime}>
+              🕐 {booking.startTime} - {booking.endTime}
+            </Text>
+            <Text style={styles.bookingGuests}>
+              👥 {booking.guests} huéspedes
+            </Text>
+            <Text style={styles.marina}>
+              📍 {booking.marina.name}
+            </Text>
+          </View>
+          <View style={styles.bookingStatus}>
+            <Chip
+              style={[
+                styles.statusChip,
+                { backgroundColor: getStatusColor(booking.bookingStatus) }
+              ]}
+              textStyle={styles.statusText}
+            >
+              {getStatusText(booking.bookingStatus)}
+            </Chip>
+            <Text style={styles.totalPrice}>
+              ${booking.totalPrice} {booking.currency}
+            </Text>
+            <Text style={styles.paymentStatus}>
+              💳 {booking.paymentStatus}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.price}>${booking.price}</Text>
-      </View>
 
-      <View style={styles.cardContent}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📅 Fecha:</Text>
-          <Text style={styles.detailValue}>{booking.date}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>🕐 Hora:</Text>
-          <Text style={styles.detailValue}>{booking.time}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>⏱️ Duración:</Text>
-          <Text style={styles.detailValue}>{booking.duration}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📍 Ubicación:</Text>
-          <Text style={styles.detailValue}>{booking.location}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>👥 Huéspedes:</Text>
-          <Text style={styles.detailValue}>{booking.guests} personas</Text>
-        </View>
-      </View>
+        {booking.specialRequests && (
+          <View style={styles.specialRequests}>
+            <Text style={styles.specialRequestsLabel}>Solicitudes especiales:</Text>
+            <Text style={styles.specialRequestsText}>{booking.specialRequests}</Text>
+          </View>
+        )}
 
-      {booking.status === 'confirmada' && (
-        <View style={styles.cardActions}>
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => onCancel(booking)}
+        <View style={styles.bookingActions}>
+          <Button
+            mode="outlined"
+            onPress={() => onPress(booking)}
+            style={styles.actionButton}
           >
-            <Text style={styles.cancelButtonText}>Cancelar Reserva</Text>
-          </TouchableOpacity>
+            Ver Detalles
+          </Button>
+          {booking.bookingStatus === 'pending' && (
+            <Button
+              mode="contained"
+              onPress={() => onCancel(booking)}
+              buttonColor="#F44336"
+              style={styles.actionButton}
+            >
+              Cancelar
+            </Button>
+          )}
         </View>
-      )}
-    </TouchableOpacity>
+      </Card.Content>
+    </Card>
   );
 }
 
-export default function BookingsScreen() {
-  const [bookings, setBookings] = useState(sampleBookings);
-  const [selectedFilter, setSelectedFilter] = useState('todas');
+// ✅ Componente principal con tipos explícitos
+export function BookingsScreen({ navigation }: BookingsScreenProps) {
+  const { bookings, isLoading } = useAppSelector((state: RootState) => state.bookings);
 
-  const filteredBookings = bookings.filter(booking => {
-    if (selectedFilter === 'todas') return true;
-    return booking.status === selectedFilter;
-  });
-
-  const handleBookingPress = (booking) => {
-    Alert.alert(
-      'Detalles de Reserva',
-      `Reserva para ${booking.boatName}\nFecha: ${booking.date}\nEstado: ${booking.status}`,
-      [{ text: 'OK' }]
-    );
+  // ✅ Handler con tipo explícito para el parámetro
+  const handleBookingPress = (booking: Booking): void => {
+    navigation.navigate('BookingDetails', { booking });
   };
 
-  const handleCancelBooking = (booking) => {
+  // ✅ Handler con tipo explícito para el parámetro
+  const handleCancelBooking = (booking: Booking): void => {
     Alert.alert(
       'Cancelar Reserva',
-      `¿Estás seguro de que quieres cancelar la reserva para ${booking.boatName}?`,
+      `¿Estás seguro de que quieres cancelar la reserva de "${booking.boatName}"?`,
       [
-        { text: 'No', style: 'cancel' },
-        { 
-          text: 'Sí, cancelar', 
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Sí, Cancelar',
           style: 'destructive',
           onPress: () => {
-            setBookings(prev => 
-              prev.map(b => 
-                b.id === booking.id 
-                  ? { ...b, status: 'cancelada' }
-                  : b
-              )
-            );
-          }
-        }
+            // TODO: Implementar lógica de cancelación
+            console.log('Cancelling booking:', booking.id);
+            // dispatch(cancelBooking(booking.id));
+          },
+        },
       ]
     );
   };
 
-  const filters = [
-    { key: 'todas', label: 'Todas', count: bookings.length },
-    { key: 'confirmada', label: 'Confirmadas', count: bookings.filter(b => b.status === 'confirmada').length },
-    { key: 'pendiente', label: 'Pendientes', count: bookings.filter(b => b.status === 'pendiente').length },
-    { key: 'completada', label: 'Completadas', count: bookings.filter(b => b.status === 'completada').length }
-  ];
-
-  console.log('✅ BookingsScreen cargado correctamente');
-
-  return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>📅 Mis Reservas</Text>
-        <Text style={styles.subtitle}>Gestiona tus aventuras acuáticas</Text>
+  // Estado de carga
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>Cargando reservas...</Text>
       </View>
+    );
+  }
 
-      {/* Filtros */}
-      <View style={styles.filtersContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.filters}>
-            {filters.map(filter => (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterButton,
-                  selectedFilter === filter.key && styles.selectedFilterButton
-                ]}
-                onPress={() => setSelectedFilter(filter.key)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  selectedFilter === filter.key && styles.selectedFilterButtonText
-                ]}>
-                  {filter.label} ({filter.count})
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* Estadísticas rápidas */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{bookings.filter(b => b.status === 'confirmada').length}</Text>
-          <Text style={styles.statLabel}>Confirmadas</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{bookings.filter(b => b.status === 'completada').length}</Text>
-          <Text style={styles.statLabel}>Completadas</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>${bookings.reduce((sum, b) => sum + b.price, 0)}</Text>
-          <Text style={styles.statLabel}>Total Gastado</Text>
-        </View>
-      </View>
-
-      {/* Lista de reservas */}
-      <View style={styles.bookingsContainer}>
-        <Text style={styles.sectionTitle}>
-          🎯 {filteredBookings.length} reservas encontradas
+  // Sin reservas
+  if (bookings.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>No tienes reservas aún</Text>
+        <Text style={styles.emptySubText}>
+          ¡Explora nuestras embarcaciones y haz tu primera reserva!
         </Text>
-        
-        {filteredBookings.map(booking => (
-          <BookingCard
-            key={booking.id}
-            booking={booking}
-            onPress={() => handleBookingPress(booking)}
-            onCancel={handleCancelBooking}
-          />
-        ))}
-
-        {filteredBookings.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>🏖️ No hay reservas</Text>
-            <Text style={styles.emptySubtext}>
-              {selectedFilter === 'todas' 
-                ? 'Aún no has hecho ninguna reserva' 
-                : `No tienes reservas ${selectedFilter}`}
-            </Text>
-          </View>
-        )}
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('Search')}
+          style={styles.searchButton}
+        >
+          Buscar Embarcaciones
+        </Button>
       </View>
+    );
+  }
 
-      {/* Botón para nueva reserva */}
-      <View style={styles.actionContainer}>
-        <TouchableOpacity style={styles.newBookingButton}>
-          <Text style={styles.newBookingButtonText}>+ Nueva Reserva</Text>
-        </TouchableOpacity>
-      </View>
+  // Renderizar reservas
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <Surface style={styles.header}>
+        <Title style={styles.headerTitle}>Mis Reservas</Title>
+        <Text style={styles.headerSubtitle}>
+          {bookings.length} reserva{bookings.length !== 1 ? 's' : ''}
+        </Text>
+      </Surface>
+
+      {bookings.map((booking: Booking) => (
+        <BookingCard
+          key={booking.id}
+          booking={booking}
+          onPress={handleBookingPress}
+          onCancel={handleCancelBooking}
+        />
+      ))}
     </ScrollView>
   );
 }
 
+// ✅ Estilos actualizados
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 20,
+  },
   header: {
     padding: 20,
-    backgroundColor: '#0066CC',
+    margin: 16,
+    borderRadius: 12,
+    elevation: 2,
+    backgroundColor: 'white',
   },
-  title: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#e3f2fd',
-  },
-  filtersContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-  },
-  filters: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#0066CC',
-    backgroundColor: '#fff',
-  },
-  selectedFilterButton: {
-    backgroundColor: '#0066CC',
-  },
-  filterButtonText: {
-    color: '#0066CC',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  selectedFilterButtonText: {
-    color: '#fff',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: 20,
-    justifyContent: 'space-around',
-  },
-  statCard: {
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    minWidth: 80,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0066CC',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  bookingsContainer: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    marginBottom: 4,
     color: '#333',
-    marginBottom: 16,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666',
   },
   bookingCard: {
-    backgroundColor: '#fff',
+    margin: 16,
+    marginTop: 8,
+    elevation: 2,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  cardHeader: {
+  bookingHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  boatEmoji: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  headerInfo: {
+  bookingInfo: {
     flex: 1,
+    marginRight: 12,
   },
   boatName: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 8,
     color: '#333',
   },
-  status: {
+  bookingDate: {
     fontSize: 14,
-    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 4,
   },
-  price: {
+  bookingTime: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  bookingGuests: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  marina: {
+    fontSize: 14,
+    color: '#666',
+  },
+  bookingStatus: {
+    alignItems: 'flex-end',
+  },
+  statusChip: {
+    marginBottom: 8,
+  },
+  statusText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  totalPrice: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#0066CC',
+    marginBottom: 4,
   },
-  cardContent: {
-    marginBottom: 12,
+  paymentStatus: {
+    fontSize: 12,
+    color: '#666',
+    textTransform: 'capitalize',
   },
-  detailRow: {
+  specialRequests: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  specialRequestsLabel: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 4,
+    color: '#333',
+  },
+  specialRequestsText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  bookingActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    gap: 12,
   },
-  detailLabel: {
-    fontSize: 14,
+  actionButton: {
+    flex: 1,
+  },
+  loadingText: {
+    fontSize: 16,
     color: '#666',
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-  },
-  cardActions: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
-  },
-  cancelButton: {
-    backgroundColor: '#F44336',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
+    fontSize: 20,
+    color: '#333',
     marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
     textAlign: 'center',
-  },
-  actionContainer: {
-    padding: 20,
-  },
-  newBookingButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  newBookingButtonText: {
-    color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
+  },
+  emptySubText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  searchButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
 });

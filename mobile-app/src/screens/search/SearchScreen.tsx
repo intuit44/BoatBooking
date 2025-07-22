@@ -1,16 +1,36 @@
-﻿import React, { useState } from 'react';
+﻿import { useState } from 'react';
 import {
-  View,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  FlatList
+  View
 } from 'react-native';
 
+// ✅ Interfaces para definir tipos
+interface Boat {
+  id: string;
+  name: string;
+  price: number;
+  type: string;
+  capacity: number;
+  location: string;
+  image: string;
+  rating: number;
+}
+
+interface BoatSearchCardProps {
+  boat: Boat;
+  onPress: (boat: Boat) => void;
+}
+
+interface SearchScreenProps {
+  navigation?: any; // Opcional si no siempre se pasa
+}
+
 // Datos de barcos expandidos para búsqueda
-const allBoats = [
+const allBoats: Boat[] = [
   { id: '1', name: 'Sea Explorer', price: 150, type: 'Yate', capacity: 8, location: 'Puerto Marina', image: '🛥️', rating: 4.8 },
   { id: '2', name: 'Ocean Breeze', price: 200, type: 'Velero', capacity: 6, location: 'Bahía Azul', image: '⛵', rating: 4.9 },
   { id: '3', name: 'Wave Rider', price: 120, type: 'Lancha', capacity: 4, location: 'Costa Norte', image: '🚤', rating: 4.7 },
@@ -19,9 +39,10 @@ const allBoats = [
   { id: '6', name: 'Calm Waters', price: 90, type: 'Velero', capacity: 4, location: 'Costa Norte', image: '⛵', rating: 4.5 },
 ];
 
-function BoatSearchCard({ boat, onPress }) {
+// ✅ Componente BoatSearchCard con tipos explícitos
+function BoatSearchCard({ boat, onPress }: BoatSearchCardProps) {
   return (
-    <TouchableOpacity style={styles.boatCard} onPress={onPress}>
+    <TouchableOpacity style={styles.boatCard} onPress={() => onPress(boat)}>
       <Text style={styles.boatEmoji}>{boat.image}</Text>
       <View style={styles.boatInfo}>
         <View style={styles.boatHeader}>
@@ -36,13 +57,14 @@ function BoatSearchCard({ boat, onPress }) {
   );
 }
 
-export default function SearchScreen() {
-  const [searchText, setSearchText] = useState('');
-  const [selectedType, setSelectedType] = useState('Todos');
-  const [maxPrice, setMaxPrice] = useState('');
+// ✅ Componente principal con tipos
+export default function SearchScreen({ navigation }: SearchScreenProps = {}) {
+  const [searchText, setSearchText] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('Todos');
+  const [maxPrice, setMaxPrice] = useState<string>('');
 
-  // Filtrar barcos
-  const filteredBoats = allBoats.filter(boat => {
+  // ✅ Función de filtrado tipada
+  const filteredBoats: Boat[] = allBoats.filter((boat: Boat) => {
     const matchesSearch = boat.name.toLowerCase().includes(searchText.toLowerCase()) ||
                          boat.location.toLowerCase().includes(searchText.toLowerCase());
     const matchesType = selectedType === 'Todos' || boat.type === selectedType;
@@ -51,12 +73,42 @@ export default function SearchScreen() {
     return matchesSearch && matchesType && matchesPrice;
   });
 
-  const boatTypes = ['Todos', 'Yate', 'Velero', 'Lancha', 'Catamarán'];
+  const boatTypes: string[] = ['Todos', 'Yate', 'Velero', 'Lancha', 'Catamarán'];
+
+  // ✅ Handler con tipo explícito
+  const handleBoatPress = (boat: Boat): void => {
+    console.log('Barco seleccionado:', boat.name);
+    if (navigation) {
+      navigation.navigate('BoatDetails', { boat });
+    }
+  };
+
+  // ✅ Handler para tipo de barco con tipo explícito
+  const handleTypeSelection = (type: string): void => {
+    setSelectedType(type);
+  };
+
+  // ✅ Handler para búsqueda con tipo explícito
+  const handleSearchChange = (text: string): void => {
+    setSearchText(text);
+  };
+
+  // ✅ Handler para precio con tipo explícito
+  const handlePriceChange = (text: string): void => {
+    setMaxPrice(text);
+  };
+
+  // ✅ Función para limpiar filtros
+  const clearFilters = (): void => {
+    setSearchText('');
+    setSelectedType('Todos');
+    setMaxPrice('');
+  };
 
   console.log('✅ SearchScreen cargado correctamente');
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header de búsqueda */}
       <View style={styles.header}>
         <Text style={styles.title}>🔍 Buscar Barcos</Text>
@@ -71,7 +123,7 @@ export default function SearchScreen() {
             style={styles.textInput}
             placeholder="Ej: Sea Explorer, Puerto Marina..."
             value={searchText}
-            onChangeText={setSearchText}
+            onChangeText={handleSearchChange}
           />
         </View>
 
@@ -79,14 +131,14 @@ export default function SearchScreen() {
           <Text style={styles.label}>Tipo de Barco</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.typeButtons}>
-              {boatTypes.map(type => (
+              {boatTypes.map((type: string) => (
                 <TouchableOpacity
                   key={type}
                   style={[
                     styles.typeButton,
                     selectedType === type && styles.selectedTypeButton
                   ]}
-                  onPress={() => setSelectedType(type)}
+                  onPress={() => handleTypeSelection(type)}
                 >
                   <Text style={[
                     styles.typeButtonText,
@@ -106,32 +158,59 @@ export default function SearchScreen() {
             style={styles.textInput}
             placeholder="Ej: 200"
             value={maxPrice}
-            onChangeText={setMaxPrice}
+            onChangeText={handlePriceChange}
             keyboardType="numeric"
           />
         </View>
+
+        {/* Botón para limpiar filtros */}
+        {(searchText || selectedType !== 'Todos' || maxPrice) && (
+          <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
+            <Text style={styles.clearButtonText}>🗑️ Limpiar Filtros</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Resultados */}
       <View style={styles.results}>
-        <Text style={styles.resultsTitle}>
-          📊 {filteredBoats.length} barcos encontrados
-        </Text>
+        <View style={styles.resultsHeader}>
+          <Text style={styles.resultsTitle}>
+            📊 {filteredBoats.length} barcos encontrados
+          </Text>
+          {filteredBoats.length > 0 && (
+            <Text style={styles.resultsSubtitle}>
+              Precio promedio: ${Math.round(filteredBoats.reduce((acc, boat) => acc + boat.price, 0) / filteredBoats.length)}/día
+            </Text>
+          )}
+        </View>
         
-        {filteredBoats.map(boat => (
+        {filteredBoats.map((boat: Boat) => (
           <BoatSearchCard
             key={boat.id}
             boat={boat}
-            onPress={() => console.log('Barco seleccionado:', boat.name)}
+            onPress={handleBoatPress}
           />
         ))}
 
         {filteredBoats.length === 0 && (
           <View style={styles.noResults}>
-            <Text style={styles.noResultsText}>😔 No se encontraron barcos</Text>
-            <Text style={styles.noResultsSubtext}>Intenta ajustar tus filtros</Text>
+            <Text style={styles.noResultsEmoji}>😔</Text>
+            <Text style={styles.noResultsText}>No se encontraron barcos</Text>
+            <Text style={styles.noResultsSubtext}>
+              Intenta ajustar tus filtros de búsqueda
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={clearFilters}>
+              <Text style={styles.retryButtonText}>Mostrar Todos</Text>
+            </TouchableOpacity>
           </View>
         )}
+      </View>
+
+      {/* Footer con información adicional */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          💡 Tip: Usa filtros específicos para encontrar exactamente lo que buscas
+        </Text>
       </View>
     </ScrollView>
   );
@@ -199,14 +278,33 @@ const styles = StyleSheet.create({
   selectedTypeButtonText: {
     color: '#fff',
   },
+  clearButton: {
+    backgroundColor: '#f44336',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   results: {
     padding: 20,
+  },
+  resultsHeader: {
+    marginBottom: 16,
   },
   resultsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  resultsSubtitle: {
+    fontSize: 14,
+    color: '#666',
   },
   boatCard: {
     flexDirection: 'row',
@@ -261,6 +359,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  noResultsEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
   noResultsText: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -270,5 +372,28 @@ const styles = StyleSheet.create({
   noResultsSubtext: {
     fontSize: 14,
     color: '#999',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#0066CC',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  footer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

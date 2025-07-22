@@ -364,7 +364,7 @@
           },
           "authTriggerConnections": "{\"triggerType\":\"DefineAuthChallenge\",\"lambdaFunctionName\":\"boatrentallapp31507f7cDefineAuthChallenge\"},{\"triggerType\":\"CreateAuthChallenge\",\"lambdaFunctionName\":\"boatrentallapp31507f7cCreateAuthChallenge\"},{\"triggerType\":\"VerifyAuthChallengeResponse\",\"lambdaFunctionName\":\"boatrentallapp31507f7cVerifyAuthChallengeResponse\"},{\"triggerType\":\"PostConfirmation\",\"lambdaFunctionName\":\"boatrentallapp31507f7cPostConfirmation\"}",
           "permissions": "{\"policyName\":\"AddToGroupCognito\",\"trigger\":\"PostConfirmation\",\"effect\":\"Allow\",\"actions\":[\"cognito-idp:AdminAddUserToGroup\",\"cognito-idp:GetGroup\",\"cognito-idp:CreateGroup\"],\"resource\":{\"paramType\":\"!GetAtt\",\"keys\":[\"UserPool\",\"Arn\"]}}",
-          "hostedUIProviderCreds": "[{\"ProviderName\":\"Facebook\",\"client_id\":\"1006091971437165\",\"client_secret\":\"7c211085b18301069f9f881b7e56889e\"},{\"ProviderName\":\"Google\",\"client_id\":\"818290824360-ssf5e0gik6sdjn8920elcs6erdksu19a.apps.googleusercontent.com\",\"client_secret\":\"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\"}]",
+          "hostedUIProviderCreds": "[]",
           "facebookAppId": "1006091971437165",
           "googleClientId": "818290824360-ssf5e0gik6sdjn8920elcs6erdksu19a.apps.googleusercontent.com",
           "env": "dev"
@@ -457,7 +457,7 @@
           "modules": "captcha-create-challenge",
           "resourceName": "boatrentallapp31507f7cCreateAuthChallenge",
           "deploymentBucketName": "amplify-boatrentallapp-dev-8193e-deployment",
-          "s3Key": "amplify-builds/boatrentallapp31507f7cCreateAuthChallenge-6b765175367674684c68-build.zip",
+          "s3Key": "amplify-builds/boatrentallapp31507f7cCreateAuthChallenge-3651544757676e476751-build.zip",
           "env": "dev"
         }
       }

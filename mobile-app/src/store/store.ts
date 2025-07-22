@@ -1,14 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit';
+import authReducer from './slices/authSlice';
 import boatsReducer from './slices/boatsSlice';
+import bookingsReducer from './slices/bookingsSlice';
 
 export const store = configureStore({
   reducer: {
-    boats: boatsReducer,
-    // Agrega otros reducers aquí
+    boats: boatsReducer,      // ✅ Dominio independiente
+    auth: authReducer,        // ✅ Dominio independiente  
+    bookings: bookingsReducer, // ✅ Dominio independiente
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: false,
+      serializableCheck: false, // Para AWS Amplify
     }),
 });
 

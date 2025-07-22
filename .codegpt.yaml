@@ -59,6 +59,18 @@ modules:
     include:
       - "**/*.ts"
 
+  - name: slices
+    path: mobile-app/src/store/slices
+    tags: [redux, slices, state-management, thunk, typescript]
+    include:
+      - "**/*.ts"
+
+  - name: amplify-schemas
+    path: mobile-app/amplify/backend/api/boatrentalapp
+    tags: [amplify, graphql, schema]
+    include:
+      - "*.graphql"
+
   - name: shared-types
     path: mobile-app/src/types
     tags: [types, shared, api]

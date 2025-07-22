@@ -27,7 +27,7 @@ console.log('✅ [Render] HomeScreen va a iniciar render (RESTORED)');
 // =============================================================================
 
 let amplifyConfigured: boolean = false;
-let graphqlClient: ReturnType<typeof generateClient> | null = null;
+let graphqlClient: any = null;
 
 if (!amplifyConfigured) {
   try {

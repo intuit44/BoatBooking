@@ -1,0 +1,24 @@
+type Boat @model @key(name: "ByType", fields: ["type"], queryField: "boatsByType") @key(name: "ByState", fields: ["state"], queryField: "boatsByState") {
+  id: ID!
+  name: String!
+  description: String
+  pricePerDay: Float!
+  capacity: Int
+  featured: Boolean
+  type: BoatType
+  state: String
+  coordinates: Coordinates
+}
+
+type Coordinates {
+  latitude: Float!
+  longitude: Float!
+}
+
+enum BoatType {
+  YACHT
+  SAILBOAT
+  MOTORBOAT
+  KAYAK
+  CANOE
+}

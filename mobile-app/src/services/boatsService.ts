@@ -1,7 +1,9 @@
 import { Boat, BoatFilters } from '../store/slices/boatsSlice';
+// ✅ Nueva sintaxis de Amplify v6
+import { generateClient } from 'aws-amplify/api';
 
 // Crear cliente GraphQL
-import { API, graphqlOperation } from 'aws-amplify';
+const client = generateClient();
 
 const listBoats = /* GraphQL */ `
   query ListBoats($filter: ModelBoatFilterInput, $limit: Int, $nextToken: String) {
@@ -98,7 +100,6 @@ const getBoat = /* GraphQL */ `
   }
 `;
 
-// GraphQL Mutations
 const createBoatMutation = /* GraphQL */ `
   mutation CreateBoat($input: CreateBoatInput!) {
     createBoat(input: $input) {
@@ -203,7 +204,10 @@ export class BoatsService {
   // Obtener todos los botes
   static async getAllBoats() {
     try {
-      const response: any = await API.graphql(graphqlOperation(listBoats));
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: listBoats
+      });
       return {
         success: true,
         data: response.data.listBoats.items as Boat[],
@@ -245,7 +249,11 @@ export class BoatsService {
         ];
       }
 
-      const response: any = await API.graphql(graphqlOperation(listBoats, { filter }));
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: listBoats,
+        variables: { filter }
+      });
       
       return {
         success: true,
@@ -264,7 +272,11 @@ export class BoatsService {
         featured: { eq: true }
       };
       
-      const response: any = await API.graphql(graphqlOperation(listBoats, { filter, limit: 10 }));
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: listBoats,
+        variables: { filter, limit: 10 }
+      });
       
       return {
         success: true,
@@ -279,7 +291,11 @@ export class BoatsService {
   // Obtener bote por ID
   static async getBoatById(boatId: string) {
     try {
-      const response: any = await API.graphql(graphqlOperation(getBoat, { id: boatId }));
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: getBoat,
+        variables: { id: boatId }
+      });
       return {
         success: true,
         data: response.data.getBoat as Boat,
@@ -293,7 +309,11 @@ export class BoatsService {
   // Crear nuevo bote
   static async createBoat(boatData: Omit<Boat, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-      const response: any = await API.graphql(graphqlOperation(createBoatMutation, { input: boatData }));
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: createBoatMutation,
+        variables: { input: boatData }
+      });
       return {
         success: true,
         data: response.data.createBoat as Boat,
@@ -307,14 +327,16 @@ export class BoatsService {
   // Actualizar bote
   static async updateBoat(boatId: string, updates: Partial<Boat>) {
     try {
-      const response: any = await API.graphql(
-        graphqlOperation(updateBoatMutation, {
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: updateBoatMutation,
+        variables: {
           input: {
             id: boatId,
             ...updates,
           }
-        })
-      );
+        }
+      });
       return {
         success: true,
         data: response.data.updateBoat as Boat,
@@ -328,9 +350,11 @@ export class BoatsService {
   // Eliminar bote
   static async deleteBoat(boatId: string) {
     try {
-      const response: any = await API.graphql(
-        graphqlOperation(deleteBoatMutation, { input: { id: boatId } })
-      );
+      // ✅ Nueva sintaxis Amplify v6
+      const response: any = await client.graphql({
+        query: deleteBoatMutation,
+        variables: { input: { id: boatId } }
+      });
       return {
         success: true,
         data: response.data.deleteBoat,
