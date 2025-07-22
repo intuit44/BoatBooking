@@ -12,7 +12,6 @@ import {
   listBoats
 } from '../../graphql/queries';
 
-sortDirection: ModelSortDirection.DESC
 // Importar tipos generados automáticamente
 import * as APITypes from '../../API';
 
@@ -20,8 +19,47 @@ import * as APITypes from '../../API';
 // INTERFACES Y TIPOS CORREGIDOS
 // =============================================================================
 
-// Usar los tipos generados de GraphQL para mayor compatibilidad
-export type Boat = APITypes.Boat;
+// ✅ Crear tipo personalizado más flexible para el state
+export interface BoatLocation {
+  marina: string;
+  state: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+export interface BoatState {
+  id: string;
+  name: string;
+  type: APITypes.BoatType;
+  description?: string;
+  capacity: number;
+  pricePerHour: number;
+  pricePerDay: number;
+  rating?: number;
+  reviews?: number;
+  images?: string[];
+  amenities?: string[];
+  location?: BoatLocation;
+  owner?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  };
+  availability?: {
+    available: boolean;
+    blockedDates?: string[];
+  };
+  featured: boolean;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Usar el tipo personalizado para el state de Redux
+export type Boat = BoatState;
 export type BoatType = APITypes.BoatType;
 export type CreateBoatInput = APITypes.CreateBoatInput;
 export type UpdateBoatInput = APITypes.UpdateBoatInput;
@@ -29,7 +67,7 @@ export type UpdateBoatInput = APITypes.UpdateBoatInput;
 // Mantener interfaz personalizada para filtros de la UI
 export interface BoatFilters {
   state?: string;
-  type?: BoatType; // Usar tipo GraphQL
+  type?: BoatType;
   priceRange?: [number, number];
   capacity?: number;
   search?: string;
@@ -65,7 +103,68 @@ const initialState: BoatsState = {
 const graphqlClient = generateClient();
 
 // =============================================================================
-// ASYNC THUNKS CON TIPOS CORREGIDOS
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * ✅ Normalizar datos de GraphQL a formato esperado por Redux
+ */
+function normalizeBoatData(rawBoat: any): Boat {
+  return {
+    id: rawBoat.id,
+    name: rawBoat.name || '',
+    type: rawBoat.type,
+    description: rawBoat.description || undefined,
+    capacity: rawBoat.capacity || 0,
+    pricePerHour: rawBoat.pricePerHour || 0,
+    pricePerDay: rawBoat.pricePerDay || 0,
+    rating: rawBoat.rating || undefined,
+    reviews: rawBoat.reviews || undefined,
+    images: rawBoat.images || undefined,
+    amenities: rawBoat.amenities || undefined,
+    
+    // ✅ Normalizar location con coordinates por defecto
+    location: rawBoat.location ? {
+      marina: rawBoat.location.marina || '',
+      state: rawBoat.location.state || '',
+      coordinates: {
+        latitude: rawBoat.location.coordinates?.latitude || 0,
+        longitude: rawBoat.location.coordinates?.longitude || 0,
+      }
+    } : undefined,
+    
+    // ✅ Normalizar owner
+    owner: rawBoat.owner ? {
+      id: rawBoat.owner.id,
+      name: rawBoat.owner.name || '',
+      email: rawBoat.owner.email || undefined,
+      phone: rawBoat.owner.phone || undefined,
+    } : undefined,
+    
+    // ✅ Normalizar availability
+    availability: rawBoat.availability ? {
+      available: rawBoat.availability.available ?? false,
+      blockedDates: rawBoat.availability.blockedDates || undefined,
+    } : undefined,
+    
+    featured: rawBoat.featured ?? false,
+    ownerId: rawBoat.ownerId || '',
+    createdAt: rawBoat.createdAt || new Date().toISOString(),
+    updatedAt: rawBoat.updatedAt || new Date().toISOString(),
+  };
+}
+
+/**
+ * ✅ Normalizar array de boats
+ */
+function normalizeBoatsArray(rawBoats: any[]): Boat[] {
+  return rawBoats
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .map(normalizeBoatData);
+}
+
+// =============================================================================
+// ASYNC THUNKS CON NORMALIZACIÓN
 // =============================================================================
 
 /**
@@ -85,7 +184,7 @@ export const fetchBoats = createAsyncThunk(
       }
       
       if (filters.capacity) {
-        graphqlFilter.capacity = { gte: filters.capacity };
+        graphqlFilter.capacity = { ge: filters.capacity };
       }
       
       if (filters.priceRange) {
@@ -114,10 +213,13 @@ export const fetchBoats = createAsyncThunk(
         },
       });
 
+      // ✅ Normalizar datos antes de retornar
+      const normalizedBoats = normalizeBoatsArray(result.data.listBoats.items);
+
       return {
-        boats: result.data.listBoats.items.filter((item): item is Boat => item !== null),
-        nextToken: result.data.listBoats.nextToken,
-        totalCount: result.data.listBoats.items.length
+        boats: normalizedBoats,
+        nextToken: result.data.listBoats.nextToken || undefined,
+        totalCount: normalizedBoats.length
       };
     } catch (error: any) {
       console.error('Error fetching boats:', error);
@@ -143,7 +245,8 @@ export const fetchFeaturedBoats = createAsyncThunk(
         },
       });
 
-      return result.data.listBoats.items.filter((item): item is Boat => item !== null);
+      // ✅ Normalizar datos antes de retornar
+      return normalizeBoatsArray(result.data.listBoats.items);
     } catch (error: any) {
       console.error('Error fetching featured boats:', error);
       throw new Error(error.message || 'Failed to fetch featured boats');
@@ -169,7 +272,8 @@ export const fetchBoatById = createAsyncThunk(
         throw new Error('Boat not found');
       }
 
-      return result.data.getBoat;
+      // ✅ Normalizar datos antes de retornar
+      return normalizeBoatData(result.data.getBoat);
     } catch (error: any) {
       console.error('Error fetching boat by ID:', error);
       throw new Error(error.message || 'Failed to fetch boat details');
@@ -196,9 +300,12 @@ export const fetchBoatsByType = createAsyncThunk(
         },
       });
 
+      // ✅ Normalizar datos antes de retornar
+      const normalizedBoats = normalizeBoatsArray(result.data.boatsByType.items);
+
       return {
-        boats: result.data.boatsByType.items.filter((item): item is Boat => item !== null),
-        nextToken: result.data.boatsByType.nextToken
+        boats: normalizedBoats,
+        nextToken: result.data.boatsByType.nextToken || undefined
       };
     } catch (error: any) {
       console.error('Error fetching boats by type:', error);
@@ -233,7 +340,8 @@ export const createBoat = createAsyncThunk(
         throw new Error('Failed to create boat');
       }
 
-      return result.data.createBoat;
+      // ✅ Normalizar datos antes de retornar
+      return normalizeBoatData(result.data.createBoat);
     } catch (error: any) {
       console.error('Error creating boat:', error);
       throw new Error(error.message || 'Failed to create boat');
@@ -266,7 +374,8 @@ export const updateBoat = createAsyncThunk(
         throw new Error('Failed to update boat');
       }
 
-      return result.data.updateBoat;
+      // ✅ Normalizar datos antes de retornar
+      return normalizeBoatData(result.data.updateBoat);
     } catch (error: any) {
       console.error('Error updating boat:', error);
       throw new Error(error.message || 'Failed to update boat');
@@ -313,6 +422,7 @@ const boatsSlice = createSlice({
       state.filters = {};
     },
     setSelectedBoat: (state, action: PayloadAction<Boat | null>) => {
+      // ✅ Ahora funciona correctamente porque los datos están normalizados
       state.selectedBoat = action.payload;
     },
     clearError: (state) => {
@@ -377,6 +487,7 @@ const boatsSlice = createSlice({
       })
       .addCase(fetchBoatById.fulfilled, (state, action) => {
         state.isLoading = false;
+        // ✅ Ahora funciona porque action.payload está normalizado
         state.selectedBoat = action.payload;
         
         // También actualizar en la lista si existe
@@ -460,7 +571,7 @@ const boatsSlice = createSlice({
           state.featuredBoats[featuredIndex] = action.payload;
         }
         
-        // Actualizar selectedBoat si es el mismo
+        // ✅ Actualizar selectedBoat si es el mismo - ahora funciona
         if (state.selectedBoat?.id === action.payload.id) {
           state.selectedBoat = action.payload;
         }
