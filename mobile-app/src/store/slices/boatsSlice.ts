@@ -163,6 +163,19 @@ function normalizeBoatsArray(rawBoats: any[]): Boat[] {
     .map(normalizeBoatData);
 }
 
+/**
+ * ✅ Verificar si un barco es válido
+ */
+function isValidBoat(boat: any): boat is Boat {
+  return (
+    boat &&
+    boat.id &&
+    boat.location &&
+    boat.location.coordinates &&
+    Array.isArray(boat.location.coordinates)
+  );
+}
+
 // =============================================================================
 // ASYNC THUNKS CON NORMALIZACIÓN
 // =============================================================================
@@ -423,7 +436,11 @@ const boatsSlice = createSlice({
     },
     setSelectedBoat: (state, action: PayloadAction<Boat | null>) => {
       // ✅ Ahora funciona correctamente porque los datos están normalizados
-      state.selectedBoat = action.payload;
+      if (isValidBoat(action.payload)) {
+        state.selectedBoat = action.payload;
+      } else {
+        // Maneja el error o asigna un valor por defecto
+      }
     },
     clearError: (state) => {
       state.error = null;
