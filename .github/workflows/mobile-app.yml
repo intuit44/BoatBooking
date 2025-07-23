@@ -1,0 +1,55 @@
+name: Mobile App CI
+
+on:
+  push:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-app.yml'
+  pull_request:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-app.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: mobile-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Verify Expo configuration
+        run: npx expo config --type public
+
+      - name: Verify Amplify configuration
+        run: node -e "const cfg=require('./src/aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('Amplify config looks valid');"
+
+      - name: Run tests
+        run: npm test --if-present
+        env:
+          CI: true
+
+      - name: Build web artifacts
+        run: npx expo export --output-dir dist --platform web
+
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-web-dist
+          path: mobile-app/dist
