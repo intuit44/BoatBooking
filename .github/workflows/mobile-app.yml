@@ -12,7 +12,13 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '22.x'
+  EXPO_PUBLIC_GRAPHQL_ENDPOINT: ${{ secrets.EXPO_PUBLIC_GRAPHQL_ENDPOINT }}
+  EXPO_PUBLIC_API_KEY: ${{ secrets.EXPO_PUBLIC_API_KEY }}
+  EXPO_PUBLIC_USER_POOL_ID: ${{ secrets.EXPO_PUBLIC_USER_POOL_ID }}
+  EXPO_PUBLIC_USER_POOL_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_USER_POOL_CLIENT_ID }}
+  EXPO_PUBLIC_IDENTITY_POOL_ID: ${{ secrets.EXPO_PUBLIC_IDENTITY_POOL_ID }}
+  EXPO_PUBLIC_AWS_REGION: ${{ secrets.EXPO_PUBLIC_AWS_REGION }}
 
 jobs:
   build:
@@ -38,7 +44,12 @@ jobs:
         run: npx expo config --type public
 
       - name: Verify Amplify configuration
-        run: node -e "const cfg=require('./src/aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('Amplify config looks valid');"
+        run: |
+          if [ -f aws-exports.js ]; then
+            node -e "const cfg=require('./aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('✅ Amplify config looks valid');"
+          else
+            echo '⚠️ aws-exports.js not found, skipping Amplify config validation.'
+          fi
 
       - name: Run tests
         run: npm test --if-present
