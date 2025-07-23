@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { generateClient } from 'aws-amplify/api';
+import Constants from 'expo-constants';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   SafeAreaView,
@@ -10,63 +13,19 @@ import {
   View,
 } from 'react-native';
 
-// ✅ ES6 IMPORTS - AWS Amplify v6
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
-import awsExports from '../../aws-exports';
-import { useEffect } from 'react';
-
-// Centralizar la configuración de Amplify en un hook
-
-function useAmplifyConfig() {
-  useEffect(() => {
-    try {
-      if (!amplifyConfigured) {
-        Amplify.configure(awsExports);
-        graphqlClient = generateClient();
-        amplifyConfigured = true;
-        console.log('✅ [useAmplifyConfig] AWS Amplify v6 configurado exitosamente');
-      }
-    } catch (error) {
-      console.error('❌ [useAmplifyConfig] Error inicializando AWS:', error);
-    }
-  }, []);
-}
-
-// Importar configuración específica para web - comentado temporalmente
-// import { configureAmplifyForWeb, getWebClient } from '../../config/amplify-web-config';
-
-console.log('✅ [Render] HomeScreen va a iniciar render (RESTORED)');
-
-// =============================================================================
-// INICIALIZACIÓN AWS AMPLIFY V6 (SIMPLE)
-// =============================================================================
-
-let amplifyConfigured: boolean = false;
-let graphqlClient: any = null;
-
-if (!amplifyConfigured) {
-  try {
-    // Configuración estándar para nativo
-    Amplify.configure(awsExports);
-    graphqlClient = generateClient();
-    amplifyConfigured = true;
-    console.log('✅ [HomeScreen] AWS Amplify v6 configurado exitosamente');
-  } catch (error) {
-    console.error('❌ [HomeScreen] Error inicializando AWS:', error);
-  }
-}
+// ✅ NO configurar Amplify aquí - ya se hace en index.js
+let graphqlClient: any;
 
 // =============================================================================
 // LOGINSCREEN SIMPLE INTEGRADO
 // =============================================================================
-type SimpleLoginScreen = {
+type SimpleLoginScreenProps = {
   visible: boolean;
   onClose: () => void;
   onLoginSuccess: () => void;
 };
 
-function SimpleLoginScreen({ visible, onClose, onLoginSuccess, }: SimpleLoginScreen) {
+function SimpleLoginScreen({ visible, onClose, onLoginSuccess }: SimpleLoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -145,9 +104,35 @@ function SimpleLoginScreen({ visible, onClose, onLoginSuccess, }: SimpleLoginScr
 export default function HomeScreen() {
   const [showLogin, setShowLogin] = useState(false);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [amplifyConfigured, setAmplifyConfigured] = useState(false);
 
   console.log('🚨 [HomeScreen] ===== RENDER FUNCTION EJECUTADA =====');
   console.log('🎯 [HomeScreen] Timestamp:', new Date().toISOString());
+
+  useEffect(() => {
+    console.log('🏠 [HomeScreen] Component mounted - SDK 53');
+    
+    try {
+      // ✅ Crear cliente después de que Amplify ya esté configurado en index.js
+      graphqlClient = generateClient();
+      setIsConfigured(true);
+      setAmplifyConfigured(true);
+      console.log('✅ [HomeScreen] GraphQL client initialized');
+      
+      // Mostrar configuración actual
+      const extra = Constants.expoConfig?.extra || {};
+      console.log('🔍 [HomeScreen] Current config:', {
+        graphqlEndpoint: extra.graphqlEndpoint,
+        environment: extra.env,
+      });
+      
+    } catch (err: any) {
+      console.error('❌ [HomeScreen] Error initializing GraphQL client:', err);
+      setError(err.message);
+    }
+  }, []);
 
   const checkAWSStatus = () => {
     const status = `✅ AWS Amplify v6: ${amplifyConfigured ? 'Configurado' : 'Error'}
@@ -178,14 +163,31 @@ export default function HomeScreen() {
       price: 150,
       status: userLoggedIn ? 'Auth Ready ✅' : 'Auth Pending ⚠️'
     }
-
   ];
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorTitle}>Configuration Error</Text>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!isConfigured) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0066cc" />
+        <Text style={styles.loadingText}>Initializing GraphQL client...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollContent}>
         <Text style={styles.title}>🚤 Boat Rental v6</Text>
-        <Text style={styles.subtitle}>AWS Amplify v6 + React Native 0.79.5</Text>
+        <Text style={styles.subtitle}>AWS Amplify v6 + React Native 0.79.5 + React 19.1.0</Text>
 
         {/* AWS Status Card */}
         <View style={styles.statusCard}>
@@ -242,9 +244,10 @@ export default function HomeScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>📊 Sistema Status</Text>
           <Text style={styles.infoText}>
-            ✅ React Native 0.79.5 New Architecture{'\n'}
-            ✅ Hermes JavaScript Engine{'\n'}
-            ✅ Polyfills optimizados{'\n'}
+            ✅ React 19.1.0 + New Architecture{'\n'}
+            ✅ React Native 0.79.5{'\n'}
+            ✅ Expo SDK 53.0.20{'\n'}
+            ✅ Metro 0.82.5{'\n'}
             ✅ AWS Amplify v6.6.0{'\n'}
             {amplifyConfigured ? '✅' : '⚠️'} AWS Configurado{'\n'}
             {graphqlClient ? '✅' : '⚠️'} GraphQL Client Ready{'\n'}
@@ -426,7 +429,6 @@ const styles = StyleSheet.create({
     color: '#34495e',
     lineHeight: 20,
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: '#f5f7fa',
@@ -487,5 +489,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     lineHeight: 18,
+  },
+  errorTitle: {
+    color: 'red',
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    textAlign: 'center',
   },
 });
