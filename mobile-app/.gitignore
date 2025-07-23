@@ -1,6 +1,6 @@
 # ============ DEBUG MODE - CARGAR AMPLIFY PARA CODEGPT ============
 
-# ✅ INCLUIR archivos críticos de Amplify para que el grafo los lea
+# ✅ INCLUIR archivos críticos de Amplify y entorno
 !amplify/backend/**
 !amplify/amplify-meta.json
 !aws-exports.js
@@ -9,6 +9,8 @@
 !awsconfiguration.json
 !amplifyconfiguration.json
 !.env.example
+!.env  
+
 
 # ❌ EXCLUIR archivos sensibles y carpetas grandes
 node_modules/
