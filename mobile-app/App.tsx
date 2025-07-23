@@ -1,8 +1,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 // ✅ Importar configuración de Amplify (ya se hace en index.js)
 // import './src/config/amplifyConfig'; // Ya se importa en index.js
@@ -84,6 +85,16 @@ export default function App() {
           options={{ title: 'Boat Rental App' }}
         />
       </Stack.Navigator>
+      <StatusBar style="auto" />
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+});
+
+console.log('✅ [App.tsx] App component definido correctamente');

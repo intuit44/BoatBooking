@@ -1,46 +1,37 @@
 ﻿const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
-/** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Configuración para polyfills de Node.js
+// Configurar resolver para polyfills
 config.resolver.alias = {
-  crypto: 'crypto-browserify',
-  stream: 'stream-browserify',
-  buffer: 'buffer',
-  events: 'events',
-  path: 'path-browserify',
-  util: 'util',
-  process: 'process/browser',
+  ...config.resolver.alias,
+  'crypto': 'crypto-browserify',
+  'stream': 'stream-browserify',
+  'buffer': 'buffer',
+  'process': 'process/browser',
+  'util': 'util',
+  'path': 'path-browserify',
+  'events': 'events'
 };
 
-// ✅ Configuración actualizada para Metro 0.82+ y Babel 8+
+// Configurar extensiones de archivos
+config.resolver.sourceExts = [
+  ...config.resolver.sourceExts,
+  'tsx',
+  'ts',
+  'jsx',
+  'js',
+  'json'
+];
+
+// Configurar transformadores
 config.transformer = {
   ...config.transformer,
   babelTransformerPath: require.resolve('metro-react-native-babel-transformer'),
-  // ✅ CRÍTICO: Deshabilitar completamente búsqueda de .babelrc
-  enableBabelRCLookup: false,
-  enableBabelRuntime: false,
-  // ✅ Configuración explícita para Metro 0.82+
-  experimentalImportSupport: false,
-  inlineRequires: true,
+  assetPlugins: ['expo-asset/tools/hashAssetFiles'],
 };
 
-// ✅ Resolver configuración actualizada
-config.resolver = {
-  ...config.resolver,
-  alias: {
-    ...config.resolver.alias,
-    crypto: 'crypto-browserify',
-    stream: 'stream-browserify',
-    buffer: 'buffer',
-    events: 'events',
-    path: 'path-browserify',
-    util: 'util',
-    process: 'process/browser',
-  },
-  platforms: ['native', 'android', 'ios', 'web'],
-  resolverMainFields: ['react-native', 'browser', 'main'],
-};
+console.log('✅ [metro.config.js] Metro configurado con polyfills');
 
 module.exports = config;
