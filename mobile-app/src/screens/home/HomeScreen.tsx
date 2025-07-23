@@ -14,8 +14,24 @@ import {
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import awsExports from '../../aws-exports';
+import { useEffect } from 'react';
 
+// Centralizar la configuración de Amplify en un hook
 
+function useAmplifyConfig() {
+  useEffect(() => {
+    try {
+      if (!amplifyConfigured) {
+        Amplify.configure(awsExports);
+        graphqlClient = generateClient();
+        amplifyConfigured = true;
+        console.log('✅ [useAmplifyConfig] AWS Amplify v6 configurado exitosamente');
+      }
+    } catch (error) {
+      console.error('❌ [useAmplifyConfig] Error inicializando AWS:', error);
+    }
+  }, []);
+}
 
 // Importar configuración específica para web - comentado temporalmente
 // import { configureAmplifyForWeb, getWebClient } from '../../config/amplify-web-config';

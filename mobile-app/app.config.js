@@ -41,11 +41,13 @@ export default {
       graphqlEndpoint: process.env.EXPO_PUBLIC_GRAPHQL_ENDPOINT,
       apiKey: process.env.EXPO_PUBLIC_API_KEY,
       s3Bucket: process.env.EXPO_PUBLIC_S3_BUCKET,
+      oauthDomain: process.env.EXPO_PUBLIC_OAUTH_DOMAIN,
     },
-    // ✅ Configuración adicional para desarrollo
     scheme: "boat-rental-app",
+    // ✅ PLUGINS ACTUALIZADOS: Agregar expo-font
     plugins: [
-      "expo-router"
+      "expo-router",
+      "expo-font"
     ]
   }
 };
