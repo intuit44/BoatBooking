@@ -88,8 +88,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests (Jest with explicit config path)
-        run: npx jest --config jest.config.js
+      - name: Run backend tests (none yet)
+        run: echo "No backend tests defined yet"
+
 
       - name: Lint (placeholder)
         run: npm run lint
