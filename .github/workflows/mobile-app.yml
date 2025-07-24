@@ -25,9 +25,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile-app
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,35 +36,38 @@ jobs:
           cache: 'npm'
           cache-dependency-path: mobile-app/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
-
       - name: Install Amplify CLI
         run: npm install -g @aws-amplify/cli
 
       # Pull Amplify config from root directory
       - name: Pull Amplify config
-        working-directory: .  # Override the default working directory
         run: |
           amplify pull --yes \
             --amplify "{\"envName\":\"prod\"}" \
             --providers "{\"awscloudformation\":{\"configLevel\":\"project\"}}" \
             --no-code
 
-      # Copy aws-exports.js to mobile-app if it was generated in root
+      # Copy aws-exports.js to mobile-app
       - name: Copy Amplify config to mobile app
         run: |
-          if [ -f ../aws-exports.js ]; then
-            cp ../aws-exports.js ./
+          if [ -f aws-exports.js ]; then
+            cp aws-exports.js mobile-app/
             echo "✅ Copied aws-exports.js to mobile-app directory"
           else
             echo "⚠️ aws-exports.js not found in root directory"
           fi
 
+      # Now work in mobile-app directory for the rest of the steps
+      - name: Install dependencies
+        working-directory: mobile-app
+        run: npm ci --prefer-offline --no-audit
+
       - name: Verify Expo configuration
+        working-directory: mobile-app
         run: npx expo config --type public
 
       - name: Verify Amplify configuration
+        working-directory: mobile-app
         run: |
           if [ -f aws-exports.js ]; then
             node -e "const cfg=require('./aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('✅ Amplify config looks valid');"
@@ -77,11 +77,13 @@ jobs:
           fi
 
       - name: Run tests
+        working-directory: mobile-app
         run: npm test --if-present
         env:
           CI: true
 
       - name: Build web artifacts
+        working-directory: mobile-app
         run: npx expo export --output-dir dist --platform web
 
       - name: Upload web artifacts
