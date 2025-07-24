@@ -4,13 +4,7 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      ['module-resolver', {
-        root: ['./src'],
-        extensions: ['.js', '.ts', '.tsx', '.json'],
-        alias: {
-          '@': './src'
-        }
-      }]
+      // Remover todos los plugins problemáticos por ahora
     ]
   };
 };
