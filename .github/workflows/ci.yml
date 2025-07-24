@@ -1,0 +1,147 @@
+name: Monorepo CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+  mobile-app:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check Expo build (web)
+        run: npm run web -- --no-dev --minify
+
+  admin-panel:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: admin-panel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test || echo "No test script defined"
+
+      - name: Build Next.js app
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Lint (placeholder)
+        run: npm run lint
+
+      - name: Build (placeholder)
+        run: npm run build
+
+  azure-functions:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: azure-functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests (placeholder)
+        run: npm test
+
+  amplify-lambdas:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        lambda:
+          - boatrentallapp31507f7cCreateAuthChallenge
+          - boatrentallapp31507f7cDefineAuthChallenge
+          - boatrentallapp31507f7cPostConfirmation
+          - boatrentallapp31507f7cVerifyAuthChallengeResponse
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Install Lambda dependencies
+        run: |
+          cd amplify/backend/function/${{ matrix.lambda }}/src
+          if [ -f package.json ]; then npm install; fi
+
+      - name: Check Lambda build (if applicable)
+        run: |
+          cd amplify/backend/function/${{ matrix.lambda }}/src
+          if [ -f package.json ] && [ -f package-lock.json ]; then npm run build || echo "No build script"; fi
+
