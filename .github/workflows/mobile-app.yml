@@ -49,7 +49,7 @@ jobs:
         run: |
           amplify pull --yes \
             --amplify "{\"envName\":\"prod\"}" \
-            --providers "{\"awscloudformation\":{\"configLevel\":\"project\"}}" \
+            --providers "{\"awscloudformation\":{\"configLevel\":\"environment\"}}"
             --no-code
 
       - name: Verify Expo configuration
