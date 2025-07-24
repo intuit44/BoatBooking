@@ -1,0 +1,93 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`App Component (Real) creates a valid component tree 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "flex": 1,
+      "justifyContent": "center",
+      "padding": 20,
+    }
+  }
+>
+  <Text
+    style={
+      {
+        "color": "red",
+        "fontSize": 18,
+        "marginBottom": 10,
+        "textAlign": "center",
+      }
+    }
+  >
+    Configuration Error
+  </Text>
+  <Text
+    style={
+      {
+        "marginBottom": 20,
+        "textAlign": "center",
+      }
+    }
+  >
+    Missing variables: graphqlEndpoint, userPoolId, userPoolClientId
+  </Text>
+  <Text
+    style={
+      {
+        "color": "gray",
+        "textAlign": "center",
+      }
+    }
+  >
+    Check your .env file and ensure all EXPO_PUBLIC_ variables are set
+  </Text>
+</View>
+`;
+
+exports[`App Component creates a valid component tree after successful configuration 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "flex": 1,
+      "justifyContent": "center",
+      "padding": 20,
+    }
+  }
+>
+  <Text
+    style={
+      {
+        "color": "red",
+        "fontSize": 18,
+        "marginBottom": 10,
+        "textAlign": "center",
+      }
+    }
+  >
+    Configuration Error
+  </Text>
+  <Text
+    style={
+      {
+        "marginBottom": 20,
+        "textAlign": "center",
+      }
+    }
+  >
+    Missing variables: graphqlEndpoint, userPoolId, userPoolClientId
+  </Text>
+  <Text
+    style={
+      {
+        "color": "gray",
+        "textAlign": "center",
+      }
+    }
+  >
+    Check your .env file and ensure all EXPO_PUBLIC_ variables are set
+  </Text>
+</View>
+`;
