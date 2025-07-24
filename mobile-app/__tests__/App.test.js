@@ -154,18 +154,28 @@ describe('App Component', () => {
       component = renderer.create(<App />);
     });
 
-    // Esperar a que complete la configuración
+    // Esperar a que complete la configuración y esté en estado estable
     await waitFor(() => {
       expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
     }, { timeout: 2000 });
 
+    // Ahora que está en estado estable, actualizar el componente para obtener el árbol final
+    await renderer.act(async () => {
+      component.update(<App />);
+    });
+
+    // Tomar el snapshot del estado final (después de la configuración)
     const tree = component.toJSON();
 
-    // Verificar estructura básica
+    // Verificar que ya no está en estado de carga
     expect(tree).toBeTruthy();
     expect(typeof tree).toBe('object');
 
-    // Guardar snapshot
+    // Verificar que no hay ActivityIndicator (estado de carga)
+    const hasActivityIndicator = JSON.stringify(tree).includes('ActivityIndicator');
+    expect(hasActivityIndicator).toBe(false);
+
+    // Ahora sí, guardar el snapshot del estado final
     expect(tree).toMatchSnapshot();
   }, 30000);
 });
