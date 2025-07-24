@@ -5,8 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .cache/
-dist/
-build/
 
 # 🧪 Tests
 coverage/
@@ -14,7 +12,6 @@ jest-cache/
 .vitest/
 
 # 🛠️ IDEs
-
 .idea/
 *.swp
 *.sublime*
@@ -39,34 +36,12 @@ backend/.serverless/
 backend/simbolico/__pycache__/
 *.pyc
 
-# 🧱 Amplify
-amplify/.config/local-*
-amplify/logs
-amplify/mock-data
-amplify/mock-api-resources
-amplify/backend/amplify-meta.json
-amplify/backend/.temp
-build/
-dist/
-node_modules/
-aws-exports.js
-awsconfiguration.json
-amplifyconfiguration.json
-amplifyconfiguration.dart
-amplify-build-config.json
-amplify-gradle-config.json
-amplifytools.xcconfig
-.secret-*
-**.sample
-
-
 # 🌐 Next.js
 .next/
 out/
 .vercel
 
 # 🖼️ OS Files
-*.log
 *.tmp
 *.temp
 *.DS_Store
@@ -92,22 +67,22 @@ desktop.ini
 
 # 💡 Env files (seguridad)
 .env
-.env.*      # Ignora .env.local, .env.dev, etc.
-!.env.example  # <-- EXCEPCIÓN explícita
+.env.*
+!.env.example
 
-# 💥 Specific cache folders
+# 💥 Cache folders
 .eslintcache
 .cache/
 .parcel-cache/
 .turbo/
 
-# 📊 Logs específicos
+# 📊 Logs
 lerna-debug.log*
 .pnpm-debug.log*
 logs/
 *.log
 
-# 🔐 Certificados y keys
+# 🔐 Certificados y claves
 *.pem
 *.p12
 *.key
@@ -115,17 +90,23 @@ logs/
 *.cer
 private/
 
-#amplify-do-not-edit-begin
-amplify/\#current-cloud-backend
+# ================== Amplify ==================
+# Ignorar archivos temporales generados por Amplify CLI
+amplify/#current-cloud-backend
 amplify/.config/local-*
 amplify/logs
 amplify/mock-data
 amplify/mock-api-resources
 amplify/backend/amplify-meta.json
 amplify/backend/.temp
-build/
-dist/
-node_modules/
+
+# ⚠️ Incluir archivos críticos para CI/CD y CodeGPT
+!amplify/backend/**
+!amplify/team-provider-info.json
+!.config/project-config.json
+!mobile-app/aws-exports.js
+
+# Ignorar duplicados innecesarios
 aws-exports.js
 awsconfiguration.json
 amplifyconfiguration.json
@@ -135,4 +116,3 @@ amplify-gradle-config.json
 amplifytools.xcconfig
 .secret-*
 **.sample
-#amplify-do-not-edit-end
