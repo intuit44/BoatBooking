@@ -2,15 +2,11 @@
 
 # ✅ INCLUIR archivos críticos de Amplify y entorno
 !amplify/backend/**
-!amplify/amplify-meta.json
-!aws-exports.js
-!amplify-build-config.json
-!amplify-gradle-config.json
-!awsconfiguration.json
-!amplifyconfiguration.json
+!amplify/team-provider-info.json
+!.config/project-config.json
+!mobile-app/aws-exports.js
 !.env.example
 !.env  
-
 
 # ❌ EXCLUIR archivos sensibles y carpetas grandes
 node_modules/
@@ -26,7 +22,18 @@ web-build/
 *.jks
 *.p12
 *.key
+*.crt
+*.cer
+*.log
 
 # ❌ EXCLUIR archivos de entorno reales (⚠️ MUY IMPORTANTE)
 .env
 .env.*
+
+# 🔁 Carpeta temporal de Amplify que no debe subirse
+amplify/#current-cloud-backend
+amplify/.config/local-*
+amplify/logs
+amplify/mock-data
+amplify/mock-api-resources
+amplify/backend/.temp
