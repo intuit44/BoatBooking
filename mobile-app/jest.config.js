@@ -1,16 +1,15 @@
+// mobile-app/jest.config.js
+
 module.exports = {
   preset: 'jest-expo',
-  testEnvironment: 'jest-expo/environment',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  transform: {
-    '^.+\\.[jt]sx?$': 'babel-jest',
-  },
   transformIgnorePatterns: [
     'node_modules/(?!(jest-)?react-native' +
     '|@react-native(-community)?' +
-    '|expo' +
-    '|expo/.+' +
+    '|expo/' +
+    '|expo$' +
     '|@expo(nent)?' +
+    '|expo-status-bar' +
     '|@expo-google-fonts' +
     '|react-navigation' +
     '|@react-navigation' +
@@ -22,10 +21,11 @@ module.exports = {
     '|aws-amplify' +
     '|@aws-amplify' +
     '|uuid' +
-    '|react-native-url-polyfill)'
+    '|react-native-url-polyfill' +
+    '|expo-modules-core' +
+    ')'
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleDirectories: ['node_modules', '<rootDir>'],
   roots: ['<rootDir>'],
   fakeTimers: {

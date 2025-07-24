@@ -88,8 +88,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests (Jest with explicit config path)
+        run: npx jest --config jest.config.js
 
       - name: Lint (placeholder)
         run: npm run lint
