@@ -11,5 +11,7 @@ module.exports = {
   // Para manejar timers correctamente
   fakeTimers: {
     enableGlobally: true
-  }
+  },
+  roots: ['<rootDir>'],
+  moduleDirectories: ['node_modules', '<rootDir>'],
 };
