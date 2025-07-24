@@ -92,15 +92,15 @@ global.mockAmplifyFunctions = {
   signOut: mockSignOut
 };
 
-// Mock de console.error y console.warn
+// Mock de console.error y console.warn (no reasignar console.log globalmente)
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => { });
   jest.spyOn(console, 'warn').mockImplementation(() => { });
+  // Si necesitas mockear console.log, usa spyOn pero no reasignes globalmente
+  jest.spyOn(console, 'log').mockImplementation(() => { });
 });
 
 afterEach(() => {
-  console.error.mockRestore();
-  console.warn.mockRestore();
-  // Limpiar timers pendientes
-  jest.clearAllTimers();
+  jest.restoreAllMocks(); // Restaura todos los mocks de consola y otros
+  jest.clearAllTimers(); // Limpia timers pendientes
 });

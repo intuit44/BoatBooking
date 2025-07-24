@@ -4,7 +4,7 @@
   "scripts": {
     "clear": "expo start --clear",
     "ios": "expo run:ios",
-    "test": "jest",
+    "test": "jest --config ./jest.config.js",
     "web": "expo start --web",
     "android": "expo run:android",
     "start": "expo start"
