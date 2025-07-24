@@ -45,12 +45,24 @@ jobs:
       - name: Install Amplify CLI
         run: npm install -g @aws-amplify/cli
 
+      # Pull Amplify config from root directory
       - name: Pull Amplify config
+        working-directory: .  # Override the default working directory
         run: |
           amplify pull --yes \
             --amplify "{\"envName\":\"prod\"}" \
             --providers "{\"awscloudformation\":{\"configLevel\":\"project\"}}" \
             --no-code
+
+      # Copy aws-exports.js to mobile-app if it was generated in root
+      - name: Copy Amplify config to mobile app
+        run: |
+          if [ -f ../aws-exports.js ]; then
+            cp ../aws-exports.js ./
+            echo "✅ Copied aws-exports.js to mobile-app directory"
+          else
+            echo "⚠️ aws-exports.js not found in root directory"
+          fi
 
       - name: Verify Expo configuration
         run: npx expo config --type public
