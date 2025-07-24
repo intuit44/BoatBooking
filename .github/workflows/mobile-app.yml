@@ -19,6 +19,8 @@ env:
   EXPO_PUBLIC_USER_POOL_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_USER_POOL_CLIENT_ID }}
   EXPO_PUBLIC_IDENTITY_POOL_ID: ${{ secrets.EXPO_PUBLIC_IDENTITY_POOL_ID }}
   EXPO_PUBLIC_AWS_REGION: ${{ secrets.EXPO_PUBLIC_AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
   build:
@@ -40,6 +42,13 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
+      - name: Pull Amplify config
+        run: |
+          amplify pull --yes \
+            --amplify "{\"envName\":\"prod\"}" \
+            --providers "{\"awscloudformation\":{\"configLevel\":\"project\"}}" \
+            --no-code
+
       - name: Verify Expo configuration
         run: npx expo config --type public
 
@@ -49,6 +58,7 @@ jobs:
             node -e "const cfg=require('./aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('✅ Amplify config looks valid');"
           else
             echo '⚠️ aws-exports.js not found, skipping Amplify config validation.'
+            exit 1
           fi
 
       - name: Run tests
@@ -64,3 +74,4 @@ jobs:
         with:
           name: expo-web-dist
           path: mobile-app/dist
+
