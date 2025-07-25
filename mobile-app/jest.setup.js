@@ -8,11 +8,98 @@ if (typeof global.clearImmediate === 'undefined') {
   global.clearImmediate = (id) => clearTimeout(id);
 }
 
-// Mock de Expo runtime que causa problemas en CI
+// Mock de módulos problemáticos de Expo ANTES de cualquier require
 jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
+jest.mock('expo/src/winter/index', () => ({}), { virtual: true });
+
+// Mock del preset de jest-expo que causa problemas
+jest.mock('jest-expo/src/preset/setup.js', () => ({}), { virtual: true });
 
 // Configuración global de Jest
 jest.setTimeout(10000); // 10 segundos como máximo por test
+
+// Mock de React Navigation
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    NavigationContainer: ({ children }) => children,
+    useNavigation: () => ({
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+    }),
+    useRoute: () => ({
+      params: {},
+    }),
+    useFocusEffect: jest.fn(),
+    useIsFocused: () => true,
+  };
+});
+
+jest.mock('@react-navigation/native-stack', () => {
+  const React = require('react');
+  return {
+    createNativeStackNavigator: () => ({
+      Navigator: ({ children }) => children,
+      Screen: ({ component: Component, ...props }) => Component ? React.createElement(Component, props) : null,
+    }),
+  };
+});
+
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  return {
+    SafeAreaProvider: ({ children }) => React.createElement('View', null, children),
+    SafeAreaView: ({ children }) => React.createElement('View', null, children),
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  };
+});
+
+jest.mock('react-native-screens', () => ({
+  enableScreens: jest.fn(),
+}));
+
+jest.mock('react-native-gesture-handler', () => {
+  const View = require('react-native').View;
+  return {
+    Swipeable: View,
+    DrawerLayout: View,
+    State: {},
+    ScrollView: View,
+    Slider: View,
+    Switch: View,
+    TextInput: View,
+    ToolbarAndroid: View,
+    ViewPagerAndroid: View,
+    DrawerLayoutAndroid: View,
+    WebView: View,
+    NativeViewGestureHandler: View,
+    TapGestureHandler: View,
+    FlingGestureHandler: View,
+    ForceTouchGestureHandler: View,
+    LongPressGestureHandler: View,
+    PanGestureHandler: View,
+    PinchGestureHandler: View,
+    RotationGestureHandler: View,
+    RawButton: View,
+    BaseButton: View,
+    RectButton: View,
+    BorderlessButton: View,
+    FlatList: View,
+    gestureHandlerRootHOC: (component) => component,
+    Directions: {},
+  };
+});
+
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => { };
+  return Reanimated;
+});
+
+// Mock de expo-status-bar
+jest.mock('expo-status-bar', () => ({
+  StatusBar: () => null,
+}));
 
 // Mock de expo-constants - DEBE IR PRIMERO
 jest.mock('expo-constants', () => ({
@@ -45,10 +132,11 @@ global.crypto = {
 };
 
 // Mock del polyfill.js
-jest.mock('./polyfill.js', () => ({}));
+jest.mock('./polyfill.js', () => ({}), { virtual: true });
 
 // Mock de aws-exports
 jest.mock('./aws-exports', () => ({
+  __esModule: true,
   default: {
     aws_project_region: 'us-east-1',
     aws_appsync_graphqlEndpoint: 'https://test.appsync.endpoint',
@@ -107,12 +195,22 @@ global.mockAmplifyFunctions = {
 };
 
 // Mock de console.error y console.warn
+const originalError = console.error;
+const originalWarn = console.warn;
+
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => { });
+  // Solo mockear si no están haciendo referencia a errores reales de test
+  jest.spyOn(console, 'error').mockImplementation((...args) => {
+    // Permitir que errores de Jest pasen
+    if (args.some(arg => typeof arg === 'string' && arg.includes('Warning:'))) {
+      return;
+    }
+    originalError(...args);
+  });
   jest.spyOn(console, 'warn').mockImplementation(() => { });
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();      // ✅ restaura todos los spyOn automáticamente
-  jest.clearAllTimers();       // ✅ limpia timers
+  jest.restoreAllMocks();
+  jest.clearAllTimers();
 });

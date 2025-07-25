@@ -7,6 +7,7 @@ import App from '../App';
 describe('App Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers('legacy');
     // Mockear console para evitar ruido en los tests
     jest.spyOn(console, 'log').mockImplementation(() => { });
     jest.spyOn(console, 'error').mockImplementation(() => { });
@@ -15,7 +16,9 @@ describe('App Component', () => {
   afterEach(() => {
     // Restaurar todos los mocks de forma segura
     jest.restoreAllMocks();
+    // Limpiar timers
     jest.clearAllTimers();
+    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
@@ -34,27 +37,29 @@ describe('App Component', () => {
     expect(console.log).toHaveBeenCalledWith('🔍 [App] App component mounted - SDK 53');
   });
 
-  it('transitions to success state after configuration timeout', async () => {
-    jest.useFakeTimers();
-
+  it('transitions from loading to ready state', async () => {
     const { queryByText, getByText } = render(<App />);
 
-    // simula paso del tiempo
-    act(() => {
+    // Verificar estado inicial
+    expect(queryByText('Configuring Amplify SDK 53...')).toBeTruthy();
+
+    // Avanza el tiempo simulado
+    await act(async () => {
       jest.advanceTimersByTime(1000);
+      // Espera a que todos los microtasks se resuelvan
+      await Promise.resolve();
     });
 
-    // fuerza ejecución de efectos colgados
-    await Promise.resolve();
-
-    // restaura timers REALES antes de usar waitFor
-    jest.useRealTimers();
-
+    // Espera a que desaparezca el texto de carga
     await waitFor(() => {
       expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
       expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
-    });
+    }, { timeout: 3000, interval: 50 });
 
+    // Verificar que no hay errores de configuración
+    expect(queryByText('Configuration Error')).toBeNull();
+
+    // Verificar que se llamó el log de éxito
     expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
   });
 
@@ -110,14 +115,48 @@ describe('App Component', () => {
     Constants.expoConfig.extra = originalExtra;
   });
 
-  it('renders navigation container after successful configuration', async () => {
+  it('renders navigation structure after successful configuration', async () => {
     const { queryByText, getByText } = render(<App />);
 
+    // Avanza el tiempo simulado
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+      // Espera a que todos los microtasks se resuelvan
+      await Promise.resolve();
+    });
+
+    // Espera a que la UI actualice y aparezca la pantalla principal
     await waitFor(() => {
       expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
       expect(queryByText('Configuration Error')).toBeNull();
       expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
     }, { timeout: 3000, interval: 50 });
+
+    expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
+    expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
+  });
+
+  it('maintains configuration state during render', async () => {
+    const { rerender, queryByText, getByText } = render(<App />);
+
+    // Avanza el tiempo simulado y espera a que la UI actualice
+    await act(async () => {
+      jest.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
+      expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
+    }, { timeout: 3000, interval: 50 });
+
+    // Re-renderizar el componente
+    rerender(<App />);
+
+    // El estado de configuración debe persistir
+    expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
+    expect(queryByText('Configuration Error')).toBeNull();
+    expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
   });
 });
 
