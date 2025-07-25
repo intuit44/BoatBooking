@@ -140,3 +140,7 @@ jobs:
           cd amplify/backend/function/${{ matrix.lambda }}/src
           if [ -f package.json ] && [ -f package-lock.json ]; then npm run build || echo "No build script"; fi
 
+
+
+
+
