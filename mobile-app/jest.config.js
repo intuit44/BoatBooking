@@ -24,9 +24,13 @@ module.exports = {
     '|uuid' +
     '|react-native-url-polyfill' +
     '|expo-modules-core' +
-    ')'
+    ')',
+    'node_modules/expo/src/winter/runtime.native.ts'
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleDirectories: ['node_modules', '<rootDir>'],
   roots: ['<rootDir>'],
+  moduleNameMapper: {
+    '^expo/src/winter/runtime.native$': '<rootDir>/__mocks__/expoRuntimeStub.js'
+  },
 };
