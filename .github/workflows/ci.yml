@@ -42,6 +42,7 @@ jobs:
       - name: Run tests
         run: npm test
 
+
   admin-panel:
     runs-on: ubuntu-latest
     needs: setup
@@ -138,4 +139,6 @@ jobs:
         run: |
           cd amplify/backend/function/${{ matrix.lambda }}/src
           if [ -f package.json ] && [ -f package-lock.json ]; then npm run build || echo "No build script"; fi
+
+
 
