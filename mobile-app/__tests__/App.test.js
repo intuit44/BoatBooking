@@ -1,130 +1,100 @@
 // mobile-app/__tests__/App.test.js
 
-import { waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
 import Constants from 'expo-constants';
-import renderer from 'react-test-renderer';
 import App from '../App';
-
-// Obtener los mocks
-const { configure, getCurrentUser } = global.mockAmplifyFunctions;
 
 describe('App Component', () => {
   beforeEach(() => {
-    // Limpiar mocks antes de cada test
     jest.clearAllMocks();
-    // Resetear el mock de console.log
+    // Mockear console para evitar ruido en los tests
     jest.spyOn(console, 'log').mockImplementation(() => { });
+    jest.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   afterEach(() => {
-    console.log.mockRestore();
+    // Restaurar todos los mocks de forma segura
+    jest.restoreAllMocks();
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
-  it('renders without crashing', async () => {
-    let component;
+  it('renders without crashing', () => {
+    const { toJSON } = render(<App />);
+    expect(toJSON()).toBeTruthy();
+  });
 
-    await renderer.act(async () => {
-      component = renderer.create(<App />);
+  it('shows loading state initially', () => {
+    const { getByText } = render(<App />);
+
+    // Verificar que muestra el texto de carga
+    expect(getByText('Configuring Amplify SDK 53...')).toBeTruthy();
+
+    // Verificar que se llamó el log de montaje
+    expect(console.log).toHaveBeenCalledWith('🔍 [App] App component mounted - SDK 53');
+  });
+
+  it('transitions to success state after configuration timeout', async () => {
+    jest.useFakeTimers();
+
+    const { queryByText, getByText } = render(<App />);
+
+    // simula paso del tiempo
+    act(() => {
+      jest.advanceTimersByTime(1000);
     });
+
+    // fuerza ejecución de efectos colgados
+    await Promise.resolve();
+
+    // restaura timers REALES antes de usar waitFor
+    jest.useRealTimers();
 
     await waitFor(() => {
-      expect(component).toBeTruthy();
-      expect(component.toJSON()).toBeTruthy();
-    });
-  }, 30000);
-
-  it('logs app mounting with SDK 53', async () => {
-    await renderer.act(async () => {
-      renderer.create(<App />);
+      expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
+      expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
     });
 
-    await waitFor(() => {
-      expect(console.log).toHaveBeenCalledWith('🔍 [App] App component mounted - SDK 53');
-    });
-  }, 30000);
+    expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
+  });
 
-  it('verifies configuration on mount', async () => {
-    await renderer.act(async () => {
-      renderer.create(<App />);
-    });
+  it('verifies configuration on mount', () => {
+    render(<App />);
 
-    await waitFor(() => {
-      expect(console.log).toHaveBeenCalledWith(
-        '🔍 [App] Config verification:',
-        expect.objectContaining({
-          hasGraphqlEndpoint: true,
-          hasUserPoolId: true,
-          hasUserPoolClientId: true
-        })
-      );
-    });
-  }, 30000);
+    expect(console.log).toHaveBeenCalledWith(
+      '🔍 [App] Config verification:',
+      expect.objectContaining({
+        hasGraphqlEndpoint: true,
+        hasUserPoolId: true,
+        hasUserPoolClientId: true,
+        environment: 'test'
+      })
+    );
+  });
 
-  it('shows loading state initially', async () => {
-    let component;
-
-    await renderer.act(async () => {
-      component = renderer.create(<App />);
-    });
-
-    // Verificar estado inicial de carga
-    const tree = component.toJSON();
-
-    // Buscar el ActivityIndicator y texto de carga
-    const texts = tree.children.filter(child => child.type === 'Text');
-    expect(texts.some(text =>
-      text.children && text.children.includes('Configuring Amplify SDK 53...')
-    )).toBeTruthy();
-  }, 30000);
-
-  it('transitions to success state after configuration', async () => {
-    let component;
-
-    await renderer.act(async () => {
-      component = renderer.create(<App />);
-    });
-
-    // Esperar a que el componente transite al estado de éxito
-    await waitFor(() => {
-      expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
-    }, { timeout: 2000 });
-
-    // Verificar que ahora muestra NavigationContainer
-    const tree = component.toJSON();
-    expect(tree).toBeTruthy();
-  }, 30000);
-
-  it('handles missing environment variables', async () => {
-    // Temporalmente cambiar el mock para simular variables faltantes
+  it('handles missing all environment variables', () => {
+    // Cambiar el mock temporalmente
     const originalExtra = Constants.expoConfig.extra;
     Constants.expoConfig.extra = {};
 
-    let component;
+    const { getByText } = render(<App />);
 
-    await renderer.act(async () => {
-      component = renderer.create(<App />);
-    });
+    // Verificar que muestra error
+    expect(getByText('Configuration Error')).toBeTruthy();
+    expect(getByText('Missing variables: graphqlEndpoint, userPoolId, userPoolClientId')).toBeTruthy();
+    expect(getByText('Check your .env file and ensure all EXPO_PUBLIC_ variables are set')).toBeTruthy();
 
-    await waitFor(() => {
-      expect(console.error).toHaveBeenCalledWith(
-        '❌ [App] Configuration error:',
-        expect.stringContaining('Missing variables')
-      );
-    });
+    // Verificar log de error
+    expect(console.error).toHaveBeenCalledWith(
+      '❌ [App] Configuration error:',
+      'Missing variables: graphqlEndpoint, userPoolId, userPoolClientId'
+    );
 
-    // Verificar que muestra la pantalla de error
-    const tree = component.toJSON();
-    const texts = tree.children.filter(child => child.type === 'Text');
-    expect(texts.some(text =>
-      text.children && text.children.includes('Configuration Error')
-    )).toBeTruthy();
-
-    // Restaurar el mock original
+    // Restaurar
     Constants.expoConfig.extra = originalExtra;
-  }, 30000);
+  });
 
-  it('validates all required environment variables', async () => {
-    // Test con una variable faltante
+  it('validates specific missing environment variable', () => {
     const originalExtra = Constants.expoConfig.extra;
     Constants.expoConfig.extra = {
       graphqlEndpoint: 'test',
@@ -132,62 +102,38 @@ describe('App Component', () => {
       // userPoolClientId faltante
     };
 
-    await renderer.act(async () => {
-      renderer.create(<App />);
-    });
+    const { getByText } = render(<App />);
 
-    await waitFor(() => {
-      expect(console.error).toHaveBeenCalledWith(
-        '❌ [App] Configuration error:',
-        'Missing variables: userPoolClientId'
-      );
-    });
+    expect(getByText('Configuration Error')).toBeTruthy();
+    expect(getByText('Missing variables: userPoolClientId')).toBeTruthy();
 
-    // Restaurar
     Constants.expoConfig.extra = originalExtra;
-  }, 30000);
+  });
 
-  it('creates a valid component tree after successful configuration', async () => {
-    let component;
+  it('renders navigation container after successful configuration', async () => {
+    const { queryByText, getByText } = render(<App />);
 
-    await renderer.act(async () => {
-      component = renderer.create(<App />);
-    });
-
-    // Esperar a que complete la configuración y esté en estado estable
     await waitFor(() => {
-      expect(console.log).toHaveBeenCalledWith('✅ [App] Configuration successful');
-    }, { timeout: 2000 });
-
-    // Ahora que está en estado estable, actualizar el componente para obtener el árbol final
-    await renderer.act(async () => {
-      component.update(<App />);
-    });
-
-    // Tomar el snapshot del estado final (después de la configuración)
-    const tree = component.toJSON();
-
-    // Verificar que ya no está en estado de carga
-    expect(tree).toBeTruthy();
-    expect(typeof tree).toBe('object');
-
-    // Verificar que no hay ActivityIndicator (estado de carga)
-    const hasActivityIndicator = JSON.stringify(tree).includes('ActivityIndicator');
-    expect(hasActivityIndicator).toBe(false);
-
-    // Ahora sí, guardar el snapshot del estado final
-    expect(tree).toMatchSnapshot();
-  }, 30000);
+      expect(queryByText('Configuring Amplify SDK 53...')).toBeNull();
+      expect(queryByText('Configuration Error')).toBeNull();
+      expect(getByText('🚤 Boat Rental v6')).toBeTruthy();
+    }, { timeout: 3000, interval: 50 });
+  });
 });
 
 describe('App Configuration', () => {
   it('has access to environment variables through expo-constants', () => {
     const extra = Constants.expoConfig.extra;
 
-    // Verificar que las variables mockeadas están disponibles
+    // Verificar variables con prefijo EXPO_PUBLIC_
     expect(extra.EXPO_PUBLIC_GRAPHQL_ENDPOINT).toBe('https://test.graphql.endpoint');
     expect(extra.EXPO_PUBLIC_USER_POOL_ID).toBe('test-user-pool');
     expect(extra.EXPO_PUBLIC_AWS_REGION).toBe('us-east-1');
+
+    // Verificar variables sin prefijo (como las usa App.tsx)
+    expect(extra.graphqlEndpoint).toBe('https://test.graphql.endpoint');
+    expect(extra.userPoolId).toBe('test-user-pool');
+    expect(extra.userPoolClientId).toBe('test-client-id');
   });
 
   it('exports a valid React component', () => {

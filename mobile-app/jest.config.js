@@ -2,6 +2,7 @@
 
 module.exports = {
   preset: 'jest-expo',
+  testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transformIgnorePatterns: [
     'node_modules/(?!(jest-)?react-native' +
@@ -28,7 +29,4 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleDirectories: ['node_modules', '<rootDir>'],
   roots: ['<rootDir>'],
-  fakeTimers: {
-    enableGlobally: true
-  }
 };

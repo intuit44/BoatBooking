@@ -1,5 +1,19 @@
 // mobile-app/jest.setup.js
 
+// Polyfills para setImmediate y clearImmediate
+if (typeof global.setImmediate === 'undefined') {
+  global.setImmediate = (cb) => setTimeout(cb, 0);
+}
+if (typeof global.clearImmediate === 'undefined') {
+  global.clearImmediate = (id) => clearTimeout(id);
+}
+
+// Mock de Expo runtime que causa problemas en CI
+jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
+
+// Configuración global de Jest
+jest.setTimeout(10000); // 10 segundos como máximo por test
+
 // Mock de expo-constants - DEBE IR PRIMERO
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -92,15 +106,13 @@ global.mockAmplifyFunctions = {
   signOut: mockSignOut
 };
 
-// Mock de console.error y console.warn (no reasignar console.log globalmente)
+// Mock de console.error y console.warn
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => { });
   jest.spyOn(console, 'warn').mockImplementation(() => { });
-  // Si necesitas mockear console.log, usa spyOn pero no reasignes globalmente
-  jest.spyOn(console, 'log').mockImplementation(() => { });
 });
 
 afterEach(() => {
-  jest.restoreAllMocks(); // Restaura todos los mocks de consola y otros
-  jest.clearAllTimers(); // Limpia timers pendientes
+  jest.restoreAllMocks();      // ✅ restaura todos los spyOn automáticamente
+  jest.clearAllTimers();       // ✅ limpia timers
 });
