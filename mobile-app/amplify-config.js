@@ -51,18 +51,21 @@ const amplifyConfig = {
 
 let amplifyConfigured = false;
 
-export const configureAmplify = () => {
+export const configureAmplify = (config = amplifyConfig) => {
   try {
-    console.log('🔧 [AmplifyConfig] Configurando Amplify v5...');
-    console.log('🔗 [AmplifyConfig] Endpoint:', amplifyConfig.API.GraphQL.endpoint);
-    
-    Amplify.configure(amplifyConfig);
+    console.log('🔧 [AmplifyConfig] Configurando Amplify...');
+    console.log('🔗 [AmplifyConfig] Endpoint:', config?.API?.GraphQL?.endpoint);
+
+    Amplify.configure({
+      ...config,
+      Analytics: { disabled: true, ...(config.Analytics || {}) },
+    });
     amplifyConfigured = true;
-    console.log('✅ [AmplifyConfig] Amplify v5 configurado correctamente');
-    
+    console.log('✅ [AmplifyConfig] Amplify configurado correctamente');
+
     return true;
   } catch (error) {
-    console.log('❌ [AmplifyConfig] Error configurando Amplify v5:', error);
+    console.log('❌ [AmplifyConfig] Error configurando Amplify:', error);
     amplifyConfigured = false;
     return false;
   }

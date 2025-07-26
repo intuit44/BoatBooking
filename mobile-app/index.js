@@ -31,19 +31,20 @@ console.log('✅ [index.js] Expo imports cargados');
 // =============================================================================
 // AWS AMPLIFY V6 CONFIGURATION
 // =============================================================================
-import { Amplify } from 'aws-amplify';
+// Configuración centralizada de Amplify
+import { configureAmplify } from './amplify-config';
 // IMPORTANTE: Verificar la ruta correcta de aws-exports
-import awsconfig from './aws-exports'; // Si está en el root
+import awsconfig from './aws-exports';
 
 console.log('🔧 [index.js] Configurando AWS Amplify v6...');
 
 try {
-  Amplify.configure(awsconfig);
+  configureAmplify(awsconfig);
   console.log('✅ [index.js] AWS Amplify v6 configurado exitosamente');
   console.log('🔍 [index.js] AWS Config:', {
     graphqlEndpoint: awsconfig.aws_appsync_graphqlEndpoint,
     region: awsconfig.aws_appsync_region,
-    authType: awsconfig.aws_appsync_authenticationType
+    authType: awsconfig.aws_appsync_authenticationType,
   });
 } catch (error) {
   console.error('❌ [index.js] Error configurando AWS Amplify:', error);
@@ -85,7 +86,7 @@ console.log('📱 [index.js] Expo SDK 53 + RN 0.79.5');
 // Debug final
 console.log('🔍 [index.js] Debug final:', {
   App: typeof App,
-  Amplify: typeof Amplify,
+  Amplify: typeof configureAmplify,
   awsconfig: typeof awsconfig,
   global: typeof global !== 'undefined'
 });
