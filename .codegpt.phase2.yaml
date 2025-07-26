@@ -1,3 +1,4 @@
+agents_file: .codegpt/agents.yaml
 modules:
   - name: simbolico
     path: backend/simbolico
