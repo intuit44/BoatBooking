@@ -37,6 +37,7 @@ agents:
       dashboards de control y seguridad del lado del cliente.
       Se enfoca en experiencia del administrador, manejo de sesiones y filtros de datos.
 
+  - name: Backend_Agent   # <-- Cambia de AWS_Agent a Backend_Agent
   - name: Backend_Agent
     repository: https://github.com/intuit44/BoatBooking
     branch: main

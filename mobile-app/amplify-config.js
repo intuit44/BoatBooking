@@ -53,13 +53,16 @@ let amplifyConfigured = false;
 
 export const configureAmplify = (config = amplifyConfig) => {
   try {
+    // Soporte para dos formatos de configuración:
+    // - config.API.GraphQL.endpoint → usado por configuración modular
+    // - config.aws_appsync_graphqlEndpoint → usado por aws-exports.js (legacy/default)
     const endpoint = config?.API?.GraphQL?.endpoint || config.aws_appsync_graphqlEndpoint;
     console.log('🔧 [AmplifyConfig] Configurando Amplify...');
     console.log('🔗 [AmplifyConfig] Endpoint:', endpoint);
 
     Amplify.configure({
       ...config,
-      Analytics: { disabled: true, ...(config.Analytics || {}) },
+      Analytics: { ...(config.Analytics || {}), disabled: true },
     });
     amplifyConfigured = true;
     console.log('✅ [AmplifyConfig] Amplify configurado correctamente');

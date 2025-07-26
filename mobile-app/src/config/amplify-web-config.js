@@ -1,6 +1,6 @@
 // Configuración específica para web de AWS Amplify
+import { configureAmplify } from '../amplify-config';
 import awsExportsWeb from '../aws-exports';
-import { configureAmplify } from '../../amplify-config';
 
 // Función para configurar Amplify para web
 export function configureAmplifyForWeb(config = awsExportsWeb) {
