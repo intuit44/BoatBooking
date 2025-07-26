@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Boat Rental App - Entry Point para Expo SDK 53
  * AWS Amplify v6 + React Native 0.79.5 + Expo 53.0.0
  */
