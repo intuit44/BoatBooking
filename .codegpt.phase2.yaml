@@ -1,10 +1,5 @@
 agents_file: .codegpt/agents.yaml
 modules:
-  - name: simbolico
-    path: backend/simbolico
-    tags: [simbolico, flask, agentes, gpt, comandos]
-    include:
-      - "**/*.py"
 
   - name: mobile-app-core
     path: mobile-app/src
