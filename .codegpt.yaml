@@ -148,12 +148,10 @@ modules:
     agent: architect_boat_rental
     tags: [architecture, config, documentation, root]
     include:
-      - "README.md"
-      - "AGENTS.md"
-      - ".codegpt.yml"
-      - "package.json"
-      - ".gitignore"
-      - "LICENSE"
+      - "*"
+      - ".*"
+      - "**/*"
+      - "**/.*"
 
   - name: ci-cd-workflows
     path: .github/workflows
