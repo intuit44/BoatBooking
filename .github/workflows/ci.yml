@@ -52,7 +52,7 @@ jobs:
 
     - name: Run all tests with coverage
       run: |
-        npm test -- --coverage --forceExit --detectOpenHandles --maxWorkers=2
+        npm run test:coverage -- --forceExit --detectOpenHandles --maxWorkers=2
       env:
         NODE_ENV: test
         CI: true
