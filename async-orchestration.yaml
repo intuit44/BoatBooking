@@ -1,0 +1,247 @@
+# async-orchestration.yaml
+# Configuración de orquestación asíncrona entre Codex y AI Foundry
+
+version: "1.0"
+
+# Definición de flujos de trabajo asíncronos
+workflows:
+  # Flujo para análisis de componentes complejos
+  complex_component_analysis:
+    name: "Análisis de Componente Complejo"
+    trigger:
+      - file_size: "> 500 lines"
+      - complexity: "> 15"
+      - manual: true
+    
+    steps:
+      - id: initial_scan
+        agent: "Mobile_App_Agent"
+        action: "scan_component"
+        async: false
+        timeout: 5000
+        
+      - id: deep_analysis
+        agent: "ReadTsxAgent"
+        action: "analyze_tsx_structure"
+        async: true
+        timeout: 30000
+        depends_on: ["initial_scan"]
+        
+      - id: refactor_suggestions
+        agent: "RefactorAgent"
+        action: "generate_refactor_plan"
+        async: true
+        timeout: 45000
+        depends_on: ["deep_analysis"]
+        
+      - id: implementation
+        agent: "Mobile_App_Agent"
+        action: "apply_refactoring"
+        async: false
+        requires_approval: true
+        depends_on: ["refactor_suggestions"]
+
+  # Flujo para optimización de performance
+  performance_optimization:
+    name: "Optimización de Performance"
+    trigger:
+      - performance_regression: true
+      - bundle_size: "> 5MB"
+      - load_time: "> 3s"
+    
+    steps:
+      - id: metrics_collection
+        agent: "Mobile_App_Agent"
+        action: "collect_performance_metrics"
+        async: false
+        
+      - id: performance_analysis
+        agent: "PerformanceOptimizer"
+        action: "analyze_bottlenecks"
+        async: true
+        parallel: true
+        
+      - id: bundle_analysis
+        agent: "PerformanceOptimizer"
+        action: "analyze_bundle"
+        async: true
+        parallel: true
+        
+      - id: optimization_plan
+        agent: "PerformanceOptimizer"
+        action: "create_optimization_plan"
+        async: true
+        depends_on: ["performance_analysis", "bundle_analysis"]
+        
+      - id: apply_optimizations
+        agent: "Mobile_App_Agent"
+        action: "implement_optimizations"
+        async: false
+        requires_approval: true
+
+  # Flujo para generación de tests
+  test_generation:
+    name: "Generación de Tests Completos"
+    trigger:
+      - coverage: "< 70%"
+      - new_feature: true
+      - manual: true
+    
+    steps:
+      - id: coverage_analysis
+        agent: "TestingExpert"
+        action: "analyze_coverage_gaps"
+        async: true
+        
+      - id: test_generation
+        agent: "TestingExpert"
+        action: "generate_test_suite"
+        async: true
+        depends_on: ["coverage_analysis"]
+        batch_size: 10
+        
+      - id: mock_generation
+        agent: "TestingExpert"
+        action: "generate_mocks"
+        async: true
+        parallel: true
+        
+      - id: integration
+        agent: "Mobile_App_Agent"
+        action: "integrate_tests"
+        async: false
+        depends_on: ["test_generation", "mock_generation"]
+
+# Configuración de colas y prioridades
+queue_config:
+  provider: "azure-service-bus"
+  queues:
+    - name: "high-priority"
+      max_concurrent: 3
+      timeout: 60000
+      retry_policy:
+        max_attempts: 3
+        backoff: "exponential"
+        
+    - name: "normal-priority"
+      max_concurrent: 5
+      timeout: 120000
+      retry_policy:
+        max_attempts: 2
+        backoff: "linear"
+        
+    - name: "batch-processing"
+      max_concurrent: 10
+      timeout: 300000
+      batch_size: 50
+
+# Manejo de eventos asíncronos
+event_handlers:
+  task_completed:
+    actions:
+      - log_metrics
+      - update_dashboard
+      - notify_next_agent
+      
+  task_failed:
+    actions:
+      - log_error
+      - retry_or_escalate
+      - notify_architect
+      
+  rate_limit_hit:
+    actions:
+      - queue_task
+      - switch_to_fallback_model
+      - notify_monitoring
+
+# Callbacks y webhooks
+webhooks:
+  codex_callback:
+    url: "http://localhost:5000/webhook/codex"
+    events: ["task_completed", "task_failed"]
+    
+  foundry_callback:
+    url: "http://localhost:5000/webhook/foundry"
+    events: ["analysis_complete", "rate_limit_warning"]
+    
+  monitoring_callback:
+    url: "https://monitor.boatrental.com/webhook"
+    events: ["all"]
+
+# Estrategias de balanceo de carga
+load_balancing:
+  strategy: "weighted_round_robin"
+  weights:
+    codex_agents: 0.7
+    ai_foundry_agents: 0.3
+    
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    recovery_timeout: 60000
+    
+  fallback_chain:
+    - primary: "codex_agent"
+    - secondary: "ai_foundry_agent"
+    - tertiary: "manual_intervention"
+
+# Configuración de caché distribuido
+distributed_cache:
+  provider: "redis"
+  cluster_mode: true
+  
+  policies:
+    tsx_analysis:
+      ttl: 86400
+      invalidate_on: ["file_change", "dependency_update"]
+      
+    refactor_suggestions:
+      ttl: 3600
+      max_size: "100MB"
+      
+    test_templates:
+      ttl: 604800
+      share_across_agents: true
+
+# Métricas y observabilidad
+observability:
+  tracing:
+    enabled: true
+    provider: "opentelemetry"
+    sample_rate: 0.1
+    
+  metrics:
+    export_interval: 60
+    aggregations:
+      - "response_time_p95"
+      - "token_usage_per_agent"
+      - "success_rate_by_workflow"
+      
+  logging:
+    level: "info"
+    async_buffer_size: 1000
+    destinations:
+      - "console"
+      - "azure-log-analytics"
+
+# Políticas de ejecución asíncrona
+async_policies:
+  max_wait_time: 300000  # 5 minutos
+  
+  retry_strategies:
+    transient_errors:
+      max_attempts: 3
+      backoff: "exponential"
+      base_delay: 1000
+      
+    rate_limits:
+      max_attempts: 5
+      backoff: "linear"
+      delay: 60000
+      
+  timeout_escalation:
+    - level1: 30000
+    - level2: 60000
+    - level3: 120000
+    - final: "manual_intervention"

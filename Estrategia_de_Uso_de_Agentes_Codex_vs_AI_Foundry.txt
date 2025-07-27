@@ -1,0 +1,153 @@
+# Estrategia de Uso de Agentes: Codex vs AI Foundry
+
+## 🎯 Cuándo usar cada tipo de agente
+
+### Agentes Codex (Por defecto)
+Usar para tareas cotidianas y desarrollo regular:
+
+- ✅ **Implementación de features** estándar
+- ✅ **Corrección de bugs** simples a moderados
+- ✅ **Actualización de dependencias**
+- ✅ **Escritura de tests** básicos
+- ✅ **Documentación** y comentarios
+- ✅ **Configuración** de herramientas
+- ✅ **Refactoring** simple (< 100 líneas)
+
+### Agentes AI Foundry (Para complejidad alta)
+Invocar para tareas que requieren análisis profundo:
+
+- 🔍 **Análisis de componentes TSX** complejos (> 200 líneas)
+- 🔄 **Refactorización masiva** de código legacy
+- 📊 **Optimización de performance** crítica
+- 🏗️ **Rediseño arquitectónico** de módulos
+- 🧪 **Generación de tests complejos** con edge cases
+- 🔐 **Análisis de seguridad** profundo
+- 📈 **Detección de patrones** y anti-patterns
+
+## 📋 Matriz de Decisión
+
+| Tarea | Complejidad | Agente Recomendado | AI Foundry Support |
+|-------|-------------|-------------------|-------------------|
+| Agregar botón a UI | Baja | Mobile_App_Agent | No |
+| Crear nuevo screen | Media | Mobile_App_Agent | Opcional |
+| Refactorizar HomeScreen (300+ líneas) | Alta | Mobile_App_Agent | ReadTsxAgent |
+| Optimizar bundle size | Alta | Mobile_App_Agent | PerformanceOptimizer |
+| Crear GraphQL resolver | Media | Backend_Agent | No |
+| Optimizar queries N+1 | Alta | Backend_Agent | RefactorAgent |
+| Análisis de arquitectura | Muy Alta | Architect_BoatRental | ArchitectureAnalyzer |
+| Generar tests E2E | Alta | Cualquiera | TestingExpert |
+
+## 🔄 Flujo de Trabajo Híbrido
+
+```mermaid
+graph TD
+    A[Nueva Tarea] --> B{Complejidad?}
+    B -->|Baja-Media| C[Agente Codex]
+    B -->|Alta| D[Análisis Inicial Codex]
+    D --> E[Invocar AI Foundry]
+    E --> F[Análisis Profundo]
+    F --> G[Recomendaciones]
+    G --> H[Implementación Codex]
+    C --> I[Resultado]
+    H --> I[Resultado]
+    I --> J{Satisfactorio?}
+    J -->|No| K[Escalar a AI Foundry]
+    J -->|Sí| L[Completado]
+    K --> E
+```
+
+## 🚀 Comandos de Invocación
+
+### Invocación Manual de AI Foundry
+
+```bash
+# Para análisis de componente TSX
+@codex invoke-foundry --agent ReadTsxAgent --file mobile-app/src/screens/home/HomeScreen.tsx
+
+# Para refactorización compleja
+@codex invoke-foundry --agent RefactorAgent --complexity high --module mobile-app
+
+# Para análisis de arquitectura
+@codex invoke-foundry --agent ArchitectureAnalyzer --scope full-project
+```
+
+### Triggers Automáticos
+
+Los agentes AI Foundry se invocan automáticamente cuando:
+
+1. **Complejidad Ciclomática > 15**
+   ```
+   Trigger: RefactorAgent
+   Notifica: Agente responsable del módulo
+   ```
+
+2. **Archivo > 500 líneas**
+   ```
+   Trigger: ReadTsxAgent (para TSX) o RefactorAgent (otros)
+   Notifica: Mobile_App_Agent o Backend_Agent
+   ```
+
+3. **Cobertura de Tests < 70%**
+   ```
+   Trigger: TestingExpert
+   Notifica: Todos los agentes relevantes
+   ```
+
+4. **Performance Regression Detectada**
+   ```
+   Trigger: PerformanceOptimizer
+   Notifica: Mobile_App_Agent + Backend_Agent
+   ```
+
+## 💰 Consideraciones de Costo
+
+### Uso Eficiente
+- **Codex First**: Siempre intentar con agentes Codex primero
+- **Batch Operations**: Agrupar análisis complejos
+- **Cache Results**: Los resultados de AI Foundry se cachean por 24h
+- **Rate Limiting**: Respetar límites (6 req/min para GPT-3.5)
+
+### Presupuesto Mensual Sugerido
+- Desarrollo activo: 80% Codex, 20% AI Foundry
+- Mantenimiento: 95% Codex, 5% AI Foundry
+- Refactorización mayor: 60% Codex, 40% AI Foundry
+
+## 📊 Métricas de Éxito
+
+| Métrica | Target | Medición |
+|---------|--------|----------|
+| Tiempo de resolución | -30% | Con AI Foundry vs sin |
+| Calidad del código | +25% | Score de complejidad |
+| Cobertura de tests | >85% | Jest coverage |
+| Bugs post-refactor | <5% | Issues reportados |
+
+## 🔧 Configuración Recomendada
+
+```yaml
+# En .codegpt.yaml
+ai_foundry:
+  enabled: true
+  auto_invoke: true
+  complexity_threshold: 15
+  file_size_threshold: 500
+  test_coverage_threshold: 70
+  
+  agents:
+    - ReadTsxAgent
+    - RefactorAgent
+    - ArchitectureAnalyzer
+    - PerformanceOptimizer
+    - TestingExpert
+```
+
+## 🎓 Mejores Prácticas
+
+1. **Documentar Decisiones**: Cuando uses AI Foundry, documenta por qué
+2. **Review Humano**: Siempre revisar sugerencias de AI Foundry
+3. **Iteración**: Usar AI Foundry para análisis, Codex para implementación
+4. **Monitoreo**: Trackear métricas de uso y ROI
+5. **Feedback Loop**: Ajustar umbrales basándose en resultados
+
+---
+
+*Este documento debe actualizarse mensualmente basándose en métricas de uso y feedback del equipo.*
