@@ -70,3 +70,11 @@ agents:
 
 
 
+  - name: Agent975
+    repository: https://github.com/intuit44/BoatBooking
+    branch: main
+    paths:
+      - .
+    description: >
+      Azure OpenAI agent used for project demonstrations.
+
