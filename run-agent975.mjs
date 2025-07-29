@@ -1,10 +1,13 @@
 import { AIProjectClient } from "@azure/ai-projects";
 import { DefaultAzureCredential } from "@azure/identity";
+import fs from "fs";
+import path from "path";
 
 async function runAgentConversation() {
-  const project = new AIProjectClient(
-    "https://boatRentalFoundry-dev.services.ai.azure.com/api/projects/booking-agents",
-    new DefaultAzureCredential());
+  const configPath = path.join(process.cwd(), ".codegpt", "agents.context.json");
+  const context = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  const apiEndpoint = `${context.endpoint}/api/projects/${context.project}`;
+  const project = new AIProjectClient(apiEndpoint, new DefaultAzureCredential());
 
   const agent = await project.agents.getAgent("asst_jjH5up8ROP1hF0sRYoNZyFNQ");
   console.log(`Retrieved agent: ${agent.name}`);

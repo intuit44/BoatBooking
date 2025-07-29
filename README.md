@@ -306,6 +306,10 @@ Estándares de Código
 ESLint: Configurado para JavaScript/TypeScript
 Prettier: Formateo automático de código
 Husky: Git hooks para pre-commit
+## Utility Scripts
+
+* [`run-agent975.mjs`](docs/run-agent975.md) – interactúa con el agente de Azure Foundry usando la configuración de `.codegpt/agents.context.json`.
+
 📞 Soporte y Contacto
 Documentación Adicional
 API Documentation: Disponible en /docs
