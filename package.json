@@ -8,6 +8,7 @@
     "test": "echo \"No tests yet...\""
   },
   "dependencies": {
+    "@azure/ai-projects": "^1.0.0-beta.10",
     "@azure/functions": "^4.0.0",
     "@azure/identity": "^4.10.2",
     "@azure/keyvault-secrets": "^4.10.0"
