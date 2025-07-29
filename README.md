@@ -128,6 +128,13 @@ json
   "codegpt.model": "o4-mini"
 }
 
+### Ejecutar un agente de ejemplo
+Para probar la integración con Azure AI Foundry:
+
+```bash
+npm run run-agent975
+```
+
 🔧 Scripts de Mantenimiento
 Scripts de Corrección Disponibles
 bash
