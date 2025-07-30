@@ -143,47 +143,19 @@ npm start      # Servidor de producción
   "codegpt.openai_deployment_name": "o4-mini",
   "codegpt.model": "o4-mini"
 }
-```
 
-## 🤖 Sistemas de Agentes AI
-
-### Para Desarrollo (Codex + AI Foundry)
-- **Uso**: Análisis y refactorización de código
-- **Agentes**: Mobile_App_Agent, ReadTsxAgent, etc.
-- **Comando**: `@codex [comando]`
-
-### Para Automatización de Negocio (Multi-Agent Engine)
-- **Uso**: Workflows de reservas, pagos, notificaciones
-- **Framework**: Semantic Kernel
-- **Submódulo**: `Multi-Agent-Custom-Automation-Engine/`
-
----
-
-### Integraciones
-
-```yaml
-integrations:
-  development:
-    type: "Codex + AI Foundry"
-    purpose: "Desarrollo y análisis de código"
-    config: "mcp_config.json"
-  business_automation:
-    type: "Multi-Agent Custom Engine"
-    purpose: "Automatización de procesos"
-    path: "./Multi-Agent-Custom-Automation-Engine"
-```
-
----
-
-🚀 **Próximos Pasos**
-- Mantener la configuración actual de Codex + AI Foundry para desarrollo
-- Usar el Multi-Agent Engine para automatizar procesos de negocio específicos
-- Documentar claramente cuándo usar cada sistema
-- Evitar duplicación de funcionalidades entre ambos sistemas
-
-## 🔧 Scripts de Mantenimiento
+### Ejecutar un agente de ejemplo
+Para probar la integración con Azure AI Foundry:
 
 ```bash
+npm run run-agent975
+```
+
+🔧 Scripts de Mantenimiento
+Scripts de Corrección Disponibles
+bash
+
+
 # Corrección de dependencias
 node fix-all-dependencies.js
 node smart-dependency-fixer.js
