@@ -68,5 +68,20 @@ agents:
       deployment_type: "Standard"
       lifecycle_status: "GenerallyAvailable"
 
+  - name: Agent975
+    description: >
+      Agente simbólico conectado a Azure AI Foundry para pruebas de conexión,
+      ejecución y trazabilidad desde run-agent975.mjs. Se usa como plantilla
+      base para crear otros agentes conectados a proyectos en AI Studio.
+    entry: run-agent975.mjs
+    context: .codegpt/agents.context.json
+    platform: local
+    capabilities:
+      - agent_execution
+      - connectivity_testing
+      - ai_project_client_usage
+    integration_with:
+      - Architect_BoatRental
+
 
 
