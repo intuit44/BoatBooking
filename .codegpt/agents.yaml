@@ -70,9 +70,9 @@ agents:
 
   - name: Agent975
     description: >
-      Agente simbólico conectado a Azure AI Foundry para pruebas de conexión,
-      ejecución y trazabilidad desde run-agent975.mjs. Se usa como plantilla
-      base para crear otros agentes conectados a proyectos en AI Studio.
+      Symbolic agent connected to Azure AI Foundry for connection testing,
+      execution, and traceability from run-agent975.mjs. It is used as a base
+      template to create other agents connected to projects in AI Studio.
     entry: run-agent975.mjs
     context: .codegpt/agents.context.json
     platform: local
