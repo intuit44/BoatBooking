@@ -5,7 +5,7 @@
   "scripts": {
     "start": "func start",
     "test": "echo \"No tests yet...\"",
-    "run-agent975": "node run-agent975.mjs"
+    "run-agent975": "node src/agents/agent975/run-agent975.mjs"
   },
   "dependencies": {
     "@azure/functions": "^4.0.0",
