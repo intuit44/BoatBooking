@@ -13,7 +13,12 @@ agents:
 
 # Definición de módulos
 modules:
-  # ===== MOBILE APP MODULES - Gestionados por Mobile_App_Agent =====
+  - name: simbolico
+    path: backend/simbolico
+    tags: [simbolico, flask, agentes, gpt, comandos]
+    include:
+      - "**/*.py"
+
   - name: mobile-app-core
     path: mobile-app
     agent: mobile_app_agent
@@ -223,5 +228,23 @@ assignment_rules:
   - pattern: "**/.github/**"
     agent: architect_boat_rental
   
-  - pattern: "{README.md,AGENTS.md,.codegpt.yml}"
+  - pattern: "{README.md,AGENTS.md,.codegpt.yaml}"
     agent: architect_boat_rental
+
+ai_foundry:
+  enabled: true
+  auto_invoke: true
+  complexity_threshold: 15
+  file_size_threshold: 500
+  test_coverage_threshold: 70
+
+  agents:
+    - ReadTsxAgent
+    - RefactorAgent
+    - ArchitectureAnalyzer
+    - PerformanceOptimizer
+    - TestingExpert
+
+
+
+  

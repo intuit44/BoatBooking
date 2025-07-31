@@ -1,0 +1,160 @@
+# ai-foundry-agents.yaml
+# Agentes especializados de AI Foundry para tareas complejas
+# Estos agentes complementan a los agentes Codex principales
+
+version: "1.0"
+
+# Configuración base de Azure AI Foundry
+azure_foundry_config:
+  endpoint: "https://boatrentalfoundry-dev.services.ai.azure.com/api/projects/booking-agents"
+  api_version: "2023-12-01-preview"
+  region: "eastus"
+  resource_group: "rg-DEV"
+
+# Agentes especializados para tareas complejas
+specialized_agents:
+  # Agente para lectura y análisis de componentes TSX
+  - name: ReadTsxAgent
+    type: azure_function
+    endpoint: "https://boatrentalfoundry-dev.openai.azure.com/openai/deployments/gpt-35-turbo-instruct/completions?api-version=2022-12-01"
+    status: active
+    deployment_name: 
+      model: "gpt-35-turbo-instruct"
+      version: "0914"
+    capabilities:
+      - analyze_tsx_components
+      - extract_component_structure
+      - identify_dependencies
+      - suggest_optimizations
+    use_cases:
+      - "Análisis profundo de componentes React Native complejos"
+      - "Detección de anti-patterns en TSX"
+      - "Extracción de props y tipos"
+      - "Análisis de renderizado condicional"
+    integration_with: [Mobile_App_Agent]
+
+  # Agente para refactorización de código complejo
+  - name: RefactorAgent
+    type: ai_foundry
+    deployment_name: "gpt-4-refactor"
+    model: "gpt-4"
+    capabilities:
+      - code_refactoring
+      - pattern_detection
+      - performance_optimization
+      - clean_code_principles
+    use_cases:
+      - "Refactorización de funciones con más de 100 líneas"
+      - "Conversión de class components a hooks"
+      - "Optimización de queries GraphQL"
+      - "Mejora de estructura de Redux slices"
+    integration_with: [Mobile_App_Agent, Backend_Agent]
+
+  # Agente para análisis de arquitectura
+  - name: ArchitectureAnalyzer
+    type: ai_foundry
+    deployment_name: "gpt-4-architecture"
+    model: "gpt-4"
+    capabilities:
+      - dependency_analysis
+      - circular_dependency_detection
+      - architecture_patterns
+      - scalability_assessment
+    use_cases:
+      - "Análisis de dependencias entre módulos"
+      - "Detección de acoplamiento alto"
+      - "Sugerencias de patrones arquitectónicos"
+      - "Evaluación de escalabilidad"
+    integration_with: [Architect_BoatRental]
+
+  # Agente para optimización de performance
+  - name: PerformanceOptimizer
+    type: ai_foundry
+    deployment_name: "gpt-35-performance"
+    model: "gpt-35-turbo-instruct"
+    capabilities:
+      - performance_profiling
+      - bundle_size_analysis
+      - render_optimization
+      - query_optimization
+    use_cases:
+      - "Optimización de re-renders en React Native"
+      - "Análisis de bundle size"
+      - "Optimización de queries GraphQL"
+      - "Mejora de tiempos de carga"
+    integration_with: [Mobile_App_Agent, Backend_Agent]
+
+  # Agente para testing avanzado
+  - name: TestingExpert
+    type: ai_foundry
+    deployment_name: "gpt-35-testing"
+    model: "gpt-35-turbo-instruct"
+    capabilities:
+      - test_generation
+      - coverage_analysis
+      - edge_case_detection
+      - mock_generation
+    use_cases:
+      - "Generación de tests complejos"
+      - "Identificación de casos edge"
+      - "Creación de mocks sofisticados"
+      - "Análisis de cobertura"
+    integration_with: [Mobile_App_Agent, Backend_Agent, AdminPanel_Agent]
+
+# Reglas de invocación automática
+invocation_rules:
+  - trigger: "component_complexity > 200_lines"
+    invoke: ReadTsxAgent
+    notify: Mobile_App_Agent
+    
+  - trigger: "function_complexity > 10"
+    invoke: RefactorAgent
+    notify: [Mobile_App_Agent, Backend_Agent]
+    
+  - trigger: "circular_dependency_detected"
+    invoke: ArchitectureAnalyzer
+    notify: Architect_BoatRental
+    
+  - trigger: "performance_issue_detected"
+    invoke: PerformanceOptimizer
+    notify: relevant_agent
+    
+  - trigger: "test_coverage < 80%"
+    invoke: TestingExpert
+    notify: relevant_agent
+
+# Umbrales y métricas
+thresholds:
+  component_complexity:
+    lines: 200
+    cyclomatic_complexity: 10
+    dependencies: 15
+    
+  performance:
+    bundle_size_mb: 5
+    initial_load_ms: 3000
+    api_response_ms: 500
+    
+  test_coverage:
+    minimum: 80
+    critical_paths: 95
+    
+# Configuración de rate limits
+rate_limits:
+  read_tsx_agent:
+    requests_per_minute: 10
+    tokens_per_minute: 5000
+    
+  ai_foundry_agents:
+    requests_per_minute: 6
+    tokens_per_minute: 1000
+
+# Integración con Codex
+codex_integration:
+  mode: "hybrid"
+  strategy: "complementary"
+  communication:
+    - method: "webhook"
+      endpoint: "https://codex.boatrental.com/ai-foundry-callback"
+    - method: "event_driven"
+      queue: "azure-service-bus"

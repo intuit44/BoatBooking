@@ -1,4 +1,4 @@
-﻿// amplify-config.js - Configuración moderna para AWS Amplify v5
+// amplify-config.js - Configuración moderna para AWS Amplify v5
 import { Amplify } from 'aws-amplify';
 import awsExports from './aws-exports';
 
@@ -51,18 +51,25 @@ const amplifyConfig = {
 
 let amplifyConfigured = false;
 
-export const configureAmplify = () => {
+export const configureAmplify = (config = amplifyConfig) => {
   try {
-    console.log('🔧 [AmplifyConfig] Configurando Amplify v5...');
-    console.log('🔗 [AmplifyConfig] Endpoint:', amplifyConfig.API.GraphQL.endpoint);
-    
-    Amplify.configure(amplifyConfig);
+    // Soporte para dos formatos de configuración:
+    // - config.API.GraphQL.endpoint → usado por configuración modular
+    // - config.aws_appsync_graphqlEndpoint → usado por aws-exports.js (legacy/default)
+    const endpoint = config?.API?.GraphQL?.endpoint || config.aws_appsync_graphqlEndpoint;
+    console.log('🔧 [AmplifyConfig] Configurando Amplify...');
+    console.log('🔗 [AmplifyConfig] Endpoint:', endpoint);
+
+    Amplify.configure({
+      ...config,
+      Analytics: { ...(config.Analytics || {}), disabled: true },
+    });
     amplifyConfigured = true;
-    console.log('✅ [AmplifyConfig] Amplify v5 configurado correctamente');
-    
+    console.log('✅ [AmplifyConfig] Amplify configurado correctamente');
+
     return true;
   } catch (error) {
-    console.log('❌ [AmplifyConfig] Error configurando Amplify v5:', error);
+    console.log('❌ [AmplifyConfig] Error configurando Amplify:', error);
     amplifyConfigured = false;
     return false;
   }
