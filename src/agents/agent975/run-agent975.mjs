@@ -4,7 +4,8 @@ import fs from "fs";
 import path from "path";
 
 async function runAgentConversation() {
-  const contextPath = path.join(path.dirname(new URL(import.meta.url).pathname), ".codegpt", "agents.context.json");
+  const __dirname = path.dirname(new URL(import.meta.url).pathname);
+  const contextPath = path.resolve(__dirname, "../../../.codegpt/agents.context.json");
   const { endpoint, project, agentId } = JSON.parse(fs.readFileSync(contextPath, "utf-8"));
 
   const projectClient = new AIProjectClient(
