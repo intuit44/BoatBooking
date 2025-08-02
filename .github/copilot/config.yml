@@ -1,0 +1,10 @@
+agents:
+  - name: "codegpt"
+    path: "./src/agents/codegpt/"
+    permissions: "read"
+  - name: "ai-foundry"
+    path: "./src/agents/ai-foundry/" 
+    permissions: "write"
+
+
+    

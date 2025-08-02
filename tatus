@@ -1,0 +1,26 @@
+  codex/reorganize-boatbooking-project-workflow                                                                                 [m e596a30 [[34morigin/codex/reorganize-boatbooking-project-workflow[m] Optimized run-agent975.mjs: modularized functions, improved error handling, and added validation
+  feature/auth                                                                                                                  [m 77ad8d1 feat(auth): integración completa de autenticación y ajustes varios en agente CodeGPT
+  main                                                                                                                          [m 52e0d0c [[34morigin/main[m] Merge pull request #18 from intuit44/codex/full-access-edit-handler.js-to-accept-context-and-req
+* [32mpr18-fix                                                                                                                      [m d4e092a [[34morigin/pr18-fix[m] ActualizaciĆ³n de los archivos de configuraciĆ³n de GitHub Copilot
+  [31mremotes/origin/92zkgh-codex/integrate-existing-modules-for-production                                                         [m 3e415b7 Merge branch 'main' into 92zkgh-codex/integrate-existing-modules-for-production
+  [31mremotes/origin/HEAD                                                                                                           [m -> origin/main
+  [31mremotes/origin/codex/add-@azure/ai-projects-to-dependencies                                                                   [m 574bda6 chore: add ai-projects dependency
+  [31mremotes/origin/codex/add-keys-to-mobile-app-.env.example                                                                      [m cc3b3b5 Update env example with AWS placeholders
+  [31mremotes/origin/codex/add-node.js-18.x-step-to-ci                                                                              [m af3a5c8 Update ci.yml
+  [31mremotes/origin/codex/add-run-agent975-script-to-package.json                                                                  [m b86140a chore: add agent975 run script
+  [31mremotes/origin/codex/create-aiprojectclient-from-context-file                                                                 [m 77886be feat: load agent client config from file
+  [31mremotes/origin/codex/create-amplifyservice-for-graphqlclient                                                                  [m 1d3012b feat: centralize Amplify client
+  [31mremotes/origin/codex/create-github-actions-workflow-for-deployment                                                            [m 6ced52e Update mobile-app.yml
+  [31mremotes/origin/codex/document-run-agent975.mjs-usage                                                                          [m 155200a docs: explain run-agent975 usage
+  [31mremotes/origin/codex/full-access-edit-handler.js-to-accept-context-and-req                                                    [m 47f4e2b feat: update agent975 handler to use context response
+  [31mremotes/origin/codex/integrate-existing-modules-for-production                                                                [m f41e6b3 chore: add Agent975 entry
+  [31mremotes/origin/codex/migrar-a-sdk-53-de-forma-segura                                                                          [m 161e640 chore: upgrade expo to sdk 53
+  [31mremotes/origin/codex/reorganize-boatbooking-project-workflow                                                                  [m e596a30 Optimized run-agent975.mjs: modularized functions, improved error handling, and added validation
+  [31mremotes/origin/codex/update-agents.context.json-and-agents.yaml                                                               [m cdf792f chore: add agent975 context
+  [31mremotes/origin/codex/update-jest.config.js-transformignorepatterns                                                            [m 47c2b67 Update transformIgnorePatterns to transform expo
+  [31mremotes/origin/dependabot/npm_and_yarn/Multi-Agent-Custom-Automation-Engine-Solution-Accelerator/src/frontend/multi-98cdd35410[m 29786ce chore(deps): bump esbuild, vite, @vitest/ui and vitest
+  [31mremotes/origin/dependabot/npm_and_yarn/admin-panel/form-data-4.0.4                                                            [m d89e44b chore(deps): bump form-data from 4.0.3 to 4.0.4 in /admin-panel
+  [31mremotes/origin/dependabot/npm_and_yarn/backend/form-data-4.0.4                                                                [m 2981802 chore(deps): bump form-data from 4.0.3 to 4.0.4 in /backend
+  [31mremotes/origin/feature/auth                                                                                                   [m 77ad8d1 feat(auth): integración completa de autenticación y ajustes varios en agente CodeGPT
+  [31mremotes/origin/main                                                                                                           [m 52e0d0c Merge pull request #18 from intuit44/codex/full-access-edit-handler.js-to-accept-context-and-req
+  [31mremotes/origin/pr18-fix                                                                                                       [m d4e092a ActualizaciĆ³n de los archivos de configuraciĆ³n de GitHub Copilot
