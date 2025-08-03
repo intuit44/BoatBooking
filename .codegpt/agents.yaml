@@ -37,7 +37,7 @@ agents:
       dashboards de control y seguridad del lado del cliente.
       Se enfoca en experiencia del administrador, manejo de sesiones y filtros de datos.
 
-  - name: Backend_Agent   # <-- Cambia de AWS_Agent a Backend_Agent
+  - name: Backend_Agent
     repository: https://github.com/intuit44/BoatBooking
     branch: main
     paths:
@@ -48,7 +48,6 @@ agents:
       DynamoDB, autenticación con Cognito, subida a S3, validación con Joi, despliegue con Serverless Framework
       y flujos CI/CD. Se encarga también de la seguridad del backend y la conexión con servicios de AWS.
 
-      # Agregar este módulo a tu .codegpt.yaml existente
   - name: azure-foundry-agent
     path: .
     tags: [azure, ai-foundry, gpt-35-turbo-instruct, agent]
@@ -70,18 +69,21 @@ agents:
 
   - name: Agent975
     description: >
-      Symbolic agent connected to Azure AI Foundry for connection testing,
-      execution, and traceability from run-agent975.mjs. It is used as a base
-      template to create other agents connected to projects in AI Studio.
-    entry: run-agent975.mjs
-    context: .codegpt/agents.context.json
-    platform: local
+      Agente de análisis TSX para React Native con Azure ML.
+      Analiza complejidad, rendimiento y sugiere optimizaciones.
+    entry: "src/agents/agent975/run-agent975-fixed.mjs"
+    context: ".codegpt/agents.context.json"
+    platform: "azure-ml"
+    status: "active"
     capabilities:
-      - agent_execution
-      - connectivity_testing
-      - ai_project_client_usage
-    integration_with:
-      - Architect_BoatRental
+      - "tsx_analysis"
+      - "complexity_detection"
+      - "performance_suggestions"
+      - "react_native_patterns"
+    metrics_tracked:
+      - "lines_of_code"
+      - "complexity_score"
+      - "optimization_level"
 
 
 

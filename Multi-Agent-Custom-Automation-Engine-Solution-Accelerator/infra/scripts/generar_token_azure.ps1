@@ -2,9 +2,9 @@
 Add-Type -AssemblyName System.Web
 
 # Configuración inicial
-$tenantId = "978d9cc6-784c-4c98-8d90-a4a6344a65ff"
-$clientId = "9b6082b6-0f95-4620-924a-c2e9232e9ac4"
-$clientSecret = "uDk8Q~7cdlHkLf2plh-xUr1ukNYvhS4VDEaPIb5W"  # Considera usar Azure Key Vault para almacenar esto
+$tenantId = $env:AZURE_TENANT_ID
+$clientId = $env:AZURE_CLIENT_ID
+$clientSecret = $env:AZURE_CLIENT_SECRET
 
 # URL de autenticación
 $tokenUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
