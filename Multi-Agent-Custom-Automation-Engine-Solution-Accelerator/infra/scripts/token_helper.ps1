@@ -1,8 +1,8 @@
 function Get-FoundryToken {
   param (
-    [string]$TenantId = "978d9cc6-784c-4c98-8d90-a4a6344a65ff",
-    [string]$ClientId = "9b6082b6-0f95-4620-924a-c2e9232e9ac4",
-    [string]$ClientSecret = "uDk8Q~7cdlHkLf2plh-xUr1ukNYvhS4VDEaPIb5W",
+    [string]$TenantId = $env:AZURE_TENANT_ID,
+    [string]$ClientId = $env:AZURE_CLIENT_ID,
+    [string]$ClientSecret = $env:AZURE_CLIENT_SECRET,
     [string]$CacheFile = "$PSScriptRoot\generated_token.json"
   )
 
