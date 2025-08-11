@@ -1,0 +1,90 @@
+﻿openapi: 3.1.0
+info:
+  title: Copiloto Semántico API
+  version: "2.0"
+  description: API del Copiloto Semántico para boat-rental-app via Logic App
+servers:
+  - url: "https://prod-15.eastus.logic.azure.com:443/workflows/4711b810bb5f478aa4d8dc5662c61c53/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2019-05-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=IUqo-n0TnqdRiQF7qSGSBnofI5LZPmuzdYHCdmsahss"
+    description: Logic App Gateway (URL actualizada 2025-08-10 21:47)
+
+paths:
+  /:
+    post:
+      operationId: invokeLogicApp
+      summary: Endpoint unificado del Copiloto Semántico
+      description: |
+        Enruta peticiones a través de Logic App que gestiona autenticación y validación.
+        La URL incluye token SAS que debe mantenerse actualizado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint:
+                  type: string
+                  enum: ["health", "status", "copiloto", "ejecutar", "dashboard", "diagnosticar"]
+                  description: Endpoint destino
+                method:
+                  type: string
+                  enum: ["GET", "POST"]
+                  default: "POST"
+                intencion:
+                  type: string
+                  description: Intención (para endpoint=ejecutar)
+                mensaje:
+                  type: string
+                  description: Mensaje (para endpoint=copiloto)
+                modo:
+                  type: string
+                  enum: ["normal", "guiado", "orquestador", "supervisor"]
+                  default: "normal"
+                parametros:
+                  type: object
+                  additionalProperties: true
+                contexto:
+                  type: object
+                  additionalProperties: true
+            examples:
+              health:
+                value:
+                  endpoint: "health"
+                  method: "GET"
+              status:
+                value:
+                  endpoint: "status"
+                  method: "GET"
+              dashboard:
+                value:
+                  endpoint: "dashboard"
+                  method: "POST"
+              copiloto:
+                value:
+                  endpoint: "copiloto"
+                  mensaje: "¿Qué barcos están disponibles?"
+              buscar:
+                value:
+                  endpoint: "ejecutar"
+                  method: "POST"
+                  intencion: "buscar:barcos"
+                  parametros:
+                    categoria: "veleros"
+              diagnosticar:
+                value:
+                  endpoint: "diagnosticar"
+                  method: "POST"
+      responses:
+        '200':
+          description: Éxito
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: No autorizado
+        '503':
+          description: Servicio no disponible
+        '500':
+          description: Error interno

@@ -1,0 +1,173 @@
+{
+  "Description": "Root Stack for AWS Amplify CLI",
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "env": {
+      "Type": "String"
+    },
+    "AuthRoleArn": {
+      "Type": "String"
+    },
+    "UnauthRoleArn": {
+      "Type": "String"
+    },
+    "authboatrentallapp31507f7cUserPoolId": {
+      "Type": "String",
+      "Default": "authboatrentallapp31507f7cUserPoolId"
+    },
+    "authboatrentallapp31507f7cIdentityPoolId": {
+      "Type": "String",
+      "Default": "authboatrentallapp31507f7cIdentityPoolId"
+    },
+    "authboatrentallapp31507f7cAppClientID": {
+      "Type": "String",
+      "Default": "authboatrentallapp31507f7cAppClientID"
+    },
+    "authboatrentallapp31507f7cAppClientIDWeb": {
+      "Type": "String",
+      "Default": "authboatrentallapp31507f7cAppClientIDWeb"
+    }
+  },
+  "Conditions": {
+    "ShouldNotCreateEnvResources": {
+      "Fn::Equals": [
+        {
+          "Ref": "env"
+        },
+        "NONE"
+      ]
+    }
+  },
+  "Resources": {
+    "adminGroup": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Properties": {
+        "Description": "override success",
+        "GroupName": "admin",
+        "Precedence": 1,
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "adminGroupRole",
+            "Arn"
+          ]
+        },
+        "UserPoolId": {
+          "Ref": "authboatrentallapp31507f7cUserPoolId"
+        }
+      }
+    },
+    "adminGroupRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "",
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "cognito-identity.amazonaws.com"
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "cognito-identity.amazonaws.com:aud": {
+                    "Ref": "authboatrentallapp31507f7cIdentityPoolId"
+                  }
+                },
+                "ForAnyValue:StringLike": {
+                  "cognito-identity.amazonaws.com:amr": "authenticated"
+                }
+              }
+            }
+          ]
+        },
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "authboatrentallapp31507f7cUserPoolId"
+              },
+              "-adminGroupRole"
+            ]
+          ]
+        }
+      }
+    },
+    "ownerGroup": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Properties": {
+        "Description": "override success",
+        "GroupName": "owner",
+        "Precedence": 2,
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "ownerGroupRole",
+            "Arn"
+          ]
+        },
+        "UserPoolId": {
+          "Ref": "authboatrentallapp31507f7cUserPoolId"
+        }
+      }
+    },
+    "ownerGroupRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "",
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "cognito-identity.amazonaws.com"
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "cognito-identity.amazonaws.com:aud": {
+                    "Ref": "authboatrentallapp31507f7cIdentityPoolId"
+                  }
+                },
+                "ForAnyValue:StringLike": {
+                  "cognito-identity.amazonaws.com:amr": "authenticated"
+                }
+              }
+            }
+          ]
+        },
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "authboatrentallapp31507f7cUserPoolId"
+              },
+              "-ownerGroupRole"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "adminGroupRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "adminGroupRole",
+          "Arn"
+        ]
+      }
+    },
+    "ownerGroupRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ownerGroupRole",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

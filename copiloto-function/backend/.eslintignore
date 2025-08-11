@@ -1,0 +1,24 @@
+# Dependencies
+
+# Build
+dist/
+build/
+.serverless/
+
+# Config files
+*.config.js
+*.config.mjs
+package.json
+package-lock.json
+
+# Tests
+coverage/
+*.test.js
+*.spec.js
+
+# Scripts
+scripts/
+
+# Logs
+*.log
+

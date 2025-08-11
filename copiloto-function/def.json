@@ -1,0 +1,431 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "actions": {
+    "Initialize_BaseURL": {
+      "inputs": {
+        "variables": [
+          {
+            "name": "BaseURL",
+            "type": "string",
+            "value": "https://copiloto-semantico-func.azurewebsites.net/api"
+          }
+        ]
+      },
+      "runAfter": {
+        "Initialize_MasterKey": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable"
+    },
+    "Initialize_MasterKey": {
+      "inputs": {
+        "variables": [
+          {
+            "name": "MasterKey",
+            "type": "string",
+            "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+          }
+        ]
+      },
+      "runAfter": {},
+      "type": "InitializeVariable"
+    },
+    "Response_Error": {
+      "inputs": {
+        "body": {
+          "details": "@result('Switch_Endpoint')",
+          "ejemplo_request": {
+            "endpoint": "dashboard",
+            "method": "POST"
+          },
+          "endpoints_disponibles": [
+            "ejecutar",
+            "status",
+            "health",
+            "copiloto",
+            "dashboard",
+            "diagnosticar"
+          ],
+          "error": "Error al procesar la solicitud"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "statusCode": 500
+      },
+      "kind": "Http",
+      "runAfter": {
+        "Switch_Endpoint": [
+          "Failed",
+          "Skipped",
+          "TimedOut"
+        ]
+      },
+      "type": "Response"
+    },
+    "Set_Correct_Key": {
+      "cases": {
+        "copiloto": {
+          "actions": {
+            "SetKey_Copiloto": {
+              "inputs": {
+                "name": "MasterKey",
+                "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+              },
+              "type": "SetVariable"
+            }
+          },
+          "case": "copiloto"
+        },
+        "ejecutar": {
+          "actions": {
+            "SetKey_Ejecutar": {
+              "inputs": {
+                "name": "MasterKey",
+                "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+              },
+              "type": "SetVariable"
+            }
+          },
+          "case": "ejecutar"
+        },
+        "status": {
+          "actions": {
+            "SetKey_Status": {
+              "inputs": {
+                "name": "MasterKey",
+                "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+              },
+              "type": "SetVariable"
+            }
+          },
+          "case": "status"
+        }
+      },
+      "default": {
+        "actions": {
+          "SetKey_Default": {
+            "inputs": {
+              "name": "MasterKey",
+              "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+            },
+            "type": "SetVariable"
+          }
+        }
+      },
+      "expression": "@triggerBody()?['endpoint']",
+      "runAfter": {
+        "Initialize_BaseURL": [
+          "Succeeded"
+        ]
+      },
+      "type": "Switch"
+    },
+    "Switch_Endpoint": {
+      "cases": {
+        "copiloto-1": {
+          "actions": {
+            "Call_Copiloto": {
+              "inputs": {
+                "method": "GET",
+                "uri": "@if(empty(triggerBody()?['mensaje']), concat(variables('BaseURL'), '/copiloto?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA==&code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+              },
+              "type": "Http"
+            },
+            "Response_Copiloto": {
+              "inputs": {
+                "body": "@body('Call_Copiloto')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Copiloto": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            }
+          },
+          "case": "copiloto"
+        },
+        "dashboard": {
+          "actions": {
+            "Call_Dashboard": {
+              "inputs": {
+                "body": {
+                  "intencion": "dashboard",
+                  "modo": "normal",
+                  "parametros": {}
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "method": "POST",
+                "uri": "@{variables('BaseURL')}/ejecutar?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+              },
+              "type": "Http"
+            },
+            "Response_Dashboard": {
+              "inputs": {
+                "body": "@body('Call_Dashboard')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Dashboard": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            }
+          },
+          "case": "dashboard"
+        },
+        "diagnosticar": {
+          "actions": {
+            "Call_Diagnosticar": {
+              "inputs": {
+                "body": {
+                  "intencion": "diagnosticar:completo",
+                  "modo": "normal",
+                  "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))"
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "method": "POST",
+                "uri": "@concat(variables('BaseURL'), '/ejecutar?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+              },
+              "runAfter": {
+                "Set_variable": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Http"
+            },
+            "Response_Diagnosticar": {
+              "inputs": {
+                "body": "@body('Call_Diagnosticar')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Diagnosticar": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            },
+            "Set_variable": {
+              "inputs": {
+                "name": "MasterKey",
+                "value": "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+              },
+              "type": "SetVariable"
+            }
+          },
+          "case": "diagnosticar"
+        },
+        "ejecutar-1": {
+          "actions": {
+            "Call_Ejecutar": {
+              "inputs": {
+                "body": {
+                  "contexto": {
+                    "incluir_metadata": true
+                  },
+                  "intencion": "@triggerBody()?['intencion']",
+                  "modo": "@coalesce(triggerBody()?['modo'], 'normal')",
+                  "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))"
+                },
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "method": "POST",
+                "uri": "@{variables('BaseURL')}/ejecutar?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+              },
+              "type": "Http"
+            },
+            "Response_Ejecutar": {
+              "inputs": {
+                "body": "@body('Call_Ejecutar')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Ejecutar": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            }
+          },
+          "case": "ejecutar"
+        },
+        "health": {
+          "actions": {
+            "Call_Health": {
+              "inputs": {
+                "method": "GET",
+                "uri": "@{variables('BaseURL')}/health"
+              },
+              "type": "Http"
+            },
+            "Response_Health": {
+              "inputs": {
+                "body": "@body('Call_Health')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Health": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            }
+          },
+          "case": "health"
+        },
+        "status-1": {
+          "actions": {
+            "Call_Status": {
+              "inputs": {
+                "method": "GET",
+                "uri": "@{variables('BaseURL')}/status?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+              },
+              "type": "Http"
+            },
+            "Response_Status": {
+              "inputs": {
+                "body": "@body('Call_Status')",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "statusCode": 200
+              },
+              "kind": "Http",
+              "runAfter": {
+                "Call_Status": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response"
+            }
+          },
+          "case": "status"
+        }
+      },
+      "default": {
+        "actions": {
+          "Call_Ejecutar_Default": {
+            "inputs": {
+              "body": {
+                "intencion": "@coalesce(triggerBody()?['intencion'], 'dashboard')",
+                "modo": "@coalesce(triggerBody()?['modo'], 'normal')",
+                "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))"
+              },
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "method": "POST",
+              "uri": "@{variables('BaseURL')}/ejecutar?code=0EAJ-Bu3RwPgDTeSJrY_O7p7g4eJ6FpXjyZWvqqpYfuLAzFucLPFIA=="
+            },
+            "type": "Http"
+          },
+          "Response_Ejecutar_Default": {
+            "inputs": {
+              "body": "@body('Call_Ejecutar_Default')",
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "statusCode": 200
+            },
+            "kind": "Http",
+            "runAfter": {
+              "Call_Ejecutar_Default": [
+                "Succeeded"
+              ]
+            },
+            "type": "Response"
+          }
+        }
+      },
+      "expression": "@coalesce(triggerBody()?['endpoint'], 'ejecutar')",
+      "runAfter": {
+        "Set_Correct_Key": [
+          "Succeeded"
+        ]
+      },
+      "type": "Switch"
+    }
+  },
+  "contentVersion": "1.0.0.0",
+  "outputs": {},
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "When_a_HTTP_request_is_received": {
+      "description": "Invoca al copiloto semntico en Azure Function App",
+      "inputs": {
+        "schema": {
+          "properties": {
+            "endpoint": {
+              "description": "Endpoint a invocar: ejecutar, status, health, copiloto",
+              "type": "string"
+            },
+            "intencion": {
+              "description": "Intencin para el endpoint ejecutar",
+              "type": "string"
+            },
+            "mensaje": {
+              "description": "Mensaje para el endpoint copiloto",
+              "type": "string"
+            },
+            "method": {
+              "description": "Mtodo HTTP: GET o POST",
+              "enum": [
+                "GET",
+                "POST"
+              ],
+              "type": "string"
+            },
+            "modo": {
+              "default": "normal",
+              "description": "Modo de ejecucin: normal, guiado, orquestador",
+              "type": "string"
+            },
+            "parametros": {
+              "description": "Parmetros para la intencin",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "kind": "Http",
+      "type": "Request"
+    }
+  }
+}
+

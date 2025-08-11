@@ -1,0 +1,7 @@
+BACKEND
+
+🔗 backend ya está totalmente accesible desde:
+arduino
+Copiar
+Editar
+https://api.remeocci.org/v1/

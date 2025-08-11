@@ -1,0 +1,10 @@
+name: safe-refactor-homescreen
+description: |
+  Refactor seguro del componente HomeScreen.tsx sin romper la inicialización de AWS Amplify ni la lógica de login.
+prompt: |
+  [⬆] Validación previa incluida.
+  Aplica el refactor **solo si se cumplen todos los criterios indicados.
+  Divide el componente en:
+  - hook: useAmplifySetup.ts
+  - componente: SimpleLoginScreen
+  - componente: BoatStatusCard

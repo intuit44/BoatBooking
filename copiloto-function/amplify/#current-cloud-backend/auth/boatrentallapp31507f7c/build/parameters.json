@@ -1,0 +1,127 @@
+{
+  "identityPoolName": "boatrentallapp31507f7c_identitypool_31507f7c",
+  "allowUnauthenticatedIdentities": false,
+  "resourceNameTruncated": "boatre31507f7c",
+  "userPoolName": "boatrentallapp31507f7c_userpool_31507f7c",
+  "autoVerifiedAttributes": [
+    "email"
+  ],
+  "mfaConfiguration": "OFF",
+  "mfaTypes": [
+    "SMS Text Message"
+  ],
+  "smsAuthenticationMessage": "Your authentication code is {####}",
+  "smsVerificationMessage": "Your verification code is {####}",
+  "emailVerificationSubject": "Verificación de tu cuenta en BoatBooking",
+  "emailVerificationMessage": "Gracias por registrarte en BoatBooking. Tu Hola,código de verificación es: {####}",
+  "defaultPasswordPolicy": false,
+  "passwordPolicyMinLength": 8,
+  "passwordPolicyCharacters": [],
+  "requiredAttributes": [
+    "email"
+  ],
+  "aliasAttributes": [],
+  "userpoolClientGenerateSecret": false,
+  "userpoolClientRefreshTokenValidity": "30",
+  "userpoolClientWriteAttributes": [
+    "email"
+  ],
+  "userpoolClientReadAttributes": [
+    "email"
+  ],
+  "userpoolClientLambdaRole": "boatre31507f7c_userpoolclient_lambda_role",
+  "userpoolClientSetAttributes": false,
+  "sharedId": "31507f7c",
+  "resourceName": "boatrentallapp31507f7c",
+  "authSelections": "identityPoolAndUserPool",
+  "useDefault": "manual",
+  "usernameAttributes": [
+    "email"
+  ],
+  "userPoolGroupList": [
+    "admin",
+    "owner"
+  ],
+  "serviceName": "Cognito",
+  "usernameCaseSensitive": false,
+  "useEnabledMfas": true,
+  "authRoleArn": {
+    "Fn::GetAtt": [
+      "AuthRole",
+      "Arn"
+    ]
+  },
+  "unauthRoleArn": {
+    "Fn::GetAtt": [
+      "UnauthRole",
+      "Arn"
+    ]
+  },
+  "breakCircularDependency": true,
+  "dependsOn": [
+    {
+      "category": "function",
+      "resourceName": "boatrentallapp31507f7cDefineAuthChallenge",
+      "triggerProvider": "Cognito",
+      "attributes": [
+        "Arn",
+        "Name"
+      ]
+    },
+    {
+      "category": "function",
+      "resourceName": "boatrentallapp31507f7cCreateAuthChallenge",
+      "triggerProvider": "Cognito",
+      "attributes": [
+        "Arn",
+        "Name"
+      ]
+    },
+    {
+      "category": "function",
+      "resourceName": "boatrentallapp31507f7cVerifyAuthChallengeResponse",
+      "triggerProvider": "Cognito",
+      "attributes": [
+        "Arn",
+        "Name"
+      ]
+    },
+    {
+      "category": "function",
+      "resourceName": "boatrentallapp31507f7cPostConfirmation",
+      "triggerProvider": "Cognito",
+      "attributes": [
+        "Arn",
+        "Name"
+      ]
+    }
+  ],
+  "hostedUI": true,
+  "hostedUIDomainName": "boatbooking",
+  "authProvidersUserPool": [
+    "Facebook",
+    "Google"
+  ],
+  "hostedUIProviderMeta": "[{\"ProviderName\":\"Facebook\",\"authorize_scopes\":\"email,public_profile\",\"AttributeMapping\":{\"email\":\"email\",\"username\":\"id\"}},{\"ProviderName\":\"Google\",\"authorize_scopes\":\"openid email profile\",\"AttributeMapping\":{\"email\":\"email\",\"username\":\"sub\"}}]",
+  "authProviders": [
+    "graph.facebook.com",
+    "accounts.google.com"
+  ],
+  "thirdPartyAuth": true,
+  "userPoolGroups": true,
+  "adminQueries": false,
+  "triggers": "{\"DefineAuthChallenge\":[\"captcha-define-challenge\"],\"CreateAuthChallenge\":[\"captcha-create-challenge\"],\"VerifyAuthChallengeResponse\":[\"captcha-verify\"],\"PostConfirmation\":[\"add-to-group\"]}",
+  "oAuthMetadata": "{\"AllowedOAuthFlows\":[\"code\"],\"AllowedOAuthScopes\":[\"phone\",\"email\",\"openid\",\"profile\",\"aws.cognito.signin.user.admin\"],\"CallbackURLs\":[\"exp://localhost:19000/--/\",\"myapp://callback:/\"],\"LogoutURLs\":[\"exp://localhost:19000/--/signout/\",\"myapp://signout/\"]}",
+  "parentStack": {
+    "Ref": "AWS::StackId"
+  },
+  "authTriggerConnections": [
+    "{\"triggerType\":\"DefineAuthChallenge\",\"lambdaFunctionName\":\"boatrentallapp31507f7cDefineAuthChallenge\"}",
+    "{\"triggerType\":\"CreateAuthChallenge\",\"lambdaFunctionName\":\"boatrentallapp31507f7cCreateAuthChallenge\"}",
+    "{\"triggerType\":\"VerifyAuthChallengeResponse\",\"lambdaFunctionName\":\"boatrentallapp31507f7cVerifyAuthChallengeResponse\"}",
+    "{\"triggerType\":\"PostConfirmation\",\"lambdaFunctionName\":\"boatrentallapp31507f7cPostConfirmation\"}"
+  ],
+  "permissions": [
+    "{\"policyName\":\"AddToGroupCognito\",\"trigger\":\"PostConfirmation\",\"effect\":\"Allow\",\"actions\":[\"cognito-idp:AdminAddUserToGroup\",\"cognito-idp:GetGroup\",\"cognito-idp:CreateGroup\"],\"resource\":{\"paramType\":\"!GetAtt\",\"keys\":[\"UserPool\",\"Arn\"]}}"
+  ]
+}

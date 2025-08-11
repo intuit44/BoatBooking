@@ -1,0 +1,7 @@
+﻿{
+    "LastSync":  "2025-08-05 04:17:05",
+    "StorageAccount":  "boatrentalstorage",
+    "ConnectionString":  "DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=boatrentalstorage;AccountKey=IzbvFwD7WupP22swwnpo4k+yKgPLOGnR84jViNT1AxYLUxvjW8Qs/Nxm9IDnpQegi1B2F2fNOY9Q+AStZy8ACA==;BlobEndpoint=https://boatrentalstorage.blob.core.windows.net/;FileEndpoint=https://boatrentalstorage.file.core.windows.net/;QueueEndpoint=https://boatrentalstorage.queue.core.windows.net/;TableEndpoint=https://boatrentalstorage.table.core.windows.net/",
+    "FilesSynced":  851,
+    "Container":  "boat-rental-project"
+}

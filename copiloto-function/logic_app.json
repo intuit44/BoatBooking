@@ -1,0 +1,446 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "properties": {
+              "endpoint": {
+                "description": "Endpoint a invocar: ejecutar, status, health, copiloto",
+                "type": "string"
+              },
+              "intencion": {
+                "description": "Intención para el endpoint ejecutar",
+                "type": "string"
+              },
+              "mensaje": {
+                "description": "Mensaje para el endpoint copiloto",
+                "type": "string"
+              },
+              "method": {
+                "description": "Método HTTP: GET o POST",
+                "enum": [
+                  "GET",
+                  "POST"
+                ],
+                "type": "string"
+              },
+              "modo": {
+                "default": "normal",
+                "description": "Modo de ejecución: normal, guiado, orquestador, supervisor",
+                "type": "string"
+              },
+              "parametros": {
+                "description": "Parámetros para la intención",
+                "type": "object"
+              },
+              "contexto": {
+                "description": "Contexto del supervisor",
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "description": "Invoca al copiloto semántico en Azure Function App con verificación de estado"
+      }
+    },
+    "actions": {
+      "Initialize_MasterKey": {
+        "runAfter": {},
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "MasterKey",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "Initialize_BaseURL": {
+        "runAfter": {
+          "Initialize_MasterKey": [
+            "Succeeded"
+          ]
+        },
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "BaseURL",
+              "type": "string",
+              "value": "https://copiloto-semantico-func.azurewebsites.net/api"
+            }
+          ]
+        }
+      },
+      "Get_MasterKey": {
+        "runAfter": {
+          "Initialize_BaseURL": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://boatrental-kv-prod.vault.azure.net/secrets/CopilotoMasterKey?api-version=7.4",
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://vault.azure.net"
+          }
+        }
+      },
+      "Set_MasterKey": {
+        "runAfter": {
+          "Get_MasterKey": [
+            "Succeeded"
+          ]
+        },
+        "type": "SetVariable",
+        "inputs": {
+          "name": "MasterKey",
+          "value": "@body('Get_MasterKey')?['value']"
+        }
+      },
+      "Check_Host_Status": {
+        "runAfter": {
+          "Set_MasterKey": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "@{replace(variables('BaseURL'), '/api','')}/admin/host/status",
+          "headers": {
+            "x-functions-key": "@{variables('MasterKey')}"
+          }
+        }
+      },
+      "If_Function_Running": {
+        "runAfter": {
+          "Check_Host_Status": [
+            "Succeeded"
+          ]
+        },
+        "type": "If",
+        "expression": "@equals(body('Check_Host_Status')?['state'], 'Running')",
+        "actions": {
+          "Switch_Endpoint": {
+            "cases": {
+              "copiloto-1": {
+                "case": "copiloto",
+                "actions": {
+                  "Call_Copiloto": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "GET",
+                      "uri": "@if(empty(triggerBody()?['mensaje']), concat(variables('BaseURL'), '/copiloto?code=', variables('MasterKey')), concat(variables('BaseURL'), '/copiloto?mensaje=', encodeUriComponent(triggerBody()?['mensaje']), '&code=', variables('MasterKey')))"
+                    }
+                  },
+                  "Response_Copiloto": {
+                    "runAfter": {
+                      "Call_Copiloto": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Copiloto')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              },
+              "dashboard": {
+                "case": "dashboard",
+                "actions": {
+                  "Call_Dashboard": {
+                    "type": "Http",
+                    "inputs": {
+                      "body": {
+                        "intencion": "dashboard",
+                        "modo": "normal",
+                        "parametros": {}
+                      },
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "method": "POST",
+                      "uri": "@{variables('BaseURL')}/ejecutar?code=@{variables('MasterKey')}"
+                    }
+                  },
+                  "Response_Dashboard": {
+                    "runAfter": {
+                      "Call_Dashboard": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Dashboard')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              },
+              "diagnosticar": {
+                "case": "diagnosticar",
+                "actions": {
+                  "Call_Diagnosticar": {
+                    "type": "Http",
+                    "inputs": {
+                      "body": {
+                        "intencion": "diagnosticar:completo",
+                        "modo": "normal",
+                        "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))"
+                      },
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "method": "POST",
+                      "uri": "@concat(variables('BaseURL'), '/ejecutar?code=', trim(variables('MasterKey')))"
+                    }
+                  },
+                  "Response_Diagnosticar": {
+                    "runAfter": {
+                      "Call_Diagnosticar": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Diagnosticar')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              },
+              "ejecutar-1": {
+                "case": "ejecutar",
+                "actions": {
+                  "Call_Ejecutar": {
+                    "type": "Http",
+                    "inputs": {
+                      "body": {
+                        "contexto": "@coalesce(triggerBody()?['contexto'], json('{\"incluir_metadata\": true}'))",
+                        "intencion": "@triggerBody()?['intencion']",
+                        "modo": "@coalesce(triggerBody()?['modo'], 'normal')",
+                        "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))"
+                      },
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "method": "POST",
+                      "uri": "@{variables('BaseURL')}/ejecutar?code=@{variables('MasterKey')}"
+                    }
+                  },
+                  "Response_Ejecutar": {
+                    "runAfter": {
+                      "Call_Ejecutar": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Ejecutar')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              },
+              "health": {
+                "case": "health",
+                "actions": {
+                  "Call_Health": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "GET",
+                      "uri": "@{variables('BaseURL')}/health"
+                    }
+                  },
+                  "Response_Health": {
+                    "runAfter": {
+                      "Call_Health": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Health')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              },
+              "status-1": {
+                "case": "status",
+                "actions": {
+                  "Call_Status": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "GET",
+                      "uri": "@{variables('BaseURL')}/status?code=@{variables('MasterKey')}"
+                    }
+                  },
+                  "Response_Status": {
+                    "runAfter": {
+                      "Call_Status": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "Http",
+                    "inputs": {
+                      "body": "@body('Call_Status')",
+                      "headers": {
+                        "Content-Type": "application/json"
+                      },
+                      "statusCode": 200
+                    }
+                  }
+                }
+              }
+            },
+            "default": {
+              "actions": {
+                "Call_Ejecutar_Default": {
+                  "type": "Http",
+                  "inputs": {
+                    "body": {
+                      "intencion": "@coalesce(triggerBody()?['intencion'], 'dashboard')",
+                      "modo": "@coalesce(triggerBody()?['modo'], 'normal')",
+                      "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))",
+                      "contexto": "@coalesce(triggerBody()?['contexto'], json('{}'))"
+                    },
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "method": "POST",
+                    "uri": "@{variables('BaseURL')}/ejecutar?code=@{variables('MasterKey')}"
+                  }
+                },
+                "Response_Ejecutar_Default": {
+                  "runAfter": {
+                    "Call_Ejecutar_Default": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Response",
+                  "kind": "Http",
+                  "inputs": {
+                    "body": "@body('Call_Ejecutar_Default')",
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "statusCode": 200
+                  }
+                }
+              }
+            },
+            "expression": "@coalesce(triggerBody()?['endpoint'], 'ejecutar')",
+            "type": "Switch"
+          }
+        },
+        "else": {
+          "actions": {
+            "Response_Function_Not_Running": {
+              "type": "Response",
+              "kind": "Http",
+              "inputs": {
+                "statusCode": 503,
+                "headers": {
+                  "Content-Type": "application/json",
+                  "Retry-After": "30"
+                },
+                "body": {
+                  "error": "Function App no está disponible",
+                  "details": "El host de la Function App no está en estado 'Running'",
+                  "host_status": "@body('Check_Host_Status')",
+                  "suggestion": "Por favor, espere unos momentos e intente nuevamente"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Response_Error": {
+        "runAfter": {
+          "If_Function_Running": [
+            "Failed",
+            "Skipped",
+            "TimedOut"
+          ]
+        },
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "body": {
+            "error": "Error al procesar la solicitud",
+            "details": "@result('If_Function_Running')",
+            "ejemplo_request": {
+              "endpoint": "dashboard",
+              "method": "POST",
+              "modo": "supervisor",
+              "contexto": {
+                "agente_origen": "ai-foundry-agent",
+                "timestamp": "2025-08-08T12:00:00Z"
+              }
+            },
+            "endpoints_disponibles": [
+              "ejecutar",
+              "status",
+              "health",
+              "copiloto",
+              "dashboard",
+              "diagnosticar"
+            ]
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "statusCode": 500
+        }
+      }
+    },
+    "outputs": {},
+    "parameters": {
+      "$connections": {
+        "type": "Object",
+        "defaultValue": {}
+      }
+    }
+  },
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "value": {}
+    }
+  }
+}
