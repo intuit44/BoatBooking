@@ -1,0 +1,16 @@
+{
+  "trigger": true,
+  "modules": [
+    "add-to-group"
+  ],
+  "parentResource": "boatrentallapp31507f7c",
+  "functionName": "boatrentallapp31507f7cPostConfirmation",
+  "resourceName": "boatrentallapp31507f7cPostConfirmation",
+  "parentStack": "auth",
+  "triggerEnvs": "[]",
+  "triggerDir": "C:\\snapshot\\amplify-cli\\build\\node_modules\\@aws-amplify\\amplify-category-auth\\provider-utils\\awscloudformation\\triggers\\PostConfirmation",
+  "triggerTemplate": "PostConfirmation.json.ejs",
+  "triggerEventPath": "PostConfirmation.event.json",
+  "roleName": "boatrentallapp31507f7cPostConfirmation",
+  "skipEdit": true
+}

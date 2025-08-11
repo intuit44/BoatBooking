@@ -1,0 +1,139 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "When_a_HTTP_request_is_received": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "Endpoint: ejecutar, status, health, copiloto, dashboard, diagnosticar"
+            },
+            "intencion": {
+              "type": "string"
+            },
+            "parametros": {
+              "type": "object"
+            },
+            "modo": {
+              "type": "string",
+              "default": "normal"
+            },
+            "mensaje": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_MasterKey": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "MasterKey",
+            "type": "string",
+            "value": "U3zegHXnF-vYOJLmfdS9ZJA_nTULH7Us0X-upGRRdHytAzFuMOc6MQ=="
+          }
+        ]
+      }
+    },
+    "Initialize_BaseURL": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_MasterKey": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "BaseURL",
+            "type": "string",
+            "value": "https://copiloto-semantico-func.azurewebsites.net/api"
+          }
+        ]
+      }
+    },
+    "Process_Request": {
+      "type": "Switch",
+      "runAfter": {
+        "Initialize_BaseURL": ["Succeeded"]
+      },
+      "expression": "@coalesce(triggerBody()?['endpoint'], 'ejecutar')",
+      "cases": {
+        "health": {
+          "case": "health",
+          "actions": {
+            "Call_Health": {
+              "type": "Http",
+              "inputs": {
+                "method": "GET",
+                "uri": "@{variables('BaseURL')}/health"
+              }
+            }
+          }
+        }
+      },
+      "default": {
+        "actions": {
+          "Call_Function": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "@{variables('BaseURL')}/ejecutar?code=@{variables('MasterKey')}",
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "intencion": "@coalesce(triggerBody()?['intencion'], 'dashboard')",
+                "parametros": "@coalesce(triggerBody()?['parametros'], json('{}'))",
+                "modo": "@coalesce(triggerBody()?['modo'], 'normal')"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Response_Success": {
+      "type": "Response",
+      "runAfter": {
+        "Process_Request": ["Succeeded"]
+      },
+      "inputs": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "@coalesce(body('Call_Function'), body('Call_Health'), json('{}'))"
+      }
+    },
+    "Response_Error": {
+      "type": "Response",
+      "runAfter": {
+        "Process_Request": ["Failed", "Skipped", "TimedOut"]
+      },
+      "inputs": {
+        "statusCode": 500,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": "Error processing request",
+          "details": "@result('Process_Request')"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

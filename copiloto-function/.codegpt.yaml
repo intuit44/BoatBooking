@@ -1,0 +1,227 @@
+# .codegpt.yml
+# Configuración de módulos para el proyecto BoatBooking
+# Alineado con AGENTS.md para asignación correcta de tareas
+
+version: "1.0"
+
+# Agentes disponibles
+agents:
+  - architect_boat_rental
+  - mobile_app_agent
+  - backend_agent
+  - admin_panel_agent
+
+# Definición de módulos
+modules:
+  # ===== MOBILE APP MODULES - Gestionados por Mobile_App_Agent =====
+  - name: mobile-app-core
+    path: mobile-app
+    agent: mobile_app_agent
+    tags: [mobile, react-native, expo, core, config]
+    include:
+      - "App.tsx"
+      - "index.js"
+      - "package.json"
+      - "babel.config.js"
+      - "metro.config.js"
+      - "jest.config.js"
+      - "jest.setup.js"
+      - "tsconfig.json"
+      - ".env.example"
+
+  - name: mobile-app-screens
+    path: mobile-app/src/screens
+    agent: mobile_app_agent
+    tags: [mobile, screens, ui, components, navigation]
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+
+  - name: mobile-app-navigation
+    path: mobile-app/src/navigation
+    agent: mobile_app_agent
+    tags: [mobile, navigation, react-navigation, routes]
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+
+  - name: mobile-app-components
+    path: mobile-app/src/components
+    agent: mobile_app_agent
+    tags: [mobile, components, ui, reusable]
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+
+  - name: mobile-app-tests
+    path: mobile-app/__tests__
+    agent: mobile_app_agent
+    tags: [mobile, tests, jest, testing]
+    include:
+      - "**/*.js"
+      - "**/*.ts"
+      - "**/*.tsx"
+
+  - name: mobile-app-mocks
+    path: mobile-app/__mocks__
+    agent: mobile_app_agent
+    tags: [mobile, mocks, testing, jest]
+    include:
+      - "**/*.js"
+      - "**/*.ts"
+
+  # ===== BACKEND MODULES - Gestionados por Backend_Agent =====
+  - name: backend-amplify-config
+    path: mobile-app
+    agent: backend_agent
+    tags: [backend, amplify, aws, config]
+    include:
+      - "amplify-config.js"
+      - "aws-exports.js"
+      - "amplifyconfiguration.json"
+      - "amplify/**"
+
+  - name: backend-graphql
+    path: mobile-app/src/graphql
+    agent: backend_agent
+    tags: [backend, graphql, api, queries, mutations]
+    include:
+      - "**/*.ts"
+      - "**/*.graphql"
+
+  - name: backend-functions
+    path: backend/functions
+    agent: backend_agent
+    tags: [backend, lambda, serverless, api, functions]
+    include:
+      - "**/*.js"
+      - "**/*.ts"
+
+  - name: backend-amplify-backend
+    path: amplify/backend
+    agent: backend_agent
+    tags: [backend, amplify, infrastructure, cloudformation]
+    include:
+      - "**/*.js"
+      - "**/*.json"
+      - "**/*.graphql"
+
+  - name: backend-api-schema
+    path: amplify/backend/api
+    agent: backend_agent
+    tags: [backend, graphql, schema, appsync]
+    include:
+      - "**/schema.graphql"
+      - "**/resolvers/**"
+
+  # ===== ADMIN PANEL MODULES - Gestionados por AdminPanel_Agent =====
+  - name: admin-panel-pages
+    path: admin-panel/pages
+    agent: admin_panel_agent
+    tags: [admin, nextjs, pages, ssr]
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+      - "**/*.js"
+
+  - name: admin-panel-components
+    path: admin-panel/src/components
+    agent: admin_panel_agent
+    tags: [admin, components, mui, ui]
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+
+  - name: admin-panel-core
+    path: admin-panel
+    agent: admin_panel_agent
+    tags: [admin, config, nextjs]
+    include:
+      - "package.json"
+      - "next.config.js"
+      - "tsconfig.json"
+      - ".env.example"
+
+  # ===== SHARED/ARCHITECTURE MODULES - Gestionados por Architect_BoatRental =====
+  - name: project-root
+    path: .
+    agent: architect_boat_rental
+    tags: [architecture, config, documentation, root]
+    include:
+      - "*"
+      - ".*"
+      - "**/*"
+      - "**/.*"
+
+  - name: ci-cd-workflows
+    path: .github/workflows
+    agent: architect_boat_rental
+    tags: [ci, cd, github-actions, automation]
+    include:
+      - "**/*.yml"
+      - "**/*.yaml"
+
+  - name: shared-types
+    path: mobile-app/src/types
+    agent: architect_boat_rental
+    tags: [types, typescript, shared, interfaces]
+    include:
+      - "**/*.ts"
+      - "**/*.d.ts"
+
+  - name: shared-utils
+    path: mobile-app/src/utils
+    agent: architect_boat_rental
+    tags: [utils, helpers, shared, common]
+    include:
+      - "**/*.ts"
+      - "**/*.js"
+
+# Referencias a archivos de configuración adicionales
+references:
+  - path: .codegpt/agents.yaml
+    type: agents
+  - path: AGENTS.md
+    type: documentation
+
+# Configuración de contexto para los agentes
+context:
+  project_type: "fullstack"
+  stack:
+    frontend:
+      - "React Native 0.79.5"
+      - "Expo SDK 53"
+      - "TypeScript"
+    backend:
+      - "AWS Amplify v6"
+      - "GraphQL/AppSync"
+      - "Lambda Functions"
+      - "DynamoDB"
+    admin:
+      - "Next.js"
+      - "Material-UI"
+      - "TypeScript"
+  
+# Reglas de asignación automática
+assignment_rules:
+  - pattern: "**/mobile-app/**/*.{js,ts,tsx}"
+    agent: mobile_app_agent
+    exceptions:
+      - "amplify-config.js"
+      - "aws-exports.js"
+      - "**/graphql/**"
+  
+  - pattern: "**/backend/**"
+    agent: backend_agent
+  
+  - pattern: "**/amplify/**"
+    agent: backend_agent
+  
+  - pattern: "**/admin-panel/**"
+    agent: admin_panel_agent
+  
+  - pattern: "**/.github/**"
+    agent: architect_boat_rental
+  
+  - pattern: "{README.md,AGENTS.md,.codegpt.yml}"
+    agent: architect_boat_rental

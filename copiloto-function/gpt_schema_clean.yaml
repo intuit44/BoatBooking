@@ -1,0 +1,62 @@
+﻿openapi: 3.1.0
+info:
+  title: Copiloto Semántico API
+  version: "2.0"
+servers:
+  - url: "https://prod-15.eastus.logic.azure.com:443/workflows/4711b810bb5f478aa4d8dc5662c61c53/triggers/When_a_HTTP_request_is_received/paths/invoke"
+paths:
+  /:
+    parameters:
+      - $ref: '#/components/parameters/apiVersion'
+      - $ref: '#/components/parameters/sp'
+      - $ref: '#/components/parameters/sv'
+      - $ref: '#/components/parameters/sig'
+    post:
+      operationId: invokeEndpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+components:
+  parameters:
+    apiVersion:
+      name: api-version
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: ["2019-05-01"]
+        default: "2019-05-01"
+    sp:
+      name: sp
+      in: query
+      required: true
+      schema:
+        type: string
+      example: "/triggers/When_a_HTTP_request_is_received/run"
+    sv:
+      name: sv
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: ["1.0"]
+        default: "1.0"
+    sig:
+      name: sig
+      in: query
+      required: true
+      schema:
+        type: string
+      example: "IUqo-n0TnqdRiQF7qSGSBnofI5LZPmuzdYHCdmsahss"

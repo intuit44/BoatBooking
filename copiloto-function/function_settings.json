@@ -1,0 +1,10 @@
+﻿{
+    "properties":  {
+                       "AZURE_OPENAI_ENDPOINT":  "https://boatRentalFoundry-dev.openai.azure.com",
+                       "FUNCTIONS_WORKER_RUNTIME":  "python",
+                       "AzureWebJobsStorage":  "UseDevelopmentStorage=true",
+                       "PYTHON_ENABLE_WORKER_EXTENSIONS":  "1",
+                       "WEBSITE_RUN_FROM_PACKAGE":  "1",
+                       "AZURE_OPENAI_KEY":  "b76e98968d9442489f2e43e4b6aff3fc"
+                   }
+}

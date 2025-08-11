@@ -1,0 +1,442 @@
+﻿{
+    "properties":  {
+                       "definition":  {
+                                          "$schema":  "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                                          "actions":  {
+                                                          "Initialize_BaseURL":  {
+                                                                                     "inputs":  {
+                                                                                                    "variables":  [
+                                                                                                                      {
+                                                                                                                          "name":  "BaseURL",
+                                                                                                                          "type":  "string",
+                                                                                                                          "value":  "https://copiloto-semantico-func.azurewebsites.net/api"
+                                                                                                                      }
+                                                                                                                  ]
+                                                                                                },
+                                                                                     "runAfter":  {
+                                                                                                      "Initialize_MasterKey":  [
+                                                                                                                                   "Succeeded"
+                                                                                                                               ]
+                                                                                                  },
+                                                                                     "type":  "InitializeVariable"
+                                                                                 },
+                                                          "Initialize_MasterKey":  {
+                                                                                       "inputs":  {
+                                                                                                      "variables":  [
+                                                                                                                        {
+                                                                                                                            "name":  "MasterKey",
+                                                                                                                            "type":  "string",
+                                                                                                                            "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                        }
+                                                                                                                    ]
+                                                                                                  },
+                                                                                       "runAfter":  {
+
+                                                                                                    },
+                                                                                       "type":  "InitializeVariable"
+                                                                                   },
+                                                          "Response_Error":  {
+                                                                                 "inputs":  {
+                                                                                                "body":  {
+                                                                                                             "details":  "@result(\u0027Switch_Endpoint\u0027)",
+                                                                                                             "ejemplo_request":  {
+                                                                                                                                     "endpoint":  "dashboard",
+                                                                                                                                     "method":  "POST"
+                                                                                                                                 },
+                                                                                                             "endpoints_disponibles":  [
+                                                                                                                                           "ejecutar",
+                                                                                                                                           "status",
+                                                                                                                                           "health",
+                                                                                                                                           "copiloto",
+                                                                                                                                           "dashboard",
+                                                                                                                                           "diagnosticar"
+                                                                                                                                       ],
+                                                                                                             "error":  "Error al procesar la solicitud"
+                                                                                                         },
+                                                                                                "headers":  {
+                                                                                                                "Content-Type":  "application/json"
+                                                                                                            },
+                                                                                                "statusCode":  500
+                                                                                            },
+                                                                                 "kind":  "Http",
+                                                                                 "runAfter":  {
+                                                                                                  "Switch_Endpoint":  [
+                                                                                                                          "Failed",
+                                                                                                                          "Skipped",
+                                                                                                                          "TimedOut"
+                                                                                                                      ]
+                                                                                              },
+                                                                                 "type":  "Response"
+                                                                             },
+                                                          "Set_Correct_Key":  {
+                                                                                  "cases":  {
+                                                                                                "copiloto":  {
+                                                                                                                 "actions":  {
+                                                                                                                                 "SetKey_Copiloto":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "name":  "MasterKey",
+                                                                                                                                                                        "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                                                                    },
+                                                                                                                                                         "type":  "SetVariable"
+                                                                                                                                                     }
+                                                                                                                             },
+                                                                                                                 "case":  "copiloto"
+                                                                                                             },
+                                                                                                "ejecutar":  {
+                                                                                                                 "actions":  {
+                                                                                                                                 "SetKey_Ejecutar":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "name":  "MasterKey",
+                                                                                                                                                                        "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                                                                    },
+                                                                                                                                                         "type":  "SetVariable"
+                                                                                                                                                     }
+                                                                                                                             },
+                                                                                                                 "case":  "ejecutar"
+                                                                                                             },
+                                                                                                "status":  {
+                                                                                                               "actions":  {
+                                                                                                                               "SetKey_Status":  {
+                                                                                                                                                     "inputs":  {
+                                                                                                                                                                    "name":  "MasterKey",
+                                                                                                                                                                    "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                                                                },
+                                                                                                                                                     "type":  "SetVariable"
+                                                                                                                                                 }
+                                                                                                                           },
+                                                                                                               "case":  "status"
+                                                                                                           }
+                                                                                            },
+                                                                                  "default":  {
+                                                                                                  "actions":  {
+                                                                                                                  "SetKey_Default":  {
+                                                                                                                                         "inputs":  {
+                                                                                                                                                        "name":  "MasterKey",
+                                                                                                                                                        "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                                                    },
+                                                                                                                                         "type":  "SetVariable"
+                                                                                                                                     }
+                                                                                                              }
+                                                                                              },
+                                                                                  "expression":  "@triggerBody()?[\u0027endpoint\u0027]",
+                                                                                  "runAfter":  {
+                                                                                                   "Initialize_BaseURL":  [
+                                                                                                                              "Succeeded"
+                                                                                                                          ]
+                                                                                               },
+                                                                                  "type":  "Switch"
+                                                                              },
+                                                          "Switch_Endpoint":  {
+                                                                                  "cases":  {
+                                                                                                "copiloto-1":  {
+                                                                                                                   "actions":  {
+                                                                                                                                   "Call_Copiloto":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "method":  "GET",
+                                                                                                                                                                        "uri":  "@if(empty(triggerBody()?[\u0027mensaje\u0027]), concat(variables(\u0027BaseURL\u0027), \u0027/copiloto?code=\u0027, variables(\u0027MasterKey\u0027)), concat(variables(\u0027BaseURL\u0027), \u0027/copiloto?mensaje=\u0027, encodeUriComponent(triggerBody()?[\u0027mensaje\u0027]), \u0027\u0026code=\u0027, variables(\u0027MasterKey\u0027)))"
+                                                                                                                                                                    },
+                                                                                                                                                         "type":  "Http"
+                                                                                                                                                     },
+                                                                                                                                   "Response_Copiloto":  {
+                                                                                                                                                             "inputs":  {
+                                                                                                                                                                            "body":  "@body(\u0027Call_Copiloto\u0027)",
+                                                                                                                                                                            "headers":  {
+                                                                                                                                                                                            "Content-Type":  "application/json"
+                                                                                                                                                                                        },
+                                                                                                                                                                            "statusCode":  200
+                                                                                                                                                                        },
+                                                                                                                                                             "kind":  "Http",
+                                                                                                                                                             "runAfter":  {
+                                                                                                                                                                              "Call_Copiloto":  [
+                                                                                                                                                                                                    "Succeeded"
+                                                                                                                                                                                                ]
+                                                                                                                                                                          },
+                                                                                                                                                             "type":  "Response"
+                                                                                                                                                         }
+                                                                                                                               },
+                                                                                                                   "case":  "copiloto"
+                                                                                                               },
+                                                                                                "dashboard":  {
+                                                                                                                  "actions":  {
+                                                                                                                                  "Call_Dashboard":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "body":  {
+                                                                                                                                                                                     "intencion":  "dashboard",
+                                                                                                                                                                                     "modo":  "normal",
+                                                                                                                                                                                     "parametros":  {
+
+                                                                                                                                                                                                    }
+                                                                                                                                                                                 },
+                                                                                                                                                                        "headers":  {
+                                                                                                                                                                                        "Content-Type":  "application/json"
+                                                                                                                                                                                    },
+                                                                                                                                                                        "method":  "POST",
+                                                                                                                                                                        "uri":  "@{variables(\u0027BaseURL\u0027)}/ejecutar?code=@{variables(\u0027MasterKey\u0027)}"
+                                                                                                                                                                    },
+                                                                                                                                                         "type":  "Http"
+                                                                                                                                                     },
+                                                                                                                                  "Response_Dashboard":  {
+                                                                                                                                                             "inputs":  {
+                                                                                                                                                                            "body":  "@body(\u0027Call_Dashboard\u0027)",
+                                                                                                                                                                            "headers":  {
+                                                                                                                                                                                            "Content-Type":  "application/json"
+                                                                                                                                                                                        },
+                                                                                                                                                                            "statusCode":  200
+                                                                                                                                                                        },
+                                                                                                                                                             "kind":  "Http",
+                                                                                                                                                             "runAfter":  {
+                                                                                                                                                                              "Call_Dashboard":  [
+                                                                                                                                                                                                     "Succeeded"
+                                                                                                                                                                                                 ]
+                                                                                                                                                                          },
+                                                                                                                                                             "type":  "Response"
+                                                                                                                                                         }
+                                                                                                                              },
+                                                                                                                  "case":  "dashboard"
+                                                                                                              },
+                                                                                                "diagnosticar":  {
+                                                                                                                     "actions":  {
+                                                                                                                                     "Call_Diagnosticar":  {
+                                                                                                                                                               "inputs":  {
+                                                                                                                                                                              "body":  {
+                                                                                                                                                                                           "intencion":  "diagnosticar:completo",
+                                                                                                                                                                                           "modo":  "normal",
+                                                                                                                                                                                           "parametros":  "@coalesce(triggerBody()?[\u0027parametros\u0027], json(\u0027{}\u0027))"
+                                                                                                                                                                                       },
+                                                                                                                                                                              "headers":  {
+                                                                                                                                                                                              "Content-Type":  "application/json"
+                                                                                                                                                                                          },
+                                                                                                                                                                              "method":  "POST",
+                                                                                                                                                                              "uri":  "@concat(variables(\u0027BaseURL\u0027), \u0027/ejecutar?code=\u0027, trim(variables(\u0027MasterKey\u0027)))"
+                                                                                                                                                                          },
+                                                                                                                                                               "runAfter":  {
+                                                                                                                                                                                "Set_variable":  [
+                                                                                                                                                                                                     "Succeeded"
+                                                                                                                                                                                                 ]
+                                                                                                                                                                            },
+                                                                                                                                                               "type":  "Http"
+                                                                                                                                                           },
+                                                                                                                                     "Response_Diagnosticar":  {
+                                                                                                                                                                   "inputs":  {
+                                                                                                                                                                                  "body":  "@body(\u0027Call_Diagnosticar\u0027)",
+                                                                                                                                                                                  "headers":  {
+                                                                                                                                                                                                  "Content-Type":  "application/json"
+                                                                                                                                                                                              },
+                                                                                                                                                                                  "statusCode":  200
+                                                                                                                                                                              },
+                                                                                                                                                                   "kind":  "Http",
+                                                                                                                                                                   "runAfter":  {
+                                                                                                                                                                                    "Call_Diagnosticar":  [
+                                                                                                                                                                                                              "Succeeded"
+                                                                                                                                                                                                          ]
+                                                                                                                                                                                },
+                                                                                                                                                                   "type":  "Response"
+                                                                                                                                                               },
+                                                                                                                                     "Set_variable":  {
+                                                                                                                                                          "inputs":  {
+                                                                                                                                                                         "name":  "MasterKey",
+                                                                                                                                                                         "value":  "b1qag0OWQeepucuEzz7_Lw7e3PU4LX00dxOjRAUuqWkLAzFu1-NWEQ=="
+                                                                                                                                                                     },
+                                                                                                                                                          "type":  "SetVariable"
+                                                                                                                                                      }
+                                                                                                                                 },
+                                                                                                                     "case":  "diagnosticar"
+                                                                                                                 },
+                                                                                                "ejecutar-1":  {
+                                                                                                                   "actions":  {
+                                                                                                                                   "Call_Ejecutar":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "body":  {
+                                                                                                                                                                                     "contexto":  {
+                                                                                                                                                                                                      "incluir_metadata":  true
+                                                                                                                                                                                                  },
+                                                                                                                                                                                     "intencion":  "@triggerBody()?[\u0027intencion\u0027]",
+                                                                                                                                                                                     "modo":  "@coalesce(triggerBody()?[\u0027modo\u0027], \u0027normal\u0027)",
+                                                                                                                                                                                     "parametros":  "@coalesce(triggerBody()?[\u0027parametros\u0027], json(\u0027{}\u0027))"
+                                                                                                                                                                                 },
+                                                                                                                                                                        "headers":  {
+                                                                                                                                                                                        "Content-Type":  "application/json"
+                                                                                                                                                                                    },
+                                                                                                                                                                        "method":  "POST",
+                                                                                                                                                                        "uri":  "@{variables(\u0027BaseURL\u0027)}/ejecutar?code=@{variables(\u0027MasterKey\u0027)}"
+                                                                                                                                                                    },
+                                                                                                                                                         "type":  "Http"
+                                                                                                                                                     },
+                                                                                                                                   "Response_Ejecutar":  {
+                                                                                                                                                             "inputs":  {
+                                                                                                                                                                            "body":  "@body(\u0027Call_Ejecutar\u0027)",
+                                                                                                                                                                            "headers":  {
+                                                                                                                                                                                            "Content-Type":  "application/json"
+                                                                                                                                                                                        },
+                                                                                                                                                                            "statusCode":  200
+                                                                                                                                                                        },
+                                                                                                                                                             "kind":  "Http",
+                                                                                                                                                             "runAfter":  {
+                                                                                                                                                                              "Call_Ejecutar":  [
+                                                                                                                                                                                                    "Succeeded"
+                                                                                                                                                                                                ]
+                                                                                                                                                                          },
+                                                                                                                                                             "type":  "Response"
+                                                                                                                                                         }
+                                                                                                                               },
+                                                                                                                   "case":  "ejecutar"
+                                                                                                               },
+                                                                                                "health":  {
+                                                                                                               "actions":  {
+                                                                                                                               "Call_Health":  {
+                                                                                                                                                   "inputs":  {
+                                                                                                                                                                  "method":  "GET",
+                                                                                                                                                                  "uri":  "@{variables(\u0027BaseURL\u0027)}/health"
+                                                                                                                                                              },
+                                                                                                                                                   "type":  "Http"
+                                                                                                                                               },
+                                                                                                                               "Response_Health":  {
+                                                                                                                                                       "inputs":  {
+                                                                                                                                                                      "body":  "@body(\u0027Call_Health\u0027)",
+                                                                                                                                                                      "headers":  {
+                                                                                                                                                                                      "Content-Type":  "application/json"
+                                                                                                                                                                                  },
+                                                                                                                                                                      "statusCode":  200
+                                                                                                                                                                  },
+                                                                                                                                                       "kind":  "Http",
+                                                                                                                                                       "runAfter":  {
+                                                                                                                                                                        "Call_Health":  [
+                                                                                                                                                                                            "Succeeded"
+                                                                                                                                                                                        ]
+                                                                                                                                                                    },
+                                                                                                                                                       "type":  "Response"
+                                                                                                                                                   }
+                                                                                                                           },
+                                                                                                               "case":  "health"
+                                                                                                           },
+                                                                                                "status-1":  {
+                                                                                                                 "actions":  {
+                                                                                                                                 "Call_Status":  {
+                                                                                                                                                     "inputs":  {
+                                                                                                                                                                    "method":  "GET",
+                                                                                                                                                                    "uri":  "@{variables(\u0027BaseURL\u0027)}/status?code=@{variables(\u0027MasterKey\u0027)}"
+                                                                                                                                                                },
+                                                                                                                                                     "type":  "Http"
+                                                                                                                                                 },
+                                                                                                                                 "Response_Status":  {
+                                                                                                                                                         "inputs":  {
+                                                                                                                                                                        "body":  "@body(\u0027Call_Status\u0027)",
+                                                                                                                                                                        "headers":  {
+                                                                                                                                                                                        "Content-Type":  "application/json"
+                                                                                                                                                                                    },
+                                                                                                                                                                        "statusCode":  200
+                                                                                                                                                                    },
+                                                                                                                                                         "kind":  "Http",
+                                                                                                                                                         "runAfter":  {
+                                                                                                                                                                          "Call_Status":  [
+                                                                                                                                                                                              "Succeeded"
+                                                                                                                                                                                          ]
+                                                                                                                                                                      },
+                                                                                                                                                         "type":  "Response"
+                                                                                                                                                     }
+                                                                                                                             },
+                                                                                                                 "case":  "status"
+                                                                                                             }
+                                                                                            },
+                                                                                  "default":  {
+                                                                                                  "actions":  {
+                                                                                                                  "Call_Ejecutar_Default":  {
+                                                                                                                                                "inputs":  {
+                                                                                                                                                               "body":  {
+                                                                                                                                                                            "intencion":  "@coalesce(triggerBody()?[\u0027intencion\u0027], \u0027dashboard\u0027)",
+                                                                                                                                                                            "modo":  "@coalesce(triggerBody()?[\u0027modo\u0027], \u0027normal\u0027)",
+                                                                                                                                                                            "parametros":  "@coalesce(triggerBody()?[\u0027parametros\u0027], json(\u0027{}\u0027))"
+                                                                                                                                                                        },
+                                                                                                                                                               "headers":  {
+                                                                                                                                                                               "Content-Type":  "application/json"
+                                                                                                                                                                           },
+                                                                                                                                                               "method":  "POST",
+                                                                                                                                                               "uri":  "@{variables(\u0027BaseURL\u0027)}/ejecutar?code=@{variables(\u0027MasterKey\u0027)}"
+                                                                                                                                                           },
+                                                                                                                                                "type":  "Http"
+                                                                                                                                            },
+                                                                                                                  "Response_Ejecutar_Default":  {
+                                                                                                                                                    "inputs":  {
+                                                                                                                                                                   "body":  "@body(\u0027Call_Ejecutar_Default\u0027)",
+                                                                                                                                                                   "headers":  {
+                                                                                                                                                                                   "Content-Type":  "application/json"
+                                                                                                                                                                               },
+                                                                                                                                                                   "statusCode":  200
+                                                                                                                                                               },
+                                                                                                                                                    "kind":  "Http",
+                                                                                                                                                    "runAfter":  {
+                                                                                                                                                                     "Call_Ejecutar_Default":  [
+                                                                                                                                                                                                   "Succeeded"
+                                                                                                                                                                                               ]
+                                                                                                                                                                 },
+                                                                                                                                                    "type":  "Response"
+                                                                                                                                                }
+                                                                                                              }
+                                                                                              },
+                                                                                  "expression":  "@coalesce(triggerBody()?[\u0027endpoint\u0027], \u0027ejecutar\u0027)",
+                                                                                  "runAfter":  {
+                                                                                                   "Set_Correct_Key":  [
+                                                                                                                           "Succeeded"
+                                                                                                                       ]
+                                                                                               },
+                                                                                  "type":  "Switch"
+                                                                              }
+                                                      },
+                                          "contentVersion":  "1.0.0.0",
+                                          "outputs":  {
+
+                                                      },
+                                          "parameters":  {
+                                                             "$connections":  {
+                                                                                  "defaultValue":  {
+
+                                                                                                   },
+                                                                                  "type":  "Object"
+                                                                              }
+                                                         },
+                                          "triggers":  {
+                                                           "When_a_HTTP_request_is_received":  {
+                                                                                                   "description":  "Invoca al copiloto semntico en Azure Function App",
+                                                                                                   "inputs":  {
+                                                                                                                  "schema":  {
+                                                                                                                                 "properties":  {
+                                                                                                                                                    "endpoint":  {
+                                                                                                                                                                     "description":  "Endpoint a invocar: ejecutar, status, health, copiloto",
+                                                                                                                                                                     "type":  "string"
+                                                                                                                                                                 },
+                                                                                                                                                    "intencion":  {
+                                                                                                                                                                      "description":  "Intencin para el endpoint ejecutar",
+                                                                                                                                                                      "type":  "string"
+                                                                                                                                                                  },
+                                                                                                                                                    "mensaje":  {
+                                                                                                                                                                    "description":  "Mensaje para el endpoint copiloto",
+                                                                                                                                                                    "type":  "string"
+                                                                                                                                                                },
+                                                                                                                                                    "method":  {
+                                                                                                                                                                   "description":  "Mtodo HTTP: GET o POST",
+                                                                                                                                                                   "enum":  [
+                                                                                                                                                                                "GET",
+                                                                                                                                                                                "POST"
+                                                                                                                                                                            ],
+                                                                                                                                                                   "type":  "string"
+                                                                                                                                                               },
+                                                                                                                                                    "modo":  {
+                                                                                                                                                                 "default":  "normal",
+                                                                                                                                                                 "description":  "Modo de ejecucin: normal, guiado, orquestador",
+                                                                                                                                                                 "type":  "string"
+                                                                                                                                                             },
+                                                                                                                                                    "parametros":  {
+                                                                                                                                                                       "description":  "Parmetros para la intencin",
+                                                                                                                                                                       "type":  "object"
+                                                                                                                                                                   }
+                                                                                                                                                },
+                                                                                                                                 "type":  "object"
+                                                                                                                             }
+                                                                                                              },
+                                                                                                   "kind":  "Http",
+                                                                                                   "type":  "Request"
+                                                                                               }
+                                                       }
+                                      }
+                   }
+}
