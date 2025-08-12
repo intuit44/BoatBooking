@@ -1,4 +1,4 @@
-﻿param(
+param(
   [switch]$Apply,                       # sin -Apply solo valida
   [string]$SubscriptionId = "380fa841-83f3-42fe-adc4-582a5ebe139b",
   [string]$RG = "boat-rental-app-group",
