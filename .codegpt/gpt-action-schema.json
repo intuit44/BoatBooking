@@ -1,0 +1,272 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Copiloto Semántico - GPT Actions",
+    "version": "3.0.0",
+    "description": "API para que Architect_BoatRental ejecute comandos en el Copiloto Semántico"
+  },
+  "servers": [
+    {
+      "url": "https://prod-15.eastus.logic.azure.com",
+      "description": "Logic App Gateway Production"
+    }
+  ],
+  "paths": {
+    "/workflows/4711b810bb5f478aa4d8dc5662c61c53/triggers/When_a_HTTP_request_is_received/paths/invoke": {
+      "post": {
+        "operationId": "invocarCopiloto",
+        "summary": "Ejecutar comando en Copiloto Semántico",
+        "description": "Envía comandos JSON al Copiloto para ejecutar acciones",
+        "parameters": [
+          {
+            "name": "api-version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "2019-05-01"
+            }
+          },
+          {
+            "name": "sp",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun"
+            }
+          },
+          {
+            "name": "sv",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "1.0"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "default": "IUqo-n0TnqdRiQF7qSGSBnofI5LZPmuzdYHCdmsahss"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopilotoCommand"
+              },
+              "examples": {
+                "status": {
+                  "summary": "Obtener estado del sistema",
+                  "value": {
+                    "endpoint": "status",
+                    "method": "GET"
+                  }
+                },
+                "dashboard": {
+                  "summary": "Ver dashboard",
+                  "value": {
+                    "endpoint": "ejecutar",
+                    "method": "POST",
+                    "intencion": "dashboard",
+                    "parametros": {},
+                    "modo": "normal"
+                  }
+                },
+                "leerArchivo": {
+                  "summary": "Leer archivo",
+                  "value": {
+                    "endpoint": "copiloto",
+                    "method": "GET",
+                    "mensaje": "leer:function_app.py"
+                  }
+                },
+                "buscarArchivos": {
+                  "summary": "Buscar archivos Python",
+                  "value": {
+                    "endpoint": "copiloto",
+                    "method": "GET",
+                    "mensaje": "buscar:*.py"
+                  }
+                },
+                "diagnostico": {
+                  "summary": "Diagnóstico completo",
+                  "value": {
+                    "endpoint": "ejecutar",
+                    "method": "POST",
+                    "intencion": "diagnosticar:completo",
+                    "parametros": {
+                      "incluir_logs": true
+                    }
+                  }
+                },
+                "azureCommand": {
+                  "summary": "Ejecutar comando Azure CLI",
+                  "value": {
+                    "endpoint": "ejecutar",
+                    "method": "POST",
+                    "intencion": "ejecutar:azure",
+                    "parametros": {
+                      "comando": "az functionapp list --resource-group boat-rental-app-group"
+                    }
+                  }
+                },
+                "guia": {
+                  "summary": "Obtener guía de configuración",
+                  "value": {
+                    "endpoint": "ejecutar",
+                    "method": "POST",
+                    "intencion": "guia:configurar_blob",
+                    "modo": "guiado"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comando ejecutado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopilotoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida"
+          },
+          "401": {
+            "description": "No autorizado"
+          },
+          "500": {
+            "description": "Error del servidor"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CopilotoCommand": {
+        "type": "object",
+        "required": [
+          "endpoint",
+          "method"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "enum": [
+              "health",
+              "status",
+              "copiloto",
+              "ejecutar",
+              "dashboard",
+              "diagnosticar"
+            ],
+            "description": "Endpoint destino en el Copiloto"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "Método HTTP"
+          },
+          "mensaje": {
+            "type": "string",
+            "description": "Mensaje para endpoint copiloto (ej: 'leer:archivo.py')"
+          },
+          "intencion": {
+            "type": "string",
+            "description": "Intención para endpoint ejecutar",
+            "examples": [
+              "dashboard",
+              "diagnosticar:completo",
+              "generar:readme",
+              "buscar:archivos",
+              "ejecutar:azure",
+              "guia:configurar_blob",
+              "orquestar:deployment"
+            ]
+          },
+          "parametros": {
+            "type": "object",
+            "description": "Parámetros adicionales para la intención",
+            "additionalProperties": true
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "guiado",
+              "orquestador"
+            ],
+            "default": "normal",
+            "description": "Modo de ejecución"
+          },
+          "contexto": {
+            "type": "object",
+            "description": "Contexto adicional",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CopilotoResponse": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean",
+            "description": "Indica si la operación fue exitosa"
+          },
+          "tipo": {
+            "type": "string",
+            "description": "Tipo de respuesta"
+          },
+          "resultado": {
+            "type": "object",
+            "description": "Resultado de la operación",
+            "additionalProperties": true
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "string"
+              },
+              "ambiente": {
+                "type": "string"
+              }
+            }
+          },
+          "proximas_acciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acciones sugeridas a ejecutar después"
+          },
+          "error": {
+            "type": "string",
+            "description": "Mensaje de error si hubo algún problema"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1608,6 +1608,69 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
 # Agregar una función health check mejorada
 
 
+@app.function_name(name="invocar")
+@app.route(route="invocar", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def invocar(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Recibe un JSON desde un agente (ej. Architect_BoatRental) y lo ejecuta
+    """
+    try:
+        comando = req.get_json()
+
+        endpoint = comando.get("endpoint")
+        metodo = comando.get("method", "GET").upper()
+
+        if endpoint == "copiloto" and metodo == "GET":
+            mensaje = comando.get("mensaje", "")
+            req_clon = func.HttpRequest(
+                method="GET",
+                url=f"http://localhost/api/copiloto?mensaje={mensaje}",
+                headers={},
+                params={"mensaje": mensaje},
+                body=b""
+            )
+            return copiloto(req_clon)
+
+        elif endpoint == "ejecutar" and metodo == "POST":
+            intencion = comando.get("intencion")
+            parametros = comando.get("parametros", {})
+            contexto = comando.get("contexto", {})
+            modo = comando.get("modo", "normal")
+
+            req_clon = func.HttpRequest(
+                method="POST",
+                url="http://localhost/api/ejecutar",
+                headers={},
+                params={},
+                body=json.dumps({
+                    "intencion": intencion,
+                    "parametros": parametros,
+                    "contexto": contexto,
+                    "modo": modo
+                }).encode("utf-8")
+            )
+            return ejecutar(req_clon)
+
+        elif endpoint == "status":
+            return status(req)
+        elif endpoint == "health":
+            return health(req)
+
+        return func.HttpResponse(
+            json.dumps({"error": f"Endpoint '{endpoint}' no manejado"}),
+            status_code=400,
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+
+
 @app.function_name(name="health")
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
 def health(req: func.HttpRequest) -> func.HttpResponse:
