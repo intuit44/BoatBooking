@@ -5,12 +5,15 @@
 param(
   [Parameter(Position = 0)]
   [string]$Action = "test",
+    
   [Parameter()]
   [string]$Message = "",
+    
   [Parameter()]
   [string]$Agent = "Architect_BoatRental",
+    
   [Parameter()]
-  [switch]$EnableDebug,
+  [switch]$DebugMode,
   [switch]$Setup,
   [switch]$TestAll
 )
@@ -258,7 +261,7 @@ function Invoke-ArchitectAgent {
   }
     
   Write-Status "Comando generado:" "Debug"
-  if ($EnableDebug) {
+  if ($DebugMode) {
     $command | ConvertTo-Json -Depth 3 | Write-Host -ForegroundColor Gray
   }
     
@@ -270,7 +273,9 @@ function Invoke-ArchitectAgent {
 function Invoke-FullPipeline {
   param(
     [string]$UserMessage,
-    [switch]$UseLogicApp
+    [switch]$UseLogicApp,
+    [switch]$AutoExecute,
+    [switch]$Interactive
   )
     
   Write-Host "`n" + ("=" * 60) -ForegroundColor Cyan
@@ -285,6 +290,21 @@ function Invoke-FullPipeline {
     return
   }
     
+  # Mostrar comando generado con explicación semántica
+  Write-Host "`n🤖 INTERPRETACIÓN DEL AGENTE:" -ForegroundColor Cyan
+  $semanticExplanation = Get-SemanticExplanation -Command $command -UserMessage $UserMessage
+  Write-Host $semanticExplanation -ForegroundColor White
+    
+  # Modo interactivo: preguntar antes de ejecutar
+  if ($Interactive) {
+    Write-Host "`n¿Desea ejecutar este comando? (S/N): " -NoNewline -ForegroundColor Yellow
+    $confirm = Read-Host
+    if ($confirm -notmatch '^[sS]') {
+      Write-Status "Ejecución cancelada por el usuario" "Warning"
+      return $command
+    }
+  }
+    
   # Paso 2: Ejecutar comando
   $response = $null
     
@@ -293,39 +313,79 @@ function Invoke-FullPipeline {
     $response = Invoke-ViaLogicApp -Command $command
   }
   else {
-    # Directo al Function App
-    switch ($command.endpoint) {
-      "copiloto" {
-        $response = Invoke-CopilotoDirect -Endpoint "copiloto" -Mensaje $command.mensaje
-      }
-      "ejecutar" {
-        $body = @{
-          intencion  = $command.intencion
-          parametros = $command.parametros
-          modo       = $command.modo
+    # Directo al Function App con manejo mejorado de errores
+    try {
+      switch ($command.endpoint) {
+        "copiloto" {
+          $response = Invoke-CopilotoDirect -Endpoint "copiloto" -Mensaje $command.mensaje
         }
-        $response = Invoke-CopilotoDirect -Endpoint "ejecutar" -Method "POST" -Body $body
+        "ejecutar" {
+          $body = @{
+            intencion  = $command.intencion
+            parametros = $command.parametros
+            modo       = $command.modo
+            contexto   = $command.contexto
+          }
+          $response = Invoke-CopilotoDirect -Endpoint "ejecutar" -Method "POST" -Body $body
+        }
+        "status" {
+          $response = Invoke-CopilotoDirect -Endpoint "status"
+        }
+        "health" {
+          $response = Invoke-CopilotoDirect -Endpoint "health"
+        }
+        default {
+          $body = $command
+          $response = Invoke-CopilotoDirect -Endpoint "invocar" -Method "POST" -Body $body
+        }
       }
-      "status" {
-        $response = Invoke-CopilotoDirect -Endpoint "status"
-      }
-      "health" {
-        $response = Invoke-CopilotoDirect -Endpoint "health"
-      }
-      default {
-        $body = $command
-        $response = Invoke-CopilotoDirect -Endpoint "invocar" -Method "POST" -Body $body
+    }
+    catch {
+      Write-Status "Error en ejecución: $_" "Error"
+            
+      # Si hay error y AutoExecute está activo, intentar acción de recuperación
+      if ($AutoExecute -and $command.contexto.siguiente_accion) {
+        Write-Status "Ejecutando acción de recuperación: $($command.contexto.siguiente_accion)" "Warning"
+        $recoveryCommand = @{
+          endpoint   = "ejecutar"
+          method     = "POST"
+          intencion  = $command.contexto.siguiente_accion
+          parametros = @{ error_original = $_.Exception.Message }
+          modo       = "normal"
+        }
+        $response = Invoke-CopilotoDirect -Endpoint "ejecutar" -Method "POST" -Body $recoveryCommand
       }
     }
   }
     
-  # Paso 3: Mostrar respuesta
+  # Paso 3: Mostrar respuesta enriquecida
   if ($response) {
-    Write-Host "`n📋 RESPUESTA:" -ForegroundColor Green
-    $response | ConvertTo-Json -Depth 5 | Write-Host -ForegroundColor White
+    Write-Host "`n📋 RESPUESTA DEL COPILOTO:" -ForegroundColor Green
+        
+    # Generar explicación semántica de la respuesta
+    $responseExplanation = Get-ResponseExplanation -Response $response -Command $command
+    Write-Host $responseExplanation -ForegroundColor White
+        
+    Write-Host "`n📊 DATOS TÉCNICOS:" -ForegroundColor Gray
+    $response | ConvertTo-Json -Depth 5 | Write-Host -ForegroundColor Gray
         
     # Procesar próximas acciones si existen
-    if ($response.proximas_acciones) {
+    if ($response.proximas_acciones -and $AutoExecute) {
+      Write-Host "`n🔄 EJECUTANDO PRÓXIMAS ACCIONES AUTOMÁTICAMENTE:" -ForegroundColor Yellow
+            
+      foreach ($action in $response.proximas_acciones | Select-Object -First 2) {
+        Write-Status "Ejecutando: $action" "Info"
+        $nextCommand = Parse-ActionToCommand -Action $action
+        if ($nextCommand) {
+          $nextResponse = Invoke-CopilotoDirect -Endpoint $nextCommand.endpoint -Method $nextCommand.method -Body $nextCommand.body
+          if ($nextResponse) {
+            Write-Host "  ✅ $action completado" -ForegroundColor Green
+          }
+        }
+        Start-Sleep -Seconds 1
+      }
+    }
+    elseif ($response.proximas_acciones) {
       Write-Host "`n💡 PRÓXIMAS ACCIONES SUGERIDAS:" -ForegroundColor Yellow
       $response.proximas_acciones | ForEach-Object {
         Write-Host "  • $_" -ForegroundColor Yellow
@@ -336,7 +396,109 @@ function Invoke-FullPipeline {
     Write-Status "No se recibió respuesta" "Warning"
   }
     
-  return $response
+  # Retornar resultado completo
+  return @{
+    Command   = $command
+    Response  = $response
+    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Success   = $null -ne $response
+  }
+}
+
+# Función auxiliar para generar explicación semántica
+function Get-SemanticExplanation {
+  param($Command, $UserMessage)
+    
+  $explanations = @{
+    "dashboard"             = "Voy a obtener el dashboard con insights del proyecto"
+    "diagnosticar:completo" = "Realizaré un diagnóstico completo del sistema"
+    "guia:debug_errores"    = "Te guiaré paso a paso para resolver el error"
+    "buscar:*"              = "Buscaré archivos en el proyecto"
+    "leer:"                 = "Leeré el archivo solicitado"
+    "ejecutar:azure"        = "Ejecutaré el comando Azure CLI"
+  }
+    
+  foreach ($key in $explanations.Keys) {
+    if ($Command.intencion -like "*$key*" -or $Command.mensaje -like "*$key*") {
+      return $explanations[$key]
+    }
+  }
+    
+  return "Procesando tu solicitud: '$UserMessage'"
+}
+
+# Función auxiliar para explicar respuestas
+function Get-ResponseExplanation {
+  param($Response, $Command)
+    
+  if ($Response.error) {
+    return "❌ Se encontró un error: $($Response.error)"
+  }
+    
+  if ($Response.exito -eq $false) {
+    return "⚠️ La operación no se completó exitosamente. Revisa los detalles técnicos."
+  }
+    
+  if ($Response.tipo -eq "respuesta_semantica") {
+    return "✅ El Copiloto procesó tu solicitud. Acción ejecutada: $($Response.accion)"
+  }
+    
+  if ($Response.status -eq "healthy") {
+    return "✅ El sistema está funcionando correctamente"
+  }
+    
+  return "✅ Comando ejecutado exitosamente"
+}
+
+# Función para parsear acciones a comandos
+function Parse-ActionToCommand {
+  param([string]$Action)
+    
+  if ($Action -match "^(\w+):(.+)$") {
+    $verb = $Matches[1]
+    $target = $Matches[2]
+        
+    switch ($verb) {
+      "leer" { 
+        return @{
+          endpoint = "copiloto"
+          method   = "GET"
+          body     = @{ mensaje = $Action }
+        }
+      }
+      "buscar" {
+        return @{
+          endpoint = "copiloto"
+          method   = "GET"
+          body     = @{ mensaje = $Action }
+        }
+      }
+      "diagnosticar" {
+        return @{
+          endpoint = "ejecutar"
+          method   = "POST"
+          body     = @{
+            intencion  = $Action
+            parametros = @{}
+            modo       = "normal"
+          }
+        }
+      }
+      default {
+        return @{
+          endpoint = "ejecutar"
+          method   = "POST"
+          body     = @{
+            intencion  = $Action
+            parametros = @{}
+            modo       = "normal"
+          }
+        }
+      }
+    }
+  }
+    
+  return $null
 }
 
 # ============= SETUP Y VERIFICACIÓN =============
@@ -566,7 +728,7 @@ EJEMPLOS:
     .\invoke-orchestrator.ps1 setup
     .\invoke-orchestrator.ps1 test -Message "lee function_app.py"
     .\invoke-orchestrator.ps1 direct -Message "busca archivos python"
-    .\invoke-orchestrator.ps1 test-all -EnableDebug
+    .\invoke-orchestrator.ps1 test-all -DebugMode
 
 "@ -ForegroundColor Gray
     }

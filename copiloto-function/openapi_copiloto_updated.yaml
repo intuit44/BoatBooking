@@ -1,90 +1,741 @@
-﻿openapi: 3.1.0
-info:
-  title: Copiloto Semántico API
-  version: "2.0"
-  description: API del Copiloto Semántico para boat-rental-app via Logic App
-servers:
-  - url: "https://prod-15.eastus.logic.azure.com:443/workflows/4711b810bb5f478aa4d8dc5662c61c53/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2019-05-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=IUqo-n0TnqdRiQF7qSGSBnofI5LZPmuzdYHCdmsahss"
-    description: Logic App Gateway (URL actualizada 2025-08-10 21:47)
-
-paths:
-  /:
-    post:
-      operationId: invokeLogicApp
-      summary: Endpoint unificado del Copiloto Semántico
-      description: |
-        Enruta peticiones a través de Logic App que gestiona autenticación y validación.
-        La URL incluye token SAS que debe mantenerse actualizado.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                endpoint:
-                  type: string
-                  enum: ["health", "status", "copiloto", "ejecutar", "dashboard", "diagnosticar"]
-                  description: Endpoint destino
-                method:
-                  type: string
-                  enum: ["GET", "POST"]
-                  default: "POST"
-                intencion:
-                  type: string
-                  description: Intención (para endpoint=ejecutar)
-                mensaje:
-                  type: string
-                  description: Mensaje (para endpoint=copiloto)
-                modo:
-                  type: string
-                  enum: ["normal", "guiado", "orquestador", "supervisor"]
-                  default: "normal"
-                parametros:
-                  type: object
-                  additionalProperties: true
-                contexto:
-                  type: object
-                  additionalProperties: true
-            examples:
-              health:
-                value:
-                  endpoint: "health"
-                  method: "GET"
-              status:
-                value:
-                  endpoint: "status"
-                  method: "GET"
-              dashboard:
-                value:
-                  endpoint: "dashboard"
-                  method: "POST"
-              copiloto:
-                value:
-                  endpoint: "copiloto"
-                  mensaje: "¿Qué barcos están disponibles?"
-              buscar:
-                value:
-                  endpoint: "ejecutar"
-                  method: "POST"
-                  intencion: "buscar:barcos"
-                  parametros:
-                    categoria: "veleros"
-              diagnosticar:
-                value:
-                  endpoint: "diagnosticar"
-                  method: "POST"
-      responses:
-        '200':
-          description: Éxito
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '401':
-          description: No autorizado
-        '503':
-          description: Servicio no disponible
-        '500':
-          description: Error interno
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Copiloto Function Gateway",
+    "version": "2.1",
+    "description": "Herramienta directa a la Function App (sin Logic App / SAS)"
+  },
+  "servers": [
+    {
+      "url": "https://copiloto-semantico-func.azurewebsites.net"
+    }
+  ],
+  "paths": {
+    "/api/crear-contenedor": {
+      "post": {
+        "summary": "Crear contenedor en Blob Storage",
+        "operationId": "crearContenedor",
+        "tags": ["Azure Storage"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["nombre"],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]([a-z0-9\\-]{1,61}[a-z0-9])?$",
+                    "description": "Nombre del contenedor (minúsculas, números, guiones)"
+                  },
+                  "publico": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Si el contenedor será de acceso público"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Metadata adicional del contenedor"
+                  }
+                }
+              },
+              "examples": {
+                "basico": {
+                  "value": {
+                    "nombre": "mi-contenedor"
+                  }
+                },
+                "completo": {
+                  "value": {
+                    "nombre": "backup-2024",
+                    "publico": false,
+                    "metadata": {
+                      "proyecto": "boat-rental",
+                      "tipo": "backup"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Contenedor creado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": { "type": "boolean" },
+                    "mensaje": { "type": "string" },
+                    "contenedor": { "type": "string" },
+                    "url": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nombre inválido o parámetros incorrectos"
+          },
+          "409": {
+            "description": "El contenedor ya existe"
+          },
+          "500": {
+            "description": "Error del servidor"
+          }
+        }
+      }
+    },
+    "/api/ejecutar-cli": {
+      "post": {
+        "summary": "Ejecutar comando Azure CLI",
+        "operationId": "ejecutarCLI",
+        "tags": ["Azure CLI"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["comando"],
+                "properties": {
+                  "servicio": {
+                    "type": "string",
+                    "enum": ["storage", "functionapp", "webapp", "monitor", "resource"],
+                    "description": "Servicio Azure a utilizar"
+                  },
+                  "comando": {
+                    "type": "string",
+                    "description": "Comando a ejecutar (sin 'az' prefix)"
+                  },
+                  "parametros": {
+                    "type": "object",
+                    "description": "Parámetros del comando",
+                    "additionalProperties": true
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Timeout en segundos"
+                  },
+                  "confirmar_operacion_peligrosa": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Requerido para comandos delete/remove/purge"
+                  }
+                }
+              },
+              "examples": {
+                "listar_storage": {
+                  "value": {
+                    "servicio": "storage",
+                    "comando": "account list"
+                  }
+                },
+                "mostrar_functionapp": {
+                  "value": {
+                    "servicio": "functionapp",
+                    "comando": "show",
+                    "parametros": {
+                      "name": "copiloto-semantico-func",
+                      "resource-group": "boat-rental-rg"
+                    }
+                  }
+                },
+                "operacion_peligrosa": {
+                  "value": {
+                    "servicio": "storage",
+                    "comando": "container delete",
+                    "parametros": {
+                      "name": "temp-container"
+                    },
+                    "confirmar_operacion_peligrosa": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comando ejecutado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": { "type": "boolean" },
+                    "comando_ejecutado": { "type": "string" },
+                    "output": { 
+                      "oneOf": [
+                        { "type": "object" },
+                        { "type": "array" },
+                        { "type": "string" }
+                      ]
+                    },
+                    "error": { "type": "string" },
+                    "codigo_salida": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Operación no permitida o requiere confirmación"
+          },
+          "408": {
+            "description": "Timeout excedido"
+          }
+        }
+      }
+    },
+    "/api/diagnostico-recursos": {
+      "get": {
+        "summary": "Diagnóstico completo de recursos Azure",
+        "operationId": "diagnosticoRecursos",
+        "tags": ["Diagnóstico"],
+        "parameters": [
+          {
+            "name": "metricas",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "Incluir métricas de rendimiento"
+          },
+          {
+            "name": "costos",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Incluir análisis de costos"
+          },
+          {
+            "name": "recurso",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Recurso específico a diagnosticar"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnóstico completo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "timestamp": { "type": "string" },
+                    "ambiente": { "type": "string" },
+                    "recursos": {
+                      "type": "object",
+                      "properties": {
+                        "function_app": { "type": "object" },
+                        "storage_account": { "type": "object" },
+                        "storage_stats": { "type": "object" }
+                      }
+                    },
+                    "metricas": { "type": "object" },
+                    "alertas": { 
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nivel": { "type": "string" },
+                          "mensaje": { "type": "string" },
+                          "accion": { "type": "string" }
+                        }
+                      }
+                    },
+                    "recomendaciones": { "type": "array" },
+                    "sistema": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Diagnóstico con parámetros específicos",
+        "operationId": "diagnosticoRecursosPost",
+        "tags": ["Diagnóstico"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metricas": { "type": "boolean" },
+                  "costos": { "type": "boolean" },
+                  "recurso": { "type": "string" },
+                  "profundidad": {
+                    "type": "string",
+                    "enum": ["basico", "detallado", "completo"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Diagnóstico ejecutado"
+          }
+        }
+      }
+    },
+    "/api/hybrid": {
+      "post": {
+        "summary": "Router semántico (intenciones)",
+        "operationId": "hybrid",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_response": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "agent_response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Solicitud inválida"
+          },
+          "500": {
+            "description": "Error servidor"
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "Estado detallado (ambiente y storage)",
+        "operationId": "statusDetallado",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "copiloto": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    },
+                    "ambiente": {
+                      "type": "string"
+                    },
+                    "storage": {
+                      "type": "string"
+                    },
+                    "is_azure": {
+                      "type": "boolean"
+                    },
+                    "container": {
+                      "type": "string"
+                    },
+                    "blob_ready": {
+                      "type": "boolean"
+                    },
+                    "endpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listar-blobs": {
+      "get": {
+        "summary": "Listar blobs",
+        "operationId": "listarBlobs",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/escribir-archivo": {
+      "post": {
+        "summary": "Crear/guardar un archivo",
+        "operationId": "escribirArchivo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ruta", "contenido"],
+                "properties": {
+                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "contenido": { "type": "string", "example": "# Hola\nEsto es una prueba." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Creado" },
+          "400": { "description": "Error de validación" }
+        }
+      }
+    },
+    "/api/modificar-archivo": {
+      "post": {
+        "summary": "Modificar un archivo existente",
+        "operationId": "modificarArchivo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ruta", "operacion"],
+                "properties": {
+                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "operacion": {
+                    "type": "string",
+                    "enum": [
+                      "agregar_linea","reemplazar_linea","eliminar_linea",
+                      "buscar_reemplazar","agregar_inicio","agregar_final",
+                      "insertar_antes","insertar_despues"
+                    ]
+                  },
+                  "linea": { "type": "integer", "description": "Usado por insertar_* y reemplazar/eliminar_linea" },
+                  "contenido": {
+                    "description": "Para 'buscar_reemplazar': acepta objeto {buscar,reemplazar} o string 'OLD->NEW' | 'OLD|NEW'. Para otras operaciones: string libre.",
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": ["buscar","reemplazar"],
+                        "properties": {
+                          "buscar": { "type": "string" },
+                          "reemplazar": { "type": "string" }
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Formato 'OLD->NEW' o 'OLD|NEW'",
+                        "pattern": ".+(->|\\|).+"
+                      },
+                      { "type": "string" }
+                    ]
+                  },
+                  "buscar": { "type": "string", "description": "Alternativa: claves al tope del body" },
+                  "reemplazar": { "type": "string", "description": "Alternativa: claves al tope del body" }
+                },
+                "anyOf": [
+                  { "required": ["contenido"] },
+                  { "required": ["buscar","reemplazar"] }
+                ]
+              },
+              "examples": {
+                "objeto_buscar_reemplazar": {
+                  "summary": "Objeto {buscar,reemplazar}",
+                  "value": {
+                    "ruta": "docs/PRUEBA.md",
+                    "operacion": "buscar_reemplazar",
+                    "contenido": { "buscar": "OK", "reemplazar": "OK ✅" }
+                  }
+                },
+                "string_arrow": {
+                  "summary": "String 'OLD->NEW'",
+                  "value": {
+                    "ruta": "docs/PRUEBA.md",
+                    "operacion": "buscar_reemplazar",
+                    "contenido": "OK->OK ✅"
+                  }
+                },
+                "top_level_keys": {
+                  "summary": "Claves al tope del body",
+                  "value": {
+                    "ruta": "docs/PRUEBA.md",
+                    "operacion": "buscar_reemplazar",
+                    "buscar": "OK",
+                    "reemplazar": "OK ✅"
+                  }
+                },
+                "agregar_final": {
+                  "summary": "Operación no-BR con string libre",
+                  "value": {
+                    "ruta": "docs/PRUEBA.md",
+                    "operacion": "agregar_final",
+                    "contenido": "Nueva línea"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "description": "Error de validación (p. ej., payload inválido)" },
+          "404": { "description": "No encontrado (archivo inexistente)" }
+        }
+      }
+    },
+    "/api/leer-archivo": {
+      "get": {
+        "summary": "Leer un archivo",
+        "operationId": "leerArchivo",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ruta",
+            "schema": { "type": "string" },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "404": { "description": "No encontrado" }
+        }
+      }
+    },
+    "/api/eliminar-archivo": {
+      "post": {
+        "summary": "Eliminar archivo (Blob o local)",
+        "operationId": "eliminarArchivo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "ruta": { "type": "string" } }, "required": ["ruta"] }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
+      },
+      "delete": {
+        "summary": "Eliminar archivo (por query)",
+        "operationId": "eliminarArchivoDelete",
+        "parameters": [
+          { "name": "ruta", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
+      }
+    },
+    "/api/ejecutar-script": {
+      "post": {
+        "summary": "Ejecutar script desde /scripts (.py/.sh/.ps1)",
+        "operationId": "ejecutarScript",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script": { "type": "string", "example": "hello.py" },
+                  "parametros": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["script"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" }, "500": { "description": "Error ejecución" } }
+      }
+    },
+    "/api/ejecutar": {
+      "post": {
+        "summary": "Orquestador de intenciones",
+        "operationId": "ejecutar",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intencion": { "type": "string", "example": "crear:archivo" },
+                  "parametros": { "type": "object" },
+                  "contexto": { "type": "object" },
+                  "modo": { "type": "string", "default": "normal" }
+                },
+                "required": ["intencion"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "health",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/mover-archivo": {
+      "post": {
+        "summary": "Mover/Renombrar archivo",
+        "operationId": "moverArchivo",
+        "requestBody": {
+          "required": true,
+          "content": {m nnnnnnbnhv
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["origen", "destino"],
+                "properties": {
+                  "origen": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "destino": { "type": "string", "example": "docs/historico/PRUEBA.md" },
+                  "overwrite": { "type": "boolean", "default": false },
+                  "eliminar_origen": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+      }
+    }
+    ,
+    "/api/info-archivo": {
+      "get": {
+        "summary": "Obtiene metadatos de un archivo",
+        "operationId": "infoArchivo",
+        "parameters": [{ "in": "query", "name": "ruta", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrado" } }
+      }
+    },
+    "/api/descargar-archivo": {
+      "get": {
+        "summary": "Descarga archivo como texto/base64 en JSON",
+        "operationId": "descargarArchivo",
+        "parameters": [
+          { "in": "query", "name": "ruta", "required": true, "schema": { "type": "string" } },
+          { "in": "query", "name": "modo", "required": false, "schema": { "type": "string", "enum": ["inline","base64"], "default": "inline" } }
+        ],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrado" } }
+      }
+    },
+    "/api/copiar-archivo": {
+      "post": {
+        "summary": "Copia un archivo (Blob o local)",
+        "operationId": "copiarArchivo",
+        "requestBody": { "required": true, "content": { "application/json": {
+          "schema": { "type": "object", "required": ["origen","destino"],
+            "properties": { "origen": { "type": "string" }, "destino": { "type": "string" }, "overwrite": { "type": "boolean", "default": false } } }
+        }}},
+        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+      }
+    },
+    "/api/preparar-script": {
+      "post": {
+        "summary": "Trae un script desde Blob a /scripts local",
+        "operationId": "prepararScript",
+        "requestBody": { "required": true, "content": { "application/json": {
+          "schema": { "type": "object", "required": ["ruta"], "properties": { "ruta": { "type": "string", "example": "scripts/hello.py" } } }
+        }}},
+        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-functions-key"
+      }
+    }
+  },
+  "security": [
+    {
+      "functionKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Azure Storage",
+      "description": "Operaciones de Azure Blob Storage"
+    },
+    {
+      "name": "Azure CLI",
+      "description": "Ejecución de comandos Azure CLI"
+    },
+    {
+      "name": "Diagnóstico",
+      "description": "Diagnóstico y monitoreo de recursos"
+    }
+  ],
+  "agent_name": "Architect_BoatRental",
+  "propósito": "Gestionar estructura backend y API",
+  "checkpoints": [
+    {
+      "etapa": "antes_modificar_backend",
+      "verificaciones": [
+        "leer_archivo_completo",
+        "verificar_estructura",
+        "verificar_funcion_target",
+        "verificar_endpoints_existentes"
+      ],
+      "requerido_para_continuar": true
+    }
+  ]
+}
