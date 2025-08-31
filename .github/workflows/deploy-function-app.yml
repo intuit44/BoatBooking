@@ -1,0 +1,35 @@
+name: Deploy Function App
+
+on:
+  push:
+    paths:
+      - 'copiloto-function/function_app.py'
+      - 'copiloto-function/Dockerfile'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: boatrentalacr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      
+      - name: Build and push
+        run: |
+          VERSION=v${{ github.run_number }}
+          docker build -t boatrentalacr.azurecr.io/copiloto-func-azcli:$VERSION .
+          docker push boatrentalacr.azurecr.io/copiloto-func-azcli:$VERSION
+      
+      - name: Update Function App
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az functionapp config container set \
+              -g boat-rental-app-group \
+              -n copiloto-semantico-func-us2 \
+              --docker-custom-image-name boatrentalacr.azurecr.io/copiloto-func-azcli:v${{ github.run_number }}
