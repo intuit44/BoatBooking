@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://copiloto-semantico-func.azurewebsites.net"
+      "url": "https://copiloto-semantico-func-us2.azurewebsites.net"
     }
   ],
   "paths": {
@@ -15,19 +15,23 @@
       "post": {
         "summary": "Crear contenedor en Blob Storage",
         "operationId": "crearContenedor",
-        "tags": ["Azure Storage"],
+        "tags": [
+          "Azure Storage"
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["nombre"],
+                "required": [
+                  "nombre"
+                ],
                 "properties": {
                   "nombre": {
                     "type": "string",
-                    "pattern": "^[a-z0-9]([a-z0-9\\-]{1,61}[a-z0-9])?$",
-                    "description": "Nombre del contenedor (minúsculas, números, guiones)"
+                    "pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+                    "description": "3–63 chars, minúsculas y guiones, no empezar/terminar en guion"
                   },
                   "publico": {
                     "type": "boolean",
@@ -68,10 +72,18 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "exito": { "type": "boolean" },
-                    "mensaje": { "type": "string" },
-                    "contenedor": { "type": "string" },
-                    "url": { "type": "string" }
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "contenedor": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -93,18 +105,28 @@
       "post": {
         "summary": "Ejecutar comando Azure CLI",
         "operationId": "ejecutarCLI",
-        "tags": ["Azure CLI"],
+        "tags": [
+          "Azure CLI"
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["comando"],
+                "required": [
+                  "comando"
+                ],
                 "properties": {
                   "servicio": {
                     "type": "string",
-                    "enum": ["storage", "functionapp", "webapp", "monitor", "resource"],
+                    "enum": [
+                      "storage",
+                      "functionapp",
+                      "webapp",
+                      "monitor",
+                      "resource"
+                    ],
                     "description": "Servicio Azure a utilizar"
                   },
                   "comando": {
@@ -141,7 +163,7 @@
                     "comando": "show",
                     "parametros": {
                       "name": "copiloto-semantico-func",
-                      "resource-group": "boat-rental-rg"
+                      "resource-group": "boat-rental-app-group"
                     }
                   }
                 },
@@ -167,17 +189,31 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "exito": { "type": "boolean" },
-                    "comando_ejecutado": { "type": "string" },
-                    "output": { 
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "comando_ejecutado": {
+                      "type": "string"
+                    },
+                    "output": {
                       "oneOf": [
-                        { "type": "object" },
-                        { "type": "array" },
-                        { "type": "string" }
+                        {
+                          "type": "object"
+                        },
+                        {
+                          "type": "array"
+                        },
+                        {
+                          "type": "string"
+                        }
                       ]
                     },
-                    "error": { "type": "string" },
-                    "codigo_salida": { "type": "integer" }
+                    "error": {
+                      "type": "string"
+                    },
+                    "codigo_salida": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
@@ -196,7 +232,9 @@
       "get": {
         "summary": "Diagnóstico completo de recursos Azure",
         "operationId": "diagnosticoRecursos",
-        "tags": ["Diagnóstico"],
+        "tags": [
+          "Diagnóstico"
+        ],
         "parameters": [
           {
             "name": "metricas",
@@ -233,30 +271,52 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "timestamp": { "type": "string" },
-                    "ambiente": { "type": "string" },
+                    "timestamp": {
+                      "type": "string"
+                    },
+                    "ambiente": {
+                      "type": "string"
+                    },
                     "recursos": {
                       "type": "object",
                       "properties": {
-                        "function_app": { "type": "object" },
-                        "storage_account": { "type": "object" },
-                        "storage_stats": { "type": "object" }
+                        "function_app": {
+                          "type": "object"
+                        },
+                        "storage_account": {
+                          "type": "object"
+                        },
+                        "storage_stats": {
+                          "type": "object"
+                        }
                       }
                     },
-                    "metricas": { "type": "object" },
-                    "alertas": { 
+                    "metricas": {
+                      "type": "object"
+                    },
+                    "alertas": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "nivel": { "type": "string" },
-                          "mensaje": { "type": "string" },
-                          "accion": { "type": "string" }
+                          "nivel": {
+                            "type": "string"
+                          },
+                          "mensaje": {
+                            "type": "string"
+                          },
+                          "accion": {
+                            "type": "string"
+                          }
                         }
                       }
                     },
-                    "recomendaciones": { "type": "array" },
-                    "sistema": { "type": "object" }
+                    "recomendaciones": {
+                      "type": "array"
+                    },
+                    "sistema": {
+                      "type": "object"
+                    }
                   }
                 }
               }
@@ -267,19 +327,31 @@
       "post": {
         "summary": "Diagnóstico con parámetros específicos",
         "operationId": "diagnosticoRecursosPost",
-        "tags": ["Diagnóstico"],
+        "tags": [
+          "Diagnóstico"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "metricas": { "type": "boolean" },
-                  "costos": { "type": "boolean" },
-                  "recurso": { "type": "string" },
+                  "metricas": {
+                    "type": "boolean"
+                  },
+                  "costos": {
+                    "type": "boolean"
+                  },
+                  "recurso": {
+                    "type": "string"
+                  },
                   "profundidad": {
                     "type": "string",
-                    "enum": ["basico", "detallado", "completo"]
+                    "enum": [
+                      "basico",
+                      "detallado",
+                      "completo"
+                    ]
                   }
                 }
               }
@@ -297,6 +369,18 @@
       "post": {
         "summary": "Router semántico (intenciones)",
         "operationId": "hybrid",
+        "parameters": [
+          {
+            "name": "semantic_response",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Si es true, la respuesta será texto semántico. Si se envían ambos (query y body), prevalece el parámetro de query"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -309,6 +393,11 @@
                   },
                   "payload": {
                     "type": "object"
+                  },
+                  "semantic_response": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Si es true, la respuesta será texto semántico. El parámetro de query tiene precedencia"
                   }
                 },
                 "required": [
@@ -320,13 +409,31 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {},
+              "text/plain": {}
+            }
           },
           "400": {
-            "description": "Solicitud inválida"
+            "description": "Solicitud inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Error servidor"
+            "description": "Error servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
           }
         }
       }
@@ -384,6 +491,20 @@
         }
       }
     },
+    "/api/copiloto": {
+      "get": {
+        "summary": "Endpoint principal del copiloto",
+        "operationId": "copiloto",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
     "/api/listar-blobs": {
       "get": {
         "summary": "Listar blobs",
@@ -409,7 +530,10 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
           }
         }
       }
@@ -424,18 +548,31 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["ruta", "contenido"],
+                "required": [
+                  "ruta",
+                  "contenido"
+                ],
                 "properties": {
-                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
-                  "contenido": { "type": "string", "example": "# Hola\nEsto es una prueba." }
+                  "ruta": {
+                    "type": "string",
+                    "example": "docs/PRUEBA.md"
+                  },
+                  "contenido": {
+                    "type": "string",
+                    "example": "# Hola\nEsto es una prueba."
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Creado" },
-          "400": { "description": "Error de validación" }
+          "201": {
+            "description": "Creado"
+          },
+          "400": {
+            "description": "Error de validación"
+          }
         }
       }
     },
@@ -449,27 +586,48 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["ruta", "operacion"],
+                "required": [
+                  "ruta",
+                  "operacion"
+                ],
                 "properties": {
-                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "ruta": {
+                    "type": "string",
+                    "example": "docs/PRUEBA.md"
+                  },
                   "operacion": {
                     "type": "string",
                     "enum": [
-                      "agregar_linea","reemplazar_linea","eliminar_linea",
-                      "buscar_reemplazar","agregar_inicio","agregar_final",
-                      "insertar_antes","insertar_despues"
+                      "agregar_linea",
+                      "reemplazar_linea",
+                      "eliminar_linea",
+                      "buscar_reemplazar",
+                      "agregar_inicio",
+                      "agregar_final",
+                      "insertar_antes",
+                      "insertar_despues"
                     ]
                   },
-                  "linea": { "type": "integer", "description": "Usado por insertar_* y reemplazar/eliminar_linea" },
+                  "linea": {
+                    "type": "integer",
+                    "description": "Usado por insertar_* y reemplazar/eliminar_linea"
+                  },
                   "contenido": {
                     "description": "Para 'buscar_reemplazar': acepta objeto {buscar,reemplazar} o string 'OLD->NEW' | 'OLD|NEW'. Para otras operaciones: string libre.",
                     "oneOf": [
                       {
                         "type": "object",
-                        "required": ["buscar","reemplazar"],
+                        "required": [
+                          "buscar",
+                          "reemplazar"
+                        ],
                         "properties": {
-                          "buscar": { "type": "string" },
-                          "reemplazar": { "type": "string" }
+                          "buscar": {
+                            "type": "string"
+                          },
+                          "reemplazar": {
+                            "type": "string"
+                          }
                         }
                       },
                       {
@@ -478,15 +636,32 @@
                         "description": "Formato 'OLD->NEW' o 'OLD|NEW'",
                         "pattern": ".+(->|\\|).+"
                       },
-                      { "type": "string" }
+                      {
+                        "type": "string"
+                      }
                     ]
                   },
-                  "buscar": { "type": "string", "description": "Alternativa: claves al tope del body" },
-                  "reemplazar": { "type": "string", "description": "Alternativa: claves al tope del body" }
+                  "buscar": {
+                    "type": "string",
+                    "description": "Alternativa: claves al tope del body"
+                  },
+                  "reemplazar": {
+                    "type": "string",
+                    "description": "Alternativa: claves al tope del body"
+                  }
                 },
                 "anyOf": [
-                  { "required": ["contenido"] },
-                  { "required": ["buscar","reemplazar"] }
+                  {
+                    "required": [
+                      "contenido"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "buscar",
+                      "reemplazar"
+                    ]
+                  }
                 ]
               },
               "examples": {
@@ -495,7 +670,10 @@
                   "value": {
                     "ruta": "docs/PRUEBA.md",
                     "operacion": "buscar_reemplazar",
-                    "contenido": { "buscar": "OK", "reemplazar": "OK ✅" }
+                    "contenido": {
+                      "buscar": "OK",
+                      "reemplazar": "OK ✅"
+                    }
                   }
                 },
                 "string_arrow": {
@@ -528,9 +706,15 @@
           }
         },
         "responses": {
-          "200": { "description": "OK" },
-          "400": { "description": "Error de validación (p. ej., payload inválido)" },
-          "404": { "description": "No encontrado (archivo inexistente)" }
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Error de validación (p. ej., payload inválido)"
+          },
+          "404": {
+            "description": "No encontrado (archivo inexistente)"
+          }
         }
       }
     },
@@ -542,13 +726,22 @@
           {
             "in": "query",
             "name": "ruta",
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "required": true
           }
         ],
         "responses": {
-          "200": { "description": "OK" },
-          "404": { "description": "No encontrado" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "404": {
+            "description": "No encontrado"
+          }
         }
       }
     },
@@ -560,19 +753,56 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "type": "object", "properties": { "ruta": { "type": "string" } }, "required": ["ruta"] }
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ruta": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ruta"
+                ]
+              }
             }
           }
         },
-        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
+        "responses": {
+          "200": {
+            "description": "Eliminado",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "404": {
+            "description": "No encontrado"
+          }
+        }
       },
       "delete": {
         "summary": "Eliminar archivo (por query)",
         "operationId": "eliminarArchivoDelete",
         "parameters": [
-          { "name": "ruta", "in": "query", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "ruta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
+        "responses": {
+          "200": {
+            "description": "Eliminado",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "404": {
+            "description": "No encontrado"
+          }
+        }
       }
     },
     "/api/ejecutar-script": {
@@ -586,15 +816,50 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "script": { "type": "string", "example": "hello.py" },
-                  "parametros": { "type": "array", "items": { "type": "string" } }
+                  "script": {
+                    "type": "string",
+                    "example": "scripts/hello2.py"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "timeout_s": {
+                    "type": "integer",
+                    "default": 60
+                  },
+                  "sync_outputs": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "parametros": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Alias de 'args' por compatibilidad"
+                  }
                 },
-                "required": ["script"]
+                "required": [
+                  "script"
+                ]
               }
             }
           }
         },
-        "responses": { "200": { "description": "OK" }, "500": { "description": "Error ejecución" } }
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "500": {
+            "description": "Error ejecución"
+          }
+        }
       }
     },
     "/api/ejecutar": {
@@ -608,17 +873,36 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "intencion": { "type": "string", "example": "crear:archivo" },
-                  "parametros": { "type": "object" },
-                  "contexto": { "type": "object" },
-                  "modo": { "type": "string", "default": "normal" }
+                  "intencion": {
+                    "type": "string",
+                    "example": "crear:archivo"
+                  },
+                  "parametros": {
+                    "type": "object"
+                  },
+                  "contexto": {
+                    "type": "object"
+                  },
+                  "modo": {
+                    "type": "string",
+                    "default": "normal"
+                  }
                 },
-                "required": ["intencion"]
+                "required": [
+                  "intencion"
+                ]
               }
             }
           }
         },
-        "responses": { "200": { "description": "OK" } }
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
       }
     },
     "/api/health": {
@@ -626,7 +910,12 @@
         "summary": "Health check",
         "operationId": "health",
         "responses": {
-          "200": { "description": "OK" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          }
         }
       }
     },
@@ -636,31 +925,71 @@
         "operationId": "moverArchivo",
         "requestBody": {
           "required": true,
-          "content": {m nnnnnnbnhv
+          "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["origen", "destino"],
+                "required": [
+                  "origen",
+                  "destino"
+                ],
                 "properties": {
-                  "origen": { "type": "string", "example": "docs/PRUEBA.md" },
-                  "destino": { "type": "string", "example": "docs/historico/PRUEBA.md" },
-                  "overwrite": { "type": "boolean", "default": false },
-                  "eliminar_origen": { "type": "boolean", "default": true }
+                  "origen": {
+                    "type": "string",
+                    "example": "docs/PRUEBA.md"
+                  },
+                  "destino": {
+                    "type": "string",
+                    "example": "docs/historico/PRUEBA.md"
+                  },
+                  "overwrite": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "eliminar_origen": {
+                    "type": "boolean",
+                    "default": true
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
       }
-    }
-    ,
+    },
     "/api/info-archivo": {
       "get": {
         "summary": "Obtiene metadatos de un archivo",
         "operationId": "infoArchivo",
-        "parameters": [{ "in": "query", "name": "ruta", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrado" } }
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ruta",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "No encontrado"
+          }
+        }
       }
     },
     "/api/descargar-archivo": {
@@ -668,48 +997,955 @@
         "summary": "Descarga archivo como texto/base64 en JSON",
         "operationId": "descargarArchivo",
         "parameters": [
-          { "in": "query", "name": "ruta", "required": true, "schema": { "type": "string" } },
-          { "in": "query", "name": "modo", "required": false, "schema": { "type": "string", "enum": ["inline","base64"], "default": "inline" } }
+          {
+            "in": "query",
+            "name": "ruta",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "modo",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inline",
+                "base64"
+              ],
+              "default": "inline"
+            }
+          }
         ],
-        "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrado" } }
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "No encontrado"
+          }
+        }
       }
     },
     "/api/copiar-archivo": {
       "post": {
         "summary": "Copia un archivo (Blob o local)",
         "operationId": "copiarArchivo",
-        "requestBody": { "required": true, "content": { "application/json": {
-          "schema": { "type": "object", "required": ["origen","destino"],
-            "properties": { "origen": { "type": "string" }, "destino": { "type": "string" }, "overwrite": { "type": "boolean", "default": false } } }
-        }}},
-        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "origen",
+                  "destino"
+                ],
+                "properties": {
+                  "origen": {
+                    "type": "string"
+                  },
+                  "destino": {
+                    "type": "string"
+                  },
+                  "overwrite": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
       }
     },
     "/api/preparar-script": {
       "post": {
         "summary": "Trae un script desde Blob a /scripts local",
         "operationId": "prepararScript",
-        "requestBody": { "required": true, "content": { "application/json": {
-          "schema": { "type": "object", "required": ["ruta"], "properties": { "ruta": { "type": "string", "example": "scripts/hello.py" } } }
-        }}},
-        "responses": { "200": { "description": "OK" }, "400": { "description": "Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ruta"
+                ],
+                "properties": {
+                  "ruta": {
+                    "type": "string",
+                    "example": "scripts/hello.py"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "400": {
+            "description": "Error"
+          }
+        }
+      }
+    },
+    "/api/deploy": {
+      "post": {
+        "summary": "Desplegar recursos Azure usando ARM templates",
+        "operationId": "deployARM",
+        "tags": [
+          "Azure Deployment"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resourceGroup": {
+                    "type": "string",
+                    "description": "Nombre del resource group"
+                  },
+                  "location": {
+                    "type": "string",
+                    "default": "eastus",
+                    "description": "Ubicación de Azure"
+                  },
+                  "template": {
+                    "type": "object",
+                    "description": "ARM template JSON"
+                  },
+                  "templateUri": {
+                    "type": "string",
+                    "description": "URI del ARM template"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "description": "Parámetros del template"
+                  },
+                  "validate_only": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Si es true, valida sin desplegar"
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "resourceGroup",
+                      "template"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "resourceGroup",
+                      "templateUri"
+                    ]
+                  }
+                ]
+              },
+              "examples": {
+                "empty_deployment": {
+                  "summary": "Deployment vacío de prueba",
+                  "value": {
+                    "resourceGroup": "boat-rental-app-group",
+                    "location": "eastus",
+                    "template": {
+                      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                      "contentVersion": "1.0.0.0",
+                      "parameters": {},
+                      "variables": {},
+                      "resources": []
+                    }
+                  }
+                },
+                "storage_account": {
+                  "summary": "Crear Storage Account",
+                  "value": {
+                    "resourceGroup": "boat-rental-app-group",
+                    "location": "eastus",
+                    "template": {
+                      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                      "contentVersion": "1.0.0.0",
+                      "parameters": {},
+                      "variables": {
+                        "storageAccountName": "[concat('test', uniqueString(resourceGroup().id))]"
+                      },
+                      "resources": [
+                        {
+                          "type": "Microsoft.Storage/storageAccounts",
+                          "apiVersion": "2021-04-01",
+                          "name": "[variables('storageAccountName')]",
+                          "location": "[resourceGroup().location]",
+                          "sku": {
+                            "name": "Standard_LRS"
+                          },
+                          "kind": "StorageV2"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "validate_deployment": {
+                  "summary": "Validar template sin desplegar",
+                  "value": {
+                    "resourceGroup": "boat-rental-app-group",
+                    "location": "eastus",
+                    "validate_only": true,
+                    "template": {
+                      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                      "contentVersion": "1.0.0.0",
+                      "parameters": {},
+                      "variables": {},
+                      "resources": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment iniciado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "deploymentName": {
+                      "type": "string"
+                    },
+                    "resourceGroup": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "hasTemplate": {
+                      "type": "boolean"
+                    },
+                    "hasTemplateUri": {
+                      "type": "boolean"
+                    },
+                    "parameters_keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros faltantes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error en deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/configurar-cors": {
+      "post": {
+        "summary": "Configurar CORS para Function App",
+        "operationId": "configurarCORS",
+        "tags": [
+          "Azure Configuration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "allowed_origins"
+                ],
+                "properties": {
+                  "function_app": {
+                    "type": "string",
+                    "description": "Nombre de la Function App (opcional, usa env var si no se proporciona)"
+                  },
+                  "resource_group": {
+                    "type": "string",
+                    "description": "Resource group (opcional, usa env var si no se proporciona)"
+                  },
+                  "allowed_origins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": [
+                      "*"
+                    ],
+                    "description": "Lista de orígenes permitidos"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CORS configurado",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "500": {
+            "description": "Error configurando CORS"
+          }
+        }
+      }
+    },
+    "/api/configurar-app-settings": {
+      "post": {
+        "summary": "Configurar App Settings de Function App",
+        "operationId": "configurarAppSettings",
+        "tags": [
+          "Azure Configuration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "settings"
+                ],
+                "properties": {
+                  "function_app": {
+                    "type": "string"
+                  },
+                  "resource_group": {
+                    "type": "string"
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Key-value pairs de configuración"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings actualizados"
+          },
+          "400": {
+            "description": "Parámetros faltantes"
+          }
+        }
+      }
+    },
+    "/api/escalar-plan": {
+      "post": {
+        "summary": "Escalar App Service Plan",
+        "operationId": "escalarPlan",
+        "tags": [
+          "Azure Configuration"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "plan_name"
+                ],
+                "properties": {
+                  "plan_name": {
+                    "type": "string"
+                  },
+                  "resource_group": {
+                    "type": "string"
+                  },
+                  "sku": {
+                    "type": "string",
+                    "default": "EP1",
+                    "enum": [
+                      "B1",
+                      "B2",
+                      "B3",
+                      "S1",
+                      "S2",
+                      "S3",
+                      "P1V2",
+                      "P2V2",
+                      "P3V2",
+                      "EP1",
+                      "EP2",
+                      "EP3"
+                    ],
+                    "description": "SKU del plan"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plan escalado"
+          },
+          "400": {
+            "description": "Parámetros faltantes"
+          }
+        }
+      }
+    },
+    "/api/auditar-deploy": {
+      "get": {
+        "summary": "Auditar deployment actual de la Function App",
+        "operationId": "auditarDeploy",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "responses": {
+          "200": {
+            "description": "Auditoría completa del deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "files_count": {
+                          "type": "integer"
+                        },
+                        "function_app_py_sha256": {
+                          "type": ["string", "null"]
+                        },
+                        "baseline_sha256": {
+                          "type": ["string", "null"]
+                        },
+                        "match_baseline": {
+                          "type": ["boolean", "null"]
+                        },
+                        "top_files": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "size": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bateria-endpoints": {
+      "post": {
+        "summary": "Ejecutar batería de pruebas de endpoints",
+        "operationId": "bateriaEndpoints",
+        "tags": [
+          "Testing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Batería ejecutada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "ok": {
+                          "type": "integer"
+                        },
+                        "fail": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "results": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Ejecutar batería de pruebas (GET)",
+        "operationId": "bateriaEndpointsGet",
+        "tags": [
+          "Testing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Batería ejecutada"
+          }
+        }
+      }
+    },
+    "/api/probar-endpoint": {
+      "post": {
+        "summary": "Probar un endpoint específico",
+        "operationId": "probarEndpoint",
+        "tags": [
+          "Testing"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "description": "Endpoint a probar (ej: /api/status)"
+                  },
+                  "method": {
+                    "type": "string",
+                    "default": "GET",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "DELETE"
+                    ]
+                  },
+                  "params": {
+                    "type": "object"
+                  },
+                  "data": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Endpoint probado",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "400": {
+            "description": "Endpoint no reconocido"
+          }
+        }
+      },
+      "get": {
+        "summary": "Probar endpoint vía GET",
+        "operationId": "probarEndpointGet",
+        "tags": [
+          "Testing"
+        ],
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "GET"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endpoint probado"
+          }
+        }
+      }
+    },
+    "/api/invocar": {
+      "post": {
+        "summary": "Invocar endpoints internamente",
+        "operationId": "invocarInterno",
+        "tags": [
+          "Internal"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string",
+                    "default": "GET"
+                  },
+                  "mensaje": {
+                    "type": "string"
+                  },
+                  "intencion": {
+                    "type": "string"
+                  },
+                  "parametros": {
+                    "type": "object"
+                  },
+                  "contexto": {
+                    "type": "object"
+                  },
+                  "modo": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Endpoint invocado",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "400": {
+            "description": "Endpoint no manejado"
+          }
+        }
+      }
+    },
+    "/api/diagnostico-configurar": {
+      "post": {
+        "summary": "Configurar diagnósticos Azure Monitor",
+        "operationId": "configurarDiagnosticos",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "resourceId",
+                  "workspaceId"
+                ],
+                "properties": {
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "settingName": {
+                    "type": "string",
+                    "default": "fa-logs"
+                  },
+                  "logs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "metrics": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Diagnósticos configurados"
+          }
+        }
+      }
+    },
+    "/api/diagnostico-listar": {
+      "get": {
+        "summary": "Listar configuraciones de diagnóstico",
+        "operationId": "listarDiagnosticos",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "parameters": [
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de configuraciones"
+          }
+        }
+      }
+    },
+    "/api/diagnostico-eliminar": {
+      "post": {
+        "summary": "Eliminar configuración de diagnóstico",
+        "operationId": "eliminarDiagnostico",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "resourceId",
+                  "settingName"
+                ],
+                "properties": {
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "settingName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuración eliminada"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar configuración vía DELETE",
+        "operationId": "eliminarDiagnosticoDelete",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "parameters": [
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "settingName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuración eliminada"
+          }
+        }
+      }
+    },
+    "/api/render-error": {
+      "post": {
+        "summary": "Renderizar error semánticamente",
+        "operationId": "renderError",
+        "tags": [
+          "Internal"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "error"
+                ],
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Error renderizado semánticamente",
+            "content": {
+              "text/plain": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/diagnostico-recursos-completo": {
+      "get": {
+        "summary": "Diagnóstico completo con SDK Azure",
+        "operationId": "diagnosticoRecursosCompleto",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "parameters": [
+          {
+            "name": "metricas",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "costos",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "recurso",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnóstico completo con SDK"
+          }
+        }
+      },
+      "post": {
+        "summary": "Diagnóstico completo con parámetros",
+        "operationId": "diagnosticoRecursosCompletoPost",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metricas": {
+                    "type": "boolean"
+                  },
+                  "costos": {
+                    "type": "boolean"
+                  },
+                  "recurso": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Diagnóstico ejecutado"
+          }
+        }
       }
     }
   },
-  "components": {
-    "securitySchemes": {
-      "functionKey": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-functions-key"
-      }
-    }
-  },
-  "security": [
-    {
-      "functionKey": []
-    }
-  ],
   "tags": [
     {
       "name": "Azure Storage",
@@ -722,11 +1958,62 @@
     {
       "name": "Diagnóstico",
       "description": "Diagnóstico y monitoreo de recursos"
+    },
+    {
+      "name": "Azure Deployment",
+      "description": "Deployment de recursos con ARM templates"
+    },
+    {
+      "name": "Azure Configuration",
+      "description": "Configuración de recursos Azure"
+    },
+    {
+      "name": "Testing",
+      "description": "Pruebas y validación de endpoints"
+    },
+    {
+      "name": "Internal",
+      "description": "Operaciones internas de la Function App"
     }
   ],
-  "agent_name": "Architect_BoatRental",
-  "propósito": "Gestionar estructura backend y API",
-  "checkpoints": [
+  "components": {
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "status": {
+            "type": ["integer", "null"]
+          },
+          "cause": {
+            "type": "string"
+          },
+          "hint": {
+            "type": ["string", "null"]
+          },
+          "next_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trace": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["ok", "error_code"]
+      }
+    }
+  },
+  "x-agent-name": "Architect_BoatRental",
+  "x-purpose": "Gestionar estructura backend y API",
+  "x-checkpoints": [
     {
       "etapa": "antes_modificar_backend",
       "verificaciones": [
