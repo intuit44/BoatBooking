@@ -1,0 +1,58 @@
+Metadata-Version: 2.0
+Name: account
+Version: 0.2.5
+Summary: Microsoft Azure Command-Line Tools SubscriptionClient Extension
+Home-page: https://github.com/Azure/azure-cli-extensions/tree/main/src/account
+Author: Microsoft Corporation
+Author-email: azpycli@microsoft.com
+License: MIT
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: License :: OSI Approved :: MIT License
+
+Microsoft Azure CLI 'account' Extension
+==========================================
+
+This package is for the 'account' extension.
+i.e. 'az account'
+
+
+.. :changelog:
+
+Release History
+===============
+
+0.2.5
++++++
+* Update SDK `azure-mgmt-subscription` version to 3.1.1
+* Add new command `az account accept-ownership-status` to support accept subscription ownership status
+
+0.2.4
++++++
+* Update `minCliCoreVersion` requirement from `2.3.1` to `2.38.0`.
+* GA of `az account alias`: Manage subscription alias.
+* Update SDK `azure-mgmt-subscription` version to 3.0.0 and api-version to 2021-10-01.
+
+0.2.1
++++++
+* az account alias create: add --reseller-id
+
+0.2.0
++++++
+* Breaking Change: remove `az account subscription create`.
+* Add az account alias commands.
+* Add az account tenant commands.
+* Support sovereign clouds.
+
+0.1.0
+++++++
+* Initial release.
+
+

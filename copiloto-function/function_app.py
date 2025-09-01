@@ -5580,111 +5580,178 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+@app.function_name(name="proxy_local_http")
+@app.route(route="proxy-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Proxy hacia tu servidor local via ngrok"""
+    import requests
+    import traceback
+
+    try:
+        body = req.get_json()
+        comando = body.get("comando")
+
+        if not comando:
+            return func.HttpResponse(
+                json.dumps({"error": "Comando requerido"}),
+                status_code=400,
+                mimetype="application/json"
+            )
+
+        # Llamar a tu servidor local via ngrok
+        response = requests.post(
+            "https://ejecutor-local.ngrok.app/ejecutar-local",
+            headers={"Authorization": "Bearer tu-token-secreto-aqui"},
+            json={"comando": comando},
+            timeout=300  # 5 minutos para builds
+        )
+
+        # Capturar y reenviar correctamente el error recibido desde el túnel
+        return func.HttpResponse(
+            response.text,
+            status_code=response.status_code,
+            mimetype="application/json"
+        )
+
+    except requests.Timeout:
+        return func.HttpResponse(
+            json.dumps({
+                "error": "Timeout ejecutando comando local",
+                "trace": traceback.format_exc()
+            }),
+            status_code=408,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            }),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+
 @app.function_name(name="gestionar_despliegue_http")
 @app.route(route="gestionar-despliegue", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
-  """Gestiona el proceso de despliegue con detección de cambios"""
+    """Gestiona el proceso de despliegue con detección de cambios y deducción automática de intención"""
 
-  try:
-    body = req.get_json() if req.get_body() else {}
-    # detectar, preparar, confirmar
-    accion = body.get("accion", "detectar")
+    # Initialize body to ensure it's always available
+    body = {}
 
-    if accion == "detectar":
-      # Obtener hash actual del archivo
-      import hashlib
-      try:
-        with open("function_app.py", "r") as f:
-          contenido = f.read()
-          # Buscar la función ejecutar_cli_http
-          inicio = contenido.find("def ejecutar_cli_http")
-          fin = contenido.find("\n@app.function_name", inicio + 1)
-          if inicio > -1:
-            funcion_actual = contenido[inicio:fin] if fin > - \
-              1 else contenido[inicio:]
-            hash_actual = hashlib.sha256(
-              funcion_actual.encode()).hexdigest()[:8]
-          else:
-            hash_actual = "no_encontrado"
-      except:
-        hash_actual = "error"
+    try:
+        body = req.get_json() if req.get_body() else {}
 
-      # Obtener última versión desplegada
-      result = subprocess.run(
-        ["az", "functionapp", "config", "container", "show",
-         "-g", "boat-rental-app-group",
-         "-n", "copiloto-semantico-func-us2",
-         "--query", "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value",
-         "-o", "tsv"],
-        capture_output=True,
-        text=True,
-        timeout=30
-      )
+        # 🔍 Deducción automática de intención si no se especifica
+        accion = body.get("accion")
 
-      imagen_actual = result.stdout.strip() if result.returncode == 0 else "desconocido"
+        if not accion:
+            # Deducción automática basada en el contenido
+            if "tag" in body:
+                accion = "desplegar"
+            elif body.get("preparar", False) is True:
+                accion = "preparar"
+            else:
+                accion = "detectar"
 
-      # Obtener próxima versión
-      tags_result = subprocess.run(
-        ["az", "acr", "repository", "show-tags",
-         "-n", "boatrentalacr",
-         "--repository", "copiloto-func-azcli",
-         "--orderby", "time_desc",
-         "--top", "1"],
-        capture_output=True,
-        text=True,
-        timeout=30
-      )
+        if accion == "detectar":
+            # Obtener hash actual del archivo
+            import hashlib
+            try:
+                with open("function_app.py", "r") as f:
+                    contenido = f.read()
+                    # Buscar la función ejecutar_cli_http
+                    inicio = contenido.find("def ejecutar_cli_http")
+                    fin = contenido.find("\n@app.function_name", inicio + 1)
+                    if inicio > -1:
+                        funcion_actual = contenido[inicio:fin] if fin > - \
+                            1 else contenido[inicio:]
+                        hash_actual = hashlib.sha256(
+                            funcion_actual.encode()).hexdigest()[:8]
+                    else:
+                        hash_actual = "no_encontrado"
+            except:
+                hash_actual = "error"
 
-      tags = json.loads(tags_result.stdout) if tags_result.stdout else []
-      ultimo_tag = tags[0] if tags else "v0"
+            # Obtener última versión desplegada
+            result = subprocess.run(
+                ["az", "functionapp", "config", "container", "show",
+                 "-g", "boat-rental-app-group",
+                 "-n", "copiloto-semantico-func-us2",
+                 "--query", "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value",
+                 "-o", "tsv"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
 
-      import re
-      match = re.search(r'v(\d+)', ultimo_tag)
-      ultimo_numero = int(match.group(1)) if match else 0
-      proximo_tag = f"v{ultimo_numero + 1}"
+            imagen_actual = result.stdout.strip() if result.returncode == 0 else "desconocido"
 
-      return func.HttpResponse(
-        json.dumps({
-          "hash_funcion": hash_actual,
-          "imagen_actual": imagen_actual,
-          "ultimo_tag_acr": ultimo_tag,
-          "proximo_tag": proximo_tag,
-          "mensaje": f"Función ejecutar_cli_http tiene hash {hash_actual}. Próxima versión sería {proximo_tag}",
-          "recomendacion": "Si detectas cambios, ejecuta el despliegue local con los comandos Docker",
-          "comandos_sugeridos": [
-            f"docker build -t copiloto-func-azcli:{proximo_tag} .",
-            f"docker tag copiloto-func-azcli:{proximo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{proximo_tag}",
-            "az acr login -n boatrentalacr",
-            f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{proximo_tag}",
-            f"Luego llama a /api/actualizar-contenedor con tag={proximo_tag}"
-          ]
-        }, ensure_ascii=False),
-        mimetype="application/json",
-        status_code=200
-      )
+            # Obtener próxima versión
+            tags_result = subprocess.run(
+                ["az", "acr", "repository", "show-tags",
+                 "-n", "boatrentalacr",
+                 "--repository", "copiloto-func-azcli",
+                 "--orderby", "time_desc",
+                 "--top", "1"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
 
-    elif accion == "preparar":
-      # Generar script de despliegue
-      tags_result = subprocess.run(
-        ["az", "acr", "repository", "show-tags",
-         "-n", "boatrentalacr",
-         "--repository", "copiloto-func-azcli",
-         "--orderby", "time_desc",
-         "--top", "1"],
-        capture_output=True,
-        text=True,
-        timeout=30
-      )
+            tags = json.loads(tags_result.stdout) if tags_result.stdout else []
+            ultimo_tag = tags[0] if tags else "v0"
 
-      tags = json.loads(tags_result.stdout) if tags_result.stdout else []
-      ultimo_tag = tags[0] if tags else "v0"
+            import re
+            match = re.search(r'v(\d+)', ultimo_tag)
+            ultimo_numero = int(match.group(1)) if match else 0
+            proximo_tag = f"v{ultimo_numero + 1}"
 
-      import re
-      match = re.search(r'v(\d+)', ultimo_tag)
-      ultimo_numero = int(match.group(1)) if match else 0
-      proximo_tag = f"v{ultimo_numero + 1}"
+            return func.HttpResponse(
+                json.dumps({
+                    "accion_deducida": accion,
+                    "hash_funcion": hash_actual,
+                    "imagen_actual": imagen_actual,
+                    "ultimo_tag_acr": ultimo_tag,
+                    "proximo_tag": proximo_tag,
+                    "mensaje": f"Función ejecutar_cli_http tiene hash {hash_actual}. Próxima versión sería {proximo_tag}",
+                    "recomendacion": "Si detectas cambios, ejecuta el despliegue local con los comandos Docker",
+                    "comandos_sugeridos": [
+                        f"docker build -t copiloto-func-azcli:{proximo_tag} .",
+                        f"docker tag copiloto-func-azcli:{proximo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{proximo_tag}",
+                        "az acr login -n boatrentalacr",
+                        f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{proximo_tag}",
+                        f"Luego llama a /api/actualizar-contenedor con tag={proximo_tag}"
+                    ]
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
 
-      script = f"""#!/bin/bash
+        elif accion == "preparar":
+            # Generar script de despliegue
+            tags_result = subprocess.run(
+                ["az", "acr", "repository", "show-tags",
+                 "-n", "boatrentalacr",
+                 "--repository", "copiloto-func-azcli",
+                 "--orderby", "time_desc",
+                 "--top", "1"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            tags = json.loads(tags_result.stdout) if tags_result.stdout else []
+            ultimo_tag = tags[0] if tags else "v0"
+
+            import re
+            match = re.search(r'v(\d+)', ultimo_tag)
+            ultimo_numero = int(match.group(1)) if match else 0
+            proximo_tag = f"v{ultimo_numero + 1}"
+
+            script = f"""#!/bin/bash
 # Auto-generated deployment script
 VERSION={proximo_tag}
 echo "🚀 Deploying version $VERSION"
@@ -5697,103 +5764,250 @@ docker push boatrentalacr.azurecr.io/copiloto-func-azcli:$VERSION
 echo "✅ Image pushed. Call /api/actualizar-contenedor with tag=$VERSION"
 """
 
-      # Guardar script localmente
-      with open("/tmp/deploy.sh", "w") as f:
-        f.write(script)
+            # Guardar script localmente
+            with open("/tmp/deploy.sh", "w") as f:
+                f.write(script)
 
-      return func.HttpResponse(
-        json.dumps({
-          "script_generado": True,
-          "version": proximo_tag,
-          "script_content": script,
-          "mensaje": f"Script preparado para desplegar {proximo_tag}. Ejecútalo localmente.",
-          "nota": "El script está en /tmp/deploy.sh dentro del contenedor"
-        }, ensure_ascii=False),
-        mimetype="application/json",
-        status_code=200
-      )
+            return func.HttpResponse(
+                json.dumps({
+                    "accion_deducida": accion,
+                    "script_generado": True,
+                    "version": proximo_tag,
+                    "script_content": script,
+                    "mensaje": f"Script preparado para desplegar {proximo_tag}. Ejecútalo localmente.",
+                    "nota": "El script está en /tmp/deploy.sh dentro del contenedor"
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
 
-    elif accion == "desplegar":
-      tag = body.get("tag")
-      if not tag:
+        elif accion == "desplegar":
+            tag = body.get("tag")
+            if not tag:
+                return func.HttpResponse(
+                    json.dumps({
+                        "error": "Falta el parámetro 'tag'. Ejemplo: {\"tag\": \"v12\"} o {\"accion\": \"desplegar\", \"tag\": \"v12\"}",
+                        "accion_deducida": accion
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=400
+                )
+
+            comandos = [
+                f"docker build -t copiloto-func-azcli:{tag} .",
+                f"docker tag copiloto-func-azcli:{tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
+                "az acr login -n boatrentalacr",
+                f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
+                f"az functionapp config container set -g boat-rental-app-group -n copiloto-semantico-func-us2 --docker-custom-image-name boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
+                "az functionapp restart -g boat-rental-app-group -n copiloto-semantico-func-us2"
+            ]
+
+            resultados = []
+            for cmd in comandos:
+                try:
+                    result = subprocess.run(
+                        cmd, shell=True, capture_output=True, text=True, timeout=300)
+                    resultados.append({
+                        "comando": cmd,
+                        "returncode": result.returncode,
+                        "stdout": result.stdout.strip(),
+                        "stderr": result.stderr.strip(),
+                        "exito": result.returncode == 0
+                    })
+
+                    # Si un comando falla, detener el proceso
+                    if result.returncode != 0:
+                        break
+
+                except subprocess.TimeoutExpired:
+                    resultados.append({
+                        "comando": cmd,
+                        "returncode": -1,
+                        "stdout": "",
+                        "stderr": "Timeout después de 5 minutos",
+                        "exito": False
+                    })
+                    break
+
+            # Verificar si todos los comandos fueron exitosos
+            todos_exitosos = all(r["exito"] for r in resultados)
+            status_code = 200 if todos_exitosos else 500
+
+            return func.HttpResponse(
+                json.dumps({
+                    "accion": "desplegar",
+                    "accion_deducida": accion,
+                    "tag": tag,
+                    "comandos_ejecutados": comandos,
+                    "resultados": resultados,
+                    "exito": todos_exitosos,
+                    "mensaje": f"Despliegue automático {'completado exitosamente' if todos_exitosos else 'falló'} para la versión {tag}",
+                    "comandos_exitosos": len([r for r in resultados if r["exito"]]),
+                    "total_comandos": len(comandos)
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=status_code
+            )
+
+        else:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": f"Acción '{accion}' no reconocida",
+                    "acciones_validas": ["detectar", "preparar", "desplegar"],
+                    "accion_recibida": body.get("accion"),
+                    "accion_deducida": accion,
+                    "deduccion_activa": body.get("accion") is None
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+
+    except Exception as e:
         return func.HttpResponse(
-          json.dumps({
-            "error": "Falta el parámetro 'tag'. Ejemplo: {\"accion\": \"desplegar\", \"tag\": \"v12\"}"
-          }, ensure_ascii=False),
-          mimetype="application/json",
-          status_code=400
+            json.dumps({
+                "error": str(e),
+                "body_recibido": body,
+                "accion_detectada": locals().get("accion", "no_detectada")
+            }),
+            mimetype="application/json",
+            status_code=500
         )
 
-      comandos = [
-        f"docker build -t copiloto-func-azcli:{tag} .",
-        f"docker tag copiloto-func-azcli:{tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-        "az acr login -n boatrentalacr",
-        f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-        f"az functionapp config container set -g boat-rental-app-group -n copiloto-semantico-func-us2 --docker-custom-image-name boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-        "az functionapp restart -g boat-rental-app-group -n copiloto-semantico-func-us2"
-      ]
 
-      resultados = []
-      for cmd in comandos:
-        try:
-          result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
-          resultados.append({
-            "comando": cmd,
-            "returncode": result.returncode,
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip(),
-            "exito": result.returncode == 0
-          })
-          
-          # Si un comando falla, detener el proceso
-          if result.returncode != 0:
-            break
-            
-        except subprocess.TimeoutExpired:
-          resultados.append({
-            "comando": cmd,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": "Timeout después de 5 minutos",
-            "exito": False
-          })
-          break
+@app.function_name(name="desplegar_funcion_http")
+@app.route(route="desplegar-funcion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Automatiza el despliegue de una nueva versión del contenedor"""
 
-      # Verificar si todos los comandos fueron exitosos
-      todos_exitosos = all(r["exito"] for r in resultados)
-      status_code = 200 if todos_exitosos else 500
+    try:
+        body = req.get_json() if req.get_body() else {}
+        razon = body.get("razon", "Actualización manual")
+        force = body.get("force", False)
 
-      return func.HttpResponse(
-        json.dumps({
-          "accion": "desplegar",
-          "tag": tag,
-          "comandos_ejecutados": comandos,
-          "resultados": resultados,
-          "exito": todos_exitosos,
-          "mensaje": f"Despliegue automático {'completado exitosamente' if todos_exitosos else 'falló'} para la versión {tag}",
-          "comandos_exitosos": len([r for r in resultados if r["exito"]]),
-          "total_comandos": len(comandos)
-        }, ensure_ascii=False),
-        mimetype="application/json",
-        status_code=status_code
-      )
+        # 1. Obtener última versión del ACR
+        result = subprocess.run(
+            ["az", "acr", "repository", "show-tags",
+             "-n", "boatrentalacr",
+             "--repository", "copiloto-func-azcli",
+             "--orderby", "time_desc",
+             "--top", "1"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
 
-    else:
-      return func.HttpResponse(
-        json.dumps({
-          "error": f"Acción '{accion}' no reconocida",
-          "acciones_validas": ["detectar", "preparar", "desplegar"]
-        }, ensure_ascii=False),
-        mimetype="application/json",
-        status_code=400
-      )
+        if result.returncode != 0:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "No se pudo obtener tags del ACR",
+                    "stderr": result.stderr
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=500
+            )
 
-  except Exception as e:
-    return func.HttpResponse(
-      json.dumps({"error": str(e)}),
-      mimetype="application/json",
-      status_code=500
-    )
+        tags = json.loads(result.stdout) if result.stdout else []
+        ultimo_tag = tags[0] if tags else "v0"
+
+        # Extraer número y calcular siguiente
+        import re
+        match = re.search(r'v(\d+)', ultimo_tag)
+        ultimo_numero = int(match.group(1)) if match else 0
+        nuevo_numero = ultimo_numero + 1
+        nuevo_tag = f"v{nuevo_numero}"
+
+        # 2. NO PODEMOS hacer docker build/push desde aquí
+        # Pero podemos actualizar el contenedor si ya existe en ACR
+
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "mensaje": "El endpoint puede detectar versiones pero no puede ejecutar Docker",
+                "ultimo_tag": ultimo_tag,
+                "proximo_tag": nuevo_tag,
+                "limitacion": "Docker build/push debe ejecutarse localmente",
+                "instrucciones": [
+                    f"1. Ejecuta localmente: docker build -t copiloto-func-azcli:{nuevo_tag} .",
+                    f"2. docker tag copiloto-func-azcli:{nuevo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
+                    f"3. az acr login -n boatrentalacr",
+                    f"4. docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
+                    f"5. Llama a /api/actualizar-contenedor con tag={nuevo_tag}"
+                ]
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+@app.function_name(name="actualizar_contenedor_http")
+@app.route(route="actualizar-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Actualiza el contenedor de la Function App a una versión específica"""
+
+    try:
+        body = req.get_json() if req.get_body() else {}
+        tag = body.get("tag")
+
+        if not tag:
+            return func.HttpResponse(
+                json.dumps({"exito": False, "error": "Tag requerido"}),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # Actualizar contenedor
+        imagen = f"boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"
+
+        result = subprocess.run([
+            "az", "functionapp", "config", "container", "set",
+            "-g", "boat-rental-app-group",
+            "-n", "copiloto-semantico-func-us2",
+            "--docker-custom-image-name", imagen
+        ], capture_output=True, text=True, timeout=60)
+
+        if result.returncode != 0:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Error actualizando contenedor",
+                    "stderr": result.stderr
+                }),
+                mimetype="application/json",
+                status_code=500
+            )
+
+        # Reiniciar
+        subprocess.run([
+            "az", "functionapp", "restart",
+            "-g", "boat-rental-app-group",
+            "-n", "copiloto-semantico-func-us2"
+        ], capture_output=True, text=True, timeout=30)
+
+        return func.HttpResponse(
+            json.dumps({
+                "exito": True,
+                "mensaje": f"Contenedor actualizado a {tag}",
+                "imagen": imagen,
+                "timestamp": datetime.now().isoformat()
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
 
 # ========== EJECUTAR CLI ==========
 
