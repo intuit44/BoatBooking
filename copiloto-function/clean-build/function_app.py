@@ -19,7 +19,6 @@ import hashlib
 import logging
 import traceback
 import subprocess
-from collections.abc import Iterator
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar
@@ -3199,102 +3198,141 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.function_name(name="hybrid")
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def hybrid(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('🚀 Hybrid (dinámico) activado')
+def hybrid_executor(req: func.HttpRequest) -> func.HttpResponse:
+    # Inicializar variables antes del try para evitar "possibly unbound"
+    req_body = {}
+    semantic_mode = False
 
     try:
-        req_body = req.get_json()
-        agent_response = req_body.get("agent_response", "").strip()
+        logging.info("🚀 Entrando a hybrid_executor")
 
-        # Intenta extraer JSON embebido (si existe claramente)
-        intencion, parametros = extraer_json_instruccion(agent_response)
-
-        if intencion:
-            logging.info(f"Intención detectada: {intencion}")
-            # Ejecución dinámica (sin predefinir intenciones)
-            resultado = procesar_intencion_hybrid(intencion, parametros)
-        else:
-            # Respuesta rápida para "ping" o instrucciones simples
-            if agent_response.lower() in ["ping", "hola", "hello"]:
-                resultado = {"exito": True, "mensaje": "pong"}
-            else:
-                resultado = {"exito": False,
-                             "error": "No se identificó intención claramente"}
-
-        # Asegurar formato consistente y metadata
-        response = {
-            "resultado": resultado,
-            "metadata": {
-                "timestamp": datetime.now().isoformat(),
-                "endpoint": "hybrid",
-                "version": "2.0-orchestrator",
-                "intencion_detectada": intencion or "ninguna",
-                "ambiente": "Azure" if IS_AZURE else "Local"
-            }
-        }
-
-        return func.HttpResponse(json.dumps(response), mimetype="application/json", status_code=200)
-
-    except Exception as e:
-        logging.error(f"Error en hybrid: {str(e)}")
-        logging.error(f"Traceback: {traceback.format_exc()}")
-
-        error_response = {
-            "resultado": {"exito": False, "error": str(e)},
-            "metadata": {
-                "timestamp": datetime.now().isoformat(),
-                "endpoint": "hybrid",
-                "ambiente": "Azure" if IS_AZURE else "Local"
-            }
-        }
-        return func.HttpResponse(json.dumps(error_response), mimetype="application/json", status_code=200)
-
-
-# Helper claro para extraer JSON embebido dinámicamente
-
-
-def extraer_json_instruccion(texto: str):
-    try:
-        # Expresión clara que detecta JSON dentro de markdown ```
-        matches = re.findall(r'```json\s*(\{.*?\})\s*```', texto, re.DOTALL)
-        if matches:
-            instruccion = json.loads(matches[0])
-            intencion = instruccion.get(
-                'endpoint') or instruccion.get('intencion')
-            parametros = instruccion.get(
-                'data') or instruccion.get('parametros') or {}
-            return intencion, parametros
-    except Exception as e:
-        logging.warning(f"No se pudo extraer JSON claramente: {e}")
-    return None, {}
-
-# Procesamiento dinámico seguro (invocación de endpoints existentes)
-
-
-def procesar_intencion_hybrid(intencion: str, parametros: dict):
-    try:
-        endpoint_url = f"{os.environ['FUNCTION_BASE_URL']}/api/{intencion}"
-        method = parametros.pop('method', 'POST').upper()
-
-        # Solicitud dinámica al endpoint (sin predefinir estructuras)
-        response = requests.request(
-            method, endpoint_url, json=parametros, timeout=30)
-
+        # Manejo seguro de JSON inválido
         try:
-            data = response.json()
-        except:
-            data = {"raw_response": response.text}
+            req_body = req.get_json() or {}
+        except ValueError:
+            req_body = {}
+            logging.warning("JSON inválido recibido, usando objeto vacío")
 
-        return {
-            "exito": response.ok,
-            "status_code": response.status_code,
-            "data": data
-        }
+        # Calcular semantic_mode de forma segura (body o query)
+        semantic_mode = (
+            req_body.get("semantic_response", False) or
+            req.params.get("semantic_response", "false").lower() in (
+                "true", "1", "yes")
+        )
+
+        if "agent_response" not in req_body:
+            error_payload = {"error": "Falta agent_response"}
+
+            if semantic_mode:
+                semantic_response = render_tool_response(400, {
+                    "ok": False,
+                    "error_code": "MISSING_AGENT_RESPONSE",
+                    "cause": "Parámetro agent_response es requerido"
+                })
+                return func.HttpResponse(
+                    semantic_response,
+                    mimetype="text/plain",
+                    status_code=200
+                )
+
+            return func.HttpResponse(
+                json.dumps(error_payload, indent=2),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        agent_response = req_body["agent_response"]
+        agent_name = req_body.get("agent_name", "Architect_BoatRental")
+        logging.info(f'Raw agent_response: {agent_response[:200]}...')
+
+        # USAR EL PARSER MEJORADO
+        parsed_command = clean_agent_response(agent_response)
+        logging.info(f'Comando parseado: {parsed_command}')
+
+        # Manejar errores de parsing
+        if "error" in parsed_command:
+            error_payload = {
+                "success": False,
+                "parsing_error": parsed_command["error"],
+                "suggestion": "Verifica el formato del JSON o usa comandos simples"
+            }
+
+            if semantic_mode:
+                semantic_response = render_tool_response(400, {
+                    "ok": False,
+                    "error_code": "PARSING_ERROR",
+                    "cause": parsed_command["error"]
+                })
+                return func.HttpResponse(
+                    semantic_response,
+                    mimetype="text/plain",
+                    status_code=200
+                )
+
+            return func.HttpResponse(
+                json.dumps(error_payload, indent=2),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # Ejecutar comando parseado
+        result = execute_parsed_command(parsed_command)
+
+        # Determinar status code basado en resultado
+        status_code = 200 if result.get("exito", True) else 400
+
+        # Si se solicita respuesta semántica
+        if semantic_mode:
+            semantic_response = render_tool_response(status_code, {
+                "ok": result.get("exito", True),
+                "error_code": result.get("error") if not result.get("exito", True) else None,
+                "cause": result.get("error") if not result.get("exito", True) else None,
+                "data": result
+            })
+            return func.HttpResponse(
+                semantic_response,
+                mimetype="text/plain",
+                status_code=200
+            )
+
+        # Respuesta JSON estándar
+        return func.HttpResponse(
+            json.dumps({
+                "success": True,
+                "parsed_command": parsed_command,
+                "execution_result": result,
+                "user_response": "✅ Comando ejecutado exitosamente" if result.get("exito", True) else f"❌ Error: {result.get('error')}",
+                "metadata": {
+                    "timestamp": datetime.now().isoformat(),
+                    "agent": agent_name,
+                    "parser_version": "2.0"
+                }
+            }, indent=2, ensure_ascii=False),
+            mimetype="application/json"
+        )
 
     except Exception as e:
-        logging.error(
-            f"Error invocando endpoint dinámico '{intencion}': {str(e)}")
-        return {"exito": False, "error": str(e)}
+        logging.error("💥 Error inesperado en hybrid_executor", exc_info=True)
+        error_payload = {"exito": False, "error": str(e)}
+
+        # Usar semantic_mode de forma segura (ya inicializada)
+        if semantic_mode:
+            semantic_response = render_tool_response(500, {
+                "ok": False,
+                "error_code": "INTERNAL_ERROR",
+                "cause": str(e)
+            })
+            return func.HttpResponse(
+                semantic_response,
+                mimetype="text/plain",
+                status_code=200
+            )
+
+        return func.HttpResponse(
+            json.dumps(error_payload),
+            mimetype="application/json",
+            status_code=500
+        )
 
 
 def process_direct_command(command: dict) -> func.HttpResponse:
@@ -6088,7 +6126,9 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta comandos Azure usando SDK dinámico (sin Azure CLI)"""
+    """Ejecuta comandos Azure CLI con respuestas semánticas mejoradas"""
+
+    comando = ""
 
     try:
         data = req.get_json() if req.get_body() else {}
@@ -6100,151 +6140,140 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "exito": False,
                     "error": "Parámetro 'comando' es requerido",
                     "mensaje_natural": "Por favor, proporciona un comando para ejecutar.",
-                    "ejemplo": {"comando": "group list"},
+                    "ejemplo": {"comando": "account show"},
                     "sugerencias": [
+                        "account show - Ver información de la cuenta",
                         "group list - Listar grupos de recursos",
-                        "storage account list - Listar cuentas de almacenamiento",
-                        "webapp list - Listar aplicaciones web"
+                        "vm list - Listar máquinas virtuales",
+                        "storage account list - Listar cuentas de almacenamiento"
                     ]
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
-        # Obtener credenciales y subscription_id
-        try:
-            credential = ManagedIdentityCredential()
-            subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
+        # TEMPORAL: Credenciales hardcodeadas
+        client_id = "2018226a-7270-4697-b6b2-0a38d8f04e47"
+        client_secret = "oiZ8Q~L9nH1lmCJYOwRA~p.E2zBcwROsehb3wdyL"
+        tenant_id = "978d9cc6-784c-4c98-8d90-a4a6344a65ff"
+        subscription_id = "380fa841-83f3-42fe-adc4-582a5ebe139b"
 
-            if not subscription_id:
-                raise ValueError("AZURE_SUBSCRIPTION_ID no configurado")
+        # Comandos sin autenticación
+        comandos_sin_auth = ["version", "--version", "help", "--help"]
+        if comando in comandos_sin_auth:
+            result = subprocess.run(
+                ["az"] + comando.split(),
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
 
-        except Exception as e:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": result.returncode == 0,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "comando_ejecutado": f"az {comando}",
+                    "mensaje_natural": "Comando de información ejecutado correctamente."
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+
+        # Login con Service Principal
+        login_cmd = [
+            "az", "login",
+            "--service-principal",
+            "-u", client_id,
+            "-p", client_secret,
+            "--tenant", tenant_id
+        ]
+
+        login_result = subprocess.run(
+            login_cmd, capture_output=True, text=True, timeout=15)
+
+        if login_result.returncode != 0:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": "Error de autenticación",
-                    "mensaje_natural": "No pude autenticarme con Azure usando Managed Identity.",
-                    "detalles_tecnicos": str(e),
+                    "mensaje_natural": "No pude autenticarme con Azure. Verifica las credenciales del Service Principal.",
+                    "detalles_tecnicos": login_result.stderr,
                     "sugerencias": [
-                        "Verificar que la Managed Identity está habilitada",
-                        "Confirmar que AZURE_SUBSCRIPTION_ID está configurado",
-                        "Revisar los permisos asignados a la identidad"
+                        "Verificar que el Service Principal existe",
+                        "Confirmar que las credenciales no han expirado",
+                        "Revisar los permisos asignados"
                     ]
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=401
             )
 
-        # Parsear comando
-        partes_comando = comando.split()
-        if len(partes_comando) < 2:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Formato de comando inválido",
-                    "mensaje_natural": f"El comando '{comando}' no tiene el formato esperado.",
-                    "formato_esperado": "servicio operacion [parametros]",
-                    "ejemplo": "group list"
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
+        # Set subscription
+        subprocess.run(
+            ["az", "account", "set", "--subscription", subscription_id],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
 
-        # Normalizar comandos estilo CLI a formato SDK
-        normalizaciones = {
-            ("storage", "account", "list"): ("storage", "list", []),
-            ("group", "list"): ("group", "list", []),
-            ("webapp", "list"): ("webapp", "list", []),
-        }
+        # Ejecutar comando
+        result = subprocess.run(
+            ["az"] + comando.split(),
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
 
-        clave = tuple(partes_comando[:3]) if len(
-            partes_comando) >= 3 else tuple(partes_comando)
-        if clave in normalizaciones:
-            servicio, operacion, params = normalizaciones[clave]
-        else:
-            servicio = partes_comando[0]
-            operacion = partes_comando[1]
-            params = partes_comando[2:] if len(partes_comando) > 2 else []
-
-        # Mapear servicios a clientes SDK
-        clientes_sdk = {
-            "group": ResourceManagementClient,
-            "storage": StorageManagementClient,
-            "webapp": WebSiteManagementClient,
-        }
-
-        if servicio not in clientes_sdk:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Servicio '{servicio}' no soportado",
-                    "mensaje_natural": f"El servicio '{servicio}' no está disponible en el SDK.",
-                    "servicios_soportados": list(clientes_sdk.keys()),
-                    "sugerencias": [
-                        "Usa 'group' para gestión de recursos",
-                        "Usa 'storage' para cuentas de almacenamiento",
-                        "Usa 'webapp' para aplicaciones web"
-                    ]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Crear cliente SDK
+        # Parsear resultado
         try:
-            cliente = clientes_sdk[servicio](credential, subscription_id)
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Error creando cliente SDK",
-                    "mensaje_natural": f"No pude crear el cliente para el servicio '{servicio}'.",
-                    "detalles_tecnicos": str(e)
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
+            output_json = json.loads(
+                result.stdout) if result.stdout.strip() else None
+        except json.JSONDecodeError:
+            output_json = None
 
-        # Ejecutar operación dinámica
-        try:
-            resultado = ejecutar_operacion_dinamica(cliente, operacion, params)
+        # Generar mensaje natural basado en el comando y resultado
+        mensaje_natural = generar_mensaje_natural(comando, output_json, result)
 
-            # Generar mensaje natural
-            mensaje_natural = generar_mensaje_natural_sdk(
-                servicio, operacion, resultado)
+        # Normalizar respuesta para arrays/objetos
+        if output_json is not None:
+            # Si es un objeto único y el comando esperaba una lista, convertir
+            if isinstance(output_json, dict) and any(cmd in comando for cmd in ["list", "show-all"]):
+                output_json = [output_json]
+            # Si es una lista vacía, mantenerla como lista
+            elif output_json == []:
+                mensaje_natural = f"No se encontraron recursos para el comando '{comando}'."
 
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "stdout": resultado,
-                    "comando_ejecutado": f"{servicio} {operacion}",
-                    "comando_original": comando,
-                    "mensaje_natural": mensaje_natural,
-                    "metodo": "Azure SDK",
-                    "timestamp": datetime.now().isoformat(),
-                    "total_resultados": len(resultado) if isinstance(resultado, list) else 1
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
+        return func.HttpResponse(
+            json.dumps({
+                "exito": result.returncode == 0,
+                "codigo_salida": result.returncode,
+                "stdout": output_json if output_json is not None else result.stdout.strip(),
+                "stderr": result.stderr if result.stderr else None,
+                "comando_ejecutado": f"az {comando}",
+                "mensaje_natural": mensaje_natural,
+                "autenticacion": "Service Principal",
+                "timestamp": datetime.now().isoformat()
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
 
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": str(e),
-                    "mensaje_natural": f"Error ejecutando '{operacion}' en el servicio '{servicio}'.",
-                    "comando": comando,
-                    "sugerencias": [
-                        "Verifica que la operación existe en el SDK",
-                        "Confirma que tienes permisos para la operación",
-                        "Revisa la sintaxis de los parámetros"
-                    ]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
+    except subprocess.TimeoutExpired:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "Timeout",
+                "mensaje_natural": f"El comando '{comando}' tardó demasiado tiempo en ejecutarse (más de 60 segundos).",
+                "sugerencias": [
+                    "Intenta con un filtro más específico",
+                    "Usa --query para limitar los resultados",
+                    "Divide la operación en comandos más pequeños"
+                ]
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=408
+        )
 
     except Exception as e:
         logging.exception("ejecutar_cli_http failed")
@@ -6253,11 +6282,12 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 "exito": False,
                 "error": str(e),
                 "tipo_error": type(e).__name__,
-                "mensaje_natural": "Ocurrió un error inesperado al procesar la solicitud.",
+                "mensaje_natural": f"Ocurrió un error inesperado al ejecutar el comando.",
+                "comando": comando,
                 "sugerencias": [
-                    "Verifica el formato JSON de la solicitud",
-                    "Confirma que todos los parámetros son válidos",
-                    "Intenta con un comando más simple"
+                    "Verifica la sintaxis del comando",
+                    "Revisa que el recurso existe",
+                    "Intenta con un comando más simple primero"
                 ]
             }, ensure_ascii=False),
             mimetype="application/json",
@@ -6265,106 +6295,52 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-def ejecutar_operacion_dinamica(cliente, operacion: str, params: list):
-    """
-    Ejecuta operaciones dinámicas usando los clientes SDK de Azure
-    Maneja operaciones comunes como list, show, create, etc.
-    """
-    # Mapeo de operaciones comunes a métodos SDK
-    if operacion == "list":
-        if hasattr(cliente, "resource_groups"):
-            # ResourceManagementClient
-            items = list(cliente.resource_groups.list())
-            return [{"name": item.name, "location": item.location, "id": item.id} for item in items]
-        elif hasattr(cliente, "storage_accounts"):
-            # StorageManagementClient
-            items = list(cliente.storage_accounts.list())
-            return [{"name": item.name, "location": item.location, "kind": item.kind} for item in items]
-        elif hasattr(cliente, "web_apps"):
-            # WebSiteManagementClient
-            items = list(cliente.web_apps.list())
-            return [{"name": item.name, "location": item.location, "state": item.state} for item in items]
+def generar_mensaje_natural(comando: str, output: Any, result: Any) -> str:
+    """Genera un mensaje natural basado en el comando y resultado"""
 
-    elif operacion == "show" and len(params) >= 1:
-        resource_name = params[0]
-        resource_group = params[1] if len(params) >= 2 else None
+    if result.returncode != 0:
+        return f"El comando falló. Revisa los detalles técnicos para más información."
 
-        if hasattr(cliente, "resource_groups") and not resource_group:
-            # ResourceManagementClient - mostrar resource group
-            item = cliente.resource_groups.get(resource_name)
-            return {
-                "name": item.name,
-                "location": item.location,
-                "id": item.id,
-                "properties": item.properties.__dict__ if item.properties else {}
-            }
-        elif hasattr(cliente, "storage_accounts") and resource_group:
-            # StorageManagementClient - mostrar storage account
-            item = cliente.storage_accounts.get_properties(
-                resource_group, resource_name)
-            return {
-                "name": item.name,
-                "location": item.location,
-                "kind": item.kind,
-                "sku": item.sku.name if item.sku else None,
-                "status": item.status_of_primary
-            }
-        elif hasattr(cliente, "web_apps") and resource_group:
-            # WebSiteManagementClient - mostrar web app
-            item = cliente.web_apps.get(resource_group, resource_name)
-            return {
-                "name": item.name,
-                "location": item.location,
-                "state": item.state,
-                "kind": item.kind,
-                "default_host_name": item.default_host_name
-            }
-
-    # Si no encuentra la operación, lanzar excepción descriptiva
-    raise NotImplementedError(
-        f"Operación '{operacion}' no implementada para este tipo de cliente")
-
-
-def generar_mensaje_natural_sdk(servicio: str, operacion: str, resultado):
-    """
-    Genera mensajes naturales basados en resultados del SDK
-    """
-    if operacion == "list":
-        if isinstance(resultado, list):
-            count = len(resultado)
-            if servicio == "group":
-                return f"✅ Encontré {count} grupos de recursos en la suscripción."
-            elif servicio == "storage":
-                return f"✅ Encontré {count} cuentas de almacenamiento en la suscripción."
-            elif servicio == "webapp":
-                return f"✅ Encontré {count} aplicaciones web en la suscripción."
-            else:
-                return f"✅ Operación list completada. {count} elementos encontrados."
+    # Mensajes específicos por comando
+    if "group list" in comando:
+        if output and isinstance(output, list):
+            return f"Encontré {len(output)} grupos de recursos en tu suscripción."
+        elif output:
+            return "Encontré 1 grupo de recursos en tu suscripción."
         else:
-            return "✅ Operación list completada."
+            return "No se encontraron grupos de recursos."
 
-    elif operacion == "show":
-        if isinstance(resultado, dict):
-            nombre = resultado.get("name", "recurso")
-            ubicacion = resultado.get("location", "ubicación desconocida")
-            if servicio == "group":
-                return f"✅ Información del grupo de recursos '{nombre}' en {ubicacion}."
-            elif servicio == "storage":
-                tipo = resultado.get("kind", "tipo desconocido")
-                estado = resultado.get("status", "estado desconocido")
-                return f"✅ Cuenta de almacenamiento '{nombre}' ({tipo}) en {ubicacion}. Estado: {estado}."
-            elif servicio == "webapp":
-                estado = resultado.get("state", "estado desconocido")
-                url = resultado.get("default_host_name", "")
-                url_text = f" (https://{url})" if url else ""
-                return f"✅ Aplicación web '{nombre}' en {ubicacion}. Estado: {estado}{url_text}."
-            else:
-                return f"✅ Información del recurso '{nombre}' obtenida correctamente."
+    elif "vm list" in comando:
+        if output and isinstance(output, list):
+            return f"Encontré {len(output)} máquinas virtuales en tu suscripción."
+        elif output and isinstance(output, dict):
+            return "Encontré 1 máquina virtual en tu suscripción."
         else:
-            return "✅ Operación show completada."
+            return "No se encontraron máquinas virtuales."
 
+    elif "storage account list" in comando:
+        if output and isinstance(output, list):
+            return f"Encontré {len(output)} cuentas de almacenamiento."
+        else:
+            return "No se encontraron cuentas de almacenamiento."
+
+    elif "account show" in comando:
+        if output:
+            return "Información de la cuenta obtenida correctamente."
+        else:
+            return "No se pudo obtener información de la cuenta."
+
+    elif "role assignment list" in comando:
+        if output and isinstance(output, list):
+            return f"Se encontraron {len(output)} asignaciones de roles."
+        else:
+            return "No se encontraron asignaciones de roles."
+
+    # Mensaje genérico
+    if output:
+        return f"Comando '{comando}' ejecutado correctamente."
     else:
-        return f"✅ Operación '{operacion}' en servicio '{servicio}' completada exitosamente."
+        return f"Comando '{comando}' ejecutado pero no devolvió resultados."
 
 
 def obtener_credenciales_azure():

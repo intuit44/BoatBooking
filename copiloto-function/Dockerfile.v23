@@ -1,0 +1,30 @@
+﻿FROM mcr.microsoft.com/azure-functions/python:4-python3.11
+
+# Instalar Azure CLI primero
+RUN apt-get update && \
+    apt-get install -y curl apt-transport-https lsb-release gnupg && \
+    curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+# Establecer directorio de trabajo
+WORKDIR /home/site/wwwroot
+
+# Copiar requirements.txt
+COPY requirements.txt .
+
+# Instalar dependencias Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar TODO el código
+COPY . .
+
+# Verificar que los archivos críticos existen
+RUN test -f function_app.py || exit 1
+RUN test -f host.json || echo '{"version": "2.0", "logging": {"applicationInsights": {"samplingSettings": {"isEnabled": true}}}}' > host.json
+
+# Variables de entorno
+ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
+    FUNCTIONS_WORKER_RUNTIME=python
+
+# Permisos
+RUN chmod -R 755 /home/site/wwwroot

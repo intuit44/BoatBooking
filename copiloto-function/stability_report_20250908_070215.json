@@ -1,0 +1,83 @@
+{
+  "timestamp": "20250908_070215",
+  "report": {
+    "summary": {
+      "total": 11,
+      "passed": 5,
+      "failed": 2,
+      "warnings": 4
+    },
+    "critical_issues": [
+      "Autenticaci\u00f3n con Managed Identity faltante",
+      "Autenticaci\u00f3n con Managed Identity faltante"
+    ],
+    "test_details": [
+      {
+        "name": "Endpoint: Status",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Endpoint: Health",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Endpoint: Listar Blobs",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "SDK CLI: Listar grupos de recursos",
+        "status": "\u274c FAILED",
+        "message": "Error de autenticaci\u00f3n (401)",
+        "fix": "Verificar Managed Identity y AZURE_SUBSCRIPTION_ID"
+      },
+      {
+        "name": "SDK CLI: Listar cuentas de almacenamiento",
+        "status": "\u274c FAILED",
+        "message": "Error de autenticaci\u00f3n (401)",
+        "fix": "Verificar Managed Identity y AZURE_SUBSCRIPTION_ID"
+      },
+      {
+        "name": "Formato Directo en /api/ejecutar-cli",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "No autenticado pero formato correcto",
+        "fix": null
+      },
+      {
+        "name": "Formato Wrapper en /api/invocar",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "No autenticado pero formato correcto",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: Dashboard",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "Respuesta recibida pero sin contenido esperado",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: Diagn\u00f3stico Completo",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "Respuesta recibida pero sin contenido esperado",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: Verificar Almacenamiento",
+        "status": "\u2705 PASSED",
+        "message": "Intenci\u00f3n procesada correctamente",
+        "fix": null
+      },
+      {
+        "name": "Storage: Crear Contenedor",
+        "status": "\u2705 PASSED",
+        "message": "Contenedor test-container-1757329335 creado",
+        "fix": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "timestamp": "20250908_031250",
+  "report": {
+    "summary": {
+      "total": 15,
+      "passed": 7,
+      "failed": 3,
+      "warnings": 5
+    },
+    "critical_issues": [
+      "Azure CLI no est\u00e1 en PATH",
+      "Autenticaci\u00f3n Azure faltante",
+      "Autenticaci\u00f3n Azure faltante"
+    ],
+    "test_details": [
+      {
+        "name": "Azure CLI en PATH",
+        "status": "\u274c FAILED",
+        "message": "Azure CLI no encontrado en PATH",
+        "fix": "Agregar Azure CLI al PATH del sistema o instalar si no existe"
+      },
+      {
+        "name": "Azure: /api/status",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Local: /api/status",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Azure: /api/health",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Local: /api/health",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Azure: /api/listar-blobs",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Local: /api/listar-blobs",
+        "status": "\u2705 PASSED",
+        "message": "OK (200)",
+        "fix": null
+      },
+      {
+        "name": "Formato JSON Directo (Correcto)",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "No autenticado pero formato correcto",
+        "fix": null
+      },
+      {
+        "name": "Formato JSON con Wrapper (Para /api/invocar)",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "No autenticado pero formato correcto",
+        "fix": null
+      },
+      {
+        "name": "Auth Test: account show",
+        "status": "\u274c FAILED",
+        "message": "No autenticado (401)",
+        "fix": "Ejecutar 'az login' en el contenedor o configurar Service Principal"
+      },
+      {
+        "name": "Auth Test: group list --query '[0].name' -o tsv",
+        "status": "\u274c FAILED",
+        "message": "No autenticado (401)",
+        "fix": "Ejecutar 'az login' en el contenedor o configurar Service Principal"
+      },
+      {
+        "name": "Intenci\u00f3n: dashboard",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "maximum recursion depth exceeded while calling a Python object",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: diagnosticar:completo",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "Respuesta no esperada",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: verificar:almacenamiento",
+        "status": "\u2705 PASSED",
+        "message": "Intenci\u00f3n procesada correctamente",
+        "fix": null
+      },
+      {
+        "name": "Intenci\u00f3n: listar:contenedores",
+        "status": "\u26a0\ufe0f WARNING",
+        "message": "Respuesta no esperada",
+        "fix": null
+      }
+    ]
+  }
+}
