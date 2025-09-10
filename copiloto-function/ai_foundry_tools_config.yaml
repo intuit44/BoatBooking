@@ -1,0 +1,78 @@
+tools:
+  - name: azure_cli_executor
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/ejecutar-cli
+          method: POST
+          description: Ejecuta comandos Azure CLI
+          parameters:
+            comando:
+              type: string
+              required: true
+              description: Comando a ejecutar (sin 'az' al inicio)
+        
+        - path: /api/status
+          method: GET
+          description: Verifica el estado del sistema
+        
+        - path: /api/listar-blobs
+          method: GET
+          description: Lista archivos en blob storage
+          parameters:
+            prefix:
+              type: string
+              required: false
+              description: Prefijo para filtrar archivos
+        
+        - path: /api/invocar
+          method: POST
+          description: Proxy para otros endpoints
+          parameters:
+            endpoint:
+              type: string
+              required: true
+              description: Nombre del endpoint (sin /api/)
+            method:
+              type: string
+              required: true
+              description: Método HTTP (GET/POST)
+            data:
+              type: object
+              required: false
+              description: Datos para el endpoint destino
+        
+        - path: /api/diagnostico-recursos
+          method: GET
+          description: Diagnóstico completo de recursos Azure
+          parameters:
+            metricas:
+              type: boolean
+              required: false
+              description: Incluir métricas de rendimiento
+            costos:
+              type: boolean
+              required: false
+              description: Incluir análisis de costos
+            recurso:
+              type: string
+              required: false
+              description: Recurso específico a diagnosticar
+        
+        - path: /api/crear-contenedor
+          method: POST
+          description: Crear contenedor en Blob Storage
+          parameters:
+            nombre:
+              type: string
+              required: true
+              description: Nombre del contenedor (3-63 chars, minúsculas)
+            publico:
+              type: boolean
+              required: false
+              description: Si el contenedor será de acceso público
+            metadata:
+              type: object
+              required: false
+              description: Metadata adicional del contenedor

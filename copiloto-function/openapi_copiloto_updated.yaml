@@ -100,134 +100,184 @@
           }
         }
       }
-    },
-    "/api/ejecutar-cli": {
-      "post": {
-        "summary": "Ejecutar comando Azure CLI",
-        "operationId": "ejecutarCLI",
+     },
+      "/api/invocar": {
+        "post": {
+        "summary": "Proxy para otros endpoints",
+        "operationId": "invocar",
         "tags": [
-          "Azure CLI"
+          "Proxy"
         ],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "comando"
-                ],
-                "properties": {
-                  "servicio": {
-                    "type": "string",
-                    "enum": [
-                      "storage",
-                      "functionapp",
-                      "webapp",
-                      "monitor",
-                      "resource"
-                    ],
-                    "description": "Servicio Azure a utilizar"
-                  },
-                  "comando": {
-                    "type": "string",
-                    "description": "Comando a ejecutar (sin 'az' prefix)"
-                  },
-                  "parametros": {
-                    "type": "object",
-                    "description": "Parámetros del comando",
-                    "additionalProperties": true
-                  },
-                  "timeout": {
-                    "type": "integer",
-                    "default": 30,
-                    "description": "Timeout en segundos"
-                  },
-                  "confirmar_operacion_peligrosa": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Requerido para comandos delete/remove/purge"
-                  }
-                }
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "required": [
+              "endpoint",
+              "method"
+            ],
+            "properties": {
+              "endpoint": {
+              "type": "string",
+              "description": "Nombre del endpoint (sin /api/)",
+              "examples": ["ejecutar-cli", "status", "health"]
               },
-              "examples": {
-                "listar_storage": {
-                  "value": {
-                    "servicio": "storage",
-                    "comando": "account list"
-                  }
-                },
-                "mostrar_functionapp": {
-                  "value": {
-                    "servicio": "functionapp",
-                    "comando": "show",
-                    "parametros": {
-                      "name": "copiloto-semantico-func",
-                      "resource-group": "boat-rental-app-group"
-                    }
-                  }
-                },
-                "operacion_peligrosa": {
-                  "value": {
-                    "servicio": "storage",
-                    "comando": "container delete",
-                    "parametros": {
-                      "name": "temp-container"
-                    },
-                    "confirmar_operacion_peligrosa": true
-                  }
-                }
+              "method": {
+              "type": "string",
+              "enum": ["GET", "POST"],
+              "description": "Método HTTP"
+              },
+              "data": {
+              "type": "object",
+              "description": "Datos para el endpoint destino",
+              "additionalProperties": true
               }
             }
+            },
+            "examples": {
+            "ejecutar_cli": {
+              "value": {
+              "endpoint": "ejecutar-cli",
+              "method": "POST",
+              "data": {
+                "comando": "account show"
+              }
+              }
+            },
+            "status": {
+              "value": {
+              "endpoint": "status",
+              "method": "GET"
+              }
+            }
+            }
+          }
           }
         },
         "responses": {
           "200": {
-            "description": "Comando ejecutado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exito": {
-                      "type": "boolean"
-                    },
-                    "comando_ejecutado": {
-                      "type": "string"
-                    },
-                    "output": {
-                      "oneOf": [
-                        {
-                          "type": "object"
-                        },
-                        {
-                          "type": "array"
-                        },
-                        {
-                          "type": "string"
-                        }
-                      ]
-                    },
-                    "error": {
-                      "type": "string"
-                    },
-                    "codigo_salida": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
+          "description": "Respuesta del endpoint destino",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
             }
+            }
+          }
           },
-          "403": {
-            "description": "Operación no permitida o requiere confirmación"
+          "400": {
+          "description": "Endpoint no válido o parámetros incorrectos"
           },
-          "408": {
-            "description": "Timeout excedido"
+          "500": {
+          "description": "Error en el endpoint destino"
           }
         }
-      }
-    },
+        }
+       },    "/api/ejecutar-cli": {
+        "post": {
+        "summary": "Ejecuta comandos de Azure CLI",
+        "operationId": "ejecutarCLI",
+        "tags": [
+          "Azure CLI"
+        ],
+        "x-tool-definition": {
+          "name": "ejecutar_cli",
+          "description": "Ejecuta comandos de Azure CLI",
+          "parameters": {
+          "type": "object",
+          "properties": {
+            "comando": {
+            "type": "string",
+            "description": "El comando Azure CLI a ejecutar (sin 'az' al inicio)"
+            }
+          },
+          "required": ["comando"]
+          },
+          "endpoint": "https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli",
+          "method": "POST"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "required": [
+              "comando"
+            ],
+            "properties": {
+              "comando": {
+              "type": "string",
+              "description": "El comando Azure CLI a ejecutar (sin 'az' al inicio)"
+              }
+            }
+            },
+            "examples": {
+            "storage_list": {
+              "value": {
+              "comando": "storage account list"
+              }
+            },
+            "functionapp_show": {
+              "value": {
+              "comando": "functionapp show --name copiloto-semantico-func --resource-group boat-rental-app-group"
+              }
+            }
+            }
+          }
+          }
+        },
+        "responses": {
+          "200": {
+          "description": "Comando ejecutado",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+              "exito": {
+                "type": "boolean"
+              },
+              "comando_ejecutado": {
+                "type": "string"
+              },
+              "output": {
+                "oneOf": [
+                {
+                  "type": "object"
+                },
+                {
+                  "type": "array"
+                },
+                {
+                  "type": "string"
+                }
+                ]
+              },
+              "error": {
+                "type": "string"
+              },
+              "codigo_salida": {
+                "type": "integer"
+              }
+              }
+            }
+            }
+          }
+          },
+          "403": {
+          "description": "Operación no permitida o requiere confirmación"
+          },
+          "408": {
+          "description": "Timeout excedido"
+          }
+        }
+        }
+      },
+
     "/api/diagnostico-recursos": {
       "get": {
         "summary": "Diagnóstico completo de recursos Azure",
@@ -1637,63 +1687,7 @@
         }
       }
     },
-    "/api/invocar": {
-      "post": {
-        "summary": "Invocar endpoints internamente",
-        "operationId": "invocarInterno",
-        "tags": [
-          "Internal"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "endpoint"
-                ],
-                "properties": {
-                  "endpoint": {
-                    "type": "string"
-                  },
-                  "method": {
-                    "type": "string",
-                    "default": "GET"
-                  },
-                  "mensaje": {
-                    "type": "string"
-                  },
-                  "intencion": {
-                    "type": "string"
-                  },
-                  "parametros": {
-                    "type": "object"
-                  },
-                  "contexto": {
-                    "type": "object"
-                  },
-                  "modo": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Endpoint invocado",
-            "content": {
-              "application/json": {}
-            }
-          },
-          "400": {
-            "description": "Endpoint no manejado"
-          }
-        }
-      }
-    },
+
     "/api/diagnostico-configurar": {
       "post": {
         "summary": "Configurar diagnósticos Azure Monitor",
