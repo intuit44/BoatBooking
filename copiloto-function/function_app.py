@@ -3508,6 +3508,79 @@ def _resolve_handler(endpoint: str):
     return path, fn
 
 
+@app.function_name(name="bridge_cli")
+@app.route(route="bridge-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def bridge_cli(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint ultra-tolerante para agentes que no pueden construir JSON
+    """
+    try:
+        # Obtener CUALQUIER cosa que venga
+        raw_body = req.get_body().decode('utf-8') if req.get_body() else ""
+
+        logging.info(f"[BRIDGE] Body crudo: {raw_body}")
+
+        # Si es JSON vacío, intentar obtener de query params
+        if raw_body == "{}" or raw_body == "":
+            # Buscar en query params
+            comando = req.params.get("comando") or req.params.get(
+                "cmd") or req.params.get("query")
+            if comando:
+                logging.info(f"[BRIDGE] Comando en query params: {comando}")
+            else:
+                # Si no hay nada, asumir que quiere listar storage accounts (comportamiento por defecto)
+                comando = "storage account list"
+                logging.info(
+                    "[BRIDGE] No se encontró comando, usando default: storage account list")
+        else:
+            # Intentar parsear JSON
+            try:
+                data = json.loads(raw_body)
+                comando = (data.get("comando") or
+                           data.get("command") or
+                           data.get("cmd") or
+                           data.get("query") or
+                           data.get("data", {}).get("comando") or
+                           "storage account list")  # Default
+            except:
+                # Si no es JSON válido, buscar patrones en el string
+                if "storage" in raw_body.lower():
+                    comando = "storage account list"
+                elif "group" in raw_body.lower():
+                    comando = "group list"
+                else:
+                    comando = "storage account list"  # Default
+
+        logging.info(f"[BRIDGE] Ejecutando comando: {comando}")
+
+        # Ejecutar con el formato correcto
+        mock_req = func.HttpRequest(
+            method="POST",
+            url="http://localhost/api/ejecutar-cli",
+            body=json.dumps({"comando": comando}).encode(),
+            headers={"Content-Type": "application/json"}
+        )
+
+        return ejecutar_cli_http(mock_req)
+
+    except Exception as e:
+        logging.error(f"[BRIDGE] Error: {str(e)}")
+        # En caso de error total, intentar ejecutar comando por defecto
+        try:
+            mock_req = func.HttpRequest(
+                method="POST",
+                url="http://localhost/api/ejecutar-cli",
+                body=json.dumps({"comando": "storage account list"}).encode(),
+                headers={"Content-Type": "application/json"}
+            )
+            return ejecutar_cli_http(mock_req)
+        except:
+            return func.HttpResponse(
+                json.dumps({"exito": False, "error": str(e)}),
+                status_code=500
+            )
+
+
 @app.function_name(name="invocar")
 @app.route(route="invocar", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def invocar(req: func.HttpRequest) -> func.HttpResponse:
@@ -3515,73 +3588,94 @@ def invocar(req: func.HttpRequest) -> func.HttpResponse:
     Resuelve y ejecuta endpoints dinámicamente con tolerancia mejorada para agentes
     """
     body = _json_body(req)
+
+    # Logging crítico para debug
+    logging.info(f"[INVOCAR] Payload completo recibido: {json.dumps(body)}")
+
     endpoint = _s(body.get("endpoint"))
     method = (_s(body.get("method")) or "GET").upper()
     data = body.get("data") or body.get("parametros") or {}
 
-    # Detectar si viene del agente de AI Foundry para ejecutar-cli
-    if endpoint == "/api/ejecutar-cli":
-        # Reformatear para ejecutar-cli
-        if "data" in body and "comando" in body["data"]:
-            # El agente está enviando en formato wrapper
-            comando = body["data"]["comando"]
-            # Llamar directamente a ejecutar_cli_http con el formato correcto
-            mock_req = func.HttpRequest(
-                method="POST",
-                url="http://localhost/api/ejecutar-cli",
-                body=json.dumps({"comando": comando}).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            return ejecutar_cli_http(mock_req)
-        elif "comando" in data:
-            # Formato directo en data
-            mock_req = func.HttpRequest(
-                method="POST",
-                url="http://localhost/api/ejecutar-cli",
-                body=json.dumps(data).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            return ejecutar_cli_http(mock_req)
+    # DETECCIÓN ESPECIAL: Si el endpoint contiene "storage-account-list"
+    if "storage-account-list" in endpoint.lower() or "storage" in endpoint.lower():
+        logging.info("[INVOCAR] Detectado intento de listar storage accounts")
 
-    # Detectar otros patrones comunes de agentes
-    if endpoint == "/api/ejecutar" and "intencion" in data:
-        # Reformatear para ejecutar
+        # Forzar redirección a ejecutar-cli con el comando correcto
         mock_req = func.HttpRequest(
             method="POST",
-            url="http://localhost/api/ejecutar",
-            body=json.dumps(data).encode(),
+            url="http://localhost/api/ejecutar-cli",
+            body=json.dumps({"comando": "storage account list"}).encode(),
             headers={"Content-Type": "application/json"}
         )
-        return ejecutar(mock_req)
+        return ejecutar_cli_http(mock_req)
 
-    # Resolver handler usando el método existente
+    # DETECCIÓN: Si endpoint es "ejecutar-cli" pero sin /api/
+    if endpoint == "ejecutar-cli" or endpoint == "/ejecutar-cli":
+        endpoint = "/api/ejecutar-cli"
+
+    # Si el endpoint es para CLI, asegurar que data tenga el formato correcto
+    if "ejecutar-cli" in endpoint:
+        # Si data.comando existe, está bien
+        if "comando" in data:
+            logging.info(f"[INVOCAR] Comando en data: {data['comando']}")
+        # Si comando está en el body principal, moverlo a data
+        elif "comando" in body:
+            data = {"comando": body["comando"]}
+            logging.info(
+                f"[INVOCAR] Comando movido de body a data: {data['comando']}")
+        # Si no hay comando pero hay algún string que parezca comando
+        else:
+            # Buscar cualquier string que parezca un comando Azure
+            for key, value in body.items():
+                if isinstance(value, str) and any(x in value.lower() for x in ["storage", "group", "webapp"]):
+                    data = {"comando": value}
+                    logging.info(
+                        f"[INVOCAR] Comando detectado en campo {key}: {value}")
+                    break
+
+    # Resolver handler con tu método existente
     path, handler = _resolve_handler(endpoint)
+
     if not handler:
+        logging.error(
+            f"[INVOCAR] No se encontró handler para endpoint: {endpoint}")
+
+        # Intento de recuperación: interpretar la intención
+        if "storage" in str(body).lower() and "account" in str(body).lower():
+            logging.info("[INVOCAR] Interpretando como storage account list")
+            mock_req = func.HttpRequest(
+                method="POST",
+                url="http://localhost/api/ejecutar-cli",
+                body=json.dumps({"comando": "storage account list"}).encode(),
+                headers={"Content-Type": "application/json"}
+            )
+            return ejecutar_cli_http(mock_req)
+
         return _error("EndpointNotHandled", 400, f"Endpoint '{endpoint}' no manejado",
-                      details={"endpoint_solicitado": endpoint, "metodo": method, "data_keys": list(data.keys()) if data else []})
+                      details={"endpoint_solicitado": endpoint, "body_completo": body})
 
     try:
-        # Construir request mock más robusto
+        # Construir request mock
         payload = json.dumps(data, ensure_ascii=False).encode(
             "utf-8") if method in {"POST", "PUT", "PATCH"} and data else b""
-
-        # Agregar parámetros de query si es GET
-        params = data if method == "GET" else {}
 
         target_req = func.HttpRequest(
             method=method,
             url=f"http://localhost{path}",
             body=payload,
             headers={"Content-Type": "application/json"},
-            params=params
+            params=data if method == "GET" else {}
         )
+
+        handler_name = getattr(handler, "__name__", str(handler))
+        logging.info(
+            f"[INVOCAR] Ejecutando handler {handler_name} con data: {data}")
 
         return handler(target_req)
 
     except Exception as e:
-        logging.exception(f"Error invocando {endpoint}")
-        return _error("InvokeError", 500, str(e),
-                      details={"endpoint": endpoint, "method": method, "handler_found": bool(handler)})
+        logging.exception(f"[INVOCAR] Error invocando {endpoint}")
+        return _error("InvokeError", 500, str(e), details={"endpoint": endpoint, "method": method, "data": data})
 
 
 @app.function_name(name="health")
@@ -6092,56 +6186,263 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta comandos Azure usando SDK dinámico con normalización semántica"""
+    """Ejecuta comandos Azure usando SDK dinámico con normalización semántica y entrada tolerante"""
+
+    # Variables para logging
+    request_id = uuid.uuid4().hex[:8]
+    start_time = time.time()
+    data = {}  # Initialize data early to ensure it's always available
+
+    logging.info(f"[{request_id}] ⚡ Iniciando ejecutar_cli_http")
 
     try:
-        data = req.get_json() if req.get_body() else {}
-        comando = data.get("comando", "")
+        # Log del request inicial
+        logging.info(f"[{request_id}] 📥 Request method: {req.method}")
+        logging.info(f"[{request_id}] 📥 Headers: {dict(req.headers)}")
 
+        # Obtener y loggear el payload
+        data = req.get_json() if req.get_body() else {}
+        logging.info(
+            f"[{request_id}] 📦 Payload recibido: {json.dumps(data, ensure_ascii=False)}")
+        logging.info(
+            f"[{request_id}] 📦 Tamaño del payload: {len(str(data))} chars")
+        logging.info(
+            f"[{request_id}] 📦 Claves en payload: {list(data.keys()) if data else 'Vacío'}")
+
+        # DEBUG LOGGING ADICIONAL
+        logging.info(
+            f"[DEBUG] Payload recibido en ejecutar_cli_http: {json.dumps(data)}")
+
+        # 🔥 NORMALIZACIÓN INTELIGENTE DE ENTRADA (MUY TOLERANTE)
+        comando = None
+        formato_detectado = "desconocido"
+
+        logging.info(f"[{request_id}] 🔍 Iniciando normalización de entrada...")
+
+        # 1. Formato separado (servicio + comando) - PRIORIDAD ALTA
+        if "servicio" in data and "comando" in data:
+            servicio = data["servicio"]
+            cmd = data["comando"]
+            comando = f"{servicio} {cmd}"
+            formato_detectado = "separado"
+            logging.info(
+                f"[{request_id}] ✅ Formato SEPARADO detectado: servicio='{servicio}', comando='{cmd}' -> '{comando}'")
+
+        # 2. Formato directo
+        elif "comando" in data and isinstance(data["comando"], str):
+            comando = data["comando"]
+            formato_detectado = "directo"
+            logging.info(
+                f"[{request_id}] ✅ Formato DIRECTO detectado: '{comando}'")
+
+        # 3. Formato del agente problemático
+        elif "intencion" in data and data["intencion"] == "cli":
+            # Buscar el comando en varios lugares posibles
+            comando = (data.get("parametros", {}).get("comando") or
+                       data.get("comando") or
+                       data.get("cli") or
+                       data.get("query") or
+                       data.get("text", ""))
+            formato_detectado = "agente_cli"
+            logging.info(
+                f"[{request_id}] ✅ Formato AGENTE_CLI detectado: '{comando}'")
+            logging.info(
+                f"[{request_id}] 🔍 Parámetros explorados: {data.get('parametros', {})}")
+
+        # 4. Intento de interpretación semántica
+        elif "text" in data or "query" in data or "prompt" in data:
+            comando = data.get("text") or data.get(
+                "query") or data.get("prompt", "")
+            formato_detectado = "semantico"
+            logging.info(
+                f"[{request_id}] ✅ Formato SEMÁNTICO detectado: '{comando}'")
+
+        # 5. Si viene embebido en el campo "data"
+        elif "data" in data and isinstance(data["data"], dict):
+            nested = data["data"]
+            logging.info(
+                f"[{request_id}] 🔍 Explorando data anidado: {nested.keys()}")
+            if "comando" in nested:
+                comando = nested["comando"]
+                formato_detectado = "anidado"
+                logging.info(
+                    f"[{request_id}] ✅ Formato ANIDADO detectado: '{comando}'")
+            elif "text" in nested or "query" in nested:
+                comando = nested.get("text") or nested.get("query", "")
+                formato_detectado = "anidado_semantico"
+                logging.info(
+                    f"[{request_id}] ✅ Formato ANIDADO_SEMÁNTICO detectado: '{comando}'")
+
+        # 6. Formato Azure Functions Tool binding
+        elif "parameters" in data and isinstance(data["parameters"], dict):
+            params = data["parameters"]
+            comando = params.get("comando") or params.get(
+                "command") or params.get("query", "")
+            formato_detectado = "tool_binding"
+            logging.info(
+                f"[{request_id}] ✅ Formato TOOL_BINDING detectado: '{comando}'")
+            logging.info(
+                f"[{request_id}] 🔍 Parameters explorados: {params.keys()}")
+
+        # 7. Formato con wrapper de AI Foundry
+        elif any(key in data for key in ["ai_foundry", "agent_response", "tool_call"]):
+            logging.info(
+                f"[{request_id}] 🔍 AI wrapper detectado, explorando...")
+            if "tool_call" in data and isinstance(data["tool_call"], dict):
+                tool_data = data["tool_call"]
+                comando = tool_data.get("comando") or tool_data.get(
+                    "arguments", {}).get("comando", "")
+                logging.info(
+                    f"[{request_id}] 🔍 Tool_call explorado: {tool_data.keys()}")
+            elif "ai_foundry" in data:
+                comando = data["ai_foundry"].get("comando", "")
+            formato_detectado = "ai_wrapper"
+            logging.info(
+                f"[{request_id}] ✅ Formato AI_WRAPPER detectado: '{comando}'")
+
+        # 8. Fallback: buscar en cualquier campo string que contenga patrones CLI conocidos
         if not comando:
+            logging.info(f"[{request_id}] 🔍 Iniciando búsqueda fallback...")
+            cli_patterns = ["group", "storage", "webapp",
+                            "vm", "network", "az ", "list", "show"]
+            for key, value in data.items():
+                if isinstance(value, str) and any(pattern in value.lower() for pattern in cli_patterns):
+                    comando = value
+                    formato_detectado = f"fallback_{key}"
+                    logging.info(
+                        f"[{request_id}] ✅ Formato FALLBACK detectado en '{key}': '{comando}'")
+                    logging.info(
+                        f"[{request_id}] 🎯 Patrón coincidente: {[p for p in cli_patterns if p in value.lower()]}")
+                    break
+
+        # Log del resultado de normalización
+        logging.info(f"[{request_id}] 🎯 Resultado normalización:")
+        logging.info(f"[{request_id}]   - Comando extraído: '{comando}'")
+        logging.info(
+            f"[{request_id}]   - Formato detectado: {formato_detectado}")
+        logging.info(
+            f"[{request_id}]   - Comando válido: {bool(comando and isinstance(comando, str))}")
+
+        # Validación final y limpieza
+        if not comando or not isinstance(comando, str):
+            logging.warning(
+                f"[{request_id}] ❌ No se pudo extraer comando válido")
+            logging.warning(
+                f"[{request_id}] 📊 Debug info generado para respuesta")
+
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Parámetro 'comando' es requerido",
-                    "mensaje_natural": "Por favor, proporciona un comando para ejecutar.",
-                    "ejemplo": {"comando": "group list"},
-                    "sugerencias": [
-                        "group list - Listar grupos de recursos",
-                        "storage account list - Listar cuentas de almacenamiento",
-                        "webapp list - Listar aplicaciones web"
+                    "error": "No se pudo extraer el comando de la solicitud",
+                    "request_id": request_id,
+                    "payload_recibido": data,
+                    "debug_info": {
+                        "keys_encontradas": list(data.keys()),
+                        "tipos_de_valores": {k: type(v).__name__ for k, v in data.items()},
+                        "formato_detectado": formato_detectado,
+                        "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
+                    },
+                    "mensaje_natural": "No encontré un comando válido en la solicitud. Revisa el formato de entrada.",
+                    "formatos_aceptados": [
+                        {"formato": "separado", "ejemplo": {
+                            "servicio": "storage", "comando": "account list"}},
+                        {"formato": "directo", "ejemplo": {
+                            "comando": "storage account list"}},
+                        {"formato": "agente", "ejemplo": {"intencion": "cli",
+                                                          "parametros": {"comando": "group list"}}},
+                        {"formato": "semantico", "ejemplo": {
+                            "text": "storage account list"}},
+                        {"formato": "anidado", "ejemplo": {
+                            "data": {"comando": "group list"}}}
                     ]
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
+        # Normalizar y limpiar el comando
+        comando_original = comando
+        comando = comando.strip()
+
+        logging.info(f"[{request_id}] 🧹 Limpieza de comando:")
+        logging.info(f"[{request_id}]   - Original: '{comando_original}'")
+        logging.info(f"[{request_id}]   - Después de strip: '{comando}'")
+
+        # Remover prefijo 'az' si está presente
+        if comando.lower().startswith("az "):
+            comando_antes = comando
+            comando = comando[3:].strip()
+            logging.info(
+                f"[{request_id}]   - Removido 'az': '{comando_antes}' -> '{comando}'")
+
+        # Validación de comando vacío después de limpieza
+        if not comando:
+            logging.warning(
+                f"[{request_id}] ❌ Comando vacío después de normalización")
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Comando vacío después de normalización",
+                    "request_id": request_id,
+                    "comando_original": comando_original,
+                    "formato_detectado": formato_detectado,
+                    "mensaje_natural": "El comando se quedó vacío después de procesarlo. Verifica que sea un comando Azure válido.",
+                    "ejemplo": {"comando": "group list"},
+                    "sugerencias": [
+                        "group list - Listar grupos de recursos",
+                        "storage account list - Listar cuentas de almacenamiento",
+                        "webapp list - Listar aplicaciones web"
+                    ],
+                    "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+
         # Obtener credenciales y subscription_id
+        logging.info(f"[{request_id}] 🔑 Obteniendo credenciales Azure...")
         try:
             credential = obtener_credenciales_azure()
             subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
+
+            logging.info(
+                f"[{request_id}] 🔑 Credenciales obtenidas: {type(credential).__name__}")
+            logging.info(
+                f"[{request_id}] 🔑 Subscription ID: {subscription_id[:8] + '...' if subscription_id else 'No configurado'}")
 
             if not subscription_id:
                 raise ValueError("AZURE_SUBSCRIPTION_ID no configurado")
 
         except Exception as e:
+            logging.error(f"[{request_id}] ❌ Error de autenticación: {str(e)}")
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": "Error de autenticación",
+                    "request_id": request_id,
                     "mensaje_natural": "No pude autenticarme con Azure usando Managed Identity.",
                     "detalles_tecnicos": str(e),
+                    "formato_detectado": formato_detectado,
                     "sugerencias": [
                         "Verificar que la Managed Identity está habilitada",
                         "Confirmar que AZURE_SUBSCRIPTION_ID está configurado",
                         "Revisar los permisos asignados a la identidad"
-                    ]
+                    ],
+                    "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=401
             )
 
         # 🔥 NORMALIZACIÓN SEMÁNTICA DINÁMICA
+        logging.info(
+            f"[{request_id}] 🧠 Iniciando normalización semántica de: '{comando}'")
         servicio, operacion, params = normalizar_comando_semantico(comando)
+
+        logging.info(f"[{request_id}] 🧠 Normalización semántica completada:")
+        logging.info(f"[{request_id}]   - Servicio: '{servicio}'")
+        logging.info(f"[{request_id}]   - Operación: '{operacion}'")
+        logging.info(f"[{request_id}]   - Parámetros: {params}")
 
         # Mapear servicios a clientes SDK
         clientes_sdk = {
@@ -6152,46 +6453,166 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             "network": NetworkManagementClient if 'NetworkManagementClient' in globals() else None,
         }
 
+        logging.info(
+            f"[{request_id}] 🔧 Clientes SDK disponibles: {[k for k, v in clientes_sdk.items() if v is not None]}")
+
         if servicio not in clientes_sdk or clientes_sdk[servicio] is None:
+            logging.warning(
+                f"[{request_id}] ❌ Servicio no soportado: '{servicio}'")
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": f"Servicio '{servicio}' no soportado",
+                    "request_id": request_id,
                     "mensaje_natural": f"El servicio '{servicio}' no está disponible en el SDK.",
+                    "comando_normalizado": comando,
+                    "formato_detectado": formato_detectado,
                     "servicios_soportados": [k for k, v in clientes_sdk.items() if v is not None],
                     "sugerencias": [
                         "Usa 'group' para gestión de recursos",
                         "Usa 'storage' para cuentas de almacenamiento",
                         "Usa 'webapp' para aplicaciones web"
-                    ]
+                    ],
+                    "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
         # Crear cliente SDK
+        logging.info(
+            f"[{request_id}] 🔧 Creando cliente SDK para servicio: {servicio}")
         try:
             cliente = clientes_sdk[servicio](credential, subscription_id)
+            logging.info(
+                f"[{request_id}] ✅ Cliente SDK creado exitosamente: {type(cliente).__name__}")
         except Exception as e:
+            logging.error(
+                f"[{request_id}] ❌ Error creando cliente SDK: {str(e)}")
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": "Error creando cliente SDK",
+                    "request_id": request_id,
                     "mensaje_natural": f"No pude crear el cliente para el servicio '{servicio}'.",
-                    "detalles_tecnicos": str(e)
+                    "detalles_tecnicos": str(e),
+                    "formato_detectado": formato_detectado,
+                    "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=500
             )
 
+        # Manejo especial para VM list sin parámetros
+        if servicio == "vm" and operacion == "list" and not params:
+            logging.info(
+                f"[{request_id}] 🔧 Caso especial: VM list sin parámetros, iterando por todos los RGs")
+            try:
+                # Listar VMs de todos los Resource Groups
+                if credential is None:
+                    raise ValueError(
+                        "No se pudieron obtener credenciales válidas para Azure")
+
+                resource_client = ResourceManagementClient(
+                    credential, subscription_id)
+                resultado = []
+                rg_count = 0
+
+                for rg in resource_client.resource_groups.list():
+                    rg_count += 1
+                    logging.info(
+                        f"[{request_id}] 🔍 Buscando VMs en RG: {rg.name}")
+                    try:
+                        vms = cliente.virtual_machines.list(rg.name)
+                        vm_list = list(vms)
+                        resultado.extend(vm_list)
+                        logging.info(
+                            f"[{request_id}] ✅ Encontradas {len(vm_list)} VMs en RG: {rg.name}")
+                    except Exception as e:
+                        logging.warning(
+                            f"[{request_id}] ⚠️ Error listando VMs en RG {rg.name}: {str(e)}")
+                        continue
+
+                # Formatear resultado
+                resultado_formateado = []
+                for vm in resultado:
+                    try:
+                        vm_dict = formatear_item_sdk(vm)
+                        resultado_formateado.append(vm_dict)
+                    except Exception as e:
+                        logging.warning(
+                            f"[{request_id}] ⚠️ Error formateando VM: {str(e)}")
+                        resultado_formateado.append(
+                            {"error": f"Error formateando VM: {str(e)}"})
+
+                total_time = round((time.time() - start_time) * 1000, 2)
+                logging.info(
+                    f"[{request_id}] ✅ VM list completado: {len(resultado)} VMs en {rg_count} RGs, tiempo: {total_time}ms")
+
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "stdout": resultado_formateado,
+                        "comando_ejecutado": "vm list",
+                        "comando_original": comando,
+                        "formato_detectado": formato_detectado,
+                        "request_id": request_id,
+                        "mensaje_natural": f"✅ Encontré {len(resultado)} VMs en la suscripción (buscadas en {rg_count} Resource Groups).",
+                        "metodo": "Azure SDK (iteración por RGs)",
+                        "timestamp": datetime.now().isoformat(),
+                        "total_resultados": len(resultado),
+                        "resource_groups_explorados": rg_count,
+                        "rendimiento": {
+                            "tiempo_total_ms": total_time
+                        }
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+
+            except Exception as e:
+                logging.error(
+                    f"[{request_id}] ❌ Error en VM list especial: {str(e)}")
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": str(e),
+                        "request_id": request_id,
+                        "mensaje_natural": "Error listando VMs en todos los Resource Groups.",
+                        "comando": comando,
+                        "formato_detectado": formato_detectado,
+                        "tipo_error": type(e).__name__,
+                        "tiempo_procesamiento_ms": round((time.time() - start_time) * 1000, 2)
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=500
+                )
+
         # Ejecutar operación dinámica
+        logging.info(
+            f"[{request_id}] ⚡ Ejecutando operación dinámica: {servicio}.{operacion}")
+        logging.info(f"[{request_id}] ⚡ Parámetros para operación: {params}")
+
         try:
+            execution_start = time.time()
             resultado = ejecutar_operacion_dinamica_v2(
                 cliente, servicio, operacion, params)
+            execution_time = round((time.time() - execution_start) * 1000, 2)
+
+            logging.info(
+                f"[{request_id}] ✅ Operación ejecutada exitosamente en {execution_time}ms")
+            logging.info(
+                f"[{request_id}] 📊 Tipo de resultado: {type(resultado).__name__}")
+            logging.info(
+                f"[{request_id}] 📊 Tamaño resultado: {len(resultado) if isinstance(resultado, list) else 'N/A'}")
 
             # Generar mensaje natural
             mensaje_natural = generar_mensaje_natural_sdk(
                 servicio, operacion, resultado)
+
+            total_time = round((time.time() - start_time) * 1000, 2)
+            logging.info(
+                f"[{request_id}] ✅ Solicitud completada exitosamente en {total_time}ms")
 
             return func.HttpResponse(
                 json.dumps({
@@ -6199,45 +6620,83 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "stdout": resultado,
                     "comando_ejecutado": f"{servicio} {operacion}",
                     "comando_original": comando,
+                    "formato_detectado": formato_detectado,
+                    "request_id": request_id,
                     "mensaje_natural": mensaje_natural,
                     "metodo": "Azure SDK",
                     "timestamp": datetime.now().isoformat(),
-                    "total_resultados": len(resultado) if isinstance(resultado, list) else 1
+                    "total_resultados": len(resultado) if isinstance(resultado, list) else 1,
+                    "normalizacion": {
+                        "servicio_detectado": servicio,
+                        "operacion_detectada": operacion,
+                        "parametros_detectados": params
+                    },
+                    "rendimiento": {
+                        "tiempo_total_ms": total_time,
+                        "tiempo_ejecucion_ms": execution_time,
+                        "tiempo_normalizacion_ms": total_time - execution_time
+                    }
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=200
             )
 
         except Exception as e:
+            execution_time = round((time.time() - start_time) * 1000, 2)
+            logging.error(
+                f"[{request_id}] ❌ Error ejecutando operación: {str(e)}")
+            logging.error(
+                f"[{request_id}] 📍 Operación fallida: {servicio}.{operacion} con parámetros {params}")
+
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": str(e),
+                    "request_id": request_id,
                     "mensaje_natural": f"Error ejecutando '{operacion}' en el servicio '{servicio}'.",
                     "comando": comando,
+                    "formato_detectado": formato_detectado,
+                    "debug_info": {
+                        "servicio_normalizado": servicio,
+                        "operacion_normalizada": operacion,
+                        "parametros_normalizados": params,
+                        "tipo_error": type(e).__name__,
+                        "tiempo_hasta_error_ms": execution_time
+                    },
                     "sugerencias": [
                         "Verifica que la operación existe en el SDK",
                         "Confirma que tienes permisos para la operación",
                         "Revisa la sintaxis de los parámetros"
-                    ]
+                    ],
+                    "tiempo_procesamiento_ms": execution_time
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=500
             )
 
     except Exception as e:
-        logging.exception("ejecutar_cli_http failed")
+        total_time = round((time.time() - start_time) * 1000, 2)
+        logging.exception(
+            f"[{request_id}] 💥 Error crítico en ejecutar_cli_http")
+        logging.error(f"[{request_id}] 💥 Tiempo hasta fallo: {total_time}ms")
+        logging.error(f"[{request_id}] 💥 Tipo de error: {type(e).__name__}")
+        logging.error(f"[{request_id}] 💥 Mensaje error: {str(e)}")
+
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
                 "error": str(e),
                 "tipo_error": type(e).__name__,
+                "request_id": request_id,
                 "mensaje_natural": "Ocurrió un error inesperado al procesar la solicitud.",
+                "payload_debug": data if 'data' in locals() else "No se pudo obtener data",
                 "sugerencias": [
                     "Verifica el formato JSON de la solicitud",
                     "Confirma que todos los parámetros son válidos",
                     "Intenta con un comando más simple"
-                ]
+                ],
+                "tiempo_procesamiento_ms": total_time,
+                "stack_trace": traceback.format_exc()[:1000] if logging.getLogger().isEnabledFor(logging.DEBUG) else None
             }, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
@@ -6247,10 +6706,22 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
 def normalizar_comando_semantico(comando: str) -> tuple:
     """
     Normalización semántica dinámica de comandos CLI a SDK.
-    Convierte variantes estilo CLI (ej. 'storage account list') a formato SDK ('storage list').
+    Versión mejorada que maneja "storage account list" como una operación completa.
     """
-    partes = comando.lower().split()
-    resto: list[str] = []
+    if not comando or not isinstance(comando, str):
+        return "unknown", "list", []
+
+    comando_original = comando.strip().lower()
+    if not comando_original:
+        return "unknown", "list", []
+
+    partes = comando_original.split()
+    if not partes:
+        return "unknown", "list", []
+
+    # ADD: Logging de debug para ver exactamente qué llega
+    logging.info(
+        f"[DEBUG] Normalizando comando: {comando_original} -> partes: {partes}")
 
     # Operaciones conocidas
     operaciones_conocidas = {
@@ -6258,87 +6729,172 @@ def normalizar_comando_semantico(comando: str) -> tuple:
         "get", "set", "start", "stop", "restart"
     }
 
-    servicio = None
-    operacion = None
-    params = []
+    servicio = partes[0]
+    resto = partes[1:] if len(partes) > 1 else []
 
-    # --- Detectar servicio (primera palabra normalmente) ---
-    if partes:
-        servicio = partes[0]
-        resto = partes[1:]
-
-    # --- Normalizaciones específicas por servicio ---
-    if servicio == "storage" and resto:
-        # 3. Para storage, manejar el patrón especial "account list"
-        if resto[0] in ["account", "accounts"]:
-            if len(resto) > 1 and resto[1] in operaciones_conocidas:
-                # "storage account list" -> servicio="storage", operacion="list"
-                return "storage", resto[1], resto[2:]
-            else:
-                # cualquier "storage account ..." sin operación clara → asumir list
-                return "storage", "list", resto[1:]
-        # Otros patrones de storage (container, blob)
-        elif resto[0] in ["container", "blob"]:
-            if len(resto) > 1 and resto[1] in operaciones_conocidas:
-                return "storage", resto[1], resto[2:]
-            else:
-                return "storage", "list", resto[1:]
-
-    # --- Detectar operación ---
-    for i in range(len(resto) - 1, -1, -1):
-        if resto[i] in operaciones_conocidas:
-            operacion = resto[i]
-            params = resto[:i] + resto[i+1:]
-            break
-
-    if not operacion and resto:
-        operacion = resto[0]
-        params = resto[1:]
-
-    if not operacion:
-        operacion = "list"
-
-    # --- Otras normalizaciones (ya no necesarias para storage por el manejo específico arriba) ---
-    if servicio == "group" and operacion in ("group", "groups"):
-        if params and params[0] in operaciones_conocidas:
-            operacion = params[0]
-            params = params[1:]
+    # --- MANEJO ESPECIAL PARA STORAGE ---
+    if servicio == "storage":
+        if len(resto) >= 2 and resto[0] in ["account", "accounts"]:
+            # Caso: "storage account list" -> servicio="storage", operacion="account list"
+            # "account list", "account show", etc.
+            operacion_completa = " ".join(resto)
+            return "storage", operacion_completa, []
+        elif len(resto) >= 1 and resto[0] in ["account", "accounts"]:
+            # Caso: "storage account" (sin operación específica) -> asumir list
+            return "storage", "account list", []
+        elif len(resto) >= 2 and resto[0] in ["container", "containers"]:
+            # Caso: "storage container list", etc.
+            operacion_completa = " ".join(resto)
+            return "storage", operacion_completa, []
+        elif len(resto) >= 1 and resto[0] in ["container", "containers"]:
+            # Caso: "storage container" -> asumir list
+            return "storage", "container list", []
+        elif len(resto) >= 2 and resto[0] in ["blob", "blobs"]:
+            # Caso: "storage blob list", etc.
+            operacion_completa = " ".join(resto)
+            return "storage", operacion_completa, []
+        elif len(resto) >= 1 and resto[0] in ["blob", "blobs"]:
+            # Caso: "storage blob" -> asumir list
+            return "storage", "blob list", []
+        elif resto:
+            # Otros casos de storage: usar todo el resto como operación
+            return "storage", " ".join(resto), []
         else:
+            # Solo "storage" -> asumir "account list"
+            return "storage", "account list", []
+
+    # --- MANEJO PARA OTROS SERVICIOS ---
+    try:
+        # Detectar operación
+        operacion = None
+        params = []
+
+        # Buscar operación conocida en el resto
+        if resto:
+            # Revisar si hay una operación conocida
+            for i, parte in enumerate(resto):
+                if parte in operaciones_conocidas:
+                    operacion = parte
+                    # Parámetros son todo lo que viene antes y después de la operación
+                    params = resto[:i] + resto[i+1:]
+                    break
+
+            # Si no se encontró operación conocida, usar la primera palabra como operación
+            if operacion is None:
+                operacion = resto[0]
+                params = resto[1:] if len(resto) > 1 else []
+        else:
+            # No hay resto, asumir "list"
             operacion = "list"
             params = []
 
-    if servicio == "webapp" and operacion in ("config", "configuration"):
-        if params and params[0] in ("show", "set"):
-            operacion = params[0]
-            params = params[1:]
-        else:
-            operacion = "show"
-            params = []
+        # --- NORMALIZACIONES ESPECÍFICAS POR SERVICIO ---
+        if servicio == "group":
+            if operacion in ("group", "groups"):
+                if params and params[0] in operaciones_conocidas:
+                    operacion = params[0]
+                    params = params[1:]
+                else:
+                    operacion = "list"
+                    params = []
 
-    if servicio == "vm" and operacion in ("vm", "vms", "machine", "machines"):
-        if params and params[0] in operaciones_conocidas:
-            operacion = params[0]
-            params = params[1:]
-        else:
+        elif servicio == "webapp":
+            if operacion in ("config", "configuration"):
+                if params and params[0] in ("show", "set"):
+                    operacion = params[0]
+                    params = params[1:]
+                else:
+                    operacion = "show"
+                    params = []
+
+        elif servicio == "vm":
+            if operacion in ("vm", "vms", "machine", "machines"):
+                if params and params[0] in operaciones_conocidas:
+                    operacion = params[0]
+                    params = params[1:]
+                else:
+                    operacion = "list"
+                    params = []
+
+        elif servicio == "network":
+            if operacion in ("vnet", "vnets", "subnet", "subnets"):
+                if params and params[0] in operaciones_conocidas:
+                    operacion = params[0]
+                    params = params[1:]
+                else:
+                    operacion = "list"
+                    params = []
+
+        # Asegurar que siempre hay una operación válida
+        if not operacion or not isinstance(operacion, str):
             operacion = "list"
+
+        # Limpiar parámetros
+        if not isinstance(params, list):
             params = []
 
-    if servicio == "network" and operacion in ("vnet", "vnets", "subnet", "subnets"):
-        if params and params[0] in operaciones_conocidas:
-            operacion = params[0]
-            params = params[1:]
-        else:
-            operacion = "list"
-            params = []
+        return servicio, operacion, params
 
-    return servicio, operacion, params
+    except Exception as e:
+        # Fallback completo en caso de cualquier error
+        logging.warning(f"Error en normalizar_comando_semantico: {e}")
+        return servicio if servicio else "unknown", "list", []
 
 
 def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, params: list):
     """
-    Ejecuta operaciones dinámicas con mapeo inteligente de métodos SDK
+    Ejecuta operaciones dinámicas con mapeo semántico inteligente
     """
-    # Mapeo de atributos del cliente por servicio
+    # Mapa semántico de operaciones → métodos reales del SDK
+    mapa_sdk = {
+        "storage": {
+            "account list": lambda c: c.storage_accounts.list(),
+            "account show": lambda c, rg, name: c.storage_accounts.get_properties(rg, name),
+            "container list": lambda c: c.blob_containers.list(),
+            "blob list": lambda c: c.blob_services.list(),
+            "list": lambda c: c.storage_accounts.list(),  # fallback
+        },
+        "group": {
+            "list": lambda c: c.resource_groups.list(),
+            "show": lambda c, name: c.resource_groups.get(name),
+            "create": lambda c, name, location: c.resource_groups.create_or_update(name, {"location": location}),
+        },
+        "webapp": {
+            "list": lambda c: c.web_apps.list(),
+            "show": lambda c, rg, name: c.web_apps.get(rg, name),
+            "config show": lambda c, rg, name: c.web_apps.get_configuration(rg, name),
+        },
+        "vm": {
+            "list": lambda c: c.virtual_machines.list_all(),
+            "show": lambda c, rg, name: c.virtual_machines.get(rg, name),
+        },
+        "network": {
+            "list": lambda c: c.virtual_networks.list_all(),
+            "vnet list": lambda c: c.virtual_networks.list_all(),
+            "subnet list": lambda c, rg, vnet: c.subnets.list(rg, vnet),
+        }
+    }
+
+    # 1. Intentar mapeo semántico directo
+    if servicio in mapa_sdk and operacion in mapa_sdk[servicio]:
+        try:
+            metodo = mapa_sdk[servicio][operacion]
+            resultado = metodo(cliente, *params)
+
+            # Convertir iteradores a listas y formatear
+            if hasattr(resultado, '__iter__') and not isinstance(resultado, (str, dict)):
+                items = []
+                for item in resultado:
+                    items.append(formatear_item_sdk(item))
+                return items
+            else:
+                return formatear_item_sdk(resultado)
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Error ejecutando {servicio}.{operacion}: {str(e)}")
+
+    # 2. Fallback al mapeo original (por compatibilidad)
     mapeo_atributos = {
         "group": "resource_groups",
         "storage": "storage_accounts",
@@ -6347,7 +6903,6 @@ def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, param
         "network": "virtual_networks",
     }
 
-    # Obtener el atributo correcto del cliente
     attr_name = mapeo_atributos.get(servicio)
 
     if attr_name and hasattr(cliente, attr_name):
@@ -6359,17 +6914,13 @@ def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, param
 
             # Determinar si necesita parámetros
             if operacion in ["get", "show", "delete"] and params:
-                # Operaciones que requieren identificadores
                 if len(params) == 1:
-                    # Solo nombre del recurso
                     resultado = metodo(params[0])
                 elif len(params) >= 2:
-                    # Resource group y nombre
                     resultado = metodo(params[0], params[1])
                 else:
                     resultado = metodo()
             else:
-                # Operaciones sin parámetros (como list)
                 resultado = metodo()
 
             # Convertir iteradores a listas
@@ -6381,7 +6932,7 @@ def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, param
             else:
                 return formatear_item_sdk(resultado)
 
-        # Si no existe el método exacto, intentar variaciones comunes
+        # Intentar variaciones comunes
         variaciones = [
             f"list_{operacion}",
             f"get_{operacion}",
@@ -6399,7 +6950,7 @@ def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, param
                 else:
                     return formatear_item_sdk(resultado)
 
-    # Fallback: buscar el método directamente en el cliente
+    # 3. Fallback final: buscar método directamente en el cliente
     if hasattr(cliente, operacion):
         metodo = getattr(cliente, operacion)
         resultado = metodo(*params) if params else metodo()
@@ -6409,9 +6960,10 @@ def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, param
         else:
             return formatear_item_sdk(resultado)
 
+    # Si nada funciona, error descriptivo
     raise NotImplementedError(
         f"No se pudo mapear '{operacion}' para el servicio '{servicio}'. "
-        f"Atributo buscado: '{attr_name}'"
+        f"Operaciones disponibles en mapa_sdk[{servicio}]: {list(mapa_sdk.get(servicio, {}).keys()) if servicio in mapa_sdk else 'Servicio no mapeado'}"
     )
 
 

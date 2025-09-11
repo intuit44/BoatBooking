@@ -37,3 +37,17 @@ if __name__ == "__main__":
         "method": "POST",
         "data": {"comando": "group list"}
     })
+
+    # ==== 6. Proxy invocar con formato PLANO ====
+    call("/api/invocar", {
+        "endpoint": "ejecutar-cli",
+        "method": "POST",
+        "data": {"comando": "storage account list"}
+    })
+
+    # ==== 7. Proxy invocar con formato SEPARADO ====
+    call("/api/invocar", {
+        "endpoint": "ejecutar-cli",
+        "method": "POST",
+        "data": {"servicio": "storage", "comando": "account list"}
+    })

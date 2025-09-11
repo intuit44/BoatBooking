@@ -100,10 +100,42 @@
           }
         }
       }
-     },
+    },
+    "/api/bridge-cli": {
+      "post": {
+        "summary": "Endpoint tolerante para agentes problemáticos",
+        "operationId": "bridgeCli",
+        "tags": [
+          "Bridge"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Respuesta procesada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
       "/api/invocar": {
         "post": {
-        "summary": "Proxy para otros endpoints",
+        "summary": "Proxy para invocar endpoints",
         "operationId": "invocar",
         "tags": [
           "Proxy"
@@ -114,42 +146,23 @@
           "application/json": {
             "schema": {
             "type": "object",
-            "required": [
-              "endpoint",
-              "method"
-            ],
             "properties": {
               "endpoint": {
               "type": "string",
-              "description": "Nombre del endpoint (sin /api/)",
-              "examples": ["ejecutar-cli", "status", "health"]
+              "example": "ejecutar-cli"
               },
               "method": {
               "type": "string",
-              "enum": ["GET", "POST"],
-              "description": "Método HTTP"
+              "example": "POST"
               },
               "data": {
               "type": "object",
-              "description": "Datos para el endpoint destino",
-              "additionalProperties": true
+              "properties": {
+                "comando": {
+                "type": "string",
+                "example": "storage account list"
+                }
               }
-            }
-            },
-            "examples": {
-            "ejecutar_cli": {
-              "value": {
-              "endpoint": "ejecutar-cli",
-              "method": "POST",
-              "data": {
-                "comando": "account show"
-              }
-              }
-            },
-            "status": {
-              "value": {
-              "endpoint": "status",
-              "method": "GET"
               }
             }
             }
@@ -175,109 +188,86 @@
           "description": "Error en el endpoint destino"
           }
         }
-        }
-       },    "/api/ejecutar-cli": {
-        "post": {
-        "summary": "Ejecuta comandos de Azure CLI",
-        "operationId": "ejecutarCLI",
-        "tags": [
-          "Azure CLI"
-        ],
-        "x-tool-definition": {
-          "name": "ejecutar_cli",
-          "description": "Ejecuta comandos de Azure CLI",
-          "parameters": {
-          "type": "object",
-          "properties": {
-            "comando": {
-            "type": "string",
-            "description": "El comando Azure CLI a ejecutar (sin 'az' al inicio)"
             }
           },
-          "required": ["comando"]
-          },
-          "endpoint": "https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli",
-          "method": "POST"
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-          "application/json": {
-            "schema": {
-            "type": "object",
-            "required": [
-              "comando"
-            ],
-            "properties": {
-              "comando": {
-              "type": "string",
-              "description": "El comando Azure CLI a ejecutar (sin 'az' al inicio)"
-              }
-            }
-            },
-            "examples": {
-            "storage_list": {
-              "value": {
-              "comando": "storage account list"
-              }
-            },
-            "functionapp_show": {
-              "value": {
-              "comando": "functionapp show --name copiloto-semantico-func --resource-group boat-rental-app-group"
-              }
-            }
-            }
-          }
-          }
-        },
-        "responses": {
-          "200": {
-          "description": "Comando ejecutado",
-          "content": {
-            "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-              "exito": {
-                "type": "boolean"
-              },
-              "comando_ejecutado": {
-                "type": "string"
-              },
-              "output": {
-                "oneOf": [
-                {
-                  "type": "object"
-                },
-                {
-                  "type": "array"
-                },
-                {
-                  "type": "string"
+          "/api/ejecutar-cli": {
+            "post": {
+              "summary": "Ejecutar comandos CLI vía SDK de Azure",
+              "operationId": "ejecutarCLI",
+              "tags": [
+                "CLI"
+              ],
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "comando": {
+                              "type": "string",
+                              "example": "storage account list"
+                            }
+                          },
+                          "required": ["comando"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "servicio": {
+                              "type": "string",
+                              "example": "storage"
+                            },
+                            "comando": {
+                              "type": "string",
+                              "example": "account list"
+                            }
+                          },
+                          "required": ["servicio", "comando"]
+                        }
+                      ]
+                    },
+                    "examples": {
+                      "comando_completo": {
+                        "summary": "Comando completo en una línea",
+                        "value": {
+                          "comando": "storage account list"
+                        }
+                      },
+                      "comando_separado": {
+                        "summary": "Servicio y comando separados",
+                        "value": {
+                          "servicio": "storage",
+                          "comando": "account list"
+                        }
+                      }
+                    }
+                  }
                 }
-                ]
               },
-              "error": {
-                "type": "string"
-              },
-              "codigo_salida": {
-                "type": "integer"
-              }
+              "responses": {
+                "200": {
+                  "description": "Respuesta del comando ejecutado",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                "403": {
+                  "description": "Operación no permitida o requiere confirmación"
+                },
+                "408": {
+                  "description": "Timeout excedido"
+                }
               }
             }
-            }
-          }
           },
-          "403": {
-          "description": "Operación no permitida o requiere confirmación"
-          },
-          "408": {
-          "description": "Timeout excedido"
-          }
-        }
-        }
-      },
-
     "/api/diagnostico-recursos": {
       "get": {
         "summary": "Diagnóstico completo de recursos Azure",
