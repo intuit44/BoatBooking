@@ -1,26 +1,41 @@
-[
-  {
-    "agentId": "asst_jjH5up8ROP1hF0sRYoNZyFNQ",
-    "project": "booking-agents",
-    "endpoint": "https://boatRentalFoundry-dev.services.ai.azure.com",
-    "status": "active",
-    "lastActivity": "2025-08-03T21:40:12Z",
-    "avgResponseTimeMs": 240
+{
+  "version": "1.0.0",
+  "agent": "Architect_BoatRental",
+  "timestamp": "2025-09-10T18:00:00Z",
+  "project": "booking-agents",
+  "scripts": {
+    "test_agent.py": {
+      "descripcion": "Ejecuta pruebas locales simulando al agente AI Foundry",
+      "uso": "Validar endpoints de la Function App antes de publicar una nueva imagen",
+      "tipo": "Python"
+    },
+    "fix_functionapp_final.ps1": {
+      "descripcion": "Crea nueva imagen Docker, etiqueta, publica en ACR y reinicia la Function App",
+      "uso": "Automatizar despliegues en Azure",
+      "tipo": "PowerShell"
+    },
+    "validate_functions.py": {
+      "descripcion": "Valida que todas las funciones estén registradas y respondiendo",
+      "uso": "Auditoría rápida del estado de la Function App",
+      "tipo": "Python"
+    }
   },
-  {
-    "agentId": "asst_k9F3Lo7QPz71aR2BDqWmEAXJ",
-    "project": "booking-agents",
-    "endpoint": "https://boatRentalFoundry-dev.services.ai.azure.com",
-    "status": "inactive",
-    "lastActivity": "2025-08-02T14:18:45Z",
-    "avgResponseTimeMs": 510
-  },
-  {
-    "agentId": "asst_ZxL8vPNy7P8mK2R1vFcYTLMq",
-    "project": "support-agents",
-    "endpoint": "https://boatRentalFoundry-dev.services.ai.azure.com",
-    "status": "active",
-    "lastActivity": "2025-08-04T02:50:00Z",
-    "avgResponseTimeMs": 330
+  "endpoints": {
+    "/api/ejecutar-cli": {
+      "metodo": "POST",
+      "descripcion": "Ejecuta comandos Azure vía SDK",
+      "parametros": [
+        "comando"
+      ]
+    },
+    "/api/invocar": {
+      "metodo": "POST",
+      "descripcion": "Proxy genérico para invocar cualquier otro endpoint",
+      "parametros": [
+        "endpoint",
+        "method",
+        "data"
+      ]
+    }
   }
-]
+}

@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar
 
 # --- Azure Core ---
-from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.storage.blob import BlobServiceClient
 
@@ -46,6 +46,8 @@ try:
     from azure.mgmt.monitor import MonitorManagementClient
     from azure.mgmt.monitor import models as monitor_models
     from azure.mgmt.web.models import StringDictionary, SiteConfigResource, CorsSettings, SkuDescription, AppServicePlan
+    from azure.mgmt.compute import ComputeManagementClient
+    from azure.mgmt.network import NetworkManagementClient
     MGMT_SDK = True
 except ImportError:
     WebSiteManagementClient = None
@@ -57,6 +59,8 @@ except ImportError:
     CorsSettings = None
     SkuDescription = None
     AppServicePlan = None
+    ComputeManagementClient = None
+    NetworkManagementClient = None
     MGMT_SDK = False
 
 # --- Semantic utilities ---
@@ -6088,7 +6092,7 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta comandos Azure usando SDK dinámico (sin Azure CLI)"""
+    """Ejecuta comandos Azure usando SDK dinámico con normalización semántica"""
 
     try:
         data = req.get_json() if req.get_body() else {}
@@ -6113,7 +6117,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Obtener credenciales y subscription_id
         try:
-            credential = ManagedIdentityCredential()
+            credential = obtener_credenciales_azure()
             subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
 
             if not subscription_id:
@@ -6136,51 +6140,25 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=401
             )
 
-        # Parsear comando
-        partes_comando = comando.split()
-        if len(partes_comando) < 2:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Formato de comando inválido",
-                    "mensaje_natural": f"El comando '{comando}' no tiene el formato esperado.",
-                    "formato_esperado": "servicio operacion [parametros]",
-                    "ejemplo": "group list"
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Normalizar comandos estilo CLI a formato SDK
-        normalizaciones = {
-            ("storage", "account", "list"): ("storage", "list", []),
-            ("group", "list"): ("group", "list", []),
-            ("webapp", "list"): ("webapp", "list", []),
-        }
-
-        clave = tuple(partes_comando[:3]) if len(
-            partes_comando) >= 3 else tuple(partes_comando)
-        if clave in normalizaciones:
-            servicio, operacion, params = normalizaciones[clave]
-        else:
-            servicio = partes_comando[0]
-            operacion = partes_comando[1]
-            params = partes_comando[2:] if len(partes_comando) > 2 else []
+        # 🔥 NORMALIZACIÓN SEMÁNTICA DINÁMICA
+        servicio, operacion, params = normalizar_comando_semantico(comando)
 
         # Mapear servicios a clientes SDK
         clientes_sdk = {
             "group": ResourceManagementClient,
             "storage": StorageManagementClient,
             "webapp": WebSiteManagementClient,
+            "vm": ComputeManagementClient if 'ComputeManagementClient' in globals() else None,
+            "network": NetworkManagementClient if 'NetworkManagementClient' in globals() else None,
         }
 
-        if servicio not in clientes_sdk:
+        if servicio not in clientes_sdk or clientes_sdk[servicio] is None:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "error": f"Servicio '{servicio}' no soportado",
                     "mensaje_natural": f"El servicio '{servicio}' no está disponible en el SDK.",
-                    "servicios_soportados": list(clientes_sdk.keys()),
+                    "servicios_soportados": [k for k, v in clientes_sdk.items() if v is not None],
                     "sugerencias": [
                         "Usa 'group' para gestión de recursos",
                         "Usa 'storage' para cuentas de almacenamiento",
@@ -6208,7 +6186,8 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Ejecutar operación dinámica
         try:
-            resultado = ejecutar_operacion_dinamica(cliente, operacion, params)
+            resultado = ejecutar_operacion_dinamica_v2(
+                cliente, servicio, operacion, params)
 
             # Generar mensaje natural
             mensaje_natural = generar_mensaje_natural_sdk(
@@ -6263,6 +6242,232 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
+
+def normalizar_comando_semantico(comando: str) -> tuple:
+    """
+    Normalización semántica dinámica de comandos CLI a SDK.
+    Convierte variantes estilo CLI (ej. 'storage account list') a formato SDK ('storage list').
+    """
+    partes = comando.lower().split()
+    resto: list[str] = []
+
+    # Operaciones conocidas
+    operaciones_conocidas = {
+        "list", "show", "create", "delete", "update",
+        "get", "set", "start", "stop", "restart"
+    }
+
+    servicio = None
+    operacion = None
+    params = []
+
+    # --- Detectar servicio (primera palabra normalmente) ---
+    if partes:
+        servicio = partes[0]
+        resto = partes[1:]
+
+    # --- Normalizaciones específicas por servicio ---
+    if servicio == "storage" and resto:
+        # 3. Para storage, manejar el patrón especial "account list"
+        if resto[0] in ["account", "accounts"]:
+            if len(resto) > 1 and resto[1] in operaciones_conocidas:
+                # "storage account list" -> servicio="storage", operacion="list"
+                return "storage", resto[1], resto[2:]
+            else:
+                # cualquier "storage account ..." sin operación clara → asumir list
+                return "storage", "list", resto[1:]
+        # Otros patrones de storage (container, blob)
+        elif resto[0] in ["container", "blob"]:
+            if len(resto) > 1 and resto[1] in operaciones_conocidas:
+                return "storage", resto[1], resto[2:]
+            else:
+                return "storage", "list", resto[1:]
+
+    # --- Detectar operación ---
+    for i in range(len(resto) - 1, -1, -1):
+        if resto[i] in operaciones_conocidas:
+            operacion = resto[i]
+            params = resto[:i] + resto[i+1:]
+            break
+
+    if not operacion and resto:
+        operacion = resto[0]
+        params = resto[1:]
+
+    if not operacion:
+        operacion = "list"
+
+    # --- Otras normalizaciones (ya no necesarias para storage por el manejo específico arriba) ---
+    if servicio == "group" and operacion in ("group", "groups"):
+        if params and params[0] in operaciones_conocidas:
+            operacion = params[0]
+            params = params[1:]
+        else:
+            operacion = "list"
+            params = []
+
+    if servicio == "webapp" and operacion in ("config", "configuration"):
+        if params and params[0] in ("show", "set"):
+            operacion = params[0]
+            params = params[1:]
+        else:
+            operacion = "show"
+            params = []
+
+    if servicio == "vm" and operacion in ("vm", "vms", "machine", "machines"):
+        if params and params[0] in operaciones_conocidas:
+            operacion = params[0]
+            params = params[1:]
+        else:
+            operacion = "list"
+            params = []
+
+    if servicio == "network" and operacion in ("vnet", "vnets", "subnet", "subnets"):
+        if params and params[0] in operaciones_conocidas:
+            operacion = params[0]
+            params = params[1:]
+        else:
+            operacion = "list"
+            params = []
+
+    return servicio, operacion, params
+
+
+def ejecutar_operacion_dinamica_v2(cliente, servicio: str, operacion: str, params: list):
+    """
+    Ejecuta operaciones dinámicas con mapeo inteligente de métodos SDK
+    """
+    # Mapeo de atributos del cliente por servicio
+    mapeo_atributos = {
+        "group": "resource_groups",
+        "storage": "storage_accounts",
+        "webapp": "web_apps",
+        "vm": "virtual_machines",
+        "network": "virtual_networks",
+    }
+
+    # Obtener el atributo correcto del cliente
+    attr_name = mapeo_atributos.get(servicio)
+
+    if attr_name and hasattr(cliente, attr_name):
+        manager = getattr(cliente, attr_name)
+
+        # Intentar ejecutar la operación
+        if hasattr(manager, operacion):
+            metodo = getattr(manager, operacion)
+
+            # Determinar si necesita parámetros
+            if operacion in ["get", "show", "delete"] and params:
+                # Operaciones que requieren identificadores
+                if len(params) == 1:
+                    # Solo nombre del recurso
+                    resultado = metodo(params[0])
+                elif len(params) >= 2:
+                    # Resource group y nombre
+                    resultado = metodo(params[0], params[1])
+                else:
+                    resultado = metodo()
+            else:
+                # Operaciones sin parámetros (como list)
+                resultado = metodo()
+
+            # Convertir iteradores a listas
+            if hasattr(resultado, '__iter__') and not isinstance(resultado, (str, dict)):
+                items = []
+                for item in resultado:
+                    items.append(formatear_item_sdk(item))
+                return items
+            else:
+                return formatear_item_sdk(resultado)
+
+        # Si no existe el método exacto, intentar variaciones comunes
+        variaciones = [
+            f"list_{operacion}",
+            f"get_{operacion}",
+            f"{operacion}_all",
+            f"{operacion}s",  # Pluralizar
+        ]
+
+        for variacion in variaciones:
+            if hasattr(manager, variacion):
+                metodo = getattr(manager, variacion)
+                resultado = metodo(*params) if params else metodo()
+
+                if hasattr(resultado, '__iter__') and not isinstance(resultado, (str, dict)):
+                    return [formatear_item_sdk(item) for item in resultado]
+                else:
+                    return formatear_item_sdk(resultado)
+
+    # Fallback: buscar el método directamente en el cliente
+    if hasattr(cliente, operacion):
+        metodo = getattr(cliente, operacion)
+        resultado = metodo(*params) if params else metodo()
+
+        if hasattr(resultado, '__iter__') and not isinstance(resultado, (str, dict)):
+            return [formatear_item_sdk(item) for item in resultado]
+        else:
+            return formatear_item_sdk(resultado)
+
+    raise NotImplementedError(
+        f"No se pudo mapear '{operacion}' para el servicio '{servicio}'. "
+        f"Atributo buscado: '{attr_name}'"
+    )
+
+
+def formatear_item_sdk(item):
+    """
+    Formatea un item del SDK a diccionario serializable
+    """
+    if item is None:
+        return None
+
+    if isinstance(item, (str, int, float, bool)):
+        return item
+
+    if isinstance(item, dict):
+        return item
+
+    # Intentar serialización estándar del SDK
+    if hasattr(item, 'as_dict'):
+        try:
+            return item.as_dict()
+        except:
+            pass
+
+    if hasattr(item, 'serialize'):
+        try:
+            return item.serialize()
+        except:
+            pass
+
+    # Extraer propiedades comunes manualmente
+    resultado = {}
+
+    # Propiedades comunes en recursos Azure
+    propiedades_comunes = [
+        'name', 'id', 'location', 'type', 'kind',
+        'state', 'status', 'properties', 'tags',
+        'sku', 'default_host_name', 'resource_group',
+        'provisioning_state', 'status_of_primary'
+    ]
+
+    for prop in propiedades_comunes:
+        if hasattr(item, prop):
+            valor = getattr(item, prop)
+            if valor is not None:
+                if hasattr(valor, 'as_dict'):
+                    resultado[prop] = valor.as_dict()
+                elif hasattr(valor, '__dict__'):
+                    resultado[prop] = valor.__dict__
+                else:
+                    resultado[prop] = valor
+
+    # Si no pudimos extraer nada, devolver representación string
+    if not resultado:
+        return str(item)
+
+    return resultado
 
 
 def ejecutar_operacion_dinamica(cliente, operacion: str, params: list):
@@ -6369,31 +6574,23 @@ def generar_mensaje_natural_sdk(servicio: str, operacion: str, resultado):
 
 def obtener_credenciales_azure():
     """
-    Obtiene las credenciales de Azure de forma robusta
-    Intenta primero Managed Identity, luego DefaultAzureCredential
+    Obtiene credenciales de Azure de forma híbrida:
+    - En Azure Functions: usa Managed Identity.
+    - En local: usa Azure CLI (az login).
     """
     try:
-        # En Azure, usar Managed Identity
-        if IS_AZURE:
+        if os.getenv("WEBSITE_INSTANCE_ID"):
+            # Esta variable de entorno solo existe en Azure Functions
             credential = ManagedIdentityCredential()
-            # Probar que funcione
-            try:
-                credential.get_token("https://management.azure.com/.default")
-                return credential
-            except:
-                pass
+            logging.info("Usando ManagedIdentityCredential (Azure).")
+        else:
+            credential = AzureCliCredential()
+            logging.info("Usando AzureCliCredential (Local).")
 
-        # Fallback a DefaultAzureCredential
-        credential = DefaultAzureCredential(
-            exclude_environment_credential=False,
-            exclude_managed_identity_credential=False,
-            exclude_shared_token_cache_credential=True,
-            exclude_visual_studio_code_credential=True,
-            exclude_cli_credential=False  # Permitir CLI para desarrollo local
-        )
         return credential
+
     except Exception as e:
-        logging.error(f"Error obteniendo credenciales: {str(e)}")
+        logging.error(f"Error obteniendo credenciales de Azure: {str(e)}")
         return None
 
 
