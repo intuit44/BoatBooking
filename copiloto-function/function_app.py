@@ -1298,26 +1298,89 @@ def procesar_intencion_semantica(intencion: str, parametros: Optional[Dict[str, 
         )
 
     elif comando == "ejecutar" and contexto == "cli":
-        servicio = parametros.get("servicio", "")
-        cmd = parametros.get("comando", "")
-        cli_params = parametros.get("parametros", {})
+        # Implementación segura de CLI que no rompe el cargador
+        try:
+            servicio = parametros.get("servicio", "")
+            cmd = parametros.get("comando", "")
+            cli_params = parametros.get("parametros", {})
 
-        if not cmd:
-            return {
-                "exito": False,
-                "error": "Parámetro 'comando' es requerido para ejecutar CLI",
-                "servicios_disponibles": ["storage", "functionapp", "webapp", "monitor", "resource"],
-                "ejemplo": {
-                    "intencion": "ejecutar:cli",
-                    "parametros": {
-                        "servicio": "storage",
-                        "comando": "container list",
-                        "parametros": {"account-name": "boatrentalstorage"}
+            if not cmd:
+                return {
+                    "exito": False,
+                    "error": "Parámetro 'comando' es requerido para ejecutar CLI",
+                    "servicios_disponibles": ["storage", "functionapp", "webapp", "monitor", "resource"],
+                    "ejemplo": {
+                        "intencion": "ejecutar:cli",
+                        "parametros": {
+                            "servicio": "storage",
+                            "comando": "container list",
+                            "parametros": {"account-name": "boatrentalstorage"}
+                        }
                     }
                 }
-            }
 
-        return procesar_intencion_cli(parametros)
+            # Implementación directa para evitar dependencias rotas
+            cmd_parts = ["az"]
+            if servicio:
+                cmd_parts.append(servicio)
+            cmd_parts.extend(cmd.split())
+
+            # Añadir parámetros
+            for key, value in cli_params.items():
+                if key.startswith("--"):
+                    cmd_parts.append(key)
+                else:
+                    cmd_parts.append(f"--{key}")
+                if value is not None:
+                    cmd_parts.append(str(value))
+
+            # Añadir output JSON por defecto
+            if "--output" not in " ".join(cmd_parts):
+                cmd_parts.extend(["--output", "json"])
+
+            try:
+                resultado = subprocess.run(
+                    cmd_parts,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                output = resultado.stdout
+                try:
+                    output_json = json.loads(output) if output else None
+                except:
+                    output_json = None
+
+                return {
+                    "exito": resultado.returncode == 0,
+                    "comando_ejecutado": " ".join(cmd_parts),
+                    "codigo_salida": resultado.returncode,
+                    "output": output_json if output_json else output,
+                    "error": resultado.stderr if resultado.stderr else None
+                }
+
+            except subprocess.TimeoutExpired:
+                return {
+                    "exito": False,
+                    "error": "Comando excedió tiempo límite (30s)",
+                    "comando": " ".join(cmd_parts)
+                }
+            except Exception as e:
+                return {
+                    "exito": False,
+                    "error": str(e),
+                    "comando": " ".join(cmd_parts),
+                    "tipo_error": type(e).__name__
+                }
+
+        except Exception as e:
+            # Fallback seguro si algo falla
+            return {
+                "exito": False,
+                "error": f"Error en procesamiento CLI: {str(e)}",
+                "tipo_error": type(e).__name__
+            }
 
     elif comando == "git":
         return operacion_git(contexto, parametros)
@@ -7610,25 +7673,6 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
 # ========== FUNCIONES AUXILIARES PARA INTENCIONES ==========
 
 
-def procesar_intencion_cli_v2(parametros: dict) -> dict:
-    """Procesa intención de ejecutar CLI"""
-    comando = parametros.get("comando", "")
-    servicio = parametros.get("servicio", "")
-
-    if not comando:
-        return {
-            "exito": False,
-            "error": "Comando CLI requerido",
-            "ejemplo": {
-                "servicio": "storage",
-                "comando": "account list"
-            }
-        }
-
-    # Ejecutar comando
-    return ejecutar_comando_azure_seguro(servicio, comando, parametros)
-
-
 def ejecutar_comando_azure_seguro(servicio: str, comando: str, params: dict) -> dict:
     """Wrapper seguro para comandos Azure CLI"""
     try:
@@ -7788,6 +7832,7 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
     try:
         if req.method == "GET":
             # Retornar información sobre el servicio
+            logging.info("diagnostico_recursos_http: GET request received")
             return func.HttpResponse(
                 json.dumps({
                     "ok": True,
@@ -7802,28 +7847,55 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # POST (lo que falla en el test)
+        logging.info("diagnostico_recursos_http: POST request received")
         body = _json_body(req)
         rid = _s(body.get("recurso"))
         profundidad = _s(body.get("profundidad") or "basico")
 
+        logging.info(
+            f"diagnostico_recursos_http: Processing recurso='{rid}', profundidad='{profundidad}'")
+
         if not rid:
+            logging.error(
+                "diagnostico_recursos_http: Missing 'recurso' parameter")
             return _error("BadRequest", 400, "Falta 'recurso'")
 
+        logging.info(
+            "diagnostico_recursos_http: Attempting to get default credentials")
         if not _try_default_credential():
+            logging.error(
+                "diagnostico_recursos_http: Failed to obtain default credentials")
             return _error("AZURE_AUTH_MISSING", 401, "No se pudieron obtener credenciales para ARM")
 
         try:
+            logging.info(
+                f"diagnostico_recursos_http: Starting diagnostics for resource: {rid}")
             # Lógica de diagnóstico POST
             result = {"ok": True, "recurso": rid, "profundidad": profundidad}
+            logging.info(
+                "diagnostico_recursos_http: Diagnostics completed successfully")
             return _json(result)
         except PermissionError as e:
-            return _error("AZURE_AUTH_FORBIDDEN", 403, str(e))
+            error_type = e.__class__.__name__
+            error_msg = str(e)
+            logging.error(
+                f"diagnostico_recursos_http: PermissionError ({error_type}): {error_msg}")
+            return _error("AZURE_AUTH_FORBIDDEN", 403, f"{error_type}: {error_msg}")
         except Exception as e:
-            return _error("DiagError", 500, str(e))
+            error_type = e.__class__.__name__
+            error_msg = str(e)
+            logging.error(
+                f"diagnostico_recursos_http: Exception in diagnostics logic ({error_type}): {error_msg}")
+            return _error("DiagError", 500, f"{error_type}: {error_msg}")
 
     except Exception as e:
-        logging.exception("diagnostico_recursos_http failed")
-        return _error("UnexpectedError", 500, str(e))
+        error_type = e.__class__.__name__
+        error_msg = str(e)
+        logging.error(
+            f"diagnostico_recursos_http: Unexpected exception ({error_type}): {error_msg}")
+        logging.exception(
+            "diagnostico_recursos_http failed with full traceback")
+        return _error("UnexpectedError", 500, f"{error_type}: {error_msg}")
 
 
 def procesar_intencion_crear_contenedor(parametros: dict) -> dict:

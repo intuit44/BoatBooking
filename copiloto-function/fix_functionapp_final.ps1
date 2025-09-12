@@ -63,12 +63,24 @@ Write-Success "Function App encontrada"
 # Verificar plan de servicio
 $plan = az functionapp show -g $ResourceGroup -n $FunctionApp --query "appServicePlanId" -o tsv
 $planDetails = az appservice plan show --ids $plan 2>$null | ConvertFrom-Json
-if ($planDetails.sku.tier -eq "Dynamic") {
-  Write-Error "El plan es Consumption (Y1). Los contenedores custom requieren Premium (EP1+)"
+
+# VALIDACIÓN CRÍTICA: Asegurar plan premium para contenedores
+$planSku = $planDetails.sku.tier
+if ($planSku -eq "Dynamic") {
+  Write-Error "Este plan (Y1) no es compatible con contenedores personalizados. Usa un plan EP1 o superior."
   Write-Info "Ejecuta: az functionapp plan update --name $($planDetails.name) -g $ResourceGroup --sku EP1"
-  if (-not $Force) { exit 1 }
+  Write-Info "O crear nuevo plan: az appservice plan create -g $ResourceGroup -n copiloto-linux-premium --sku EP1 --is-linux"
+  exit 1
 }
-Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) ✓"
+
+# Verificar que el plan es Linux para contenedores
+if ($planDetails.reserved -ne $true) {
+  Write-Error "El plan debe ser Linux para contenedores personalizados"
+  Write-Info "Recomendado: usar --plan copiloto-linux-premium con EP1 o superior"
+  exit 1
+}
+
+Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) (Linux: $($planDetails.reserved)) ✓"
 
 # ==========================================
 # FASE 2: OBTENER CREDENCIALES Y STORAGE KEY
