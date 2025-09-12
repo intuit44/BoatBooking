@@ -42,7 +42,7 @@ SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara
 | "modificar", "cambiar", "editar" | POST /api/modificar-archivo |
 | "borrar", "eliminar archivo" | POST /api/eliminar-archivo |
 | "ejecutar script", "correr" | POST /api/ejecutar-script |
-| "comando azure", "az" | POST /api/ejecutar-cli |
+| "comando azure", "az", "CLI Azure" | POST /api/ejecutar-cli → POST /api/invocar (fallback) |
 | "dashboard", "resumen" | POST /api/ejecutar {"intencion":"dashboard"} |
 
 ## 🚀 PROTOCOLO DE DECISIÓN AUTOMÁTICA
@@ -102,9 +102,35 @@ GET /api/diagnostico-recursos
 | Modificar archivo | /api/modificar-archivo | POST | 20 segundos | ruta, operacion, contenido |
 | Eliminar archivo | /api/eliminar-archivo | POST | 15 segundos | ruta |
 | Ejecutar script | /api/ejecutar-script | POST | 30 segundos | script, parámetros |
-| Ejecutar CLI | /api/ejecutar-cli | POST | 60 segundos | comando |
+| Comandos Azure CLI | /api/ejecutar-cli | POST | 60 segundos | comando (fallback: /api/invocar) |
 | Dashboard | /api/ejecutar | POST | 25 segundos | {"intencion": "dashboard"} |
 | Diagnóstico | /api/diagnostico-recursos | GET | 20 segundos | opcional: metricas, costos |
+
+## ⚡ JERARQUÍA PARA COMANDOS AZURE CLI/SDK
+
+### ➡ Para comandos Azure (CLI/SDK):
+
+**Camino principal** (si el payload ya viene correcto):
+```
+POST /api/ejecutar-cli
+```
+Ejemplos válidos:
+```json
+{"comando":"group list"}
+{"servicio":"storage","comando":"account list"}
+```
+
+**Camino tolerante** (si el agente manda intenciones o JSON mal formado):
+```
+POST /api/invocar
+```
+Ejemplos de fallback:
+```json
+{"intencion":"listar-cuentas"}
+{"endpoint":"ejecutar-cli","method":"POST","data":{"comando":"storage account list"}}
+```
+
+⚠ **Nota**: Siempre intentar primero `/api/ejecutar-cli`. Si la intención no está limpia, usar `/api/invocar` como fallback.
 
 ### 🔑 AUTENTICACIÓN IMPLÍCITA (MI)
 
@@ -118,6 +144,7 @@ Asegura explícitamente que todo endpoint que use recursos Azure como Storage o 
 | /api/modificar-archivo      | ✔ Sí             |
 | /api/eliminar-archivo       | ✔ Sí             |
 | /api/ejecutar-cli           | ✔ Sí             |
+| /api/invocar                | ✔ Sí             |
 | /api/diagnostico-recursos   | ✔ Sí             |
 | /api/gestionar-despliegue   | ✔ Sí             |
 | /api/status                 | ⚪ N/A            |
