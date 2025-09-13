@@ -23,25 +23,34 @@ function Write-Info { param($msg) Write-Host "→ $msg" -ForegroundColor Gray }
 # ==========================================
 if ([string]::IsNullOrEmpty($ImageTag)) {
   Write-Info "Calculando siguiente tag automáticamente..."
-  
-  # Obtener el tag más reciente desde ACR
-  $latestTag = az acr repository show-tags `
+
+  $allTags = az acr repository show-tags `
     -n $ACR `
     --repository copiloto-func-azcli `
     --orderby time_desc `
-    --query "[0]" -o tsv
+    -o tsv
 
-  # Calcular siguiente tag automáticamente (asumiendo formato 'vXX')
-  if ($latestTag -match "v(\d+)") {
-    $nextVersion = [int]$Matches[1] + 1
-    $ImageTag = "v$nextVersion"
-    Write-Info "Usando próximo ImageTag automático: $ImageTag"
+  # Filtrar solo los tags que coincidan con formato vNN
+  $versionTags = $allTags | Where-Object { $_ -match "^v(\d+)$" }
+
+  if ($versionTags.Count -gt 0) {
+    $latestVersionTag = ($versionTags | Sort-Object {
+        [int]($_ -replace '^v', '')
+      } -Descending)[0]
+
+    if ($latestVersionTag -match "^v(\d+)$") {
+      $nextVersion = [int]$Matches[1] + 1
+      $ImageTag = "v$nextVersion"
+      Write-Info "→ Usando siguiente tag: $ImageTag"
+    }
   }
   else {
-    Write-Warning "No se pudo calcular el siguiente tag automáticamente. Usa -ImageTag manualmente."
-    exit 1
+    # No hay tags previos → arrancar en v1
+    $ImageTag = "v1"
+    Write-Warning "→ No se encontraron tags vNN previos. Iniciando en $ImageTag"
   }
 }
+
 
 # ==========================================
 # FASE 1: VALIDACIÓN INICIAL
@@ -63,24 +72,12 @@ Write-Success "Function App encontrada"
 # Verificar plan de servicio
 $plan = az functionapp show -g $ResourceGroup -n $FunctionApp --query "appServicePlanId" -o tsv
 $planDetails = az appservice plan show --ids $plan 2>$null | ConvertFrom-Json
-
-# VALIDACIÓN CRÍTICA: Asegurar plan premium para contenedores
-$planSku = $planDetails.sku.tier
-if ($planSku -eq "Dynamic") {
-  Write-Error "Este plan (Y1) no es compatible con contenedores personalizados. Usa un plan EP1 o superior."
+if ($planDetails.sku.tier -eq "Dynamic") {
+  Write-Error "El plan es Consumption (Y1). Los contenedores custom requieren Premium (EP1+)"
   Write-Info "Ejecuta: az functionapp plan update --name $($planDetails.name) -g $ResourceGroup --sku EP1"
-  Write-Info "O crear nuevo plan: az appservice plan create -g $ResourceGroup -n copiloto-linux-premium --sku EP1 --is-linux"
-  exit 1
+  if (-not $Force) { exit 1 }
 }
-
-# Verificar que el plan es Linux para contenedores
-if ($planDetails.reserved -ne $true) {
-  Write-Error "El plan debe ser Linux para contenedores personalizados"
-  Write-Info "Recomendado: usar --plan copiloto-linux-premium con EP1 o superior"
-  exit 1
-}
-
-Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) (Linux: $($planDetails.reserved)) ✓"
+Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) ✓"
 
 # ==========================================
 # FASE 2: OBTENER CREDENCIALES Y STORAGE KEY

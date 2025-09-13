@@ -3,7 +3,11 @@
   "info": {
     "title": "Copiloto Function Gateway",
     "version": "2.1",
-    "description": "Herramienta directa a la Function App (sin Logic App / SAS)"
+    "description": "Herramienta directa a la Function App (sin Logic App / SAS)",
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
   },
   "servers": [
     {
@@ -99,46 +103,7 @@
         }
       }
     },
-    "/api/invocar": {
-      "post": {
-        "summary": "Proxy para invocar endpoints",
-        "operationId": "invocar",
-        "tags": ["Proxy"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "endpoint": {"type": "string", "example": "ejecutar-cli"},
-                  "method": {"type": "string", "example": "POST"},
-                  "data": {
-                    "type": "object",
-                    "properties": {
-                      "comando": {"type": "string", "example": "storage account list"}
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Respuesta del endpoint destino",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error en el endpoint destino"}
-        }
-      }
-    },
+
     "/api/ejecutar-cli": {
       "post": {
         "summary": "Ejecutar comandos CLI vía SDK de Azure",
@@ -421,7 +386,7 @@
     },
     "/api/ejecutar-script": {
       "post": {
-        "summary": "Ejecutar script desde /scripts",
+        "summary": "Ejecutar script desde /scripts o blob storage",
         "operationId": "ejecutarScript",
         "tags": ["Testing"],
         "security": [],
@@ -432,9 +397,25 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "script": {"type": "string", "description": "Nombre del script a ejecutar"},
-                  "args": {"type": "array", "items": {"type": "string"}},
-                  "timeout_s": {"type": "integer", "default": 60}
+                  "script": {
+                    "type": "string", 
+                    "description": "Ruta del script: 'scripts/mi_script.py' (local) o 'blob::container/path/to/script.py' (blob)"
+                  },
+                  "args": {
+                    "type": "array", 
+                    "items": {"type": "string"}, 
+                    "description": "Argumentos del script"
+                  },
+                  "timeout_s": {
+                    "type": "integer", 
+                    "default": 60, 
+                    "description": "Timeout en segundos"
+                  },
+                  "sync_outputs": {
+                    "type": "boolean", 
+                    "default": true, 
+                    "description": "Sincronizar outputs"
+                  }
                 },
                 "required": ["script"]
               }
@@ -451,6 +432,54 @@
             }
           },
           "400": {"description": "Solicitud inválida"},
+          "404": {"description": "Script no encontrado"},
+          "500": {"description": "Error del servidor"}
+        }
+      }
+    },
+    "/api/ejecutar-script-local": {
+      "post": {
+        "summary": "Ejecutar script local desde /scripts",
+        "operationId": "ejecutarScriptLocal",
+        "tags": ["Testing"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script_path": {
+                    "type": "string", 
+                    "description": "Ruta del script local, ej: 'scripts/test_script.py'"
+                  }
+                },
+                "required": ["script_path"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Script ejecutado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {"type": "string", "description": "Salida estándar"},
+                    "stderr": {"type": "string", "description": "Salida de error"},
+                    "exit_code": {"type": "integer", "description": "Código de salida"},
+                    "success": {"type": "boolean", "description": "Si la ejecución fue exitosa"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Solicitud inválida"},
+          "403": {"description": "Archivo fuera del scope permitido"},
+          "404": {"description": "Archivo no encontrado"},
           "500": {"description": "Error del servidor"}
         }
       }
