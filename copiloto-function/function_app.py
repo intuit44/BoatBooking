@@ -4721,6 +4721,74 @@ _TRUE_SET = {"1", "true", "yes", "y", "si", "sí", "on"}
 _FALSE_SET = {"0", "false", "no", "n", "off"}
 
 
+@app.function_name(name="ejecutar_script_local_http")
+@app.route(route="ejecutar-script-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Ejecuta scripts desde el filesystem local del contenedor"""
+    try:
+        body = req.get_json()
+        script_path = body.get("script_path", "").strip()
+
+        if not script_path:
+            return func.HttpResponse(
+                json.dumps({"error": "script_path parameter required"}),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # Asegurar que la ruta esté dentro del directorio permitido
+        base_dir = Path("/home/site/wwwroot")
+        script_path = (base_dir / script_path).resolve()
+
+        if not script_path.is_relative_to(base_dir):
+            return func.HttpResponse(
+                json.dumps({"error": "Script path outside allowed directory"}),
+                mimetype="application/json",
+                status_code=403
+            )
+
+        if not script_path.exists():
+            return func.HttpResponse(
+                json.dumps({"error": f"Script not found: {script_path}"}),
+                mimetype="application/json",
+                status_code=404
+            )
+
+        # Determinar el comando basado en la extensión
+        ext = script_path.suffix.lower()
+        if ext == ".py":
+            cmd = [sys.executable, str(script_path)]
+        elif ext == ".sh":
+            cmd = ["bash", str(script_path)]
+        else:
+            cmd = [str(script_path)]
+
+        # Ejecutar el script
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+
+        return func.HttpResponse(
+            json.dumps({
+                "success": result.returncode == 0,
+                "exit_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            }),
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
 @app.function_name(name="ejecutar_script_http")
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -4755,36 +4823,62 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                           "Parámetro 'script' requerido", missing_params=["script"], run_id=run_id)
             return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
 
-        base, scripts_dir, work_dir, logs_dir = _mk_run_dirs(run_id)
+        # ✅ NUEVO: Detectar si es una ruta local (empieza con / o ./ o paths conocidos)
+        is_local_script = script_spec.startswith(
+            ('/home/site/wwwroot/', './', '/', 'scripts/')) or Path(script_spec).is_absolute()
 
-        # 1) Traer el script desde blob a local
-        cont, path, hint = _normalize_script_spec(script_spec)
-        if not cont or not path:
-            err = api_err(endpoint, method, 400, "ScriptSpecInvalid",
-                          f"Especificación inválida: {script_spec}", run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False),
-                                     mimetype="application/json", status_code=400)
+        if is_local_script:
+            # Es una ruta local, no necesita descargar de blob
+            if script_spec.startswith('./'):
+                # Relativo al directorio actual
+                script_local = Path(PROJECT_ROOT) / script_spec[2:]
+            elif script_spec.startswith('scripts/'):
+                # Relativo al directorio de scripts
+                script_local = Path(PROJECT_ROOT) / script_spec
+            else:
+                # Ruta absoluta o relativa al proyecto
+                script_local = Path(script_spec) if Path(
+                    script_spec).is_absolute() else Path(PROJECT_ROOT) / script_spec
 
-        cli = get_blob_client()
-        if not cli:
-            err = api_err(endpoint, method, 500, "StorageError",
-                          "No se pudo obtener cliente de Blob Storage", run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
+            if not script_local.exists():
+                err = api_err(endpoint, method, 404, "ScriptNotFound",
+                              f"No existe el script local: {script_spec}", run_id=run_id)
+                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=404)
 
-        try:
-            bcs = cli.get_container_client(cont).get_blob_client(path)
-        except Exception as e:
-            err = api_err(endpoint, method, 500, "StorageError",
-                          f"Error al acceder al blob: {str(e)}", run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-        if not bcs.exists():
-            err = api_err(endpoint, method, 404, "ScriptNotFound",
-                          f"No existe el script '{path}' en '{cont}'", run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=404)
+            # Para scripts locales, usar directorio temporal simple
+            work_dir = Path(tempfile.mkdtemp(prefix=f"script_run_{run_id}_"))
+        else:
+            # Es un blob de storage (código original)
+            base, scripts_dir, work_dir, logs_dir = _mk_run_dirs(run_id)
 
-        script_local = scripts_dir / Path(path).name
-        with open(script_local, "wb") as f:
-            f.write(bcs.download_blob().readall())
+            # 1) Traer el script desde blob a local
+            cont, path, hint = _normalize_script_spec(script_spec)
+            if not cont or not path:
+                err = api_err(endpoint, method, 400, "ScriptSpecInvalid",
+                              f"Especificación inválida: {script_spec}", run_id=run_id)
+                return func.HttpResponse(json.dumps(err, ensure_ascii=False),
+                                         mimetype="application/json", status_code=400)
+
+            cli = get_blob_client()
+            if not cli:
+                err = api_err(endpoint, method, 500, "StorageError",
+                              "No se pudo obtener cliente de Blob Storage", run_id=run_id)
+                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
+
+            try:
+                bcs = cli.get_container_client(cont).get_blob_client(path)
+            except Exception as e:
+                err = api_err(endpoint, method, 500, "StorageError",
+                              f"Error al acceder al blob: {str(e)}", run_id=run_id)
+                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
+            if not bcs.exists():
+                err = api_err(endpoint, method, 404, "ScriptNotFound",
+                              f"No existe el script '{path}' en '{cont}'", run_id=run_id)
+                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=404)
+
+            script_local = scripts_dir / Path(path).name
+            with open(script_local, "wb") as f:
+                f.write(bcs.download_blob().readall())
 
         # 2) Determinar intérprete
         ext = script_local.suffix.lower()
@@ -4795,14 +4889,20 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         else:
             # intento directo
             cmd = [str(script_local)]
-        # mapear args a locales si son blobs
+
+        # mapear args a locales si son blobs (solo para scripts de blob)
         staged_inputs = []
         mapped_args = []
-        for a in (args or []):
-            m, meta = _stage_arg_to_local(a, work_dir)
-            mapped_args.append(m)
-            if meta:
-                staged_inputs.append({"arg": a, **meta, "local": m})
+        if not is_local_script:
+            for a in (args or []):
+                m, meta = _stage_arg_to_local(a, work_dir)
+                mapped_args.append(m)
+                if meta:
+                    staged_inputs.append({"arg": a, **meta, "local": m})
+        else:
+            # Para scripts locales, usar argumentos tal como vienen
+            mapped_args = args or []
+
         cmd += mapped_args
 
         # chmod y cwd
@@ -4834,13 +4934,21 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
             # Respuesta simplificada según el formato solicitado
-            return func.HttpResponse(json.dumps({
+            response_data = {
                 "ok": True,
                 "stdout": result.stdout,
                 "stderr": result.stderr,
                 "exit_code": result.returncode,
-                "timeout_used": safe_timeout
-            }), mimetype="application/json")
+                "timeout_used": safe_timeout,
+                "script_type": "local" if is_local_script else "blob",
+                "script_path": str(script_local)
+            }
+
+            # Agregar información de staging solo para scripts de blob
+            if not is_local_script and staged_inputs:
+                response_data["staged_inputs"] = staged_inputs
+
+            return func.HttpResponse(json.dumps(response_data), mimetype="application/json")
 
         except subprocess.TimeoutExpired as te:
             return func.HttpResponse(json.dumps({
@@ -4850,7 +4958,9 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 "stderr": getattr(te, "stderr", "") or "",
                 "exit_code": -1,
                 "timeout_s": safe_timeout,
-                "timeout_reason": "Script excedió el tiempo límite de seguridad"
+                "timeout_reason": "Script excedió el tiempo límite de seguridad",
+                "script_type": "local" if is_local_script else "blob",
+                "script_path": str(script_local)
             }), mimetype="application/json")
 
     except Exception as e:
@@ -6259,12 +6369,32 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     logging.info(f"[{request_id}] ⚡ Iniciando ejecutar_cli_http")
 
     try:
+        # 🔥 LOG EXPLÍCITO DEL BODY AL INICIO
+        try:
+            body = req.get_json()
+            logging.info(f"[DEBUG] Body recibido en ejecutar-cli: {body}")
+            logging.info(f"[DEBUG] Tipo de body: {type(body)}")
+            logging.info(f"[DEBUG] Body es None: {body is None}")
+            logging.info(f"[DEBUG] Body es vacío: {body == {}}")
+            logging.info(
+                f"[DEBUG] Tamaño del body: {len(str(body)) if body else 0}")
+        except Exception as e:
+            logging.error(f"[DEBUG] Error parseando JSON del body: {str(e)}")
+            body = {}
+
+        # Si body es None, convertir a dict vacío
+        if body is None:
+            logging.warning(
+                f"[{request_id}] ⚠️ Body era None, convertido a dict vacío")
+            body = {}
+
+        data = body  # Usar body como data
+
         # Log del request inicial
         logging.info(f"[{request_id}] 📥 Request method: {req.method}")
         logging.info(f"[{request_id}] 📥 Headers: {dict(req.headers)}")
 
         # Obtener y loggear el payload
-        data = req.get_json() if req.get_body() else {}
         logging.info(
             f"[{request_id}] 📦 Payload recibido: {json.dumps(data, ensure_ascii=False)}")
         logging.info(
