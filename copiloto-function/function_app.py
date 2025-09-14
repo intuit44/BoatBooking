@@ -4721,6 +4721,64 @@ _TRUE_SET = {"1", "true", "yes", "y", "si", "sí", "on"}
 _FALSE_SET = {"0", "false", "no", "n", "off"}
 
 
+@app.function_name(name="bridge_cli_http")
+@app.route(route="bridge-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def bridge_cli_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint súper tolerante para agentes problemáticos"""
+    try:
+        body = req.get_json() or {}
+        
+        # Log para monitorear uso del fallback
+        logging.warning(f"BRIDGE-CLI usado - Agente problemático detectado: {json.dumps(body, ensure_ascii=False)[:200]}")
+        
+        # Detectar intención CLI
+        comando = None
+        if "comando" in body:
+            comando = body["comando"]
+        elif "servicio" in body and "comando" in body:
+            comando = f"{body['servicio']} {body['comando']}"
+        elif "agent_response" in body:
+            # Extraer comando de agent_response
+            response = body["agent_response"]
+            if "group list" in response:
+                comando = "group list"
+            elif "storage account" in response:
+                comando = "storage account list"
+        
+        if comando:
+            # Rutear a ejecutar-cli
+            from urllib.parse import urljoin
+            import requests
+            
+            url = "http://localhost:7071/api/ejecutar-cli" if not IS_AZURE else "https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli"
+            
+            response = requests.post(url, json={"comando": comando}, timeout=30)
+            
+            return func.HttpResponse(
+                response.text,
+                mimetype="application/json",
+                status_code=response.status_code
+            )
+        
+        # Si no es CLI, devolver respuesta genérica
+        logging.info(f"BRIDGE-CLI: No es CLI, respuesta genérica para: {body}")
+        return func.HttpResponse(
+            json.dumps({
+                "ok": True,
+                "message": "Comando procesado por bridge",
+                "received": body
+            }),
+            mimetype="application/json"
+        )
+        
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"ok": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
 @app.function_name(name="ejecutar_script_local_http")
 @app.route(route="ejecutar-script-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:

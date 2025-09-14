@@ -114,37 +114,49 @@ Write-Step "FASE 3: CONFIGURAR APP SETTINGS" 3
 $settings = @{
   "FUNCTIONS_WORKER_RUNTIME"                    = "python"
   "FUNCTIONS_EXTENSION_VERSION"                 = "~4"
-  "AzureWebJobsStorage"                         = "DefaultEndpointsProtocol=https;AccountName=boatrentalstorage;AccountKey=$storageKey;EndpointSuffix=core.windows.net"
+  "AzureWebJobsStorage"                         = "..."
   "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
   "WEBSITES_PORT"                               = "80"
   "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
   "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot"
-  "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "AzureWebJobsDisableHomepage"                 = "false"
   "WEBSITE_MOUNT_ENABLED"                       = "1"
   "DOCKER_ENABLE_CI"                            = "true"
   "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
   "AZURE_CLIENT_ID"                             = "768637f1-4a55-4f42-8526-cb57782a0285"
   "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
+  # Dejarlo de último
+  "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
 }
+
 
 
 Write-Info "Aplicando settings críticos..."
 foreach ($key in $settings.Keys) {
   $value = $settings[$key]
-  Write-Info "  Configurando: $key"
-    
-  # Aplicar setting
-  $result = az functionapp config appsettings set `
-    -g $ResourceGroup `
-    -n $FunctionApp `
-    --settings "$key=$value" 2>&1
-    
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "Fallo al configurar $key"
-    if (-not $Force) { exit 1 }
+  $applied = $false
+  for ($i = 1; $i -le 3; $i++) {
+    Write-Info "  Configurando: $key (intento $i/3)"
+    $result = az functionapp config appsettings set `
+      -g $ResourceGroup `
+      -n $FunctionApp `
+      --settings "$key=$value" 2>&1
+    if ($LASTEXITCODE -eq 0) {
+      Write-Success "$key configurado"
+      $applied = $true
+      break
+    }
+    else {
+      Write-Warning "Fallo al configurar $key. Reintentando en $([int](5 * $i))s..."
+      Start-Sleep -Seconds (5 * $i)
+    }
+  }
+  if (-not $applied -and -not $Force) {
+    Write-Error "No se pudo configurar $key después de 3 intentos"
+    exit 1
   }
 }
+
 Write-Success "App Settings configurados"
 
 # ==========================================
