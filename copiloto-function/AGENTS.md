@@ -27,6 +27,48 @@ Si el usuario pide ver el JSON, entonces sí, muéstralo.
 ## 🎯 REGLA FUNDAMENTAL
 SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara, NO esperes confirmación explícita.
 
+## 🚦 REGLAS DE ENRUTAMIENTO
+
+### ✅ CLI Azure - IR DIRECTO
+- **Patrones**: `az group list`, `storage account list`, `group list`
+- **Endpoint**: `/api/ejecutar-cli`
+- **✅ Formato correcto**: 
+  ```json
+  {"comando": "group list"}
+  {"servicio": "storage", "comando": "account list"}
+  ```
+- **❌ Formato incorrecto**:
+  ```json
+  {"agent_response": "group list", "payload": {...}}
+  {"intencion": "listar-grupos"}
+  ```
+- **❌ NO pasar por `/api/hybrid`**
+
+### ✅ Archivos - IR DIRECTO  
+- **Patrones**: `leer`, `escribir`, `modificar`, `eliminar`
+- **Endpoints**: `/api/[operacion]-archivo`
+- **❌ NO pasar por `/api/hybrid`**
+
+### ✅ Status/Health - IR DIRECTO
+- **Patrones**: `status`, `health`, `cómo está`
+- **Endpoints**: `/api/status`, `/api/health`
+- **❌ NO pasar por `/api/hybrid`**
+
+### 🔄 Ambiguo/Natural - USAR HYBRID
+- **Patrones**: `muéstrame un resumen`, `analiza el sistema`, `necesito ayuda`
+- **Endpoint**: `/api/hybrid`
+- **Formato**: `{"agent_response": "texto natural"}`
+
+### 🆘 Tolerante - BRIDGE CLI
+- **Uso**: SOLO agentes problemáticos con JSON mal formado
+- **Endpoint**: `/api/bridge-cli` (FALLBACK, no camino principal)
+- **⚠️ Acepta**: Cualquier JSON (`additionalProperties: true`)
+- **📝 Ejemplos de uso legítimo**:
+  ```json
+  {"agent_response": "group list", "extra_data": "..."}
+  {"malformed": true, "comando": "storage account list"}
+  ```
+
 ## 🧠 SISTEMA DE DETECCIÓN AUTOMÁTICA DE INTENCIONES
 
 ### PALABRAS CLAVE → ENDPOINT AUTOMÁTICO
@@ -42,7 +84,7 @@ SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara
 | "modificar", "cambiar", "editar" | POST /api/modificar-archivo |
 | "borrar", "eliminar archivo" | POST /api/eliminar-archivo |
 | "ejecutar script", "correr" | POST /api/ejecutar-script |
-| "comando azure", "az", "CLI Azure" | POST /api/ejecutar-cli → POST /api/invocar (fallback) |
+| "comando azure", "az", "CLI Azure", "group list", "storage account" | POST /api/ejecutar-cli (directo) |
 | "dashboard", "resumen" | POST /api/ejecutar {"intencion":"dashboard"} |
 
 ## 🚀 PROTOCOLO DE DECISIÓN AUTOMÁTICA
@@ -102,7 +144,7 @@ GET /api/diagnostico-recursos
 | Modificar archivo | /api/modificar-archivo | POST | 20 segundos | ruta, operacion, contenido |
 | Eliminar archivo | /api/eliminar-archivo | POST | 15 segundos | ruta |
 | Ejecutar script | /api/ejecutar-script | POST | 30 segundos | script, parámetros |
-| Comandos Azure CLI | /api/ejecutar-cli | POST | 60 segundos | comando (fallback: /api/invocar) |
+| Comandos Azure CLI | /api/ejecutar-cli | POST | 60 segundos | comando (fallback: /api/bridge-cli) |
 | Dashboard | /api/ejecutar | POST | 25 segundos | {"intencion": "dashboard"} |
 | Diagnóstico | /api/diagnostico-recursos | GET | 20 segundos | opcional: metricas, costos |
 
@@ -110,7 +152,7 @@ GET /api/diagnostico-recursos
 
 ### ➡ Para comandos Azure (CLI/SDK):
 
-**Camino principal** (si el payload ya viene correcto):
+**Camino principal** (USAR SIEMPRE PRIMERO):
 ```
 POST /api/ejecutar-cli
 ```
@@ -120,17 +162,17 @@ Ejemplos válidos:
 {"servicio":"storage","comando":"account list"}
 ```
 
-**Camino tolerante** (si el agente manda intenciones o JSON mal formado):
+**Camino tolerante** (SOLO si el agente es problemático):
 ```
-POST /api/invocar
+POST /api/bridge-cli
 ```
 Ejemplos de fallback:
 ```json
-{"intencion":"listar-cuentas"}
-{"endpoint":"ejecutar-cli","method":"POST","data":{"comando":"storage account list"}}
+{"comando":"group list"}
+{"agent_response":"listar grupos", "payload":{"comando":"group list"}}
 ```
 
-⚠ **Nota**: Siempre intentar primero `/api/ejecutar-cli`. Si la intención no está limpia, usar `/api/invocar` como fallback.
+⚠ **Nota**: NO usar `/api/hybrid` para CLI. Usar `/api/bridge-cli` para agentes problemáticos.
 
 ### 🔑 AUTENTICACIÓN IMPLÍCITA (MI)
 
@@ -144,6 +186,7 @@ Asegura explícitamente que todo endpoint que use recursos Azure como Storage o 
 | /api/modificar-archivo      | ✔ Sí             |
 | /api/eliminar-archivo       | ✔ Sí             |
 | /api/ejecutar-cli           | ✔ Sí             |
+| /api/bridge-cli             | ✔ Sí             |
 | /api/invocar                | ✔ Sí             |
 | /api/diagnostico-recursos   | ✔ Sí             |
 | /api/gestionar-despliegue   | ✔ Sí             |
