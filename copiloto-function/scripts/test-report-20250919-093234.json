@@ -1,0 +1,166 @@
+[
+    {
+        "ExpectedStatus":  [
+                               200
+                           ],
+        "Name":  "Health",
+        "Path":  "/api/health",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200
+                           ],
+        "Name":  "Status",
+        "Path":  "/api/status",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200
+                           ],
+        "Name":  "Copiloto",
+        "Path":  "/api/copiloto",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               404
+                           ],
+        "Name":  "ListarBlobs",
+        "Path":  "/api/listar-blobs?prefix=test",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               201,
+                               200
+                           ],
+        "Name":  "EscribirArchivo",
+        "Path":  "/api/escribir-archivo",
+        "Method":  "POST",
+        "StatusCode":  201,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               404
+                           ],
+        "Name":  "LeerArchivo",
+        "Path":  "/api/leer-archivo?ruta=test/prueba.txt",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               404
+                           ],
+        "Name":  "InfoArchivo",
+        "Path":  "/api/info-archivo?ruta=test/prueba.txt",
+        "Method":  "GET",
+        "StatusCode":  404,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               404
+                           ],
+        "Name":  "EliminarArchivo",
+        "Path":  "/api/eliminar-archivo",
+        "Method":  "POST",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               401,
+                               403
+                           ],
+        "Name":  "EjecutarCLI",
+        "Path":  "/api/ejecutar-cli",
+        "Method":  "POST",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               400
+                           ],
+        "Name":  "CrearContenedor-Invalid",
+        "Path":  "/api/crear-contenedor",
+        "Method":  "POST",
+        "StatusCode":  400,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200
+                           ],
+        "Name":  "Hybrid",
+        "Path":  "/api/hybrid",
+        "Method":  "POST",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               401
+                           ],
+        "Name":  "DiagnosticoRecursos",
+        "Path":  "/api/diagnostico-recursos",
+        "Method":  "GET",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               401,
+                               403,
+                               500
+                           ],
+        "Name":  "AuditarDeploy",
+        "Path":  "/api/auditar-deploy",
+        "Method":  "GET",
+        "StatusCode":  404,
+        "Success":  false
+    },
+    {
+        "ExpectedStatus":  [
+                               200
+                           ],
+        "Name":  "ProbarEndpoint",
+        "Path":  "/api/probar-endpoint",
+        "Method":  "POST",
+        "StatusCode":  200,
+        "Success":  true
+    },
+    {
+        "ExpectedStatus":  [
+                               200,
+                               400,
+                               401,
+                               403
+                           ],
+        "Name":  "Deploy-Validate",
+        "Path":  "/api/deploy",
+        "Method":  "POST",
+        "StatusCode":  200,
+        "Success":  true
+    }
+]

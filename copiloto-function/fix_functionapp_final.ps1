@@ -125,9 +125,14 @@ $settings = @{
   "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
   "AZURE_CLIENT_ID"                             = "768637f1-4a55-4f42-8526-cb57782a0285"
   "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
+  # Variables de Voice Live
+  "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
+  "AZURE_VOICE_LIVE_DEPLOYMENT"                 = "gpt-4o-mini"
+  "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
 }
+
 
 
 
@@ -314,7 +319,7 @@ $containerResult = az functionapp config container set `
 
 if ($LASTEXITCODE -ne 0) {
   Write-Warning "Primer intento falló, reintentando sin https..."
-    
+      
   $containerResult = az functionapp config container set `
     -g $ResourceGroup `
     -n $FunctionApp `
@@ -406,27 +411,27 @@ if ($successCount -gt 0) {
   Write-Host "========================================" -ForegroundColor Green
   Write-Success "$successCount de 3 endpoints funcionando"
   Write-Info "URL: $baseUrl"
-    
+      
   # Listar funciones disponibles
   Write-Info "`nFunciones registradas:"
   $functions = az functionapp function list -g $ResourceGroup -n $FunctionApp --query "[].name" -o tsv 2>$null
   foreach ($func in $functions) {
     Write-Info "  • $func"
   }
-    
+      
 }
 else {
   Write-Host "`n========================================" -ForegroundColor Red
   Write-Host "✗ PROBLEMA PERSISTE" -ForegroundColor Red
   Write-Host "========================================" -ForegroundColor Red
-    
+      
   Write-Warning "Acciones adicionales requeridas:"
   Write-Info "1. Verificar logs del contenedor:"
   Write-Info "   az webapp log tail -g $ResourceGroup -n $FunctionApp"
-    
+      
   Write-Info "2. Verificar que la imagen tiene los archivos correctos:"
   Write-Info "   docker run --rm $fullImage ls -la /home/site/wwwroot/"
-    
+      
   Write-Info "3. Si persiste, recrear la Function App:"
   Write-Info "   az functionapp delete -g $ResourceGroup -n $FunctionApp"
   Write-Info "   az functionapp create -g $ResourceGroup -n $FunctionApp --plan <PLAN> --deployment-container-image-name $fullImage --runtime custom"

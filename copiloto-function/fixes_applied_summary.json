@@ -1,0 +1,43 @@
+{
+  "timestamp": "2025-09-17T12:00:13.960256",
+  "test_report_analyzed": "test-report-20250917-112537.json",
+  "total_tests": 83,
+  "failed_tests": 34,
+  "success_rate_before": "59.04%",
+  "critical_fixes": [
+    {
+      "endpoint": "/api/crear-contenedor",
+      "issue": "500 error on malformed JSON",
+      "fix": "Added JSON validation + required params check",
+      "expected_improvement": "400 status for invalid input"
+    },
+    {
+      "endpoint": "/api/bridge-cli",
+      "issue": "200 response for empty body",
+      "fix": "Added empty body validation",
+      "expected_improvement": "400 status for missing required data"
+    },
+    {
+      "endpoint": "/api/ejecutar-cli",
+      "issue": "500 error on malformed JSON",
+      "fix": "Added JSON validation + comando param check",
+      "expected_improvement": "400 status for invalid input"
+    },
+    {
+      "endpoint": "/api/leer-archivo",
+      "issue": "Timeout errors (0 status code)",
+      "fix": "Added timeout handling + param validation",
+      "expected_improvement": "Faster response + proper error codes"
+    }
+  ],
+  "validation_helpers_added": [
+    "validate_json_input(req)",
+    "validate_required_params(body, fields)"
+  ],
+  "expected_outcomes": {
+    "fewer_500_errors": "Internal errors converted to proper 400 validation errors",
+    "proper_status_codes": "400 for bad input, 422 for validation errors",
+    "faster_responses": "Timeout handling prevents hanging requests",
+    "better_error_messages": "Clear indication of missing/invalid parameters"
+  }
+}
