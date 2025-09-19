@@ -1,0 +1,1852 @@
+{
+    "ByTag":  {
+                  "Internal":  {
+                                   "Failed":  5,
+                                   "Total":  11,
+                                   "Passed":  6
+                               },
+                  "Azure Configuration":  {
+                                              "Failed":  3,
+                                              "Total":  9,
+                                              "Passed":  6
+                                          },
+                  "Bridge":  {
+                                 "Failed":  1,
+                                 "Total":  3,
+                                 "Passed":  2
+                             },
+                  "CLI":  {
+                              "Failed":  0,
+                              "Total":  3,
+                              "Passed":  3
+                          },
+                  "Diagn√≥stico":  {
+                                       "Failed":  2,
+                                       "Total":  6,
+                                       "Passed":  4
+                                   },
+                  "Testing":  {
+                                  "Failed":  4,
+                                  "Total":  14,
+                                  "Passed":  10
+                              },
+                  "Azure Storage":  {
+                                        "Failed":  6,
+                                        "Total":  24,
+                                        "Passed":  18
+                                    },
+                  "Azure Deployment":  {
+                                           "Failed":  5,
+                                           "Total":  9,
+                                           "Passed":  4
+                                       }
+              },
+    "FailedTests":  [
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "bridgeCli",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  true,
+                                          "stdout":  [
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  true,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-02T23:14:59.802844+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-02T23:14:59.959091+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-02T23:14:59.959091+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/boatrentalstorage",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-02T23:14:59.943466+00:00",
+                                                                                     "key2":  "2025-08-02T23:14:59.943466+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "boatrentalstorage",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  [
+
+                                                                                                            ],
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://boatrentalstorage.blob.core.windows.net/",
+                                                                                      "dfs":  "https://boatrentalstorage.dfs.core.windows.net/",
+                                                                                      "file":  "https://boatrentalstorage.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://boatrentalstorage.queue.core.windows.net/",
+                                                                                      "table":  "https://boatrentalstorage.table.core.windows.net/",
+                                                                                      "web":  "https://boatrentalstorage.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  "Enabled",
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-05T20:37:56.553181+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-05T20:37:56.740757+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-05T20:37:56.740757+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/CloudShellRG/providers/Microsoft.Storage/storageAccounts/cloudshell9929",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-05T20:37:56.725049+00:00",
+                                                                                     "key2":  "2025-08-05T20:37:56.725049+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "cloudshell9929",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://cloudshell9929.blob.core.windows.net/",
+                                                                                      "dfs":  "https://cloudshell9929.dfs.core.windows.net/",
+                                                                                      "file":  "https://cloudshell9929.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://cloudshell9929.queue.core.windows.net/",
+                                                                                      "table":  "https://cloudshell9929.table.core.windows.net/",
+                                                                                      "web":  "https://cloudshell9929.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "CloudShellRG",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+                                                                          "ms-resource-usage":  "azure-cloud-shell"
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-27T23:12:40.828232+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:12:41.000110+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:12:41.000110+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/stor232690854",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-27T23:12:41.000110+00:00",
+                                                                                     "key2":  "2025-08-27T23:12:41.000110+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "stor232690854",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://stor232690854.blob.core.windows.net/",
+                                                                                      "dfs":  "https://stor232690854.dfs.core.windows.net/",
+                                                                                      "file":  "https://stor232690854.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://stor232690854.queue.core.windows.net/",
+                                                                                      "table":  "https://stor232690854.table.core.windows.net/",
+                                                                                      "web":  "https://stor232690854.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-27T23:47:50.855529+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:47:51.027396+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:47:51.027396+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/stor895033224",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-27T23:47:51.027396+00:00",
+                                                                                     "key2":  "2025-08-27T23:47:51.027396+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "stor895033224",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://stor895033224.blob.core.windows.net/",
+                                                                                      "dfs":  "https://stor895033224.dfs.core.windows.net/",
+                                                                                      "file":  "https://stor895033224.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://stor895033224.queue.core.windows.net/",
+                                                                                      "table":  "https://stor895033224.table.core.windows.net/",
+                                                                                      "web":  "https://stor895033224.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-27T23:39:49.813077+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:39:49.984952+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T23:39:49.984952+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/stor948587179",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-27T23:39:49.984952+00:00",
+                                                                                     "key2":  "2025-08-27T23:39:49.984952+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "stor948587179",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://stor948587179.blob.core.windows.net/",
+                                                                                      "dfs":  "https://stor948587179.dfs.core.windows.net/",
+                                                                                      "file":  "https://stor948587179.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://stor948587179.queue.core.windows.net/",
+                                                                                      "table":  "https://stor948587179.table.core.windows.net/",
+                                                                                      "web":  "https://stor948587179.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-27T20:48:25.103959+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T20:48:25.307081+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-27T20:48:25.307081+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/storagebrv44",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-27T20:48:25.307081+00:00",
+                                                                                     "key2":  "2025-08-27T20:48:25.307081+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "storagebrv44",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://storagebrv44.blob.core.windows.net/",
+                                                                                      "dfs":  "https://storagebrv44.dfs.core.windows.net/",
+                                                                                      "file":  "https://storagebrv44.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://storagebrv44.queue.core.windows.net/",
+                                                                                      "table":  "https://storagebrv44.table.core.windows.net/",
+                                                                                      "web":  "https://storagebrv44.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-28T00:24:04.272895+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-28T00:24:04.444768+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-28T00:24:04.444768+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/storagebrv948172635",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-28T00:24:04.444768+00:00",
+                                                                                     "key2":  "2025-08-28T00:24:04.444768+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "storagebrv948172635",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://storagebrv948172635.blob.core.windows.net/",
+                                                                                      "dfs":  "https://storagebrv948172635.dfs.core.windows.net/",
+                                                                                      "file":  "https://storagebrv948172635.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://storagebrv948172635.queue.core.windows.net/",
+                                                                                      "table":  "https://storagebrv948172635.table.core.windows.net/",
+                                                                                      "web":  "https://storagebrv948172635.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-28T00:31:07.597083+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-28T00:31:07.768954+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-28T00:31:07.768954+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Storage/storageAccounts/storagebrv948172644",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-28T00:31:07.753330+00:00",
+                                                                                     "key2":  "2025-08-28T00:31:07.753330+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "storagebrv948172644",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://storagebrv948172644.blob.core.windows.net/",
+                                                                                      "dfs":  "https://storagebrv948172644.dfs.core.windows.net/",
+                                                                                      "file":  "https://storagebrv948172644.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://storagebrv948172644.queue.core.windows.net/",
+                                                                                      "table":  "https://storagebrv948172644.table.core.windows.net/",
+                                                                                      "web":  "https://storagebrv948172644.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "boat-rental-app-group",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-07-11T03:47:08.171277+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-07-11T03:47:08.327528+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-07-11T03:47:08.327528+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/rg-DEV/providers/Microsoft.Storage/storageAccounts/storagedev749",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-07-11T04:12:45.307022+00:00",
+                                                                                     "key2":  "2025-07-11T03:47:08.327528+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "eastus",
+                                                             "minimumTlsVersion":  "TLS1_0",
+                                                             "name":  "storagedev749",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://storagedev749.blob.core.windows.net/",
+                                                                                      "dfs":  "https://storagedev749.dfs.core.windows.net/",
+                                                                                      "file":  "https://storagedev749.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://storagedev749.queue.core.windows.net/",
+                                                                                      "table":  "https://storagedev749.table.core.windows.net/",
+                                                                                      "web":  "https://storagedev749.z13.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "eastus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "rg-DEV",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         },
+                                                         {
+                                                             "accessTier":  "Hot",
+                                                             "accountMigrationInProgress":  null,
+                                                             "allowBlobPublicAccess":  false,
+                                                             "allowCrossTenantReplication":  false,
+                                                             "allowSharedKeyAccess":  null,
+                                                             "allowedCopyScope":  null,
+                                                             "azureFilesIdentityBasedAuthentication":  null,
+                                                             "blobRestoreStatus":  null,
+                                                             "creationTime":  "2025-08-05T22:08:41.565473+00:00",
+                                                             "customDomain":  null,
+                                                             "defaultToOAuthAuthentication":  null,
+                                                             "dnsEndpointType":  null,
+                                                             "enableExtendedGroups":  null,
+                                                             "enableHttpsTrafficOnly":  true,
+                                                             "enableNfsV3":  null,
+                                                             "encryption":  {
+                                                                                "encryptionIdentity":  null,
+                                                                                "keySource":  "Microsoft.Storage",
+                                                                                "keyVaultProperties":  null,
+                                                                                "requireInfrastructureEncryption":  null,
+                                                                                "services":  {
+                                                                                                 "blob":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-05T22:08:41.737343+00:00"
+                                                                                                          },
+                                                                                                 "file":  {
+                                                                                                              "enabled":  true,
+                                                                                                              "keyType":  "Account",
+                                                                                                              "lastEnabledTime":  "2025-08-05T22:08:41.737343+00:00"
+                                                                                                          },
+                                                                                                 "queue":  null,
+                                                                                                 "table":  null
+                                                                                             }
+                                                                            },
+                                                             "extendedLocation":  null,
+                                                             "failoverInProgress":  null,
+                                                             "geoReplicationStats":  null,
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/cloud-shell-storage-southcentralus/providers/Microsoft.Storage/storageAccounts/cs210032004da873142",
+                                                             "identity":  null,
+                                                             "immutableStorageWithVersioning":  null,
+                                                             "isHnsEnabled":  null,
+                                                             "isLocalUserEnabled":  null,
+                                                             "isSftpEnabled":  null,
+                                                             "isSkuConversionBlocked":  null,
+                                                             "keyCreationTime":  {
+                                                                                     "key1":  "2025-08-05T22:08:41.721717+00:00",
+                                                                                     "key2":  "2025-08-05T22:08:41.721717+00:00"
+                                                                                 },
+                                                             "keyPolicy":  null,
+                                                             "kind":  "StorageV2",
+                                                             "largeFileSharesState":  null,
+                                                             "lastGeoFailoverTime":  null,
+                                                             "location":  "southcentralus",
+                                                             "minimumTlsVersion":  "TLS1_2",
+                                                             "name":  "cs210032004da873142",
+                                                             "networkRuleSet":  {
+                                                                                    "bypass":  "AzureServices",
+                                                                                    "defaultAction":  "Allow",
+                                                                                    "ipRules":  [
+
+                                                                                                ],
+                                                                                    "ipv6Rules":  [
+
+                                                                                                  ],
+                                                                                    "resourceAccessRules":  null,
+                                                                                    "virtualNetworkRules":  [
+
+                                                                                                            ]
+                                                                                },
+                                                             "primaryEndpoints":  {
+                                                                                      "blob":  "https://cs210032004da873142.blob.core.windows.net/",
+                                                                                      "dfs":  "https://cs210032004da873142.dfs.core.windows.net/",
+                                                                                      "file":  "https://cs210032004da873142.file.core.windows.net/",
+                                                                                      "internetEndpoints":  null,
+                                                                                      "microsoftEndpoints":  null,
+                                                                                      "queue":  "https://cs210032004da873142.queue.core.windows.net/",
+                                                                                      "table":  "https://cs210032004da873142.table.core.windows.net/",
+                                                                                      "web":  "https://cs210032004da873142.z21.web.core.windows.net/"
+                                                                                  },
+                                                             "primaryLocation":  "southcentralus",
+                                                             "privateEndpointConnections":  [
+
+                                                                                            ],
+                                                             "provisioningState":  "Succeeded",
+                                                             "publicNetworkAccess":  null,
+                                                             "resourceGroup":  "cloud-shell-storage-southcentralus",
+                                                             "routingPreference":  null,
+                                                             "sasPolicy":  null,
+                                                             "secondaryEndpoints":  null,
+                                                             "secondaryLocation":  null,
+                                                             "sku":  {
+                                                                         "name":  "Standard_LRS",
+                                                                         "tier":  "Standard"
+                                                                     },
+                                                             "statusOfPrimary":  "available",
+                                                             "statusOfSecondary":  null,
+                                                             "storageAccountSkuConversionStatus":  null,
+                                                             "tags":  {
+                                                                          "ms-resource-usage":  "azure-cloud-shell"
+                                                                      },
+                                                             "type":  "Microsoft.Storage/storageAccounts"
+                                                         }
+                                                     ],
+                                          "comando_ejecutado":  "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd storage account list",
+                                          "codigo_salida":  0,
+                                          "sistema_operativo":  "Windows",
+                                          "bridge_metadata":  {
+                                                                  "request_id":  "0165c0b9",
+                                                                  "comando_extraido":  "storage account list",
+                                                                  "origen_comando":  "default_fallback",
+                                                                  "raw_body_size":  15,
+                                                                  "json_body_keys":  [
+
+                                                                                     ]
+                                                              }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/bridge-cli",
+                            "ResponseTime":  2050
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "diagnosticoRecursosPost",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error_code":  "BadRequest",
+                                          "status":  400,
+                                          "cause":  "Falta \u0027recurso\u0027",
+                                          "hint":  null,
+                                          "next_steps":  [
+
+                                                         ],
+                                          "trace":  null
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/diagnostico-recursos",
+                            "ResponseTime":  22
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "hybrid",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "resultado":  {
+                                                            "exito":  false,
+                                                            "error":  "HTTP request does not contain valid JSON data"
+                                                        },
+                                          "metadata":  {
+                                                           "timestamp":  "2025-09-17T14:54:03.907352",
+                                                           "endpoint":  "hybrid",
+                                                           "ambiente":  "Local"
+                                                       }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/hybrid",
+                            "ResponseTime":  25
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "moverArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error_code":  "BadRequest",
+                                          "status":  400,
+                                          "cause":  "Par·metros faltantes",
+                                          "hint":  null,
+                                          "next_steps":  [
+                                                             "Proporciona \u0027origen\u0027 y \u0027destino\u0027."
+                                                         ],
+                                          "trace":  null
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/mover-archivo",
+                            "ResponseTime":  18
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "copiarArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Faltan \u0027origen\u0027 y/o \u0027destino\u0027",
+                                          "ejemplo":  {
+                                                          "origen":  "archivo1.txt",
+                                                          "destino":  "archivo2.txt",
+                                                          "overwrite":  true
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/copiar-archivo",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "prepararScript",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Falta \u0027ruta\u0027"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/preparar-script",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "gestionarDespliegue",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "[WinError 2] El sistema no puede encontrar el archivo especificado",
+                                          "body_recibido":  {
+
+                                                            },
+                                          "accion_detectada":  "detectar"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/gestionar-despliegue",
+                            "ResponseTime":  28
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "gestionarDespliegue",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "[WinError 2] El sistema no puede encontrar el archivo especificado",
+                                          "body_recibido":  {
+
+                                                            },
+                                          "accion_detectada":  "detectar"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/gestionar-despliegue",
+                            "ResponseTime":  31
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScript",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "endpoint":  "/api/ejecutar-script",
+                                          "method":  "POST",
+                                          "status":  404,
+                                          "runId":  "d5a247c96be7",
+                                          "error":  {
+                                                        "code":  "ScriptNotFound",
+                                                        "reason":  "No existe el script local: scripts/test.py",
+                                                        "missing_params":  [
+
+                                                                           ]
+                                                    },
+                                          "details":  {
+
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScriptLocal",
+                            "StatusCode":  403,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Script path outside allowed directory"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script-local",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "leerArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un mÈtodo en una expresiÛn con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/leer-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "eliminarArchivo",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "No encontrado o no se pudo eliminar: test/sample_8281.txt",
+                                          "tipo_operacion":  "eliminar_archivo"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/eliminar-archivo",
+                            "ResponseTime":  100
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "deployARM",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error_code":  "EMPTY_TEMPLATE",
+                                          "cause":  "El \u0027template\u0027 est· vacÌo o sin \u0027resources\u0027."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/deploy",
+                            "ResponseTime":  11
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarCORS",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "function_app y resource_group requeridos"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-cors",
+                            "ResponseTime":  11
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "escalarPlan",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "404 Client Error: Not Found for url: https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/serverfarms/test-string?api-version=2023-12-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/escalar-plan",
+                            "ResponseTime":  14451
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "auditarDeploy",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "source":  "ARM",
+                                          "status":  404,
+                                          "body":  "{\"error\":{\"code\":\"ResourceNotFound\",\"message\":\"The Resource \u0027Microsoft.Web/sites/copiloto-semantico-func\u0027 under resource group \u0027boat-rental-app-group\u0027 was not found. For more details please go to https://aka.ms/ARMResourceNotFoundFix\"}}",
+                                          "endpoint":  "https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/sites/copiloto-semantico-func/deployments?api-version=2023-01-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/auditar-deploy",
+                            "ResponseTime":  1342
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "bateriaEndpoints",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "ok":  true,
+                                          "endpoint":  "/api/bateria-endpoints",
+                                          "method":  "POST",
+                                          "status":  200,
+                                          "runId":  null,
+                                          "message":  "Bater√≠a ejecutada",
+                                          "details":  {
+                                                          "summary":  {
+                                                                          "total":  7,
+                                                                          "ok":  3,
+                                                                          "fail":  4
+                                                                      },
+                                                          "results":  [
+                                                                          {
+                                                                              "endpoint":  "/api/info-archivo",
+                                                                              "method":  "GET",
+                                                                              "status_code":  200,
+                                                                              "ok":  true,
+                                                                              "data":  {
+                                                                                           "ok":  true,
+                                                                                           "endpoint":  "/api/info-archivo",
+                                                                                           "method":  "GET",
+                                                                                           "status":  200,
+                                                                                           "runId":  null,
+                                                                                           "message":  "Informaci√≥n del archivo obtenida",
+                                                                                           "details":  {
+                                                                                                           "container":  "boat-rental-project",
+                                                                                                           "ruta_recibida":  "README.md",
+                                                                                                           "ruta_efectiva":  "README.md",
+                                                                                                           "size":  10518,
+                                                                                                           "last_modified":  "2025-08-05T08:13:22+00:00",
+                                                                                                           "content_type":  "text/markdown",
+                                                                                                           "etag":  "\"0x8DDD3F7F22B90B1\"",
+                                                                                                           "md5_b64":  "mjyO6uf+H5I7IRXRKFaEhQ==",
+                                                                                                           "blob_type":  "BlockBlob"
+                                                                                                       }
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/leer-archivo",
+                                                                              "method":  "GET",
+                                                                              "status_code":  200,
+                                                                              "ok":  true,
+                                                                              "data":  {
+                                                                                           "ok":  true,
+                                                                                           "endpoint":  "/api/leer-archivo",
+                                                                                           "method":  "GET",
+                                                                                           "status":  200,
+                                                                                           "runId":  "b41609ee6bbf",
+                                                                                           "message":  "Archivo \u0027README.md\u0027 le√≠do correctamente (10.3 KB)",
+                                                                                           "details":  {
+                                                                                                           "archivo":  {
+                                                                                                                           "container":  "boat-rental-project",
+                                                                                                                           "ruta_recibida":  "README.md",
+                                                                                                                           "ruta_efectiva":  "README.md",
+                                                                                                                           "source":  "azure_blob"
+                                                                                                                       },
+                                                                                                           "metadata":  {
+                                                                                                                            "size_bytes":  10518,
+                                                                                                                            "size_human":  "10.3 KB",
+                                                                                                                            "last_modified":  "2025-08-05T08:13:22+00:00",
+                                                                                                                            "content_type":  "text/markdown",
+                                                                                                                            "etag":  "\"0x8DDD3F7F22B90B1\"",
+                                                                                                                            "encoding":  "utf-8",
+                                                                                                                            "file_extension":  ".md",
+                                                                                                                            "is_text":  true,
+                                                                                                                            "cache_hit":  false,
+                                                                                                                            "run_id":  "b41609ee6bbf",
+                                                                                                                            "timestamp":  "2025-09-17T14:39:16.253603"
+                                                                                                                        },
+                                                                                                           "content_info":  {
+                                                                                                                                "preview_type":  "text",
+                                                                                                                                "preview_size":  2051,
+                                                                                                                                "full_content_available":  true,
+                                                                                                                                "lines_count":  355,
+                                                                                                                                "words_count":  1283
+                                                                                                                            },
+                                                                                                           "operacion":  {
+                                                                                                                             "force_refresh":  false,
+                                                                                                                             "include_preview":  true,
+                                                                                                                             "semantic_analysis":  false,
+                                                                                                                             "max_preview_size":  2000
+                                                                                                                         },
+                                                                                                           "preview":  "# ??§ BoatRental Venezuela - Plataforma Completa de Alquiler de Embarcaciones\n\nUna aplicaci√≥n completa para el alquiler de embarcaciones en Venezuela, con app m√≥vil, panel de administraci√≥n web y backend serverless escalable.\n\n## ?è?Ô∏è Arquitectura del Proyecto\n\n\nboat-rental-app/ ‚??‚??‚?? mobile-app/ # React Native + Expo (iOS/Android) ‚??‚??‚?? backend/ # Serverless Framework + AWS Lambda\n‚??‚??‚?? admin-panel/ # Next.js + Material-UI ‚??‚??‚?? .codegpt/ # Configuraci√≥n de agentes CodeGPT ‚??‚??‚?? README.md # Este archivo\n\n\n## ??ê POL√çTICA OFICIAL DE GESTI√?N DE SECRETOS\n\n### Configuraci√≥n Actual de Seguridad\n- ‚?\u0085 **Gesti√≥n Centralizada**: Claves almacenadas en **Azure Key Vault** (`boatRentalVault`)\n- ??ê Secreto principal: `ENV-FILE`, contiene el `.env` completo\n- ‚?†Ô∏è El archivo `.env` ya no se gestiona localmente en producci√≥n\n- ‚?\u0085 Los scripts o funciones deben consultar el Vault v√≠a `getSecret(\"ENV-FILE\")`\n\n- **Variables Cr√≠ticas**:\n  - `JWT_SECRET`: Configurado en serverless.yml (valor por defecto: \u0027dev-secret-change-in-production\u0027)\n  - `DYNAMODB_TABLE_*`: Tablas DynamoDB por ambiente\n  - `AWS Credentials`: Configuraci√≥n local AWS CLI\n\n### **Scripts de Seguridad Disponibles**\n```bash\n# Generar secretos seguros\nnode backend/generate-secret.js\n\n# Configurar ambiente de desarrollo\n./mobile-app/scripts/setup-dev-environment.sh\n??? ESTADO DEL PROYECTO - COMPLETAMENTE FUNCIONAL\nVerificaci√≥n Completa Realizada\nFecha de verificaci√≥n: Enero 2025\nEstado general: ‚?\u0085 COMPLETAMENTE FUNCIONAL\n\n‚?\u0085 Mobile App: 1,855+ packages instalados, configuraci√≥n completa\n‚?\u0085 Backend: 974 packages instalados, serverless.yml configurado\n‚?\u0085 Admin Panel: 453 packages instalados, todas las p√°ginas creadas\n??± Aplicaci√≥n M√≥vil (React Native + Expo)\nTecnolog√≠as Activas\nReact Native 0.72.10 con Expo ~49.0.15\nTypeScript ^5.1.3 para tipado est√°tico\nRedux Toolkit ^1.9.7 para gesti√≥n de estado\nAWS Amplify ^6.0.7 para integraci√≥n con backend\nReact Native Paper ^5.11.1 para componentes UI\nFuncionalidades Implementadas\n??ê Autenticaci√≥n: Login/Register\n... [truncado, mostrando 2000 de 10241 caracteres]",
+                                                                                                           "content":  "# ??§ BoatRental Venezuela - Plataforma Completa de Alquiler de Embarcaciones\n\nUna aplicaci√≥n completa para el alquiler de embarcaciones en Venezuela, con app m√≥vil, panel de administraci√≥n web y backend serverless escalable.\n\n## ?è?Ô∏è Arquitectura del Proyecto\n\n\nboat-rental-app/ ‚??‚??‚?? mobile-app/ # React Native + Expo (iOS/Android) ‚??‚??‚?? backend/ # Serverless Framework + AWS Lambda\n‚??‚??‚?? admin-panel/ # Next.js + Material-UI ‚??‚??‚?? .codegpt/ # Configuraci√≥n de agentes CodeGPT ‚??‚??‚?? README.md # Este archivo\n\n\n## ??ê POL√çTICA OFICIAL DE GESTI√?N DE SECRETOS\n\n### Configuraci√≥n Actual de Seguridad\n- ‚?\u0085 **Gesti√≥n Centralizada**: Claves almacenadas en **Azure Key Vault** (`boatRentalVault`)\n- ??ê Secreto principal: `ENV-FILE`, contiene el `.env` completo\n- ‚?†Ô∏è El archivo `.env` ya no se gestiona localmente en producci√≥n\n- ‚?\u0085 Los scripts o funciones deben consultar el Vault v√≠a `getSecret(\"ENV-FILE\")`\n\n- **Variables Cr√≠ticas**:\n  - `JWT_SECRET`: Configurado en serverless.yml (valor por defecto: \u0027dev-secret-change-in-production\u0027)\n  - `DYNAMODB_TABLE_*`: Tablas DynamoDB por ambiente\n  - `AWS Credentials`: Configuraci√≥n local AWS CLI\n\n### **Scripts de Seguridad Disponibles**\n```bash\n# Generar secretos seguros\nnode backend/generate-secret.js\n\n# Configurar ambiente de desarrollo\n./mobile-app/scripts/setup-dev-environment.sh\n??? ESTADO DEL PROYECTO - COMPLETAMENTE FUNCIONAL\nVerificaci√≥n Completa Realizada\nFecha de verificaci√≥n: Enero 2025\nEstado general: ‚?\u0085 COMPLETAMENTE FUNCIONAL\n\n‚?\u0085 Mobile App: 1,855+ packages instalados, configuraci√≥n completa\n‚?\u0085 Backend: 974 packages instalados, serverless.yml configurado\n‚?\u0085 Admin Panel: 453 packages instalados, todas las p√°ginas creadas\n??± Aplicaci√≥n M√≥vil (React Native + Expo)\nTecnolog√≠as Activas\nReact Native 0.72.10 con Expo ~49.0.15\nTypeScript ^5.1.3 para tipado est√°tico\nRedux Toolkit ^1.9.7 para gesti√≥n de estado\nAWS Amplify ^6.0.7 para integraci√≥n con backend\nReact Native Paper ^5.11.1 para componentes UI\nFuncionalidades Implementadas\n??ê Autenticaci√≥n: Login/Register con JWT\n??§ Cat√°logo de Embarcaciones: B√∫squeda y filtros avanzados\n??\u0085 Sistema de Reservas: Booking completo con calendario\n??≥ Procesamiento de Pagos: Integraci√≥n con servicios de pago\n??± Navegaci√≥n: Stack y Tab navigation configurados\nComandos de Ejecuci√≥n\nbash\n\n\ncd mobile-app\nnpm install                # Instalar dependencias\nnpm start                  # Servidor de desarrollo\nnpm run android           # Android\nnpm run ios               # iOS\nnpm run web               # Web Browser\n\n‚?° Backend (Serverless Framework)\nTecnolog√≠as Activas\nNode.js 18.x runtime\nServerless Framework ^3.38.0\nAWS SDK ^2.1490.0\nJWT ^9.0.2 para autenticaci√≥n\nDynamoDB: Tables para Users, Boats, Bookings, Payments\nAPI Endpoints Configurados\nAutenticaci√≥n: /auth/register, /auth/login, /auth/refresh\nEmbarcaciones: /boats (CRUD completo)\nReservas: /bookings (gesti√≥n completa)\nPagos: /payments/process\nServicios AWS Integrados\nLambda Functions: Funciones serverless para cada endpoint\nDynamoDB: Base de datos NoSQL para persistencia\nIAM: Roles y pol√≠ticas de seguridad\nAPI Gateway: Gesti√≥n de APIs REST\nComandos de Ejecuci√≥n\nbash\n\n\ncd backend\nnpm install               # Instalar dependencias\nnpm run dev              # Servidor local puerto 3000\nnpm run deploy           # Desplegar a AWS (dev)\nnpm run deploy:prod      # Desplegar a producci√≥n\n??•Ô∏è Panel de Administraci√≥n (Next.js)\nTecnolog√≠as Activas\nNext.js 14.0.3 con App Router\nMaterial-UI ^5.14.18\nTypeScript ^5.2.2\nReact Hook Form ^7.47.0\nRecharts ^2.8.0 para gr√°ficos\nP√°ginas Implementadas\n/dashboard - Panel principal con m√©tricas\n/boats - Gesti√≥n de embarcaciones\n/bookings - Gesti√≥n de reservas\n/users - Gesti√≥n de usuarios\n/reports - Reportes y an√°lisis\nComandos de Ejecuci√≥n\nbash\n\n\ncd admin-panel\nnpm install              # Instalar dependencias\nnpm run dev             # Servidor de desarrollo\nnpm run build           # Build para producci√≥n\nnpm start               # Servidor de producci√≥n\n?§? Agentes CodeGPT Especializados\nEstructura de Agentes Activa\nArchitect_BoatRental: Arquitectura general y coordinaci√≥n\nMobile_App_Agent: React Native/Expo development\nAdminPanel_Agent: Next.js admin panel\nAWS_Agent: Backend serverless y servicios AWS\nAzure_Foundry_Agent: Modelo gpt-35-turbo-instruct\nConfiguraci√≥n Azure OpenAI\njson\n\n\n{\n  \"codegpt.openai_api_type\": \"azure\",\n  \"codegpt.openai_api_base\": \"https://boatrentalfoundry-dev.openai.azure.com\",\n  \"codegpt.openai_api_version\": \"2023-12-01\",\n  \"codegpt.openai_deployment_name\": \"o4-mini\",\n  \"codegpt.model\": \"o4-mini\"\n}\n\n### Ejecutar un agente de ejemplo\nPara probar la integraci√≥n con Azure AI Foundry:\n\n```bash\nnpm run run-agent975\n```\n\n??ß Scripts de Mantenimiento\nScripts de Correcci√≥n Disponibles\nbash\n\n\n# Correcci√≥n de dependencias\nnode fix-all-dependencies.js\nnode smart-dependency-fixer.js\n\n# Correcci√≥n de TypeScript\nnode final-typescript-fixes.js\nnode fix-remaining-ts-errors.js\n\n# Correcci√≥n de Amplify\nnode amplify-v5-complete-fix.js\nnode amplify-diagnostic-fix.js\n\n# Correcci√≥n de versiones Expo\nnode expo-version-fixer-pro.js\nnode force-expo-versions.js\n\n??ø Ramas y Desarrollo\nRama Principal\nmain: Rama de producci√≥n con deploy autom√°tico\nWorkflow: GitHub Actions configurado para CI/CD\nDeploy: Autom√°tico a AWS en push a main\nCI/CD Pipeline\nyaml\n\n\n# .github/workflows/deploy.yml\nname: Deploy to AWS\non:\n  push:\n    branches: [main]\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v2\n      - name: Deploy Backend\n        run: cd backend \u0026\u0026 npm run deploy\n\n??? Estado del Grafo de Dependencias\nEstad√≠sticas Actuales\nTotal de archivos: 1000+ archivos\nDependencias totales: 3,282+ packages\nL√≠neas de c√≥digo: 15,000+ l√≠neas\nPlataformas soportadas: iOS, Android, Web\nServicios AWS: Lambda, DynamoDB, S3, IAM, Cognito\nNodos Cr√≠ticos del Grafo\nM√°s referenciados: useAppSelector, authSlice, fetchBoats\nFunciones principales: HomeScreen, createResponse, BookingsScreen\nServicios clave: PaymentService, BookingsService, BoatsService\nInterfaces Principales\nBoat: Definici√≥n de embarcaciones\nBooking: Gesti√≥n de reservas\nPaymentData: Procesamiento de pagos\nUser: Gesti√≥n de usuarios\n??? Inicio R√°pido para Desarrolladores\nPrerrequisitos\nNode.js 18.x o superior\nAWS CLI configurado\nExpo CLI instalado globalmente\nGit configurado\nSetup Completo\nbash\n\n\n# 1. Clonar repositorio\ngit clone https://github.com/intuit44/BoatBooking.git\ncd BoatBooking\n\n# 2. Mobile App\ncd mobile-app\nnpm install\nnpm start\n\n# 3. Backend (nueva terminal)\ncd ../backend\nnpm install\nnpm run dev\n\n# 4. Admin Panel (nueva terminal)\ncd ../admin-panel\nnpm install\nnpm run dev\n\nVariables de Entorno Requeridas\nbash\n\n\n# Backend (.env)\nJWT_SECRET=your-jwt-secret-key\nJWT_EXPIRES_IN=7d\nCORS_ORIGIN=*\nDYNAMODB_TABLE_USERS=boat-rental-users-dev\nDYNAMODB_TABLE_BOATS=boat-rental-boats-dev\nDYNAMODB_TABLE_BOOKINGS=boat-rental-bookings-dev\nDYNAMODB_TABLE_PAYMENTS=boat-rental-payments-dev\n\n# AWS Credentials\naws configure\n\nVerificaci√≥n de Setup\nbash\n\n\n# Verificar Amplify\n./mobile-app/scripts/verify-amplify.ps1\n\n# Verificar Phase 2\n./mobile-app/scripts/verify-phase2-complete.ps1\n\n# Verificar Phase 3\n./mobile-app/scripts/verify-phase3-complete.ps1\n\n?è?Ô∏è Arquitectura de Datos\nTablas DynamoDB\nUsers: Gesti√≥n de usuarios y autenticaci√≥n\nBoats: Cat√°logo de embarcaciones\nBookings: Sistema de reservas\nPayments: Procesamiento de pagos\nGraphQL Schema\nQueries: Consultas para obtener datos\nMutations: Operaciones de escritura\nSubscriptions: Actualizaciones en tiempo real\n??? Roadmap y Pr√≥ximas Funcionalidades\nEn Desarrollo\n‚?\u0085 Integraci√≥n completa con servicios de pago\n‚?\u0085 Sistema de notificaciones push\n??? Geolocalizaci√≥n y mapas\n??? Sistema de reviews y ratings\n??? Dashboard en tiempo real\nPr√≥ximas Versiones\nChat en tiempo real\nSistema de promociones\nIntegraci√≥n con redes sociales\nApp para capitanes\nSistema de mantenimiento\n?ß™ Testing\nFrameworks de Testing\nJest: Testing unitario\nReact Native Testing Library: Testing de componentes\nSupertest: Testing de APIs\nComandos de Testing\nbash\n\n\n# Mobile App\ncd mobile-app \u0026\u0026 npm test\n\n# Backend\ncd backend \u0026\u0026 npm test\n\n# Admin Panel\ncd admin-panel \u0026\u0026 npm test\n\n??ç Debugging y Troubleshooting\nProblemas Comunes\nErrores de TypeScript: Ejecutar node final-typescript-fixes.js\nProblemas de Amplify: Ejecutar node amplify-v5-complete-fix.js\nDependencias: Ejecutar node fix-all-dependencies.js\nLogs y Monitoreo\nCloudWatch: Logs de Lambda functions\nExpo DevTools: Debugging de React Native\nRedux DevTools: Estado de la aplicaci√≥n\n?§ù Contribuci√≥n\nProceso de Contribuci√≥n\nFork el proyecto\nCrea una rama para tu feature (git checkout -b feature/AmazingFeature)\nCommit tus cambios (git commit -m \u0027Add some AmazingFeature\u0027)\nPush a la rama (git push origin feature/AmazingFeature)\nAbre un Pull Request\nEst√°ndares de C√≥digo\nESLint: Configurado para JavaScript/TypeScript\nPrettier: Formateo autom√°tico de c√≥digo\nHusky: Git hooks para pre-commit\n??? Soporte y Contacto\nDocumentaci√≥n Adicional\nAPI Documentation: Disponible en /docs\nComponent Library: Storybook configurado\nArchitecture Decision Records: En /docs/adr\nCanales de Comunicaci√≥n\nIssues: GitHub Issues para bugs y features\nDiscussions: GitHub Discussions para preguntas\nWiki: Documentaci√≥n t√©cnica detallada\n??? Licencia\nEste proyecto est√° bajo la Licencia MIT - ver el archivo LICENSE para detalles.\n\nRepositorio: https://github.com/intuit44/BoatBooking\nHash: 6f6cb8e67440918b1f79fe9fd0270f1d36cd8d06\n√?ltima actualizaci√≥n: Enero 2025\nVersi√≥n: 1.0.0\n\n??? M√©tricas del Proyecto\nComponente\tArchivos\tDependencias\tEstado\nMobile App\t500+\t1,855+\t‚?\u0085 Funcional\nBackend\t200+\t974\t‚?\u0085 Funcional\nAdmin Panel\t150+\t453\t‚?\u0085 Funcional\nTotal\t850+\t3,282+\t‚?\u0085 Completamente Funcional\n¬°Bienvenido al proyecto BoatRental Venezuela! ??§\n\n\nEste README.md actualizado incluye:\n\n1. ‚?\u0085 **Pol√≠tica oficial de gesti√≥n de secretos** \n2. ‚?\u0085 **Tecnolog√≠as activas** con versiones espec√≠ficas\n3. ‚?\u0085 **Estado completo del grafo** con estad√≠sticas reales\n4. ‚?\u0085 **Agentes CodeGPT** documentados\n5. ‚?\u0085 **Scripts de mantenimiento** listados\n6. ‚?\u0085 **Configuraci√≥n de ramas** y CI/CD\n7. ‚?\u0085 **Setup detallado** para desarrolladores nuevos\n8. ‚?\u0085 **Arquitectura completa** del proyecto\n9. ‚?\u0085 **Troubleshooting** y debugging\n10. ‚?\u0085 **M√©tricas actualizadas** del proyecto\n\nEl README est√° listo para ser guardado como `README.md` en la ra√≠z del proyecto.",
+                                                                                                           "sugerencias_contextuales":  {
+                                                                                                                                            "acciones":  [
+                                                                                                                                                             "generar:resumen:README.md",
+                                                                                                                                                             "verificar:enlaces:README.md",
+                                                                                                                                                             "modificar:README.md",
+                                                                                                                                                             "copiar:README.md",
+                                                                                                                                                             "buscar:similar:README.md"
+                                                                                                                                                         ]
+                                                                                                                                        },
+                                                                                                           "cache_hit":  true,
+                                                                                                           "cache_age_seconds":  924.1517751216888
+                                                                                                       }
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/escribir-archivo",
+                                                                              "method":  "POST",
+                                                                              "status_code":  201,
+                                                                              "ok":  false,
+                                                                              "data":  {
+                                                                                           "exito":  true,
+                                                                                           "mensaje":  "Archivo creado exitosamente: hello.txt",
+                                                                                           "ubicacion":  "C:\\ProyectosSimbolicos\\boat-rental-app\\verificacion\\hello.txt",
+                                                                                           "tipo_operacion":  "crear_archivo",
+                                                                                           "tama√±o_bytes":  10
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/modificar-archivo",
+                                                                              "method":  "POST",
+                                                                              "status_code":  200,
+                                                                              "ok":  true,
+                                                                              "data":  {
+                                                                                           "exito":  true,
+                                                                                           "mensaje":  "Archivo modificado exitosamente con operaci√≥n \u0027agregar_final\u0027",
+                                                                                           "ubicacion":  "C:\\ProyectosSimbolicos\\boat-rental-app\\verificacion\\hello.txt",
+                                                                                           "tipo_operacion":  "crear_archivo",
+                                                                                           "tama√±o_bytes":  25,
+                                                                                           "operacion_realizada":  "agregar_final",
+                                                                                           "linea_afectada":  null,
+                                                                                           "lineas_totales":  2
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/copiar-archivo",
+                                                                              "method":  "POST",
+                                                                              "status_code":  400,
+                                                                              "ok":  false,
+                                                                              "data":  {
+                                                                                           "exito":  false,
+                                                                                           "error":  "Destino ya existe: C:\\ProyectosSimbolicos\\boat-rental-app\\verificacion\\hello.v2.txt. Usa overwrite=true",
+                                                                                           "sugerencia":  "El archivo de destino ya existe. Usa \u0027overwrite\u0027: true para sobrescribirlo",
+                                                                                           "accion_sugerida":  {
+                                                                                                                   "endpoint":  "/api/copiar-archivo",
+                                                                                                                   "payload":  {
+                                                                                                                                   "origen":  "verificacion/hello.txt",
+                                                                                                                                   "destino":  "verificacion/hello.v2.txt",
+                                                                                                                                   "overwrite":  true
+                                                                                                                               },
+                                                                                                                   "descripcion":  "Copiar \u0027verificacion/hello.txt\u0027 a \u0027verificacion/hello.v2.txt\u0027 sobrescribiendo el archivo existente"
+                                                                                                               }
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/ejecutar-script",
+                                                                              "method":  "POST",
+                                                                              "status_code":  404,
+                                                                              "ok":  false,
+                                                                              "data":  {
+                                                                                           "ok":  false,
+                                                                                           "endpoint":  "/api/ejecutar-script",
+                                                                                           "method":  "POST",
+                                                                                           "status":  404,
+                                                                                           "runId":  "afaebc58270a",
+                                                                                           "error":  {
+                                                                                                         "code":  "ScriptNotFound",
+                                                                                                         "reason":  "No existe el script local: scripts/setup.sh",
+                                                                                                         "missing_params":  [
+
+                                                                                                                            ]
+                                                                                                     },
+                                                                                           "details":  {
+
+                                                                                                       }
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          },
+                                                                          {
+                                                                              "endpoint":  "/api/ejecutar-script",
+                                                                              "method":  "POST",
+                                                                              "status_code":  404,
+                                                                              "ok":  false,
+                                                                              "data":  {
+                                                                                           "ok":  false,
+                                                                                           "endpoint":  "/api/ejecutar-script",
+                                                                                           "method":  "POST",
+                                                                                           "status":  404,
+                                                                                           "runId":  "ba66c68186b9",
+                                                                                           "error":  {
+                                                                                                         "code":  "ScriptNotFound",
+                                                                                                         "reason":  "No existe el script local: scripts/lines.py",
+                                                                                                         "missing_params":  [
+
+                                                                                                                            ]
+                                                                                                     },
+                                                                                           "details":  {
+
+                                                                                                       }
+                                                                                       },
+                                                                              "runId":  null,
+                                                                              "exit_code":  null,
+                                                                              "stdout_preview":  ""
+                                                                          }
+                                                                      ]
+                                                      }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/bateria-endpoints",
+                            "ResponseTime":  14573
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un mÈtodo en una expresiÛn con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  19
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un mÈtodo en una expresiÛn con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  19
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un mÈtodo en una expresiÛn con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  20
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutar",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "mensaje":  "No pude interpretar la intenci√≥n: \u0027\u0027",
+                                          "sugerencias":  [
+                                                              "dashboard - Ver m√©tricas del sistema",
+                                                              "diagnosticar:completo - Diagn√≥stico exhaustivo",
+                                                              "generar:resumen - Resumen ejecutivo",
+                                                              "verificar:almacenamiento - Estado del storage",
+                                                              "git:status - Estado del repositorio"
+                                                          ],
+                                          "tip":  "Puedes usar comandos m√°s espec√≠ficos o palabras clave conocidas",
+                                          "metadata":  {
+                                                           "timestamp":  "2025-09-17T14:54:53.068892",
+                                                           "modo":  "normal",
+                                                           "intencion_procesada":  "",
+                                                           "procesador":  "extendido",
+                                                           "ambiente":  "Local",
+                                                           "copiloto_version":  "2.0-orchestrator-extendido"
+                                                       },
+                                          "ayuda":  {
+                                                        "intenciones_extendidas":  [
+                                                                                       "verificar:almacenamiento",
+                                                                                       "limpiar:cache",
+                                                                                       "generar:resumen",
+                                                                                       "git:status",
+                                                                                       "analizar:rendimiento",
+                                                                                       "confirmar:accion"
+                                                                                   ],
+                                                        "intenciones_basicas":  [
+                                                                                    "dashboard",
+                                                                                    "diagnosticar:completo",
+                                                                                    "buscar:archivos",
+                                                                                    "generar:readme",
+                                                                                    "guia:configurar_blob"
+                                                                                ],
+                                                        "ejemplo":  {
+                                                                        "intencion":  "verificar:almacenamiento",
+                                                                        "parametros":  {
+
+                                                                                       },
+                                                                        "modo":  "normal"
+                                                                    }
+                                                    }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/ejecutar",
+                            "ResponseTime":  20
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "actualizarContenedor",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Tag requerido"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/actualizar-contenedor",
+                            "ResponseTime":  15
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Comando requerido"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  11
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "infoArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un mÈtodo en una expresiÛn con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/info-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "[WinError 2] El sistema no puede encontrar el archivo especificado"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  23
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "[WinError 2] El sistema no puede encontrar el archivo especificado"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  24
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarAppSettings",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "function_app, resource_group y settings requeridos"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-app-settings",
+                            "ResponseTime":  11
+                        }
+                    ],
+    "ByMethod":  {
+
+                 },
+    "ValidationErrors":  [
+
+                         ],
+    "Summary":  {
+                    "SuccessRate":  67.47,
+                    "Timestamp":  "2025-09-17 14:54:53",
+                    "TotalTests":  83,
+                    "Failed":  27,
+                    "Passed":  56
+                }
+}

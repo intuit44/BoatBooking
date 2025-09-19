@@ -54,10 +54,11 @@ SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara
 - **Endpoints**: `/api/status`, `/api/health`
 - **❌ NO pasar por `/api/hybrid`**
 
-### 🔄 Ambiguo/Natural - USAR HYBRID
+### 🔄 Ambiguo/Natural - USAR HYBRID (SOLO COMO Último RECURSO)
 - **Patrones**: `muéstrame un resumen`, `analiza el sistema`, `necesito ayuda`
 - **Endpoint**: `/api/hybrid`
 - **Formato**: `{"agent_response": "texto natural"}`
+- **⚠️ NUNCA usar para CLI, archivos o status**
 
 ### 🆘 Tolerante - BRIDGE CLI
 - **Uso**: SOLO agentes problemáticos con JSON mal formado
@@ -75,28 +76,24 @@ SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara
 
 | Cuando el usuario dice... | Usa automáticamente... |
 |---------------------------|-------------------------|
-| "estado", "status", "cómo está" | GET /api/status |
-| "salud", "health", "funcionando" | GET /api/health |
+| CLI Azure (az, group list, storage account) | POST /api/ejecutar-cli |
+| Archivos (leer, escribir, modificar) | POST /api/[operacion]-archivo |
+| Estado/Health | GET /api/status /api/health |
 | "diagnóstico", "diagnosticar", "revisar" | GET /api/diagnostico-recursos |
 | "archivos", "listar", "qué hay" | GET /api/listar-blobs |
-| "leer", "mostrar", "ver archivo" | GET /api/leer-archivo |
-| "crear archivo", "escribir" | POST /api/escribir-archivo |
-| "modificar", "cambiar", "editar" | POST /api/modificar-archivo |
-| "borrar", "eliminar archivo" | POST /api/eliminar-archivo |
 | "ejecutar script", "correr" | POST /api/ejecutar-script |
-| "comando azure", "az", "CLI Azure", "group list", "storage account" | POST /api/ejecutar-cli (directo) |
-| "dashboard", "resumen" | POST /api/ejecutar {"intencion":"dashboard"} |
+| Intenciones ambiguas | POST /api/hybrid |
 
 ## 🚀 PROTOCOLO DE DECISIÓN AUTOMÁTICA
 
 ```mermaid
 graph TD
-  A[Usuario habla] --> B{¿Contiene palabra clave?}
-  B -->|SÍ| C[Ejecutar endpoint INMEDIATAMENTE]
-  B -->|NO| D{¿Es pregunta sobre capacidades?}
-  D -->|SÍ| E[Listar funciones disponibles]
-  D -->|NO| F{¿Es comando híbrido?}
-  F -->|SÍ| G[Usar /api/hybrid]
+  A[Usuario habla] --> B{¿CLI/Archivos/Status?}
+  B -->|SÍ| C[Endpoint DIRECTO]
+  B -->|NO| D{¿Pregunta capacidades?}
+  D -->|SÍ| E[Listar funciones]
+  D -->|NO| F{¿Ambiguo/Natural?}
+  F -->|SÍ| G[/api/hybrid FALLBACK]
   F -->|NO| H[Pedir clarificación]
 ```
 

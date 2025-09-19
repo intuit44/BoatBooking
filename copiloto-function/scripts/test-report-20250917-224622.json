@@ -1,0 +1,652 @@
+{
+    "ByTag":  {
+                  "Internal":  {
+                                   "Failed":  4,
+                                   "Total":  11,
+                                   "Passed":  7
+                               },
+                  "Azure Configuration":  {
+                                              "Failed":  3,
+                                              "Total":  9,
+                                              "Passed":  6
+                                          },
+                  "Bridge":  {
+                                 "Failed":  1,
+                                 "Total":  3,
+                                 "Passed":  2
+                             },
+                  "CLI":  {
+                              "Failed":  0,
+                              "Total":  3,
+                              "Passed":  3
+                          },
+                  "DiagnÃ³stico":  {
+                                       "Failed":  1,
+                                       "Total":  6,
+                                       "Passed":  5
+                                   },
+                  "Testing":  {
+                                  "Failed":  3,
+                                  "Total":  14,
+                                  "Passed":  11
+                              },
+                  "Azure Storage":  {
+                                        "Failed":  5,
+                                        "Total":  24,
+                                        "Passed":  19
+                                    },
+                  "Azure Deployment":  {
+                                           "Failed":  2,
+                                           "Total":  9,
+                                           "Passed":  7
+                                       }
+              },
+    "FailedTests":  [
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "bridgeCli",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  true,
+                                          "stdout":  [
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/cloud-shell-storage-southcentralus",
+                                                             "location":  "southcentralus",
+                                                             "managedBy":  null,
+                                                             "name":  "cloud-shell-storage-southcentralus",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "boat-rental-app-group",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boatRentalResourceGroup",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "boatRentalResourceGroup",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/rg-DEV",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "rg-DEV",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/DefaultResourceGroup-EUS",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "DefaultResourceGroup-EUS",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/azureapp-auto-alerts-e1b4a9-yellowstone413g_gmail_com",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "azureapp-auto-alerts-e1b4a9-yellowstone413g_gmail_com",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/MyvirtualMachine",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "MyvirtualMachine",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/NetworkWatcherRG",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "NetworkWatcherRG",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/CloudShellRG",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "CloudShellRG",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/test-rg-winston",
+                                                             "location":  "eastus",
+                                                             "managedBy":  null,
+                                                             "name":  "test-rg-winston",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         },
+                                                         {
+                                                             "id":  "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/DefaultResourceGroup-EUS2",
+                                                             "location":  "eastus2",
+                                                             "managedBy":  null,
+                                                             "name":  "DefaultResourceGroup-EUS2",
+                                                             "properties":  {
+                                                                                "provisioningState":  "Succeeded"
+                                                                            },
+                                                             "tags":  null,
+                                                             "type":  "Microsoft.Resources/resourceGroups"
+                                                         }
+                                                     ],
+                                          "comando_ejecutado":  "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd group list",
+                                          "codigo_salida":  0,
+                                          "sistema_operativo":  "Windows",
+                                          "bridge_metadata":  {
+                                                                  "request_id":  "f9205238",
+                                                                  "comando_extraido":  "group list",
+                                                                  "origen_comando":  "json_invalid_fallback",
+                                                                  "json_parse_error":  "HTTP request does not contain valid JSON data",
+                                                                  "mensaje":  "JSON invÃ¡lido - usando comando de recuperaciÃ³n"
+                                                              }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/bridge-cli",
+                            "ResponseTime":  1553
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "moverArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Request body debe ser un objeto JSON válido",
+                                          "body_recibido":  {
+
+                                                            },
+                                          "ejemplo":  {
+                                                          "origen":  "archivo-origen.txt",
+                                                          "destino":  "archivo-destino.txt",
+                                                          "overwrite":  false,
+                                                          "eliminar_origen":  true
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/mover-archivo",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "copiarArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Request body debe ser un objeto JSON válido",
+                                          "body_recibido":  {
+
+                                                            },
+                                          "ejemplo":  {
+                                                          "origen":  "archivo1.txt",
+                                                          "destino":  "archivo2.txt",
+                                                          "overwrite":  false
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/copiar-archivo",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "prepararScript",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Parámetro \u0027ruta\u0027 es requerido",
+                                          "ejemplo":  {
+                                                          "ruta":  "scripts/setup.sh"
+                                                      },
+                                          "descripcion":  "Especifica la ruta del script a preparar desde Blob Storage"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/preparar-script",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScript",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "endpoint":  "/api/ejecutar-script",
+                                          "method":  "POST",
+                                          "status":  404,
+                                          "runId":  "0ea114c21f36",
+                                          "error":  {
+                                                        "code":  "ScriptNotFound",
+                                                        "reason":  "No existe el script local: scripts/test_1.py",
+                                                        "missing_params":  [
+
+                                                                           ]
+                                                    },
+                                          "details":  {
+                                                          "script_solicitado":  "scripts/test_1.py",
+                                                          "ubicaciones_intentadas":  [
+                                                                                         "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\test_1.py",
+                                                                                         "C:\\ProyectosSimbolicos\\boat-rental-app\\copiloto-function\\scripts\\test_1.py"
+                                                                                     ],
+                                                          "es_azure":  false,
+                                                          "project_root":  "C:\\ProyectosSimbolicos\\boat-rental-app",
+                                                          "sugerencias":  [
+                                                                              "Verificar que scripts/test_1.py existe en alguna de las ubicaciones",
+                                                                              "Crear el script si no existe",
+                                                                              "Usar ruta absoluta si el script está en otra ubicación"
+                                                                          ]
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script",
+                            "ResponseTime":  15
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScriptLocal",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "\u0027test-string\u0027 is not a valid script path",
+                                          "suggestion":  "Please provide a real script path like \u0027scripts/setup.sh\u0027 or \u0027src/deploy.py\u0027",
+                                          "available_scripts":  [
+                                                                    "copiloto-function\\scripts\\TEST_COMPLETO_VALIDACION_OPENAPI.ps1",
+                                                                    "copiloto-function\\scripts\\TEST_FIXED.ps1",
+                                                                    "copiloto-function\\scripts\\TEST_VALIDACION_OPENAPI_SIMPLE.ps1",
+                                                                    "copiloto-function\\scripts\\ajustar_mi.ps1",
+                                                                    "copiloto-function\\scripts\\ajustar_rate_limit.ps1",
+                                                                    "copiloto-function\\scripts\\deploy-agent.ps1",
+                                                                    "copiloto-function\\scripts\\test.py",
+                                                                    "copiloto-function\\scripts\\write-dockerfile.ps1"
+                                                                ],
+                                          "directories_to_check":  [
+                                                                       "scripts/",
+                                                                       "src/",
+                                                                       "tools/",
+                                                                       "deployment/"
+                                                                   ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script-local",
+                            "ResponseTime":  15
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "leerArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/leer-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarCORS",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Parámetros requeridos faltantes: function_app",
+                                          "missing_params":  [
+                                                                 "function_app"
+                                                             ],
+                                          "ejemplo":  {
+                                                          "function_app":  "mi-function-app",
+                                                          "resource_group":  "mi-resource-group",
+                                                          "allowed_origins":  [
+                                                                                  "https://mi-dominio.com",
+                                                                                  "https://otro-dominio.com"
+                                                                              ]
+                                                      },
+                                          "nota":  "También puedes configurar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-cors",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "escalarPlan",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "\u0027test-string\u0027 no es un nombre de plan válido",
+                                          "codigo_error":  "INVALID_PLAN_NAME",
+                                          "valores_no_validos":  [
+                                                                     "test",
+                                                                     "test-string",
+                                                                     "ejemplo",
+                                                                     "sample",
+                                                                     "placeholder",
+                                                                     "demo"
+                                                                 ],
+                                          "sugerencia":  "Proporciona el nombre real de tu App Service Plan",
+                                          "ejemplo":  {
+                                                          "plan_name":  "boat-rental-app-plan",
+                                                          "resource_group":  "boat-rental-rg",
+                                                          "sku":  "EP1"
+                                                      },
+                                          "skus_disponibles":  [
+                                                                   "B1",
+                                                                   "B2",
+                                                                   "B3",
+                                                                   "S1",
+                                                                   "S2",
+                                                                   "S3",
+                                                                   "P1V2",
+                                                                   "P2V2",
+                                                                   "P3V2",
+                                                                   "EP1",
+                                                                   "EP2",
+                                                                   "EP3"
+                                                               ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/escalar-plan",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "auditarDeploy",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error_code":  "RESOURCE_NOT_FOUND",
+                                          "mensaje":  "Recurso \u0027copiloto-semantico-func\u0027 no encontrado en el resource group \u0027boat-rental-app-group\u0027",
+                                          "verificacion":  {
+                                                               "subscription_id":  "380fa841-83f3-42fe-adc4-582a5ebe139b",
+                                                               "resource_group":  "boat-rental-app-group",
+                                                               "site_name":  "copiloto-semantico-func",
+                                                               "resource_type":  "Microsoft.Web/sites"
+                                                           },
+                                          "sugerencias":  [
+                                                              "Verificar que la Function App \u0027copiloto-semantico-func\u0027 existe",
+                                                              "Confirmar que está en el resource group \u0027boat-rental-app-group\u0027",
+                                                              "Revisar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP",
+                                                              "Usar \u0027az webapp list\u0027 para listar Function Apps disponibles"
+                                                          ],
+                                          "posibles_nombres":  [
+                                                                   "copiloto-semantico-func-us2",
+                                                                   "copiloto-semantico-func-func",
+                                                                   "copiloto-func-azcli",
+                                                                   "boat-rental-copiloto"
+                                                               ],
+                                          "endpoint_verificado":  "https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/sites/copiloto-semantico-func?api-version=2023-01-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/auditar-deploy",
+                            "ResponseTime":  2156
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  21
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  20
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  21
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "actualizarContenedor",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Tag requerido",
+                                          "ejemplo":  {
+                                                          "tag":  "v12"
+                                                      },
+                                          "descripcion":  "Especifica la versión del contenedor a desplegar"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/actualizar-contenedor",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Comando requerido y no puede estar vacío",
+                                          "comando_recibido":  null,
+                                          "tipo_comando":  "None",
+                                          "ejemplo":  {
+                                                          "comando":  "docker build -t mi-imagen ."
+                                                      },
+                                          "comandos_validos":  [
+                                                                   "docker build -t copiloto-func-azcli:v13 .",
+                                                                   "docker push boatrentalacr.azurecr.io/copiloto-func-azcli:v13",
+                                                                   "az functionapp config container set ..."
+                                                               ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "infoArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/info-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  26
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  28
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarAppSettings",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Parámetros requeridos faltantes: function_app, settings",
+                                          "missing_params":  [
+                                                                 "function_app",
+                                                                 "settings"
+                                                             ],
+                                          "valores_recibidos":  {
+                                                                    "function_app":  "no_proporcionado",
+                                                                    "resource_group":  "boat-rental-app-group",
+                                                                    "settings":  "no_proporcionado"
+                                                                },
+                                          "ejemplo":  {
+                                                          "function_app":  "mi-function-app",
+                                                          "resource_group":  "mi-resource-group",
+                                                          "settings":  {
+                                                                           "AZURE_STORAGE_CONNECTION_STRING":  "DefaultEndpointsProtocol=https;...",
+                                                                           "CUSTOM_SETTING":  "mi_valor",
+                                                                           "ENVIRONMENT":  "production"
+                                                                       }
+                                                      },
+                                          "nota":  "También puedes configurar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-app-settings",
+                            "ResponseTime":  13
+                        }
+                    ],
+    "ByMethod":  {
+
+                 },
+    "ValidationErrors":  [
+
+                         ],
+    "Summary":  {
+                    "SuccessRate":  77.11,
+                    "Timestamp":  "2025-09-17 22:46:22",
+                    "TotalTests":  83,
+                    "Failed":  19,
+                    "Passed":  64
+                }
+}

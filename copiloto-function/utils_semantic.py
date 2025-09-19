@@ -56,14 +56,14 @@ def explain_arm_cause(cause_text: str) -> dict:
     }
 
 
-def render_tool_response(status: int, payload: dict) -> str:
+def render_tool_response(status_code: int, payload: dict) -> str:
     """
     Render semántico:
     - deploy si hay señales de despliegue (deploymentName/state/resourceGroup).
     - genérico en el resto (ping, scripts, etc.).
     Mantiene validate_only y tu manejo de errores.
     """
-    ok = (200 <= status < 300) and payload.get("ok", True)
+    ok = (200 <= status_code < 300) and payload.get("ok", True)
 
     # Señales de despliegue (en payload nivel raíz o dentro de data)
     data = payload.get("data") or {}
@@ -114,4 +114,4 @@ def render_tool_response(status: int, payload: dict) -> str:
         return "\n".join(msg)
 
     # Error de transporte/formato (lo mantengo)
-    return f"❌ Error de transporte o formato (HTTP {status}). Reintenta y, si persiste, revisa logs del Function App."
+    return f"❌ Error de transporte o formato (HTTP {status_code}). Reintenta y, si persiste, revisa logs del Function App."

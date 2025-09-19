@@ -1,0 +1,495 @@
+{
+    "ByTag":  {
+                  "Internal":  {
+                                   "Failed":  5,
+                                   "Total":  11,
+                                   "Passed":  6
+                               },
+                  "Azure Configuration":  {
+                                              "Failed":  3,
+                                              "Total":  9,
+                                              "Passed":  6
+                                          },
+                  "Bridge":  {
+                                 "Failed":  1,
+                                 "Total":  3,
+                                 "Passed":  2
+                             },
+                  "CLI":  {
+                              "Failed":  0,
+                              "Total":  3,
+                              "Passed":  3
+                          },
+                  "DiagnÃ³stico":  {
+                                       "Failed":  2,
+                                       "Total":  6,
+                                       "Passed":  4
+                                   },
+                  "Testing":  {
+                                  "Failed":  3,
+                                  "Total":  14,
+                                  "Passed":  11
+                              },
+                  "Azure Storage":  {
+                                        "Failed":  5,
+                                        "Total":  24,
+                                        "Passed":  19
+                                    },
+                  "Azure Deployment":  {
+                                           "Failed":  2,
+                                           "Total":  9,
+                                           "Passed":  7
+                                       }
+              },
+    "FailedTests":  [
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "bridgeCli",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error_code":  "INSUFFICIENT_CONTENT",
+                                          "error":  "Contenido insuficiente para determinar comando",
+                                          "request_id":  "d4c120d3",
+                                          "raw_body_length":  2,
+                                          "status":  400
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/bridge-cli",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "diagnosticoRecursosPost",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "ok":  true,
+                                          "tipo":  "diagnostico_general",
+                                          "timestamp":  "2025-09-17T19:39:10.914763",
+                                          "ambiente":  "Local",
+                                          "sistema":  {
+                                                          "mgmt_sdk_available":  true,
+                                                          "blob_storage_configured":  true,
+                                                          "cache_entries":  2,
+                                                          "function_app":  "local"
+                                                      },
+                                          "profundidad":  "basico",
+                                          "mensaje":  "DiagnÃ³stico general del sistema completado"
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/diagnostico-recursos",
+                            "ResponseTime":  29
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "moverArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Parámetros \u0027origen\u0027 y \u0027destino\u0027 son requeridos",
+                                          "recibido":  {
+                                                           "origen":  null,
+                                                           "destino":  null
+                                                       },
+                                          "ejemplo":  {
+                                                          "origen":  "archivo-origen.txt",
+                                                          "destino":  "archivo-destino.txt",
+                                                          "overwrite":  false,
+                                                          "eliminar_origen":  true
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/mover-archivo",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "copiarArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Faltan \u0027origen\u0027 y/o \u0027destino\u0027",
+                                          "ejemplo":  {
+                                                          "origen":  "archivo1.txt",
+                                                          "destino":  "archivo2.txt",
+                                                          "overwrite":  true
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/copiar-archivo",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "prepararScript",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  true,
+                                          "mensaje":  "No se proporcionÃ³ ruta, operaciÃ³n completada sin acciÃ³n",
+                                          "ruta_recibida":  "",
+                                          "sugerencia":  "Proporciona una ruta vÃ¡lida para preparar un script especÃ­fico"
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/preparar-script",
+                            "ResponseTime":  20
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScript",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "endpoint":  "/api/ejecutar-script",
+                                          "method":  "POST",
+                                          "status":  404,
+                                          "runId":  "f9271f9162e3",
+                                          "error":  {
+                                                        "code":  "ScriptNotFound",
+                                                        "reason":  "No existe el script local: scripts/test_1.py",
+                                                        "missing_params":  [
+
+                                                                           ]
+                                                    },
+                                          "details":  {
+
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScriptLocal",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Script not found: test-string",
+                                          "searched_paths":  [
+                                                                 "C:\\ProyectosSimbolicos\\boat-rental-app\\test-string",
+                                                                 "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\test-string",
+                                                                 "C:\\ProyectosSimbolicos\\boat-rental-app\\src\\test-string",
+                                                                 "\\tmp\\scripts\\test-string"
+                                                             ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script-local",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "leerArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/leer-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarCORS",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "function_app y resource_group requeridos"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-cors",
+                            "ResponseTime":  11
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "escalarPlan",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "404 Client Error: Not Found for url: https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/serverfarms/test-string?api-version=2023-12-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/escalar-plan",
+                            "ResponseTime":  14440
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "auditarDeploy",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "source":  "ARM",
+                                          "status":  404,
+                                          "body":  "{\"error\":{\"code\":\"ResourceNotFound\",\"message\":\"The Resource \u0027Microsoft.Web/sites/copiloto-semantico-func\u0027 under resource group \u0027boat-rental-app-group\u0027 was not found. For more details please go to https://aka.ms/ARMResourceNotFoundFix\"}}",
+                                          "endpoint":  "https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/sites/copiloto-semantico-func/deployments?api-version=2023-01-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/auditar-deploy",
+                            "ResponseTime":  1392
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  21
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  22
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  23
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutar",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "mensaje":  "No pude interpretar la intenciÃ³n: \u0027\u0027",
+                                          "sugerencias":  [
+                                                              "dashboard - Ver mÃ©tricas del sistema",
+                                                              "diagnosticar:completo - DiagnÃ³stico exhaustivo",
+                                                              "generar:resumen - Resumen ejecutivo",
+                                                              "verificar:almacenamiento - Estado del storage",
+                                                              "git:status - Estado del repositorio"
+                                                          ],
+                                          "tip":  "Puedes usar comandos mÃ¡s especÃ­ficos o palabras clave conocidas",
+                                          "metadata":  {
+                                                           "timestamp":  "2025-09-17T19:39:46.008413",
+                                                           "modo":  "normal",
+                                                           "intencion_procesada":  "",
+                                                           "procesador":  "extendido",
+                                                           "ambiente":  "Local",
+                                                           "copiloto_version":  "2.0-orchestrator-extendido"
+                                                       },
+                                          "ayuda":  {
+                                                        "intenciones_extendidas":  [
+                                                                                       "verificar:almacenamiento",
+                                                                                       "limpiar:cache",
+                                                                                       "generar:resumen",
+                                                                                       "git:status",
+                                                                                       "analizar:rendimiento",
+                                                                                       "confirmar:accion"
+                                                                                   ],
+                                                        "intenciones_basicas":  [
+                                                                                    "dashboard",
+                                                                                    "diagnosticar:completo",
+                                                                                    "buscar:archivos",
+                                                                                    "generar:readme",
+                                                                                    "guia:configurar_blob"
+                                                                                ],
+                                                        "ejemplo":  {
+                                                                        "intencion":  "verificar:almacenamiento",
+                                                                        "parametros":  {
+
+                                                                                       },
+                                                                        "modo":  "normal"
+                                                                    }
+                                                    }
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/ejecutar",
+                            "ResponseTime":  25
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "actualizarContenedor",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Tag requerido",
+                                          "ejemplo":  {
+                                                          "tag":  "v12"
+                                                      },
+                                          "descripcion":  "Especifica la versión del contenedor a desplegar"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/actualizar-contenedor",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Comando requerido"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "infoArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/info-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  27
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  29
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarAppSettings",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "function_app, resource_group y settings requeridos"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-app-settings",
+                            "ResponseTime":  16
+                        }
+                    ],
+    "ByMethod":  {
+
+                 },
+    "ValidationErrors":  [
+
+                         ],
+    "Summary":  {
+                    "SuccessRate":  74.7,
+                    "Timestamp":  "2025-09-17 19:39:46",
+                    "TotalTests":  83,
+                    "Failed":  21,
+                    "Passed":  62
+                }
+}

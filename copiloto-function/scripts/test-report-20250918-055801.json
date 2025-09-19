@@ -1,0 +1,454 @@
+{
+    "ByTag":  {
+                  "Internal":  {
+                                   "Failed":  4,
+                                   "Total":  11,
+                                   "Passed":  7
+                               },
+                  "Azure Configuration":  {
+                                              "Failed":  3,
+                                              "Total":  9,
+                                              "Passed":  6
+                                          },
+                  "Bridge":  {
+                                 "Failed":  0,
+                                 "Total":  3,
+                                 "Passed":  3
+                             },
+                  "CLI":  {
+                              "Failed":  0,
+                              "Total":  3,
+                              "Passed":  3
+                          },
+                  "DiagnÃ³stico":  {
+                                       "Failed":  1,
+                                       "Total":  6,
+                                       "Passed":  5
+                                   },
+                  "Testing":  {
+                                  "Failed":  2,
+                                  "Total":  14,
+                                  "Passed":  12
+                              },
+                  "Azure Storage":  {
+                                        "Failed":  5,
+                                        "Total":  24,
+                                        "Passed":  19
+                                    },
+                  "Azure Deployment":  {
+                                           "Failed":  2,
+                                           "Total":  9,
+                                           "Passed":  7
+                                       }
+              },
+    "FailedTests":  [
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "moverArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Campos requeridos faltantes: origen, destino",
+                                          "campos_faltantes":  [
+                                                                   "origen",
+                                                                   "destino"
+                                                               ],
+                                          "campos_recibidos":  [
+
+                                                               ],
+                                          "body_vacio":  true,
+                                          "ejemplo":  {
+                                                          "origen":  "archivo-origen.txt",
+                                                          "destino":  "archivo-destino.txt",
+                                                          "overwrite":  false,
+                                                          "eliminar_origen":  true
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/mover-archivo",
+                            "ResponseTime":  12
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "copiarArchivo",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Request body debe ser un objeto JSON válido y no vacío",
+                                          "body_recibido":  {
+
+                                                            },
+                                          "tipo_recibido":  "dict",
+                                          "es_vacio":  true,
+                                          "campos_requeridos":  [
+                                                                    "origen",
+                                                                    "destino"
+                                                                ],
+                                          "ejemplo":  {
+                                                          "origen":  "archivo1.txt",
+                                                          "destino":  "archivo2.txt",
+                                                          "overwrite":  false
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/copiar-archivo",
+                            "ResponseTime":  11
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "prepararScript",
+                            "StatusCode":  200,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "local_path":  "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\setup.sh"
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/preparar-script",
+                            "ResponseTime":  24
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScriptLocal",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script-local",
+                            "ResponseTime":  30004
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "leerArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/leer-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarCORS",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Parámetros requeridos faltantes: function_app",
+                                          "missing_params":  [
+                                                                 "function_app"
+                                                             ],
+                                          "ejemplo":  {
+                                                          "function_app":  "mi-function-app",
+                                                          "resource_group":  "mi-resource-group",
+                                                          "allowed_origins":  [
+                                                                                  "https://mi-dominio.com",
+                                                                                  "https://otro-dominio.com"
+                                                                              ]
+                                                      },
+                                          "nota":  "También puedes configurar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-cors",
+                            "ResponseTime":  15
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "escalarPlan",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "\u0027test-string\u0027 no es un nombre de plan válido",
+                                          "codigo_error":  "INVALID_PLAN_NAME",
+                                          "valores_no_validos":  [
+                                                                     "test",
+                                                                     "test-string",
+                                                                     "ejemplo",
+                                                                     "sample",
+                                                                     "placeholder",
+                                                                     "demo"
+                                                                 ],
+                                          "sugerencia":  "Proporciona el nombre real de tu App Service Plan",
+                                          "ejemplo":  {
+                                                          "plan_name":  "boat-rental-app-plan",
+                                                          "resource_group":  "boat-rental-rg",
+                                                          "sku":  "EP1"
+                                                      },
+                                          "skus_disponibles":  [
+                                                                   "B1",
+                                                                   "B2",
+                                                                   "B3",
+                                                                   "S1",
+                                                                   "S2",
+                                                                   "S3",
+                                                                   "P1V2",
+                                                                   "P2V2",
+                                                                   "P3V2",
+                                                                   "EP1",
+                                                                   "EP2",
+                                                                   "EP3"
+                                                               ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/escalar-plan",
+                            "ResponseTime":  15
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "auditarDeploy",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error_code":  "RESOURCE_NOT_FOUND",
+                                          "mensaje":  "Recurso \u0027copiloto-semantico-func\u0027 no encontrado en el resource group \u0027boat-rental-app-group\u0027",
+                                          "verificacion":  {
+                                                               "subscription_id":  "380fa841-83f3-42fe-adc4-582a5ebe139b",
+                                                               "resource_group":  "boat-rental-app-group",
+                                                               "site_name":  "copiloto-semantico-func",
+                                                               "resource_type":  "Microsoft.Web/sites"
+                                                           },
+                                          "sugerencias":  [
+                                                              "Verificar que la Function App \u0027copiloto-semantico-func\u0027 existe",
+                                                              "Confirmar que está en el resource group \u0027boat-rental-app-group\u0027",
+                                                              "Revisar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP",
+                                                              "Usar \u0027az webapp list\u0027 para listar Function Apps disponibles"
+                                                          ],
+                                          "posibles_nombres":  [
+                                                                   "copiloto-semantico-func-us2",
+                                                                   "copiloto-semantico-func-func",
+                                                                   "copiloto-func-azcli",
+                                                                   "boat-rental-copiloto"
+                                                               ],
+                                          "endpoint_verificado":  "https://management.azure.com/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b/resourceGroups/boat-rental-app-group/providers/Microsoft.Web/sites/copiloto-semantico-func?api-version=2023-01-01"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/auditar-deploy",
+                            "ResponseTime":  2550
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  20
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  21
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  21
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "actualizarContenedor",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Tag requerido",
+                                          "ejemplo":  {
+                                                          "tag":  "v12"
+                                                      },
+                                          "descripcion":  "Especifica la versión del contenedor a desplegar"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/actualizar-contenedor",
+                            "ResponseTime":  14
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Comando requerido y no puede estar vacío",
+                                          "comando_recibido":  null,
+                                          "tipo_comando":  "None",
+                                          "ejemplo":  {
+                                                          "comando":  "docker build -t mi-imagen ."
+                                                      },
+                                          "comandos_validos":  [
+                                                                   "docker build -t copiloto-func-azcli:v13 .",
+                                                                   "docker push boatrentalacr.azurecr.io/copiloto-func-azcli:v13",
+                                                                   "az functionapp config container set ..."
+                                                               ]
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  13
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "infoArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/info-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  28
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  27
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarAppSettings",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "error":  "Parámetros requeridos faltantes: function_app, settings",
+                                          "missing_params":  [
+                                                                 "function_app",
+                                                                 "settings"
+                                                             ],
+                                          "valores_recibidos":  {
+                                                                    "function_app":  "no_proporcionado",
+                                                                    "resource_group":  "boat-rental-app-group",
+                                                                    "settings":  "no_proporcionado"
+                                                                },
+                                          "ejemplo":  {
+                                                          "function_app":  "mi-function-app",
+                                                          "resource_group":  "mi-resource-group",
+                                                          "settings":  {
+                                                                           "AZURE_STORAGE_CONNECTION_STRING":  "DefaultEndpointsProtocol=https;...",
+                                                                           "CUSTOM_SETTING":  "mi_valor",
+                                                                           "ENVIRONMENT":  "production"
+                                                                       }
+                                                      },
+                                          "nota":  "También puedes configurar las variables de entorno WEBSITE_SITE_NAME y RESOURCE_GROUP"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-app-settings",
+                            "ResponseTime":  15
+                        }
+                    ],
+    "ByMethod":  {
+
+                 },
+    "ValidationErrors":  [
+
+                         ],
+    "Summary":  {
+                    "SuccessRate":  79.52,
+                    "Timestamp":  "2025-09-18 05:58:00",
+                    "TotalTests":  83,
+                    "Failed":  17,
+                    "Passed":  66
+                }
+}
