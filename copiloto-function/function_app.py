@@ -7742,6 +7742,15 @@ def info_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     method = "GET"
     run_id = get_run_id(req)
 
+    # ✅ VALIDACIÓN TEMPRANA: Verificar parámetros y existencia física del archivo
+    validation_result = validate_info_archivo_params(
+        req, run_id, CONTAINER_NAME, IS_AZURE, get_blob_client,
+        PROJECT_ROOT, globals().get('COPILOT_ROOT'), Path, datetime,
+        json, func, logging, os
+    )
+    if validation_result is not None:
+        return validation_result
+
     try:
         # ✅ VALIDACIÓN PREVIA: Verificar que req y params no sean None
         if not req:
@@ -8118,6 +8127,147 @@ def info_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 "status": 500,
                 "run_id": run_id if 'run_id' in locals() else "unknown",
                 "error_type": type(e).__name__,
+                "timestamp": datetime.now().isoformat()
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+def validate_info_archivo_params(req, run_id, CONTAINER_NAME, IS_AZURE, get_blob_client, PROJECT_ROOT, COPILOT_ROOT, Path, datetime, json, func, logging, os):
+    """
+    Validación robusta de parámetros y existencia física del archivo para info_archivo_http
+    """
+    try:
+        # ✅ VALIDACIÓN CRÍTICA: Verificar que ruta venga con archivo válido
+        ruta_raw = (req.params.get("ruta") or req.params.get("path") or
+                    req.params.get("archivo") or req.params.get("blob") or "").strip()
+
+        if not ruta_raw:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetro 'ruta' es requerido para obtener información del archivo",
+                    "error_code": "MISSING_REQUIRED_PARAMETER",
+                    "parametros_aceptados": {
+                        "ruta": "Ruta del archivo (requerido)",
+                        "path": "Alias para 'ruta'",
+                        "archivo": "Alias para 'ruta'",
+                        "blob": "Alias para 'ruta'"
+                    },
+                    "ejemplos_validos": [
+                        "?ruta=README.md",
+                        "?ruta=package.json",
+                        "?path=mobile-app/src/App.tsx",
+                        "?archivo=docs/API.md"
+                    ],
+                    "run_id": run_id,
+                    "timestamp": datetime.now().isoformat()
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # ✅ VALIDACIÓN ADICIONAL: Formato de ruta válido
+        if ruta_raw.startswith("//") or ".." in ruta_raw or len(ruta_raw.strip()) < 1:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Formato de ruta inválido o inseguro",
+                    "error_code": "INVALID_PATH_FORMAT",
+                    "ruta_recibida": ruta_raw,
+                    "problema": "Contiene caracteres no permitidos o está vacía",
+                    "formatos_validos": [
+                        "archivo.txt",
+                        "carpeta/archivo.txt",
+                        "docs/readme.md"
+                    ],
+                    "run_id": run_id
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # ✅ VERIFICACIÓN FÍSICA: Comprobar que el archivo existe antes de procesar
+        container = req.params.get("container", CONTAINER_NAME)
+        archivo_existe = False
+        error_existencia = None
+
+        # Verificar existencia en Azure Blob Storage
+        if IS_AZURE:
+            try:
+                client = get_blob_client()
+                if client:
+                    container_client = client.get_container_client(container)
+                    if container_client.exists():
+                        ruta_normalizada = ruta_raw.replace(
+                            '\\', '/').lstrip('/')
+                        blob_client = container_client.get_blob_client(
+                            ruta_normalizada)
+                        archivo_existe = blob_client.exists()
+                        if not archivo_existe:
+                            error_existencia = f"El archivo '{ruta_raw}' no existe en el contenedor '{container}'"
+                    else:
+                        error_existencia = f"El contenedor '{container}' no existe"
+                else:
+                    error_existencia = "Cliente de Blob Storage no disponible"
+            except Exception as e:
+                error_existencia = f"Error verificando existencia en Blob Storage: {str(e)}"
+        else:
+            # Verificar existencia local
+            posibles_rutas = [
+                PROJECT_ROOT / ruta_raw,
+                COPILOT_ROOT / ruta_raw if COPILOT_ROOT else None,
+                Path(ruta_raw) if Path(ruta_raw).is_absolute() else None
+            ]
+
+            for ruta_completa in filter(None, posibles_rutas):
+                if ruta_completa and ruta_completa.exists() and ruta_completa.is_file():
+                    archivo_existe = True
+                    break
+
+            if not archivo_existe:
+                error_existencia = f"El archivo '{ruta_raw}' no existe en el sistema local"
+
+        # ✅ RESPUESTA DE ERROR SI NO EXISTE
+        if not archivo_existe:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": error_existencia or f"El archivo '{ruta_raw}' no existe",
+                    "error_code": "FILE_NOT_FOUND",
+                    "archivo_solicitado": {
+                        "ruta_recibida": ruta_raw,
+                        "container": container,
+                        "ambiente": "Azure" if IS_AZURE else "Local"
+                    },
+                    "acciones_recomendadas": [
+                        "Verificar que el archivo existe en la ubicación especificada",
+                        "Comprobar permisos de acceso al archivo",
+                        f"Listar archivos disponibles en el contenedor '{container}'"
+                    ],
+                    "run_id": run_id,
+                    "timestamp": datetime.now().isoformat()
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=404
+            )
+
+        logging.info(f"[{run_id}] Archivo verificado y existe: {ruta_raw}")
+
+        # Retornar None si todo está bien para continuar con el procesamiento normal
+        return None
+
+    except Exception as e:
+        logging.exception(
+            f"[{run_id}] Error en validación de info_archivo: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": f"Error interno en validación: {str(e)}",
+                "error_code": "VALIDATION_ERROR",
+                "tipo_error": type(e).__name__,
+                "run_id": run_id,
                 "timestamp": datetime.now().isoformat()
             }, ensure_ascii=False),
             mimetype="application/json",
@@ -8688,7 +8838,7 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="text/plain",
                 status_code=200
             )
-        except Exception as fallback_error:
+        except:
             # Último recurso si incluso el fallback falla
             return func.HttpResponse(
                 "❌ Error crítico: No se pudo procesar la respuesta",
@@ -8821,17 +8971,43 @@ def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         # ✅ VALIDACIÓN MEJORADA: Verificar body y comando con mejor manejo de errores
+        raw_body = req.get_body().decode('utf-8') if req.get_body() else ""
+
+        # ✅ DETECTAR CASOS ESPECÍFICOS: Body que es solo "." o texto plano
+        if raw_body.strip() == ".":
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "JSON no válido: '.'",
+                    "body_recibido": raw_body,
+                    "problema": "El cuerpo de la solicitud debe ser un objeto JSON, no texto plano",
+                    "ejemplo_correcto": {"comando": "docker build -t mi-imagen ."},
+                    "formato_requerido": "application/json"
+                }),
+                status_code=404,  # Usar 404 como indica el error
+                mimetype="application/json"
+            )
+
         try:
             body = req.get_json() if req.get_body() else {}
-        except (ValueError, TypeError):
-            body = {}
+        except (ValueError, TypeError) as json_error:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": f"JSON no válido: {str(json_error)}",
+                    "body_recibido": raw_body[:100],  # Primeros 100 chars
+                    "ejemplo_correcto": {"comando": "docker build -t mi-imagen ."},
+                    "formato_requerido": "application/json"
+                }),
+                status_code=404,
+                mimetype="application/json"
+            )
 
         if not body or not isinstance(body, dict):
             return func.HttpResponse(
                 json.dumps({
                     "error": "Request body debe ser un objeto JSON válido",
                     "ejemplo": {"comando": "docker build -t mi-imagen ."},
-                    "body_recibido": str(body) if body else "vacío"
+                    "body_recibido": str(body) if body else "vacío",
+                    "raw_body": raw_body[:50] if raw_body else "vacío"
                 }),
                 status_code=400,
                 mimetype="application/json"
@@ -9427,15 +9603,59 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400
             )
 
+        # ✅ VALIDAR AZURE CLI DISPONIBLE
+        if platform.system() == "Windows":
+            AZ_BIN = shutil.which("az.cmd") or shutil.which("az")
+        else:
+            AZ_BIN = shutil.which("az") or "/usr/bin/az"
+
+        if not AZ_BIN:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Azure CLI no encontrado en el sistema",
+                    "codigo_error": "AZ_CLI_NOT_FOUND",
+                    "sistema": platform.system(),
+                    "solucion": "Instalar Azure CLI o verificar que esté en el PATH"
+                }),
+                mimetype="application/json",
+                status_code=500
+            )
+
         # Actualizar contenedor
         imagen = f"boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"
 
-        result = subprocess.run([
-            "az", "functionapp", "config", "container", "set",
+        cmd_parts = [
+            AZ_BIN, "functionapp", "config", "container", "set",
             "-g", "boat-rental-app-group",
             "-n", "copiloto-semantico-func-us2",
             "--docker-custom-image-name", imagen
-        ], capture_output=True, text=True, timeout=60)
+        ]
+
+        # ✅ LOG DEL COMANDO ANTES DE EJECUTAR
+        logging.info(f"Ejecutando comando: {' '.join(cmd_parts)}")
+
+        try:
+            result = subprocess.run(
+                cmd_parts,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+        except FileNotFoundError as fnf_error:
+            logging.error(f"Archivo no encontrado: {fnf_error}")
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": f"Comando no encuentra archivo: {str(fnf_error)}",
+                    "codigo_error": "FILE_NOT_FOUND",
+                    "comando_intentado": ' '.join(cmd_parts),
+                    "az_bin_usado": AZ_BIN,
+                    "solucion": "Verificar que Azure CLI esté correctamente instalado"
+                }),
+                mimetype="application/json",
+                status_code=500
+            )
 
         if result.returncode != 0:
             return func.HttpResponse(
@@ -9449,11 +9669,13 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # Reiniciar
-        subprocess.run([
-            "az", "functionapp", "restart",
+        restart_cmd = [
+            AZ_BIN, "functionapp", "restart",
             "-g", "boat-rental-app-group",
             "-n", "copiloto-semantico-func-us2"
-        ], capture_output=True, text=True, timeout=30)
+        ]
+        logging.info(f"Ejecutando restart: {' '.join(restart_cmd)}")
+        subprocess.run(restart_cmd, capture_output=True, text=True, timeout=30)
 
         return func.HttpResponse(
             json.dumps({
