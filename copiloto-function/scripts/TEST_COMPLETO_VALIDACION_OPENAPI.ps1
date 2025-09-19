@@ -225,23 +225,29 @@ function Initialize-TestFiles {
 
   # Crear archivo para /api/leer-archivo
   if ($TestCase.Path -eq "/api/leer-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
+    Write-Host "🔧 Initialize-TestFiles: Procesando /api/leer-archivo" -ForegroundColor Yellow
     $ruta = $Scenario.QueryParams["ruta"]
+    Write-Host "🔧 Ruta inicial: '$ruta'" -ForegroundColor Yellow
     if (-not $ruta) {
       # Fallback: generar ruta si no existe
       $ruta = "test/sample_$(Get-Random -Maximum 9999).txt"
       $Scenario.QueryParams["ruta"] = $ruta
+      Write-Host "🔧 Ruta generada: '$ruta'" -ForegroundColor Yellow
     }
     if ($ruta) {
       $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
       $rutaDir = Split-Path $rutaPath -Parent
+      Write-Host "🔧 Creando directorio: '$rutaDir'" -ForegroundColor Yellow
       if (!(Test-Path $rutaDir)) {
         New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
       }
+      Write-Host "🔧 Creando archivo: '$rutaPath'" -ForegroundColor Yellow
       if (!(Test-Path $rutaPath)) {
         New-Item -ItemType File -Path $rutaPath -Force | Out-Null
         Set-Content -Path $rutaPath -Value "Archivo de lectura para prueba - $(Get-Date)"
       }
-      Write-Debug "Archivo de lectura creado: $rutaPath"
+      Write-Host "🔧 ✅ Archivo de lectura creado: $rutaPath" -ForegroundColor Green
+      Write-Host "🔧 QueryParams final: $($Scenario.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Yellow
     }
   }
 
@@ -278,7 +284,7 @@ function Initialize-TestFiles {
       }
       if (!(Test-Path $rutaPath)) {
         New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "#!/bin/bash`necho Preparar script $(Get-Date)"
+        Set-Content -Path $rutaPath -Value "#!/usr/bin/env python3`nprint('Preparar script $(Get-Date)')"
       }
       Write-Debug "Script preparado: $rutaPath"
     }
@@ -409,10 +415,10 @@ function New-SampleBody {
       timeout_s = 30
     }
     "/api/preparar-script"         = @{
-      ruta = "scripts/setup_$(Get-Random -Maximum 9999).sh"
+      ruta = "scripts/setup_$(Get-Random -Maximum 9999).py"
     }
     "/api/ejecutar-script-local"   = @{
-      script = "scripts/test_$(Get-Random -Maximum 9999).sh"
+      script = "scripts/test_$(Get-Random -Maximum 9999).py"
       args   = @()
     }
     "/api/hybrid"                  = @{
@@ -425,7 +431,7 @@ function New-SampleBody {
       }
     }
     "/api/escalar-plan"            = @{
-      plan_name      = "boat-rental-app-plan"
+      plan_name      = "copiloto-linux-premium"
       resource_group = "boat-rental-app-group"
       sku            = "EP1"
     }
@@ -498,7 +504,7 @@ function Invoke-TestCase {
   if ($QueryParams -and $QueryParams.Count -gt 0) {
     $queryString = ($QueryParams.GetEnumerator() | ForEach-Object {
         "$($_.Key)=$([uri]::EscapeDataString($_.Value))"
-      }) -join "&"
+      }) -join '&'
     $url = "$url?$queryString"
   }
     
@@ -708,7 +714,7 @@ foreach ($testCase in $testCases) {
     $allResults += $testResult
         
     if ($result.Success) {
-      Write-Pass "PASS ($($result.StatusCode), $($result.ResponseTime)ms)"
+      Write-Pass "PASS ($($result.StatusCode), $($result.ResponseTime)) ms"
     }
     else {
       Write-Fail "FAIL (esperado: $($scenario.ExpectedStatus -join ','), recibido: $($result.StatusCode))"
@@ -740,15 +746,15 @@ Write-Host ""
 Write-Info "RESUMEN DE PRUEBAS"
 Write-Host ""
 
-Write-Host "Total de pruebas:    $($report.Summary.TotalTests)"
-Write-Pass "Pruebas exitosas:    $($report.Summary.Passed)"
-if ($report.Summary.Failed -gt 0) {
-  Write-Fail "Pruebas fallidas:    $($report.Summary.Failed)"
+Write-Host "Total de pruebas:    $($report['Summary']['TotalTests'])"
+Write-Pass "Pruebas exitosas:    $($report['Summary']['Passed'])"
+if ($report['Summary']['Failed'] -gt 0) {
+  Write-Fail "Pruebas fallidas:    $($report['Summary']['Failed'])"
 }
 else {
   Write-Host "Pruebas fallidas:    0"
 }
-Write-Host "Tasa de exito:       $($report.Summary.SuccessRate)%"
+Write-Host "Tasa de exito:       $($report['Summary']['SuccessRate'])%"
 Write-Host ""
 
 # Resumen por metodo
@@ -756,7 +762,10 @@ Write-Info "Por metodo HTTP:"
 foreach ($method in $report.ByMethod.Keys | Sort-Object) {
   $methodData = $report.ByMethod[$method]
   $methodSuccess = if ($methodData.Total -gt 0) { [math]::Round(($methodData.Passed / $methodData.Total) * 100, 0) } else { 0 }
-  Write-Host "  ${method}: $($methodData.Passed)/$($methodData.Total) ($methodSuccess%)"
+  $percentStr = "$methodSuccess%"
+  Write-Host "  ${method}: $($methodData.Passed)/$($methodData.Total) ($percentStr)" -ForegroundColor Cyan
+
+
 }
 Write-Host ""
 
@@ -777,7 +786,8 @@ if ($report.FailedTests.Count -gt 0) {
 }
 
 # Guardar reporte en archivo
-$reportPath = "./test-report-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$reportPath = "./test-report-$timestamp.json"
 $report | ConvertTo-Json -Depth 10 | Set-Content $reportPath
 Write-Info "Reporte guardado en: $reportPath"
 
@@ -821,88 +831,3 @@ else {
   exit 1
 }
 
-Set-Content "scripts/test.sh" -Value "echo Hello"
-
-function Invoke-TestCase {
-  param(
-    [string]$BaseUrl,
-    [string]$Path,
-    [string]$Method,
-    [hashtable]$QueryParams,
-    $Body,
-    [int[]]$ExpectedStatus,
-    [int]$TimeoutSec = 30
-  )
-    
-  Write-Host "🧪 Ejecutando test: $Path [$Method]"
-  
-  $url = $BaseUrl + $Path
-    
-  if ($QueryParams -and $QueryParams.Count -gt 0) {
-    $queryString = ($QueryParams.GetEnumerator() | ForEach-Object {
-        "$($_.Key)=$([uri]::EscapeDataString($_.Value))"
-      }) -join "&"
-    $url = "$url?$queryString"
-  }
-    
-  $headers = @{
-    "Content-Type" = "application/json"
-    "Accept"       = "application/json"
-  }
-    
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    
-  try {
-    if ($Method -in @("GET", "DELETE")) {
-      $response = Invoke-WebRequest -Uri $url -Method $Method -Headers $headers -TimeoutSec $TimeoutSec -ErrorAction Stop
-    }
-    else {
-      if ($Body -is [string]) {
-        $bodyJson = $Body
-      }
-      elseif ($Body) {
-        $bodyJson = $Body | ConvertTo-Json -Depth 20 -Compress
-      }
-      else {
-        $bodyJson = "{}"
-      }
-            
-      Write-Debug "Request Body: $bodyJson"
-      $response = Invoke-WebRequest -Uri $url -Method $Method -Headers $headers -Body $bodyJson -TimeoutSec $TimeoutSec -ErrorAction Stop
-    }
-        
-    $statusCode = $response.StatusCode
-    $responseBody = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
-    if (!$responseBody) { $responseBody = $response.Content }
-        
-    $success = $statusCode -in $ExpectedStatus
-  }
-  catch {
-    $errorResponse = $_.Exception.Response
-    $statusCode = if ($errorResponse) { [int]$errorResponse.StatusCode } else { 0 }
-        
-    try {
-      $stream = $errorResponse.GetResponseStream()
-      $reader = New-Object System.IO.StreamReader($stream)
-      $responseText = $reader.ReadToEnd()
-      $responseBody = $responseText | ConvertFrom-Json -ErrorAction SilentlyContinue
-      if (!$responseBody) { $responseBody = $responseText }
-    }
-    catch {
-      $responseBody = @{ error = $_.ToString() }
-    }
-        
-    $success = $statusCode -in $ExpectedStatus
-  }
-    
-  $sw.Stop()
-    
-  return @{
-    Success      = $success
-    StatusCode   = $statusCode
-    ResponseBody = $responseBody
-    ResponseTime = $sw.ElapsedMilliseconds
-    Url          = $url
-    Method       = $Method
-  }
-}
