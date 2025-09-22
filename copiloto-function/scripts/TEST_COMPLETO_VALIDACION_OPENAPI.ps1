@@ -714,7 +714,7 @@ foreach ($testCase in $testCases) {
     $allResults += $testResult
         
     if ($result.Success) {
-      Write-Pass "PASS ($($result.StatusCode), $($result.ResponseTime)) ms"
+      Write-Pass "PASS ($($result.StatusCode), $($result.ResponseTime) ms)"
     }
     else {
       Write-Fail "FAIL (esperado: $($scenario.ExpectedStatus -join ','), recibido: $($result.StatusCode))"
