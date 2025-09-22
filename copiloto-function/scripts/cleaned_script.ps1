@@ -233,97 +233,99 @@ function Initialize-TestFiles {
       $ruta = "test/sample_$(Get-Random -Maximum 9999).txt"
       $Scenario.QueryParams["ruta"] = $ruta
       Write-Host "ðŸ”§ Ruta generada: '$ruta'" -ForegroundColor Yellow
-    }  # â† CIERRE FALTANTE AQUÃ
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      Write-Host "ðŸ”§ Creando directorio: '$rutaDir'" -ForegroundColor Yellow
+    }  # Cierre del if -not $ruta
+  }
+  if ($ruta) {
+    $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
+    $rutaDir = Split-Path $rutaPath -Parent
+    Write-Host "ðŸ”§ Creando directorio: '$rutaDir'" -ForegroundColor Yellow
       if (!(Test-Path $rutaDir)) {
         New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
       }
       Write-Host "ðŸ”§ Creando archivo: '$rutaPath'" -ForegroundColor Yellow
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "Archivo de lectura para prueba - $(Get-Date)"
-      }
-      Write-Host "ðŸ”§ âœ… Archivo de lectura creado: $rutaPath" -ForegroundColor Green
+    if (!(Test-Path $rutaPath)) {
+      New-Item -ItemType File -Path $rutaPath -Force | Out-Null
+      Set-Content -Path $rutaPath -Value "Archivo de lectura para prueba - $(Get-Date)"
+    }
+    Write-Host "ðŸ”§ âœ… Archivo de lectura creado: $rutaPath" -ForegroundColor Green
       Write-Host "ðŸ”§ QueryParams final: $($Scenario.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Yellow
-    }
-  }
-
-  # Crear archivo para /api/info-archivo
-  if ($TestCase.Path -eq "/api/info-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $ruta = $Scenario.QueryParams["ruta"]
-    if (-not $ruta) {
-      # Fallback: generar ruta si no existe
-      $ruta = "test/info_$(Get-Random -Maximum 9999).txt"
-      $Scenario.QueryParams["ruta"] = $ruta
-    }
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      if (!(Test-Path $rutaDir)) {
-        New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
-      }
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "Archivo para info - $(Get-Date)"
-      }
-      Write-Debug "Archivo para info creado: $rutaPath"
-    }
-  }
-
-  # Crear archivo para /api/preparar-script
-  if ($TestCase.Path -eq "/api/preparar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $ruta = $Scenario.Body["ruta"]
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      if (!(Test-Path $rutaDir)) {
-        New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
-      }
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "#!/usr/bin/env python3`nprint('Preparar script $(Get-Date)')"
-      }
-      Write-Debug "Script preparado: $rutaPath"
-    }
-  }
-
-  # Crear archivo para /api/ejecutar-script
-  if ($TestCase.Path -eq "/api/ejecutar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $script = $Scenario.Body["script"]
-    if ($script) {
-      $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
-      $scriptDir = Split-Path $scriptPath -Parent
-      if (!(Test-Path $scriptDir)) {
-        New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-      }
-      if (!(Test-Path $scriptPath)) {
-        New-Item -ItemType File -Path $scriptPath -Force | Out-Null
-        Set-Content -Path $scriptPath -Value "print('Test script ejecutado - $(Get-Date)')"
-      }
-      Write-Debug "Script creado: $scriptPath"
-    }
-  }
-
-  # Crear archivo para /api/ejecutar-script-local
-  if ($TestCase.Path -eq "/api/ejecutar-script-local" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $script = $Scenario.Body["script"]
-    if ($script) {
-      $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
-      $scriptDir = Split-Path $scriptPath -Parent
-      if (!(Test-Path $scriptDir)) {
-        New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-      }
-      if (!(Test-Path $scriptPath)) {
-        New-Item -ItemType File -Path $scriptPath -Force | Out-Null
-        Set-Content -Path $scriptPath -Value "print('Script ejecutado')"
-      }
-      Write-Debug "Script local creado: $scriptPath"
-    }
   }
 }
+
+
+# Crear archivo para /api/info-archivo
+if ($TestCase.Path -eq "/api/info-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
+  $ruta = $Scenario.QueryParams["ruta"]
+  if (-not $ruta) {
+    # Fallback: generar ruta si no existe
+    $ruta = "test/info_$(Get-Random -Maximum 9999).txt"
+    $Scenario.QueryParams["ruta"] = $ruta
+  }
+  if ($ruta) {
+    $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
+    $rutaDir = Split-Path $rutaPath -Parent
+    if (!(Test-Path $rutaDir)) {
+      New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
+    }
+    if (!(Test-Path $rutaPath)) {
+      New-Item -ItemType File -Path $rutaPath -Force | Out-Null
+      Set-Content -Path $rutaPath -Value "Archivo para info - $(Get-Date)"
+    }
+    Write-Debug "Archivo para info creado: $rutaPath"
+  }
+}
+
+# Crear archivo para /api/preparar-script
+if ($TestCase.Path -eq "/api/preparar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
+  $ruta = $Scenario.Body["ruta"]
+  if ($ruta) {
+    $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
+    $rutaDir = Split-Path $rutaPath -Parent
+    if (!(Test-Path $rutaDir)) {
+      New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
+    }
+    if (!(Test-Path $rutaPath)) {
+      New-Item -ItemType File -Path $rutaPath -Force | Out-Null
+      Set-Content -Path $rutaPath -Value "#!/usr/bin/env python3`nprint('Preparar script $(Get-Date)')"
+    }
+    Write-Debug "Script preparado: $rutaPath"
+  }
+}
+
+# Crear archivo para /api/ejecutar-script
+if ($TestCase.Path -eq "/api/ejecutar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
+  $script = $Scenario.Body["script"]
+  if ($script) {
+    $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
+    $scriptDir = Split-Path $scriptPath -Parent
+    if (!(Test-Path $scriptDir)) {
+      New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
+    }
+    if (!(Test-Path $scriptPath)) {
+      New-Item -ItemType File -Path $scriptPath -Force | Out-Null
+      Set-Content -Path $scriptPath -Value "print('Test script ejecutado - $(Get-Date)')"
+    }
+    Write-Debug "Script creado: $scriptPath"
+  }
+}
+
+# Crear archivo para /api/ejecutar-script-local
+if ($TestCase.Path -eq "/api/ejecutar-script-local" -and $Scenario.Name -eq "Valid_MinimalRequired") {
+  $script = $Scenario.Body["script"]
+  if ($script) {
+    $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
+    $scriptDir = Split-Path $scriptPath -Parent
+    if (!(Test-Path $scriptDir)) {
+      New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
+    }
+    if (!(Test-Path $scriptPath)) {
+      New-Item -ItemType File -Path $scriptPath -Force | Out-Null
+      Set-Content -Path $scriptPath -Value "print('Script ejecutado')"
+    }
+    Write-Debug "Script local creado: $scriptPath"
+  }
+}
+
 # ============ GENERADOR DE VALORES DE EJEMPLO ============
 function Get-SampleValue {
 
@@ -718,7 +720,8 @@ foreach ($testCase in $testCases) {
       Write-Pass ("PASS ({ 0 }, { 1 }ms)" -f $result.StatusCode, $result.ResponseTime)
     }
     else {
-      Write-Fail ("FAIL (esperado: { 0 }, recibido: { 1 })" -f ($scenario.ExpectedStatus -join ','), $result.StatusCode)
+      Write-Fail ("FAIL (esperado: { 0 }, recibido: { 1 })" -f ($scenario.ExpectedStatus -join ", "), $result.StatusCode)
+
       if ($VerboseOutput -and $result.ResponseBody) {
         Write-Debug ("    Response: { 0 }" -f ($result.ResponseBody | ConvertTo-Json -Compress))
       }
@@ -788,7 +791,7 @@ if ($report.FailedTests.Count -gt 0) {
 
 # Guardar reporte en archivo
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$reportPath = "./test-report-$timestamp.json"
+$reportPath = ".\test-report-$timestamp.json"
 $report | ConvertTo-Json -Depth 10 | Set-Content $reportPath
 Write-Info "Reporte guardado en: $reportPath"
 

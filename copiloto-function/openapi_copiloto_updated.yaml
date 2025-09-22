@@ -3,132 +3,34 @@
   "info": {
     "title": "Copiloto Function Gateway",
     "version": "2.1",
-    "description": "Herramienta directa a la Function App (sin Logic App / SAS)",
-    "license": {
-      "name": "MIT",
-      "url": "https://opensource.org/licenses/MIT"
-    }
+    "description": "Herramienta directa a la Function App (sin Logic App / SAS)"
   },
   "servers": [
     {
-      "url": "https://copiloto-semantico-func-us2.azurewebsites.net"
+      "url": "https://copiloto-semantico-func.azurewebsites.net"
     }
   ],
   "paths": {
-    "/api/crear-contenedor": {
+    "/api/hybrid": {
       "post": {
-        "summary": "Crear contenedor en Blob Storage",
-        "operationId": "crearContenedor",
-        "tags": ["Azure Storage"],
-        "security": [],
+        "summary": "Router semántico (intenciones)",
+        "operationId": "hybrid",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["nombre"],
                 "properties": {
-                  "nombre": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
-                    "description": "3–63 chars, minúsculas y guiones, no empezar/terminar en guion"
+                  "agent_response": {
+                    "type": "string"
                   },
-                  "publico": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Si el contenedor será de acceso público"
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "description": "Metadata adicional del contenedor"
+                  "payload": {
+                    "type": "object"
                   }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Contenedor creado exitosamente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exito": {"type": "boolean"},
-                    "mensaje": {"type": "string"},
-                    "contenedor": {"type": "string"},
-                    "url": {"type": "string"}
-                  }
-                }
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "409": {"description": "El contenedor ya existe"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/bridge-cli": {
-      "post": {
-        "summary": "Endpoint tolerante para agentes problemáticos",
-        "operationId": "bridgeCli",
-        "tags": ["Bridge"],
-        "security": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Respuesta procesada",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-
-    "/api/ejecutar-cli": {
-      "post": {
-        "summary": "Ejecutar comandos CLI vía SDK de Azure",
-        "operationId": "ejecutarCLI",
-        "tags": ["CLI"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {"comando": {"type": "string", "example": "storage account list"}},
-                    "required": ["comando"]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "servicio": {"type": "string", "example": "storage"},
-                      "comando": {"type": "string", "example": "account list"}
-                    },
-                    "required": ["servicio", "comando"]
-                  }
+                },
+                "required": [
+                  "agent_response"
                 ]
               }
             }
@@ -136,134 +38,13 @@
         },
         "responses": {
           "200": {
-            "description": "Respuesta del comando ejecutado",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "403": {"description": "Operación no permitida"},
-          "408": {"description": "Timeout excedido"}
-        }
-      }
-    },
-    "/api/diagnostico-recursos": {
-      "get": {
-        "summary": "Diagnóstico completo de recursos Azure",
-        "operationId": "diagnosticoRecursos",
-        "tags": ["Diagnóstico"],
-        "security": [],
-        "parameters": [
-          {"name": "metricas", "in": "query", "schema": {"type": "boolean", "default": true}},
-          {"name": "costos", "in": "query", "schema": {"type": "boolean", "default": false}},
-          {"name": "recurso", "in": "query", "schema": {"type": "string"}}
-        ],
-        "responses": {
-          "200": {
-            "description": "Diagnóstico completo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "timestamp": {"type": "string"},
-                    "ambiente": {"type": "string"},
-                    "recursos": {"type": "object"},
-                    "metricas": {"type": "object"},
-                    "alertas": {"type": "array"},
-                    "recomendaciones": {"type": "array"},
-                    "sistema": {"type": "object"}
-                  }
-                }
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      },
-      "post": {
-        "summary": "Diagnóstico con parámetros específicos",
-        "operationId": "diagnosticoRecursosPost",
-        "tags": ["Diagnóstico"],
-        "security": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "metricas": {"type": "boolean"},
-                  "costos": {"type": "boolean"},
-                  "recurso": {"type": "string"},
-                  "profundidad": {"type": "string", "enum": ["basico", "detallado", "completo"]}
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Diagnóstico ejecutado",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/hybrid": {
-      "post": {
-        "summary": "Router semántico (intenciones)",
-        "operationId": "hybrid",
-        "security": [],
-        "parameters": [
-          {
-            "name": "semantic_response",
-            "in": "query",
-            "required": false,
-            "schema": {"type": "boolean", "default": false}
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "agent_response": {"type": "string"},
-                  "payload": {"type": "object"},
-                  "semantic_response": {"type": "boolean", "default": false}
-                },
-                "required": ["agent_response"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {"schema": {"type": "object", "additionalProperties": true}},
-              "text/plain": {"schema": {"type": "string"}}
-            }
+            "description": "OK"
           },
           "400": {
-            "description": "Solicitud inválida",
-            "content": {
-              "application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}
-            }
+            "description": "Solicitud inválida"
           },
           "500": {
-            "description": "Error servidor",
-            "content": {
-              "application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}
-            }
+            "description": "Error servidor"
           }
         }
       }
@@ -272,7 +53,6 @@
       "get": {
         "summary": "Estado detallado (ambiente y storage)",
         "operationId": "statusDetallado",
-        "security": [],
         "responses": {
           "200": {
             "description": "OK",
@@ -281,206 +61,74 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "copiloto": {"type": "string"},
-                    "version": {"type": "string"},
-                    "timestamp": {"type": "string"},
-                    "ambiente": {"type": "string"},
-                    "storage": {"type": "string"},
-                    "is_azure": {"type": "boolean"},
-                    "container": {"type": "string"},
-                    "blob_ready": {"type": "boolean"},
-                    "endpoints": {"type": "array", "items": {"type": "string"}},
-                    "ready": {"type": "boolean"}
+                    "copiloto": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string"
+                    },
+                    "ambiente": {
+                      "type": "string"
+                    },
+                    "storage": {
+                      "type": "string"
+                    },
+                    "is_azure": {
+                      "type": "boolean"
+                    },
+                    "container": {
+                      "type": "string"
+                    },
+                    "blob_ready": {
+                      "type": "boolean"
+                    },
+                    "endpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/listar-blobs": {
+      "get": {
+        "summary": "Listar blobs",
+        "operationId": "listarBlobs",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/mover-archivo": {
-      "post": {
-        "summary": "Mover un archivo de una ubicación a otra",
-        "operationId": "moverArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/MoverArchivoRequest"}
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10
             }
           }
-        },
-        "responses": {
-          "200": {"description": "Archivo movido correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/copiar-archivo": {
-      "post": {
-        "summary": "Copiar un archivo",
-        "operationId": "copiarArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/CopiarArchivoRequest"}
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Archivo copiado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/preparar-script": {
-      "post": {
-        "summary": "Preparar script para ejecución",
-        "operationId": "prepararScript",
-        "tags": ["Testing"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/PrepararScriptRequest"}
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Script preparado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/gestionar-despliegue": {
-      "post": {
-        "summary": "Gestionar despliegue de aplicación",
-        "operationId": "gestionarDespliegue",
-        "tags": ["Azure Deployment"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/GestionarDespliegueRequest"}
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Despliegue gestionado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/ejecutar-script": {
-      "post": {
-        "summary": "Ejecutar script desde /scripts o blob storage",
-        "operationId": "ejecutarScript",
-        "tags": ["Testing"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "script": {
-                    "type": "string", 
-                    "description": "Ruta del script: 'scripts/mi_script.py' (local) o 'blob::container/path/to/script.py' (blob)"
-                  },
-                  "args": {
-                    "type": "array", 
-                    "items": {"type": "string"}, 
-                    "description": "Argumentos del script"
-                  },
-                  "timeout_s": {
-                    "type": "integer", 
-                    "default": 60, 
-                    "description": "Timeout en segundos"
-                  },
-                  "sync_outputs": {
-                    "type": "boolean", 
-                    "default": true, 
-                    "description": "Sincronizar outputs"
-                  }
-                },
-                "required": ["script"]
-              }
-            }
-          }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Script ejecutado correctamente",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "404": {"description": "Script no encontrado"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/ejecutar-script-local": {
-      "post": {
-        "summary": "Ejecutar script local desde /scripts",
-        "operationId": "ejecutarScriptLocal",
-        "tags": ["Testing"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "script_path": {
-                    "type": "string", 
-                    "description": "Ruta del script local, ej: 'scripts/test_script.py'"
-                  }
-                },
-                "required": ["script_path"]
-              }
-            }
+            "description": "OK"
           }
-        },
-        "responses": {
-          "200": {
-            "description": "Script ejecutado correctamente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "stdout": {"type": "string", "description": "Salida estándar"},
-                    "stderr": {"type": "string", "description": "Salida de error"},
-                    "exit_code": {"type": "integer", "description": "Código de salida"},
-                    "success": {"type": "boolean", "description": "Si la ejecución fue exitosa"}
-                  }
-                }
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "403": {"description": "Archivo fuera del scope permitido"},
-          "404": {"description": "Archivo no encontrado"},
-          "500": {"description": "Error del servidor"}
         }
       }
     },
@@ -488,27 +136,54 @@
       "post": {
         "summary": "Crear/guardar un archivo",
         "operationId": "escribirArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["ruta", "contenido"],
                 "properties": {
-                  "ruta": {"type": "string", "description": "Ruta del archivo"},
-                  "contenido": {"type": "string", "description": "Contenido del archivo"}
-                },
-                "required": ["ruta", "contenido"]
+                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "contenido": { "type": "string", "example": "# Hola\nEsto es una prueba." }
+                }
               }
             }
           }
         },
         "responses": {
-          "201": {"description": "Archivo creado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
+          "201": { "description": "Creado" },
+          "400": { "description": "Error de validación" }
+        }
+      }
+    },
+    "/api/modificar-archivo": {
+      "post": {
+        "summary": "Modificar un archivo existente",
+        "operationId": "modificarArchivo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ruta", "operacion"],
+                "properties": {
+                  "ruta": { "type": "string", "example": "docs/PRUEBA.md" },
+                  "operacion": {
+                    "type": "string",
+                    "enum": ["agregar_linea", "reemplazar_linea", "eliminar_linea", "buscar_reemplazar", "agregar_inicio", "agregar_final", "insertar_antes", "insertar_despues"]
+                  },
+                  "contenido": { "type": "string" },
+                  "linea": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" },
+          "400": { "description": "Error de validación" }
         }
       }
     },
@@ -516,81 +191,47 @@
       "get": {
         "summary": "Leer un archivo",
         "operationId": "leerArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
         "parameters": [
-          {"name": "ruta", "in": "query", "required": true, "schema": {"type": "string"}}
+          {
+            "in": "query",
+            "name": "ruta",
+            "schema": { "type": "string" },
+            "required": true
+          }
         ],
         "responses": {
-          "200": {
-            "description": "Archivo leído correctamente",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "404": {"description": "Archivo no encontrado"}
+          "200": { "description": "OK" },
+          "404": { "description": "No encontrado" }
         }
       }
     },
     "/api/eliminar-archivo": {
       "post": {
-        "summary": "Eliminar archivo",
+        "summary": "Eliminar archivo (Blob o local)",
         "operationId": "eliminarArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ruta": {"type": "string", "description": "Ruta del archivo a eliminar"}
-                },
-                "required": ["ruta"]
-              }
+              "schema": { "type": "object", "properties": { "ruta": { "type": "string" } }, "required": ["ruta"] }
             }
           }
         },
-        "responses": {
-          "200": {"description": "Archivo eliminado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "404": {"description": "Archivo no encontrado"}
-        }
-      }
-    },
-    "/api/listar-blobs": {
-      "get": {
-        "summary": "Listar blobs en storage",
-        "operationId": "listarBlobs",
-        "tags": ["Azure Storage"],
-        "security": [],
+        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
+      },
+      "delete": {
+        "summary": "Eliminar archivo (por query)",
+        "operationId": "eliminarArchivoDelete",
         "parameters": [
-          {"name": "prefix", "in": "query", "schema": {"type": "string"}},
-          {"name": "top", "in": "query", "schema": {"type": "integer", "default": 10}}
+          { "name": "ruta", "in": "query", "required": true, "schema": { "type": "string" } }
         ],
-        "responses": {
-          "200": {
-            "description": "Lista de blobs",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
+        "responses": { "200": { "description": "Eliminado" }, "404": { "description": "No encontrado" } }
       }
     },
-    "/api/deploy": {
+    "/api/ejecutar-script": {
       "post": {
-        "summary": "Desplegar recursos Azure usando ARM templates",
-        "operationId": "deployARM",
-        "tags": ["Azure Deployment"],
-        "security": [],
+        "summary": "Ejecutar script desde /scripts (.py/.sh/.ps1)",
+        "operationId": "ejecutarScript",
         "requestBody": {
           "required": true,
           "content": {
@@ -598,481 +239,15 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "resourceGroup": {"type": "string", "description": "Nombre del resource group"},
-                  "template": {"type": "object", "description": "ARM template JSON"},
-                  "parameters": {"type": "object", "description": "Parámetros del template"}
+                  "script": { "type": "string", "example": "hello.py" },
+                  "parametros": { "type": "array", "items": { "type": "string" } }
                 },
-                "required": ["resourceGroup", "template"]
+                "required": ["script"]
               }
             }
           }
         },
-        "responses": {
-          "200": {
-            "description": "Deployment iniciado exitosamente",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/configurar-cors": {
-      "post": {
-        "summary": "Configurar CORS para Function App",
-        "operationId": "configurarCORS",
-        "tags": ["Azure Configuration"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "allowed_origins": {"type": "array", "items": {"type": "string"}}
-                },
-                "required": ["allowed_origins"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "CORS configurado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/escalar-plan": {
-      "post": {
-        "summary": "Escalar App Service Plan",
-        "operationId": "escalarPlan",
-        "tags": ["Azure Configuration"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "plan_name": {"type": "string", "description": "Nombre del plan"},
-                  "sku": {"type": "string", "enum": ["B1", "B2", "B3", "S1", "S2", "S3", "EP1", "EP2", "EP3"]}
-                },
-                "required": ["plan_name"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Plan escalado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/auditar-deploy": {
-      "get": {
-        "summary": "Auditar deployment actual",
-        "operationId": "auditarDeploy",
-        "tags": ["Diagnóstico"],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Auditoría completa del deployment",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {"type": "boolean"},
-                    "details": {
-                      "type": "object",
-                      "properties": {
-                        "files_count": {"type": "integer"},
-                        "function_app_py_sha256": {"type": "string", "nullable": true},
-                        "baseline_sha256": {"type": "string", "nullable": true},
-                        "match_baseline": {"type": "boolean", "nullable": true}
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/bateria-endpoints": {
-      "post": {
-        "summary": "Ejecutar batería de pruebas de endpoints",
-        "operationId": "bateriaEndpoints",
-        "tags": ["Testing"],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Batería ejecutada",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/probar-endpoint": {
-      "post": {
-        "summary": "Probar un endpoint específico",
-        "operationId": "probarEndpoint",
-        "tags": ["Testing"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "endpoint": {"type": "string", "description": "Endpoint a probar"},
-                  "method": {"type": "string", "enum": ["GET", "POST", "DELETE"], "default": "GET"}
-                },
-                "required": ["endpoint"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Endpoint probado",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/render-error": {
-      "post": {
-        "summary": "Renderizar error semánticamente",
-        "operationId": "renderError",
-        "tags": ["Internal"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "error": {"type": "string", "description": "Error a renderizar"},
-                  "context": {"type": "object", "description": "Contexto adicional"}
-                },
-                "required": ["error"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Error renderizado semánticamente",
-            "content": {
-              "text/plain": {
-                "schema": {"type": "string"}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/copiloto": {
-      "get": {
-        "summary": "Endpoint principal del copiloto",
-        "operationId": "copiloto",
-        "tags": ["Internal"],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Información del copiloto",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/health": {
-      "get": {
-        "summary": "Health check",
-        "operationId": "health",
-        "tags": ["Internal"],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "Servicio saludable",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/ejecutar": {
-      "post": {
-        "summary": "Orquestador de intenciones",
-        "operationId": "ejecutar",
-        "tags": ["Internal"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "intencion": {"type": "string", "description": "Intención a ejecutar"},
-                  "parametros": {"type": "object", "description": "Parámetros de la intención"}
-                },
-                "required": ["intencion"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Intención ejecutada",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"}
-        }
-      }
-    },
-    "/api/actualizar-contenedor": {
-      "post": {
-        "summary": "Actualizar propiedades de un contenedor en Blob Storage",
-        "operationId": "actualizarContenedor",
-        "tags": ["Azure Storage"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "nombre": {"type": "string", "description": "Nombre del contenedor"},
-                  "metadata": {"type": "object", "description": "Metadata a actualizar"}
-                },
-                "required": ["nombre"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Contenedor actualizado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "404": {"description": "Contenedor no encontrado"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/proxy-local": {
-      "post": {
-        "summary": "Endpoint interno de proxy",
-        "operationId": "proxyLocal",
-        "tags": ["Internal"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "url": {"type": "string", "description": "URL de destino"},
-                  "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE"], "default": "GET"},
-                  "data": {"type": "object", "description": "Datos a enviar"}
-                },
-                "required": ["url"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Proxy ejecutado correctamente",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/info-archivo": {
-      "get": {
-        "summary": "Obtener metadatos de un archivo",
-        "operationId": "infoArchivo",
-        "tags": ["Azure Storage"],
-        "security": [],
-        "parameters": [
-          {"name": "ruta", "in": "query", "required": true, "schema": {"type": "string", "description": "Ruta del archivo"}}
-        ],
-        "responses": {
-          "200": {
-            "description": "Metadatos del archivo",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "404": {"description": "Archivo no encontrado"}
-        }
-      }
-    },
-    "/api/desplegar-funcion": {
-      "post": {
-        "summary": "Desplegar función Azure",
-        "operationId": "desplegarFuncion",
-        "tags": ["Azure Deployment"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "function_name": {"type": "string", "description": "Nombre de la función"},
-                  "code": {"type": "string", "description": "Código de la función"},
-                  "config": {"type": "object", "description": "Configuración de la función"}
-                },
-                "required": ["function_name", "code"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Función desplegada correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    },
-    "/api/configurar-app-settings": {
-      "post": {
-        "summary": "Configurar App Settings de Function App",
-        "operationId": "configurarAppSettings",
-        "tags": ["Azure Configuration"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "function_app": {"type": "string", "description": "Nombre de la Function App"},
-                  "resource_group": {"type": "string", "description": "Resource group"},
-                  "settings": {"type": "object", "description": "Key-value pairs de configuración"}
-                },
-                "required": ["settings"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Settings actualizados correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
-        }
-      }
-    }
-  },
-  "tags": [
-    {"name": "Azure Storage", "description": "Operaciones de Azure Blob Storage"},
-    {"name": "Azure CLI", "description": "Ejecución de comandos Azure CLI"},
-    {"name": "Diagnóstico", "description": "Diagnóstico y monitoreo de recursos"},
-    {"name": "Azure Deployment", "description": "Deployment de recursos con ARM templates"},
-    {"name": "Azure Configuration", "description": "Configuración de recursos Azure"},
-    {"name": "Testing", "description": "Pruebas y validación de endpoints"},
-    {"name": "Internal", "description": "Operaciones internas de la Function App"}
-  ],
-  "components": {
-    "schemas": {
-      "ErrorEnvelope": {
-        "type": "object",
-        "properties": {
-          "ok": {"type": "boolean", "enum": [false]},
-          "error_code": {"type": "string"},
-          "status": {"type": "integer", "nullable": true},
-          "cause": {"type": "string"},
-          "hint": {"type": "string", "nullable": true},
-          "next_steps": {"type": "array", "items": {"type": "string"}},
-          "trace": {"type": "string", "nullable": true}
-        },
-        "required": ["ok", "error_code"]
-      },
-      "MoverArchivoRequest": {
-        "type": "object",
-        "properties": {
-          "origen": {"type": "string", "description": "Ruta del archivo de origen"},
-          "destino": {"type": "string", "description": "Ruta del archivo de destino"},
-          "overwrite": {"type": "boolean", "default": false, "description": "Sobrescribir si existe"}
-        },
-        "required": ["origen", "destino"]
-      },
-      "CopiarArchivoRequest": {
-        "type": "object",
-        "properties": {
-          "origen": {"type": "string", "description": "Ruta del archivo de origen"},
-          "destino": {"type": "string", "description": "Ruta del archivo de destino"},
-          "overwrite": {"type": "boolean", "default": false, "description": "Sobrescribir si existe"}
-        },
-        "required": ["origen", "destino"]
-      },
-      "PrepararScriptRequest": {
-        "type": "object",
-        "properties": {
-          "ruta": {"type": "string", "description": "Ruta del script a preparar"}
-        },
-        "required": ["ruta"]
-      },
-      "GestionarDespliegueRequest": {
-        "type": "object",
-        "properties": {
-          "accion": {"type": "string", "enum": ["deploy", "rollback", "status", "validate"], "description": "Acción a realizar"},
-          "ambiente": {"type": "string", "enum": ["dev", "staging", "prod"], "description": "Ambiente de despliegue"},
-          "version": {"type": "string", "description": "Versión a desplegar o rollback"},
-          "configuracion": {"type": "object", "description": "Configuración adicional del despliegue"}
-        },
-        "required": ["accion", "ambiente"]
+        "responses": { "200": { "description": "OK" }, "500": { "description": "Error ejecución" } }
       }
     }
   }

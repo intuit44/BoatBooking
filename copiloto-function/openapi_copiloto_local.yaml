@@ -1101,12 +1101,26 @@
       },
       "PrepararScriptRequest": {
         "type": "object",
+        "required": ["ruta"],
         "properties": {
-          "ruta": {"type": "string", "description": "Ruta del script a preparar"}
-        },
-        "required": ["ruta"]
-      },
-      "GestionarDespliegueRequest": {
+          "ruta": {
+            "type": "string",
+            "description": "Ruta local del script a preparar"
+          },
+          "tipo": {
+            "type": "string",
+            "description": "Tipo de script (opcional)"
+          },
+          "opciones": {
+            "type": "object",
+            "description": "Opciones adicionales (opcional)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Metadata extra (opcional)"
+          }
+        }
+      },    "GestionarDespliegueRequest": {
         "type": "object",
         "properties": {
           "accion": {"type": "string", "enum": ["deploy", "rollback", "status", "validate"], "description": "Acción a realizar"},
