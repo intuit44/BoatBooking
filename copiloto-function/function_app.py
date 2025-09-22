@@ -1800,7 +1800,7 @@ def probar_todos_los_endpoints() -> dict:
         {"endpoint": "/api/ejecutar-script", "method": "POST",
             "body": {"script": "scripts/test.py", "args": ["--help"], "timeout_s": 15}},
         {"endpoint": "/api/preparar-script", "method": "POST",
-            "body": {"ruta": "scripts/deploy.sh"}},
+            "body": {"ruta": "deploy.sh"}},
 
         # Azure Management
         {"endpoint": "/api/crear-contenedor", "method": "POST",
@@ -8596,6 +8596,9 @@ def preparar_script_desde_blob(ruta_blob: str) -> dict:
         if not ruta_blob:
             return {"exito": False, "error": "Falta ruta_blob"}
         if not IS_AZURE:
+            ruta_blob = ruta_blob.strip().replace("\\", "/")
+            if not ruta_blob.startswith("scripts/"):
+                ruta_blob = f"scripts/{ruta_blob}"
             p = PROJECT_ROOT / ruta_blob
             return {"exito": p.exists(), "local_path": str(p)}
 
