@@ -14,7 +14,7 @@
       "url": "https://copiloto-func.ngrok.app"
     },
     {
-      "url": "https://copiloto-semantico-func.azurewebsites.net"
+      "url": "https://copiloto-semantico-func-us2.azurewebsites.net"
     }
   ],
   "paths": {
@@ -389,9 +389,10 @@
     },
     "/api/ejecutar-script": {
       "post": {
-        "summary": "Ejecutar script desde /scripts o blob storage",
+        "summary": "Ejecutar script desde /scripts o blob storage (con validación avanzada)",
         "operationId": "ejecutarScript",
         "tags": ["Testing"],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -401,19 +402,32 @@
                 "properties": {
                   "script": {
                     "type": "string",
-                    "description": "Ruta local (scripts/x.py) o 'container/path' para blob"
+                    "description": "Ruta local (scripts/x.py, .sh, .bat) o 'container/path' para blob"
                   },
                   "args": {
                     "type": "array",
-                    "items": { "type": "string" }
+                    "items": { "type": "string" },
+                    "description": "Argumentos propagados a sys.argv[] o equivalente"
                   },
                   "timeout_s": {
                     "type": "integer",
-                    "default": 60
+                    "default": 60,
+                    "description": "Timeout en segundos"
                   },
                   "sync_outputs": {
                     "type": "boolean",
-                    "default": true
+                    "default": true,
+                    "description": "Sincronizar salida estándar y error"
+                  },
+                  "interpreter": {
+                    "type": "string",
+                    "enum": ["python", "bash", "powershell", "cmd"],
+                    "description": "Forzar intérprete (opcional, autodetect si no se especifica)"
+                  },
+                  "inject_error": {
+                    "type": "string",
+                    "enum": ["permission", "corrupt", "exception"],
+                    "description": "Inyectar error voluntario para pruebas"
                   }
                 },
                 "required": ["script"]
@@ -422,18 +436,38 @@
           }
         },
         "responses": {
-          "200": { "description": "OK" },
+          "200": {
+            "description": "Script ejecutado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": { "type": "string", "description": "Salida estándar" },
+                    "stderr": { "type": "string", "description": "Salida de error" },
+                    "exit_code": { "type": "integer", "description": "Código de salida" },
+                    "success": { "type": "boolean", "description": "Si la ejecución fue exitosa" },
+                    "args_propagated": { "type": "array", "items": { "type": "string" }, "description": "Args recibidos por el script" },
+                    "interpreter_detected": { "type": "string", "description": "Intérprete detectado" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Solicitud inválida" },
+          "403": { "description": "Script sin permisos de ejecución" },
           "404": { "description": "Script no encontrado" },
-          "422": { "description": "Extensión no ejecutable" },
-          "500": { "description": "Error interno" }
+          "422": { "description": "Extensión no ejecutable o script corrupto" },
+          "500": { "description": "Error interno o excepción lanzada por el script" }
         }
       }
     },
     "/api/ejecutar-script-local": {
       "post": {
-        "summary": "Ejecutar script local desde /scripts",
+        "summary": "Ejecutar script local desde /scripts (validación avanzada)",
         "operationId": "ejecutarScriptLocal",
         "tags": ["Testing"],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -443,7 +477,22 @@
                 "properties": {
                   "script_path": {
                     "type": "string",
-                    "description": "Ruta del script local, ej: 'scripts/test_script.py'"
+                    "description": "Ruta del script local, ej: 'scripts/test_script.py', .sh, .bat"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Argumentos propagados"
+                  },
+                  "interpreter": {
+                    "type": "string",
+                    "enum": ["python", "bash", "powershell", "cmd"],
+                    "description": "Forzar intérprete (opcional)"
+                  },
+                  "inject_error": {
+                    "type": "string",
+                    "enum": ["permission", "corrupt", "exception"],
+                    "description": "Inyectar error voluntario para pruebas"
                   }
                 },
                 "required": ["script_path"]
@@ -462,16 +511,19 @@
                     "stdout": { "type": "string", "description": "Salida estándar" },
                     "stderr": { "type": "string", "description": "Salida de error" },
                     "exit_code": { "type": "integer", "description": "Código de salida" },
-                    "success": { "type": "boolean", "description": "Si la ejecución fue exitosa" }
+                    "success": { "type": "boolean", "description": "Si la ejecución fue exitosa" },
+                    "args_propagated": { "type": "array", "items": { "type": "string" }, "description": "Args recibidos por el script" },
+                    "interpreter_detected": { "type": "string", "description": "Intérprete detectado" }
                   }
                 }
               }
             }
           },
           "400": { "description": "Solicitud inválida" },
-          "403": { "description": "Archivo fuera del scope permitido" },
+          "403": { "description": "Archivo fuera del scope permitido o sin permisos" },
           "404": { "description": "Archivo no encontrado" },
-          "500": { "description": "Error del servidor" }
+          "422": { "description": "Extensión no ejecutable o script corrupto" },
+          "500": { "description": "Error del servidor o excepción lanzada por el script" }
         }
       }
     },
