@@ -647,29 +647,59 @@
         }
       }
     },
-    "/api/listar-blobs": {
-      "get": {
-        "summary": "Listar blobs en storage",
-        "operationId": "listarBlobs",
-        "tags": ["Azure Storage"],
-        "security": [],
-        "parameters": [
-          {"name": "prefix", "in": "query", "schema": {"type": "string"}},
-          {"name": "top", "in": "query", "schema": {"type": "integer", "default": 10}}
-        ],
-        "responses": {
-          "200": {
-            "description": "Lista de blobs",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
+      "/api/listar-blobs": {
+        "get": {
+          "summary": "Listar blobs en el contenedor de Azure Storage",
+          "description": "Permite obtener archivos almacenados en el contenedor `boat-rental-project`. Se puede usar `prefix` para filtrar por carpetas virtuales (ej: scripts/), y `top` para limitar la cantidad de resultados.",
+          "operationId": "listarBlobs",
+          "tags": ["Azure Storage"],
+          "security": [],
+          "parameters": [
+        {"name": "prefix", "in": "query", "schema": {"type": "string"}},
+        {"name": "top", "in": "query", "schema": {"type": "integer", "default": 10}}
+          ],
+          "responses": {
+        "200": {
+          "description": "Listado de blobs en el contenedor",
+          "content": {
+            "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ok": {
+            "type": "boolean",
+            "example": true
+              },
+              "details": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "example": 35
+              },
+              "sample": {
+                "type": "array",
+                "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "size": { "type": "integer" },
+                "last_modified": { "type": "string", "format": "date-time" },
+                "tipo": { "type": "string" }
+              }
+                }
               }
             }
-          },
-          "400": {"description": "Solicitud inválida"}
+              }
+            }
+          }
+            }
+          }
+        },
+        "400": {"description": "Solicitud inválida"}
+          }
         }
-      }
-    },
+      },
     "/api/deploy": {
       "post": {
         "summary": "Desplegar recursos Azure usando ARM templates",
