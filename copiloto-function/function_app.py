@@ -9233,11 +9233,32 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+def ensure_mi_login():
+    try:
+        subprocess.run(
+            ["az", "account", "show"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except subprocess.CalledProcessError:
+        result = subprocess.run(
+            ["az", "login", "--identity"],
+            capture_output=True,
+            text=True
+        )
+        logging.info(
+            f"az login --identity ejecutado: {result.stdout or result.stderr}")
+
+
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     """Ejecuta comandos Azure CLI exactamente como se envían"""
     try:
+        # 🔑 Asegurar login con MI en cada request
+        ensure_mi_login()
+
         body = req.get_json()
         comando = body.get("comando")
 
@@ -9254,10 +9275,8 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Detectar Azure CLI de forma universal (Windows/Linux/Container)
         if platform.system() == "Windows":
-            # En Windows, usar az.cmd si está disponible
             AZ_BIN = shutil.which("az.cmd") or shutil.which("az") or "az"
         else:
-            # En Linux/Container, usar az directamente
             AZ_BIN = shutil.which("az") or "/usr/bin/az" or "az"
 
         cmd_parts = [AZ_BIN] + comando.split()
@@ -9270,10 +9289,9 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 cmd_parts,
                 capture_output=True,
                 text=True,
-                timeout=60  # timeout de seguridad
+                timeout=60
             )
 
-            # Si el comando falló, devolver el error
             if result.returncode != 0:
                 return func.HttpResponse(
                     json.dumps({
@@ -9284,7 +9302,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                         "sistema_operativo": platform.system()
                     }),
                     mimetype="application/json",
-                    status_code=200  # Mantener 200 para que el agente pueda leer el error
+                    status_code=200
                 )
 
             # Intentar parsear como JSON, si falla devolver texto plano
@@ -9333,13 +9351,26 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
 
-    except Exception as e:
-        logging.exception("ejecutar_cli_http failed")
+        except Exception as e:
+            logging.exception("ejecutar_cli_http failed")
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": str(e),
+                    "tipo_error": type(e).__name__,
+                    "sistema_operativo": platform.system()
+                }),
+                mimetype="application/json",
+                status_code=500
+            )
+
+    except Exception as outer_e:
+        logging.exception("ejecutar_cli_http outer try failed")
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
-                "error": str(e),
-                "tipo_error": type(e).__name__,
+                "error": str(outer_e),
+                "tipo_error": type(outer_e).__name__,
                 "sistema_operativo": platform.system()
             }),
             mimetype="application/json",
