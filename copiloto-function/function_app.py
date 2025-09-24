@@ -6237,11 +6237,24 @@ def _generate_smart_suggestions(script_name: str) -> dict:
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Versión optimizada - Ejecuta scripts desde Blob Storage
+    Ejecuta scripts desde Blob Storage o local, soportando múltiples tipos (.py, .sh, .ps1)
     """
     endpoint = "/api/ejecutar-script"
     run_id = uuid.uuid4().hex[:12]
     script_blob_path = None
+
+    def determinar_interpreter(script_path, interpreter_hint=None):
+        """Determina el intérprete correcto para el script"""
+        if interpreter_hint:
+            return interpreter_hint
+        extension = script_path.lower().split('.')[-1]
+        interpreters = {
+            'py': 'python',
+            'sh': 'bash',
+            'bash': 'bash',
+            'ps1': 'powershell'
+        }
+        return interpreters.get(extension, 'python')  # Default seguro
 
     try:
         # 1. Validar request
@@ -6253,6 +6266,8 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         script_blob_path = req_body.get('script') or req.params.get('script')
         timeout_s = int(req_body.get(
             'timeout_s', req.params.get('timeout_s') or 60))
+        args = req_body.get('args', [])
+        interpreter_hint = req_body.get('interpreter')
 
         if not script_blob_path:
             return func.HttpResponse(
@@ -6302,7 +6317,6 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # 4. Verificar que el script existe en Blob Storage
         if not blob_client.exists():
-            # Listar scripts disponibles para ayudar al agente
             container_client = blob_service_client.get_container_client(
                 CONTAINER_NAME)
             scripts_disponibles = list(
@@ -6311,16 +6325,17 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 json.dumps({
                     "exito": False,
                     "error": f"Script no encontrado: {script_blob_path}",
-                    # Primeros 10
                     "scripts_disponibles": [blob.name for blob in scripts_disponibles[:10]]
                 }),
                 status_code=404,
                 mimetype="application/json"
             )
 
-        # 5. Descargar y ejecutar
+        # 5. Descargar y ejecutar según tipo
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
+            # Detectar extensión de forma robusta
+            extension = script_blob_path.lower().split('.')[-1]
+            with tempfile.NamedTemporaryFile(mode='w', suffix=f".{extension}", delete=False) as temp_file:
                 temp_path = temp_file.name
                 script_content = blob_client.download_blob().readall().decode('utf-8')
                 temp_file.write(script_content)
@@ -6345,14 +6360,29 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             pass
 
-        logging.info(f"🚀 Ejecutando script: {script_blob_path}")
+        # Determinar intérprete
+        interpreter = determinar_interpreter(
+            script_blob_path, interpreter_hint)
+        if interpreter == 'python':
+            comando = [sys.executable, temp_path] + args
+        elif interpreter == 'bash':
+            comando = ['bash', temp_path] + args
+        elif interpreter == 'powershell':
+            ps_cmd = shutil.which("pwsh") or shutil.which(
+                "powershell") or "powershell"
+            comando = [ps_cmd, '-File', temp_path] + args
+        else:
+            comando = ['bash', temp_path] + args  # Default a bash
+
+        logging.info(
+            f"🚀 Ejecutando script: {script_blob_path} con comando: {' '.join(comando)}")
         try:
             result = subprocess.run(
-                [sys.executable, temp_path],
+                comando,
                 capture_output=True,
                 text=True,
                 timeout=timeout_s,
-                cwd=tempfile.gettempdir()
+                cwd=os.path.dirname(temp_path)
             )
             os.unlink(temp_path)
             respuesta = {
@@ -6360,7 +6390,8 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 "script": script_blob_path,
                 "returncode": result.returncode,
                 "stdout": result.stdout,
-                "stderr": result.stderr
+                "stderr": result.stderr,
+                "comando_usado": ' '.join(comando)
             }
             status_code = 200 if result.returncode == 0 else 400
             return func.HttpResponse(
@@ -6372,8 +6403,16 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             os.unlink(temp_path)
             return func.HttpResponse(
                 json.dumps(
-                    {"exito": False, "error": f"Timeout después de {timeout_s} segundos"}),
+                    {"exito": False, "error": f"Timeout después de {timeout_s} segundos", "returncode": -1}),
                 status_code=408,
+                mimetype="application/json"
+            )
+        except Exception as e:
+            os.unlink(temp_path)
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": str(e), "returncode": -1}),
+                status_code=500,
                 mimetype="application/json"
             )
 
