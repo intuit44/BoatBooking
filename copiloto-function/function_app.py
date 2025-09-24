@@ -6237,35 +6237,48 @@ def _generate_smart_suggestions(script_name: str) -> dict:
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Ejecuta scripts Python desde Blob Storage (descarga antes de ejecutar)
+    Versión optimizada - Ejecuta scripts desde Blob Storage
     """
     endpoint = "/api/ejecutar-script"
-    method = "POST"
     run_id = uuid.uuid4().hex[:12]
     script_blob_path = None
 
     try:
+        # 1. Validar request
         try:
-            body = req.get_json()
+            req_body = req.get_json()
         except Exception:
-            body = {}
+            req_body = {}
 
-        # Obtener parámetro 'script'
-        script_blob_path = (body.get("script")
-                            or req.params.get("script") or "").strip()
-        timeout_s = int(
-            body.get("timeout_s", req.params.get("timeout_s") or 60))
+        script_blob_path = req_body.get('script') or req.params.get('script')
+        timeout_s = int(req_body.get(
+            'timeout_s', req.params.get('timeout_s') or 60))
 
         if not script_blob_path:
-            err = {
-                "exito": False,
-                "error": "Falta parámetro 'script'",
-                "endpoint": endpoint,
-                "run_id": run_id
-            }
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), status_code=400, mimetype="application/json")
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetro 'script' requerido",
+                    "ejemplo_correcto": {"script": "scripts/mi_script.py"}
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
 
-        # Conectar a Blob Storage usando credenciales configuradas
+        # 2. Validar formato de ruta
+        if not script_blob_path.startswith('scripts/'):
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "La ruta debe comenzar con 'scripts/'",
+                    "ruta_recibida": script_blob_path,
+                    "ruta_correcta": "scripts/nombre_script.py"
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+
+        # 3. Conectar a Blob Storage
         try:
             blob_service_client = get_blob_client()
             if not blob_service_client:
@@ -6287,15 +6300,26 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json"
             )
 
-        # Descargar script desde Blob Storage
+        # 4. Verificar que el script existe en Blob Storage
+        if not blob_client.exists():
+            # Listar scripts disponibles para ayudar al agente
+            container_client = blob_service_client.get_container_client(
+                CONTAINER_NAME)
+            scripts_disponibles = list(
+                container_client.list_blobs(name_starts_with="scripts/"))
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": f"Script no encontrado: {script_blob_path}",
+                    # Primeros 10
+                    "scripts_disponibles": [blob.name for blob in scripts_disponibles[:10]]
+                }),
+                status_code=404,
+                mimetype="application/json"
+            )
+
+        # 5. Descargar y ejecutar
         try:
-            if not blob_client.exists():
-                return func.HttpResponse(
-                    json.dumps(
-                        {"exito": False, "error": f"No existe el script en Blob Storage: {script_blob_path}"}),
-                    status_code=404,
-                    mimetype="application/json"
-                )
             with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
                 temp_path = temp_file.name
                 script_content = blob_client.download_blob().readall().decode('utf-8')
@@ -6308,7 +6332,6 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json"
             )
 
-        # Verificar que se descargó correctamente
         if not os.path.exists(temp_path):
             return func.HttpResponse(
                 json.dumps(
@@ -6317,13 +6340,11 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json"
             )
 
-        # Hacer el archivo ejecutable
         try:
             os.chmod(temp_path, 0o755)
         except Exception:
             pass
 
-        # Ejecutar script
         logging.info(f"🚀 Ejecutando script: {script_blob_path}")
         try:
             result = subprocess.run(
