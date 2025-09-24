@@ -514,19 +514,32 @@ TMP_SCRIPTS_DIR = Path(tempfile.gettempdir()) / \
     "scripts"  # /tmp/scripts en Linux
 
 
+# Define PROJECT_ROOT before using it
+PROJECT_ROOT = Path("C:/ProyectosSimbolicos/boat-rental-app")
+ALT_SCRIPTS = PROJECT_ROOT / "copiloto-function" / "scripts"
+
+
 def _resolve_local_script_path(nombre_script: str) -> Optional[Path]:
+    search_dirs = [
+        PROJECT_ROOT / "scripts",
+        ALT_SCRIPTS,
+        PROJECT_ROOT / "src",
+        PROJECT_ROOT / "tools",
+        PROJECT_ROOT / "deployment",
+    ]
     p = Path(nombre_script)
     if p.is_absolute() and p.exists():
         return p
+    for d in search_dirs:
+        candidate = (d / Path(nombre_script).name).resolve()
+        if candidate.exists():
+            return candidate
     p1 = (PROJECT_ROOT / nombre_script).resolve()
     if p1.exists():
         return p1
     p2 = (TMP_SCRIPTS_DIR / nombre_script).resolve()
     if p2.exists():
         return p2
-    p3 = (PROJECT_ROOT / "scripts" / Path(nombre_script).name).resolve()
-    if p3.exists():
-        return p3
     return None
 
 
@@ -1193,6 +1206,739 @@ def invocar_endpoint_directo(endpoint: str, method: str = "GET", params: Optiona
             "endpoint": endpoint,
             "method": method
         }
+
+
+FILE_CACHE = {}
+
+
+@app.function_name(name="leer_archivo_http")
+@app.route(route="leer-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint mejorado para lectura de archivos con búsqueda inteligente
+    y respuestas optimizadas para agentes AI
+    """
+    endpoint = "/api/leer-archivo"
+    method = "GET"
+    run_id = get_run_id(req)
+
+    try:
+        # === PASO 1: EXTRAER Y VALIDAR PARÁMETROS ===
+        params = extract_parameters(req)
+
+        if not params["ruta_raw"]:
+            return error_response(
+                code="MISSING_PARAMETER",
+                message="Se requiere el parámetro 'ruta' para leer un archivo",
+                suggestions=generate_parameter_suggestions(),
+                status=400,
+                run_id=run_id
+            )
+
+        # === PASO 2: DETECTAR TIPO DE SOLICITUD ===
+        request_type = detect_request_type(params["ruta_raw"])
+
+        # === PASO 3: MANEJAR SEGÚN TIPO ===
+        if request_type == "api_function":
+            return handle_api_function_request(params["ruta_raw"], run_id)
+        elif request_type == "special_path":
+            return handle_special_path_request(params["ruta_raw"], run_id)
+        else:
+            return handle_file_request(params, run_id)
+
+    except Exception as e:
+        logging.exception(f"[{run_id}] Error en leer_archivo_http")
+        return error_response(
+            code="INTERNAL_ERROR",
+            message=f"Error procesando solicitud: {str(e)}",
+            suggestions=["Verificar formato de la solicitud",
+                         "Revisar logs del servidor"],
+            status=500,
+            run_id=run_id
+        )
+
+
+def extract_parameters(req: func.HttpRequest) -> Dict[str, Any]:
+    """Extrae y normaliza parámetros de la request"""
+    return {
+        "ruta_raw": (req.params.get("ruta") or
+                     req.params.get("path") or
+                     req.params.get("archivo") or
+                     req.params.get("blob") or "").strip(),
+        "container": (req.params.get("container") or
+                      req.params.get("contenedor") or
+                      CONTAINER_NAME).strip(),
+        "force_refresh": req.params.get("force_refresh", "false").lower() == "true",
+        "include_preview": req.params.get("include_preview", "true").lower() == "true",
+        "semantic_analysis": req.params.get("semantic_analysis", "false").lower() == "true"
+    }
+
+
+def detect_request_type(path: str) -> str:
+    """Detecta si la solicitud es para una función API, ruta especial o archivo normal"""
+
+    # Detectar solicitudes de funciones API
+    if path.startswith("api/") or path.startswith("/api/"):
+        # Es una solicitud para obtener info de un endpoint
+        return "api_function"
+
+    # Detectar rutas especiales que necesitan manejo especial
+    special_patterns = [
+        "function_app.py",  # Archivo principal de funciones
+        "__init__.py",      # Archivos de inicialización
+        "host.json",        # Configuración
+        "requirements.txt",  # Dependencias
+        "local.settings.json"  # Configuración local
+    ]
+
+    if any(pattern in path.lower() for pattern in special_patterns):
+        return "special_path"
+
+    return "file"
+
+
+def handle_api_function_request(path: str, run_id: str) -> func.HttpResponse:
+    """
+    Maneja solicitudes para obtener información sobre endpoints API
+    """
+    # Normalizar el path del API
+    api_name = path.replace("api/", "").replace("/api/", "").replace("-", "_")
+
+    # Buscar el código de la función en los lugares probables
+    function_locations = [
+        PROJECT_ROOT / "function_app.py",  # Archivo principal
+        PROJECT_ROOT / f"{api_name}.py",   # Archivo individual
+        PROJECT_ROOT / "api" / f"{api_name}.py",  # En carpeta api
+        PROJECT_ROOT / "functions" / f"{api_name}.py"  # En carpeta functions
+    ]
+
+    for location in function_locations:
+        if location.exists():
+            try:
+                content = location.read_text(encoding="utf-8")
+
+                # Buscar la función específica en el contenido
+                function_code = extract_function_code(content, api_name)
+
+                if function_code:
+                    return success_response(
+                        message=f"Código de la función '{api_name}' encontrado",
+                        data={
+                            "function_name": api_name,
+                            "source_file": str(location),
+                            "code": function_code,
+                            "type": "api_function",
+                            "endpoint": f"/api/{api_name.replace('_', '-')}"
+                        },
+                        run_id=run_id
+                    )
+            except Exception as e:
+                logging.warning(f"[{run_id}] Error leyendo {location}: {e}")
+
+    # Si no se encontró la función, buscar funciones similares
+    available_functions = find_available_api_functions()
+    import difflib
+    similar = difflib.get_close_matches(
+        api_name, available_functions, n=10, cutoff=0.6)
+
+    return error_response(
+        code="API_FUNCTION_NOT_FOUND",
+        message=f"No se encontró la función API '{api_name}'",
+        suggestions=generate_api_suggestions(api_name, similar),
+        status=404,
+        run_id=run_id,
+        details={
+            "requested_function": api_name,
+            "available_functions": similar[:10],
+            "search_locations": [str(loc) for loc in function_locations]
+        }
+    )
+
+
+def handle_special_path_request(path: str, run_id: str) -> func.HttpResponse:
+    """Maneja solicitudes de archivos especiales del proyecto"""
+
+    special_files = {
+        "function_app.py": PROJECT_ROOT / "function_app.py",
+        "host.json": PROJECT_ROOT / "host.json",
+        "requirements.txt": PROJECT_ROOT / "requirements.txt",
+        "local.settings.json": PROJECT_ROOT / "local.settings.json"
+    }
+
+    # Buscar el archivo especial
+    for name, location in special_files.items():
+        if name in path.lower():
+            if location.exists():
+                try:
+                    content = location.read_text(encoding="utf-8")
+                    return success_response(
+                        message=f"Archivo especial '{name}' encontrado",
+                        data={
+                            "file_name": name,
+                            "path": str(location),
+                            "content": content,
+                            "type": "special_file"
+                        },
+                        run_id=run_id
+                    )
+                except Exception as e:
+                    logging.error(f"[{run_id}] Error leyendo {location}: {e}")
+
+    return error_response(
+        code="SPECIAL_FILE_NOT_FOUND",
+        message=f"Archivo especial '{path}' no encontrado",
+        suggestions=list(special_files.keys()),
+        status=404,
+        run_id=run_id
+    )
+
+
+def handle_file_request(params: Dict[str, Any], run_id: str) -> func.HttpResponse:
+    """Maneja solicitudes de archivos normales con búsqueda inteligente"""
+
+    ruta_raw = params["ruta_raw"]
+    container = params["container"]
+
+    # Cache check
+    cache_key = f"{container}:{ruta_raw}"
+    if not params["force_refresh"] and cache_key in FILE_CACHE:
+        cached = FILE_CACHE[cache_key]
+        if (datetime.now() - cached["timestamp"]).seconds < 300:  # 5 min cache
+            return cached["response"]
+
+    # === BÚSQUEDA INTELIGENTE EN MÚLTIPLES UBICACIONES ===
+    result = smart_file_search(ruta_raw, container, run_id)
+
+    if result["found"]:
+        response = success_response(
+            message=f"Archivo encontrado: {result['path']}",
+            data={
+                "path": result["path"],
+                "content": result["content"],
+                "source": result["source"],
+                "size": len(result["content"]),
+                "type": detect_file_type(result["path"])
+            },
+            run_id=run_id
+        )
+
+        # Actualizar cache
+        FILE_CACHE[cache_key] = {
+            "response": response,
+            "timestamp": datetime.now()
+        }
+
+        return response
+
+    # === ARCHIVO NO ENCONTRADO - GENERAR SUGERENCIAS INTELIGENTES ===
+    suggestions = generate_file_suggestions(
+        ruta_raw, container, result["attempts"])
+
+    return error_response(
+        code="FILE_NOT_FOUND",
+        message=f"No se encontró el archivo '{ruta_raw}'",
+        suggestions=suggestions["actions"],
+        status=404,
+        run_id=run_id,
+        details={
+            "requested_path": ruta_raw,
+            "container": container,
+            "attempts": result["attempts"],
+            "similar_files": suggestions["similar_files"][:10],
+            "search_strategy": result.get("strategy", "standard")
+        }
+    )
+
+
+def smart_file_search(path: str, container: str, run_id: str) -> Dict[str, Any]:
+    """
+    Búsqueda inteligente de archivos en múltiples ubicaciones
+    """
+    attempts = []
+    normalized_path = normalize_path(path)
+    file_name = Path(path).name
+
+    # === ESTRATEGIA 1: BÚSQUEDA LOCAL ===
+    local_search_paths = generate_local_search_paths(
+        path, normalized_path, file_name)
+
+    for search_path in local_search_paths:
+        attempts.append(f"local:{search_path}")
+        if search_path.exists() and search_path.is_file():
+            try:
+                content = search_path.read_text(
+                    encoding="utf-8", errors="replace")
+                return {
+                    "found": True,
+                    "path": str(search_path),
+                    "content": content,
+                    "source": "local",
+                    "attempts": attempts,
+                    "strategy": "local_filesystem"
+                }
+            except Exception as e:
+                logging.warning(f"[{run_id}] Error leyendo {search_path}: {e}")
+
+    # === ESTRATEGIA 2: BÚSQUEDA EN BLOB STORAGE ===
+    blob_result = search_in_blob_storage(
+        container, normalized_path, attempts, run_id)
+    if blob_result["found"]:
+        return blob_result
+
+    # === ESTRATEGIA 3: BÚSQUEDA FUZZY ===
+    fuzzy_result = fuzzy_file_search(file_name, path, attempts, run_id)
+    if fuzzy_result["found"]:
+        return fuzzy_result
+
+    return {
+        "found": False,
+        "attempts": attempts,
+        "strategy": "exhaustive_search"
+    }
+
+
+def generate_local_search_paths(path: str, normalized: str, filename: str) -> List[Path]:
+    """Genera una lista priorizada de rutas locales donde buscar"""
+
+    paths = []
+
+    # Rutas directas
+    paths.append(PROJECT_ROOT / path)
+    paths.append(PROJECT_ROOT / normalized)
+
+    # Rutas comunes de proyecto
+    common_dirs = ["scripts", "src", "app", "functions",
+                   "api", "docs", "test", "copiloto-function"]
+    for dir_name in common_dirs:
+        paths.append(PROJECT_ROOT / dir_name / filename)
+        paths.append(PROJECT_ROOT / dir_name / normalized)
+        if "/" in path:
+            # Si el path tiene subdirectorios, buscar también manteniendo estructura
+            paths.append(PROJECT_ROOT / dir_name / path)
+
+    # Rutas específicas del proyecto copiloto
+    paths.append(PROJECT_ROOT / "copiloto-function" / "scripts" / filename)
+    paths.append(PROJECT_ROOT / "boat-rental-app" / path)
+
+    # Eliminar duplicados manteniendo orden
+    seen = set()
+    unique_paths = []
+    for p in paths:
+        if p not in seen:
+            seen.add(p)
+            unique_paths.append(p)
+
+    return unique_paths
+
+
+def search_in_blob_storage(container: str, path: str, attempts: List[str], run_id: str) -> Dict[str, Any]:
+    """Busca archivo en Azure Blob Storage"""
+
+    try:
+        client = get_blob_client()
+        if not client:
+            attempts.append("blob:no_client")
+            return {"found": False}
+
+        cc = client.get_container_client(container)
+        if not cc.exists():
+            attempts.append(f"blob:container_not_found:{container}")
+            return {"found": False}
+
+        # Intentar ruta directa
+        bc = cc.get_blob_client(path)
+        attempts.append(f"blob:{container}/{path}")
+
+        if bc.exists():
+            content = bc.download_blob().readall()
+            try:
+                text_content = content.decode("utf-8")
+                return {
+                    "found": True,
+                    "path": f"blob://{container}/{path}",
+                    "content": text_content,
+                    "source": "blob",
+                    "attempts": attempts,
+                    "strategy": "blob_direct"
+                }
+            except UnicodeDecodeError:
+                # Es un archivo binario
+                return {
+                    "found": True,
+                    "path": f"blob://{container}/{path}",
+                    "content": base64.b64encode(content).decode("utf-8"),
+                    "source": "blob_binary",
+                    "attempts": attempts,
+                    "strategy": "blob_binary"
+                }
+
+    except Exception as e:
+        logging.warning(f"[{run_id}] Error en blob storage: {e}")
+        attempts.append(f"blob:error:{str(e)[:50]}")
+
+    return {"found": False}
+
+
+def fuzzy_file_search(filename: str, original_path: str, attempts: List[str], run_id: str) -> Dict[str, Any]:
+    """Búsqueda fuzzy para encontrar archivos similares"""
+
+    try:
+        # Buscar archivos con nombre similar en el proyecto
+        for root, dirs, files in os.walk(PROJECT_ROOT):
+            for file in files:
+                if filename.lower() in file.lower() or file.lower() in filename.lower():
+                    file_path = Path(root) / file
+                    attempts.append(f"fuzzy:{file_path}")
+
+                    # Si es muy similar, intentar leerlo
+                    similarity = calculate_similarity(
+                        filename.lower(), file.lower())
+                    if similarity > 0.8:  # 80% similar
+                        try:
+                            content = file_path.read_text(
+                                encoding="utf-8", errors="replace")
+                            return {
+                                "found": True,
+                                "path": str(file_path),
+                                "content": content,
+                                "source": "fuzzy_match",
+                                "attempts": attempts,
+                                "strategy": "fuzzy_search",
+                                "similarity": similarity
+                            }
+                        except Exception:
+                            pass
+    except Exception as e:
+        logging.warning(f"[{run_id}] Error en búsqueda fuzzy: {e}")
+
+    return {"found": False}
+
+
+def generate_file_suggestions(path: str, container: str, attempts: List[str]) -> Dict[str, Any]:
+    """Genera sugerencias inteligentes cuando no se encuentra un archivo"""
+
+    suggestions = {
+        "actions": [],
+        "similar_files": []
+    }
+
+    filename = Path(path).name
+    extension = Path(path).suffix
+
+    # Buscar archivos similares
+    similar_files = find_similar_files(filename, extension)
+    suggestions["similar_files"] = similar_files
+
+    # Generar acciones recomendadas
+    if similar_files:
+        if len(similar_files) == 1:
+            suggestions["actions"].append(
+                f"Usar archivo: {similar_files[0]['path']}")
+        else:
+            suggestions["actions"].append(
+                "Seleccionar uno de los archivos similares encontrados")
+            for file in similar_files[:3]:
+                suggestions["actions"].append(f"Probar con: {file['path']}")
+
+    # Sugerencias basadas en el tipo de archivo solicitado
+    if "script" in path.lower() or extension in [".py", ".sh", ".ps1"]:
+        suggestions["actions"].append(
+            "Listar scripts disponibles con: ?path=scripts")
+        suggestions["actions"].append("Verificar en la carpeta scripts/")
+
+    if "test" in path.lower():
+        suggestions["actions"].append("Buscar en carpeta test/ o tests/")
+
+    # Sugerencias generales
+    suggestions["actions"].extend([
+        f"Verificar el nombre exacto del archivo",
+        f"Confirmar que el archivo existe en el container '{container}'",
+        "Usar el parámetro 'container' si el archivo está en otro contenedor"
+    ])
+
+    return suggestions
+
+
+def find_similar_files(filename: str, extension: str) -> List[Dict[str, str]]:
+    """Encuentra archivos similares al solicitado"""
+
+    similar = []
+    filename_lower = filename.lower()
+
+    try:
+        # Buscar en el proyecto local
+        for root, dirs, files in os.walk(PROJECT_ROOT):
+            # Limitar profundidad de búsqueda
+            depth = len(Path(root).relative_to(PROJECT_ROOT).parts)
+            if depth > 3:
+                continue
+
+            for file in files:
+                file_lower = file.lower()
+
+                # Calcular similitud
+                score = 0
+                if file_lower == filename_lower:
+                    score = 100
+                elif filename_lower in file_lower or file_lower in filename_lower:
+                    score = 80
+                elif extension and file.endswith(extension):
+                    score = 60
+                elif any(part in file_lower for part in filename_lower.split('_')):
+                    score = 40
+
+                if score > 30:
+                    rel_path = Path(root).relative_to(PROJECT_ROOT) / file
+                    similar.append({
+                        "path": str(rel_path).replace('\\', '/'),
+                        "score": score,
+                        "type": "local"
+                    })
+
+        # Ordenar por score
+        similar.sort(key=lambda x: x["score"], reverse=True)
+
+    except Exception as e:
+        logging.warning(f"Error buscando archivos similares: {e}")
+
+    return similar[:15]  # Top 15
+
+
+def extract_function_code(content: str, function_name: str) -> Optional[str]:
+    """Extrae el código de una función específica del contenido"""
+
+    import re
+
+    # Buscar la definición de la función
+    patterns = [
+        # Azure Functions
+        f"@app.function_name.*?{function_name}.*?def.*?^(?=@app|def|class|$)",
+        f"def {function_name}.*?^(?=def|class|$)",  # Función normal
+        # Función async
+        f"async def {function_name}.*?^(?=def|async def|class|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+        if match:
+            return match.group(0).strip()
+
+    # Si no se encuentra exacta, buscar parcial
+    if function_name in content:
+        # Encontrar línea donde aparece
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            if function_name in line and ('def' in line or '@app' in line):
+                # Extraer función desde esa línea
+                function_lines = []
+                indent_level = len(line) - len(line.lstrip())
+
+                for j in range(i, min(i + 100, len(lines))):  # Max 100 líneas
+                    current_line = lines[j]
+                    if j > i and current_line.strip() and not current_line.startswith(' '):
+                        break
+                    function_lines.append(current_line)
+
+                return '\n'.join(function_lines)
+
+    return None
+
+
+def find_available_api_functions() -> List[str]:
+    """Encuentra todas las funciones API disponibles"""
+
+    functions = []
+
+    try:
+        # Buscar en function_app.py
+        function_app = PROJECT_ROOT / "function_app.py"
+        if function_app.exists():
+            content = function_app.read_text()
+            import re
+            # Buscar decoradores @app.route
+            routes = re.findall(r'@app\.route\(route="([^"]+)"', content)
+            functions.extend([route.replace('-', '_') for route in routes])
+
+            # Buscar @app.function_name
+            func_names = re.findall(
+                r'@app\.function_name\(name="([^"]+)"', content)
+            functions.extend(func_names)
+    except Exception as e:
+        logging.warning(f"Error buscando funciones disponibles: {e}")
+
+    return list(set(functions))  # Eliminar duplicados
+
+
+def generate_api_suggestions(requested: str, similar: List[str]) -> List[str]:
+    """Genera sugerencias para funciones API"""
+
+    suggestions = []
+
+    if similar:
+        suggestions.append(f"Funciones similares disponibles:")
+        for func in similar[:5]:
+            suggestions.append(f"  - /api/{func.replace('_', '-')}")
+
+    suggestions.extend([
+        "Verificar el nombre exacto de la función",
+        "Usar /api/status para verificar funciones disponibles",
+        "Revisar la documentación de la API"
+    ])
+
+    return suggestions
+
+
+def calculate_similarity(str1: str, str2: str) -> float:
+    """Calcula similitud entre dos strings (0-1)"""
+
+    if str1 == str2:
+        return 1.0
+
+    # Algoritmo simple de similitud
+    longer = max(len(str1), len(str2))
+    if longer == 0:
+        return 0.0
+
+    # Contar caracteres comunes
+    common = sum(1 for a, b in zip(str1, str2) if a == b)
+    return common / longer
+
+
+def detect_file_type(path: str) -> str:
+    """Detecta el tipo de archivo basado en la extensión"""
+
+    ext = Path(path).suffix.lower()
+
+    type_map = {
+        '.py': 'python',
+        '.js': 'javascript',
+        '.ts': 'typescript',
+        '.json': 'json',
+        '.yaml': 'yaml',
+        '.yml': 'yaml',
+        '.md': 'markdown',
+        '.txt': 'text',
+        '.sh': 'shell',
+        '.ps1': 'powershell',
+        '.xml': 'xml',
+        '.html': 'html',
+        '.css': 'css'
+    }
+
+    return type_map.get(ext, 'unknown')
+
+
+def normalize_path(path: str) -> str:
+    """Normaliza una ruta eliminando caracteres problemáticos"""
+
+    # Eliminar barras iniciales/finales
+    path = path.strip('/')
+
+    # Reemplazar barras dobles
+    path = path.replace('//', '/')
+
+    # Eliminar referencias peligrosas
+    path = path.replace('..', '')
+
+    return path
+
+
+def success_response(message: str, data: Dict[str, Any], run_id: str) -> func.HttpResponse:
+    """Genera una respuesta exitosa estructurada"""
+
+    response = {
+        "ok": True,
+        "message": message,
+        "data": data,
+        "metadata": {
+            "run_id": run_id,
+            "timestamp": datetime.now().isoformat(),
+            "endpoint": "/api/leer-archivo"
+        }
+    }
+
+    return func.HttpResponse(
+        json.dumps(response, ensure_ascii=False, indent=2),
+        mimetype="application/json",
+        status_code=200
+    )
+
+
+def error_response(code: str, message: str, suggestions: List[str], status: int,
+                   run_id: str, details: Optional[Dict] = None) -> func.HttpResponse:
+    """Genera una respuesta de error estructurada y útil para el agente"""
+
+    response = {
+        "ok": False,
+        "error_code": code,
+        "message": message,
+        "suggestions": suggestions,
+        "metadata": {
+            "run_id": run_id,
+            "timestamp": datetime.now().isoformat(),
+            "endpoint": "/api/leer-archivo"
+        }
+    }
+
+    if details:
+        response["details"] = details
+
+    # Agregar información para el agente AI
+    response["agent_guidance"] = generate_agent_guidance(code, suggestions)
+
+    return func.HttpResponse(
+        json.dumps(response, ensure_ascii=False, indent=2),
+        mimetype="application/json",
+        status_code=status
+    )
+
+
+def generate_agent_guidance(error_code: str, suggestions: List[str]) -> Dict[str, Any]:
+    """Genera guía específica para el agente AI"""
+
+    guidance = {
+        "next_action": "ask_user",
+        "prompt_suggestions": []
+    }
+
+    if error_code == "MISSING_PARAMETER":
+        guidance["next_action"] = "request_parameter"
+        guidance["prompt_suggestions"] = [
+            "Por favor, proporciona la ruta del archivo que deseas leer",
+            "¿Qué archivo necesitas consultar?"
+        ]
+
+    elif error_code == "FILE_NOT_FOUND":
+        guidance["next_action"] = "clarify_path"
+        guidance["prompt_suggestions"] = [
+            "No encontré ese archivo. ¿Puedes verificar el nombre?",
+            "Encontré archivos similares: " +
+            ", ".join(
+                suggestions[:3]) if suggestions else "No hay archivos similares"
+        ]
+
+    elif error_code == "API_FUNCTION_NOT_FOUND":
+        guidance["next_action"] = "suggest_alternatives"
+        guidance["prompt_suggestions"] = [
+            "Esa función no existe. Las funciones disponibles son: " +
+            ", ".join(suggestions[:5])
+        ]
+
+    return guidance
+
+
+def generate_parameter_suggestions() -> List[str]:
+    """Genera sugerencias cuando faltan parámetros"""
+
+    return [
+        "Incluir parámetro 'ruta' con el path del archivo",
+        "Ejemplo: ?ruta=scripts/test.py",
+        "Ejemplo: ?ruta=README.md",
+        "Para archivos en otro contenedor: ?ruta=file.txt&container=mi-contenedor"
+    ]
+
+
+# ============= FUNCIONES AUXILIARES =============
 
 
 @app.function_name(name="probar_endpoint_http")
@@ -4634,1202 +5380,6 @@ def _generar_mensaje_no_encontrado(ruta: str, sugerencias: list) -> str:
         return f"El archivo '{ruta}' no existe y no encontré alternativas similares. Por favor, proporciona la ruta correcta."
 
 
-@app.function_name(name="leer_archivo_http")
-@app.route(route="leer-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
-    endpoint = "/api/leer-archivo"
-    method = "GET"
-    run_id = get_run_id(req)
-    ruta_raw = "unknown"  # Initialize early to prevent unbound variable errors
-    container = CONTAINER_NAME  # Initialize early to prevent unbound variable errors
-
-    try:
-        # === VALIDACIÓN DE PARÁMETROS ===
-        # Parámetros flexibles con soporte extendido
-        ruta_raw = (req.params.get("ruta") or req.params.get("path") or
-                    req.params.get("archivo") or req.params.get("blob") or "").strip()
-        container = (req.params.get("container") or req.params.get(
-            "contenedor") or CONTAINER_NAME).strip()
-
-        # Nuevos parámetros de control
-        force_refresh = _to_bool(req.params.get("force_refresh", False))
-        include_preview = _to_bool(req.params.get("include_preview", True))
-        max_preview_size = int(req.params.get("max_preview_size", 2000))
-        semantic_analysis = _to_bool(
-            req.params.get("semantic_analysis", False))
-
-        # === VALIDACIÓN MEJORADA DE PARÁMETROS ===
-        if not ruta_raw:
-            # Error más específico con ejemplos prácticos
-            err = api_err(endpoint, method, 400, "MISSING_REQUIRED_PARAMETER",
-                          "Parámetro 'ruta' es requerido para leer un archivo",
-                          missing_params=["ruta"], run_id=run_id,
-                          details={
-                              "parametros_aceptados": {
-                                  "ruta": "Ruta del archivo (requerido)",
-                                  "path": "Alias para 'ruta'",
-                                  "archivo": "Alias para 'ruta'",
-                                  "blob": "Alias para 'ruta'"
-                              },
-                              "parametros_opcionales": {
-                                  "container": f"Contenedor (por defecto: {CONTAINER_NAME})",
-                                  "force_refresh": "Forzar actualización del cache (true/false)",
-                                  "include_preview": "Incluir preview del contenido (true/false)",
-                                  "semantic_analysis": "Análisis semántico del archivo (true/false)"
-                              },
-                              "ejemplos_validos": [
-                                  "?ruta=README.md",
-                                  "?ruta=mobile-app/package.json&container=mi-contenedor",
-                                  "?path=scripts/setup.sh&semantic_analysis=true",
-                                  "?archivo=docs/API.md&include_preview=false"
-                              ],
-                              "formatos_ruta_aceptados": [
-                                  "archivo.txt",
-                                  "carpeta/archivo.txt",
-                                  "carpeta/subcarpeta/archivo.txt",
-                                  "scripts/setup.sh"
-                              ]
-                          })
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-        # === VALIDACIÓN ADICIONAL DE PARÁMETROS ===
-        # Validar formato de ruta
-        if ruta_raw.startswith("//") or ".." in ruta_raw:
-            err = api_err(endpoint, method, 400, "INVALID_PATH_FORMAT",
-                          "Formato de ruta inválido. No se permiten rutas con '..' o '//' por seguridad",
-                          run_id=run_id,
-                          details={
-                              "ruta_recibida": ruta_raw,
-                              "problema": "Contiene caracteres no permitidos",
-                              "rutas_validas_ejemplo": [
-                                  "README.md",
-                                  "src/main.py",
-                                  "docs/api/swagger.json"
-                              ]
-                          })
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-        # Validar tamaño de preview
-        if max_preview_size < 100 or max_preview_size > 50000:
-            err = api_err(endpoint, method, 400, "INVALID_PREVIEW_SIZE",
-                          "El tamaño de preview debe estar entre 100 y 50000 caracteres",
-                          run_id=run_id,
-                          details={
-                              "valor_recibido": max_preview_size,
-                              "rango_valido": "100-50000",
-                              "valor_recomendado": 2000
-                          })
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-        # Normalizar ruta y crear clave de cache
-        ruta = _normalize_blob_path(container, ruta_raw)
-        if not ruta:
-            err = api_err(endpoint, method, 400, "INVALID_PATH_FORMAT",
-                          "La ruta normalizada está vacía o es inválida",
-                          run_id=run_id,
-                          details={
-                              "ruta_recibida": ruta_raw,
-                              "problema": "La ruta quedó vacía después de normalizar"
-                          })
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-        cache_key = f"{container}:{ruta}"
-
-        # Logging mejorado para tracking
-        logging.info(
-            f"[{run_id}] Solicitud leer archivo: ruta='{ruta_raw}' -> normalizada='{ruta}', container='{container}'")
-
-        # === VERIFICAR CACHE ===
-        cached_result = None
-        if not force_refresh and cache_key in CACHE:
-            cached_data = CACHE[cache_key]
-            # Verificar si el cache no está muy desactualizado (30 minutos)
-            cache_age = time.time() - cached_data.get("cached_at", 0)
-            if cache_age < 1800:  # 30 minutos
-                logging.info(
-                    f"[{run_id}] Cache hit para {ruta} (edad: {cache_age:.1f}s)")
-                cached_result = cached_data["response"]
-                cached_result["details"]["cache_hit"] = True
-                cached_result["details"]["cache_age_seconds"] = cache_age
-                return func.HttpResponse(json.dumps(cached_result, ensure_ascii=False),
-                                         mimetype="application/json", status_code=200)
-
-        # === LECTURA DINÁMICA MEJORADA ===
-        result = _leer_archivo_dinamico_mejorado(
-            container, ruta, ruta_raw, include_preview, max_preview_size)
-
-        # === MANEJO DE ERRORES ESPECÍFICOS ===
-        if not result["success"]:
-            logging.warning(f"[{run_id}] Archivo no encontrado: {ruta_raw}")
-
-            # Buscar archivos similares para sugerencias útiles
-            sugerencias = _buscar_archivos_similares(container, ruta, ruta_raw)
-
-            # Determinar tipo específico de error
-            error_code = result["error_code"]
-            status_code = result["status_code"]
-
-            # Mensajes de error específicos y útiles
-            if error_code == "FILE_NOT_FOUND":
-                if sugerencias["total"] > 0:
-                    mensaje_principal = f"El archivo '{ruta_raw}' no se encontró, pero hay {sugerencias['total']} archivos similares disponibles"
-                    accion_sugerida = _generar_accion_sugerida_detallada(
-                        sugerencias, ruta_raw)
-                else:
-                    mensaje_principal = f"El archivo '{ruta_raw}' no se encontró en el contenedor '{container}'"
-                    accion_sugerida = "verificar_ruta_y_contenedor"
-            elif error_code == "CONTAINER_NOT_FOUND":
-                mensaje_principal = f"El contenedor '{container}' no existe o no es accesible"
-                accion_sugerida = "verificar_contenedor"
-                # Sugerir contenedores disponibles
-                contenedores_disponibles = _listar_contenedores_disponibles()
-                sugerencias["contenedores_disponibles"] = contenedores_disponibles
-            else:
-                mensaje_principal = result["error_message"]
-                accion_sugerida = "revisar_configuracion"
-
-            # Construir respuesta de error enriquecida
-            err = api_err(endpoint, method, status_code, error_code, mensaje_principal, run_id=run_id,
-                          details={
-                              "archivo_solicitado": {
-                                  "ruta_recibida": ruta_raw,
-                                  "ruta_normalizada": ruta,
-                                  "container": container
-                              },
-                              "diagnostico": {
-                                  "intentos_realizados": result.get("attempts", []),
-                                  "blob_client_disponible": result.get("diagnostico", {}).get("blob_client_available", False),
-                                  "ambiente": "Azure" if IS_AZURE else "Local",
-                                  "project_root": str(PROJECT_ROOT)
-                              },
-                              "sugerencias_archivos": {
-                                  "archivos_similares": sugerencias["archivos"][:5],
-                                  "total_encontrados": sugerencias["total"],
-                                  "criterios_busqueda": sugerencias.get("criterios_busqueda", {}),
-                                  "contenedores_disponibles": sugerencias.get("contenedores_disponibles", [])
-                              },
-                              "acciones_recomendadas": _generar_acciones_recomendadas(error_code, sugerencias, container, ruta_raw),
-                              "ejemplos_solicitudes_validas": [
-                                  f"?ruta={s['nombre']}" for s in sugerencias["archivos"][:3]
-                              ] if sugerencias["archivos"] else [
-                                  "?ruta=README.md",
-                                  "?ruta=package.json",
-                                  f"?ruta=docs/API.md&container={container}"
-                              ],
-                              "siguiente_accion": accion_sugerida,
-                              "documentacion": {
-                                  "endpoint": endpoint,
-                                  "parametros_requeridos": ["ruta"],
-                                  "formatos_soportados": ["texto", "json", "markdown", "código"],
-                                  "limites": {
-                                      "tamaño_maximo": "10MB",
-                                      "preview_maximo": "50KB"
-                                  }
-                              }
-                          })
-
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False),
-                                     mimetype="application/json", status_code=status_code)
-
-        # === PROCESAMIENTO EXITOSO ===
-        logging.info(
-            f"[{run_id}] Archivo leído exitosamente: {ruta} ({result['size']} bytes)")
-
-        # === ANÁLISIS SEMÁNTICO OPCIONAL ===
-        semantic_data = {}
-        if semantic_analysis and result["content"]:
-            try:
-                semantic_data = _analizar_contenido_semantico(
-                    ruta, result["content"])
-                logging.info(
-                    f"[{run_id}] Análisis semántico completado para {ruta}")
-            except Exception as e:
-                logging.warning(
-                    f"[{run_id}] Error en análisis semántico: {str(e)}")
-                semantic_data = {
-                    "error": f"Error en análisis semántico: {str(e)}"}
-
-        # === CONSTRUIR RESPUESTA ESTRUCTURADA ===
-        response_data = {
-            "archivo": {
-                "container": container,
-                "ruta_recibida": ruta_raw,
-                "ruta_efectiva": ruta,
-                "source": result["source"]
-            },
-            "metadata": {
-                "size_bytes": result["size"],
-                "size_human": _format_file_size(result["size"]),
-                "last_modified": result["last_modified"],
-                "content_type": result["content_type"],
-                "etag": result.get("etag"),
-                "encoding": result.get("encoding", "utf-8"),
-                "file_extension": Path(ruta).suffix.lower(),
-                "is_text": result["is_text"],
-                "cache_hit": False,
-                "run_id": run_id,
-                "timestamp": datetime.now().isoformat()
-            },
-            "content_info": {
-                "preview_type": result["preview_type"],
-                "preview_size": len(result["preview"]) if result["preview"] else 0,
-                "full_content_available": True,
-                "lines_count": result.get("lines_count", 0) if result["is_text"] else None,
-                "words_count": result.get("words_count", 0) if result["is_text"] else None
-            },
-            "operacion": {
-                "force_refresh": force_refresh,
-                "include_preview": include_preview,
-                "semantic_analysis": semantic_analysis,
-                "max_preview_size": max_preview_size
-            }
-        }
-
-        # Incluir preview si se solicita
-        if include_preview and result["preview"]:
-            response_data["preview"] = result["preview"]
-
-        # Incluir contenido completo si es texto y no muy grande
-        if result["is_text"] and result["size"] < 100000:  # 100KB límite
-            response_data["content"] = result["content"]
-        elif not result["is_text"]:
-            response_data["content_base64"] = result["content_base64"]
-
-        # Incluir análisis semántico si se solicitó
-        if semantic_data:
-            response_data["semantic_analysis"] = semantic_data
-
-        # Incluir sugerencias contextuales útiles
-        response_data["sugerencias_contextuales"] = {
-            "acciones": _generar_sugerencias_contextuales(ruta, result)
-        }
-
-        # === ACTUALIZAR CACHE ===
-        cache_entry = {
-            "response": api_ok(endpoint, method, 200, f"Archivo '{ruta}' leído correctamente ({_format_file_size(result['size'])})", response_data, run_id),
-            "cached_at": time.time(),
-            "size": result["size"],
-            "last_modified": result["last_modified"]
-        }
-        CACHE[cache_key] = cache_entry
-
-        # Limpiar cache si está muy lleno (más de 1000 entradas)
-        if len(CACHE) > 1000:
-            _limpiar_cache_antiguo()
-
-        ok = cache_entry["response"]
-        return func.HttpResponse(json.dumps(ok, ensure_ascii=False), mimetype="application/json", status_code=200)
-
-    except ValueError as ve:
-        # Error de validación específico
-        logging.error(f"[{run_id}] Error de validación: {str(ve)}")
-        err = api_err(endpoint, method, 400, "VALIDATION_ERROR",
-                      f"Error de validación: {str(ve)}", run_id=run_id,
-                      details={
-                          "tipo_error": "Validación de parámetros",
-                          "parametros_recibidos": dict(req.params),
-                          "sugerencia": "Revisa el formato de los parámetros enviados"
-                      })
-        return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-    except PermissionError as pe:
-        # Error de permisos específico
-        logging.error(f"[{run_id}] Error de permisos: {str(pe)}")
-        err = api_err(endpoint, method, 403, "PERMISSION_DENIED",
-                      "No tienes permisos para acceder a este archivo", run_id=run_id,
-                      details={
-                          "tipo_error": "Permisos insuficientes",
-                          "archivo_solicitado": ruta_raw,
-                          "sugerencias": [
-                              "Verificar permisos de la cuenta de storage",
-                              "Comprobar configuración de Managed Identity",
-                              "Revisar políticas de acceso del contenedor"
-                          ]
-                      })
-        return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=403)
-
-    except TimeoutError as te:
-        # Error de timeout específico
-        logging.error(f"[{run_id}] Timeout: {str(te)}")
-        err = api_err(endpoint, method, 408, "REQUEST_TIMEOUT",
-                      "La operación excedió el tiempo límite", run_id=run_id,
-                      details={
-                          "tipo_error": "Timeout",
-                          "tiempo_limite": "30 segundos",
-                          "sugerencias": [
-                              "Reintentar la operación",
-                              "Verificar conectividad de red",
-                              "Comprobar tamaño del archivo"
-                          ]
-                      })
-        return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=408)
-
-    except Exception as e:
-        # Error genérico con información detallada para debugging
-        logging.exception(
-            f"[{run_id}] Error inesperado en leer_archivo_http: {str(e)}")
-
-        # Error detallado para debugging
-        error_details = {
-            "error_type": type(e).__name__,
-            "error_location": "leer_archivo_http",
-            "error_message": str(e),
-            "parametros_request": {
-                "ruta_recibida": ruta_raw if 'ruta_raw' in locals() else "unknown",
-                "container": container if 'container' in locals() else "unknown",
-                "method": method,
-                "query_params": dict(req.params)
-            },
-            "contexto_ejecucion": {
-                "ambiente": "Azure" if IS_AZURE else "Local",
-                "blob_client_available": bool(get_blob_client()),
-                "project_root": str(PROJECT_ROOT),
-                "cache_entries": len(CACHE)
-            },
-            # Últimas 1500 chars del stack
-            "stack_trace": traceback.format_exc()[-1500:],
-            "timestamp": datetime.now().isoformat(),
-            "run_id": run_id
-        }
-
-        err = api_err(endpoint, method, 500, "INTERNAL_SERVER_ERROR",
-                      f"Error interno del servidor: {str(e)}", run_id=run_id, details=error_details)
-        return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-
-def _generar_accion_sugerida_detallada(sugerencias: dict, ruta_original: str) -> str:
-    """Genera una acción específica basada en las sugerencias encontradas"""
-    archivos = sugerencias["archivos"]
-
-    if not archivos:
-        return "verificar_ruta_manual"
-    elif len(archivos) == 1:
-        return f"usar_archivo_sugerido:{archivos[0]['nombre']}"
-    elif archivos[0]["score"] >= 90:
-        return f"usar_coincidencia_exacta:{archivos[0]['nombre']}"
-    elif len([a for a in archivos if a["score"] >= 70]) > 1:
-        return "seleccionar_de_opciones_similares"
-    else:
-        return "revisar_lista_completa"
-
-
-def _listar_contenedores_disponibles() -> list:
-    """Lista contenedores disponibles para sugerencias"""
-    try:
-        client = get_blob_client()
-        if not client:
-            return []
-
-        contenedores = []
-        for container in client.list_containers():
-            contenedores.append({
-                "nombre": container.name,
-                "activo": True
-            })
-        return contenedores[:10]  # Limitar a 10
-    except Exception as e:
-        logging.warning(f"Error listando contenedores: {e}")
-        return []
-
-
-def _generar_acciones_recomendadas(error_code: str, sugerencias: dict, container: str, ruta: str) -> list:
-    """Genera acciones recomendadas específicas según el tipo de error"""
-
-    acciones = []
-
-    if error_code == "FILE_NOT_FOUND":
-        if sugerencias["total"] > 0:
-            acciones.extend([
-                f"Probar con archivo similar: {sugerencias['archivos'][0]['nombre']}" if sugerencias["archivos"] else None,
-                "Revisar la lista completa de archivos similares",
-                "Verificar que el nombre del archivo esté correctamente escrito"
-            ])
-        else:
-            acciones.extend([
-                f"Listar archivos disponibles en el contenedor '{container}'",
-                "Verificar que el archivo existe en la ubicación esperada",
-                "Comprobar permisos de acceso al archivo"
-            ])
-
-    elif error_code == "CONTAINER_NOT_FOUND":
-        acciones.extend([
-            f"Verificar que el contenedor '{container}' existe",
-            "Listar contenedores disponibles en la cuenta de storage",
-            "Comprobar permisos de acceso al contenedor"
-        ])
-
-        if sugerencias.get("contenedores_disponibles"):
-            contenedor_sugerido = sugerencias["contenedores_disponibles"][0]["nombre"]
-            acciones.append(
-                f"Probar con contenedor disponible: {contenedor_sugerido}")
-
-    elif error_code == "PERMISSION_DENIED":
-        acciones.extend([
-            "Verificar configuración de Managed Identity",
-            "Comprobar políticas de acceso del Storage Account",
-            "Revisar permisos RBAC asignados"
-        ])
-
-    else:
-        acciones.extend([
-            "Verificar conectividad con Azure Storage",
-            "Comprobar configuración de connection string",
-            "Revisar logs detallados para más información"
-        ])
-
-    # Filtrar acciones nulas y limitar
-    return [accion for accion in acciones if accion][:6]
-
-
-def _leer_archivo_dinamico_mejorado(container: str, ruta: str, ruta_raw: str, include_preview: bool, max_preview_size: int) -> dict:
-    """Lectura dinámica mejorada con priorización inteligente y diagnóstico detallado"""
-
-    attempts = []
-
-    # Prioridad 1: Azure Blob Storage (si estamos en Azure o hay cliente configurado)
-    if IS_AZURE or get_blob_client():
-        attempt = {"method": "azure_blob",
-                   "timestamp": datetime.now().isoformat()}
-        try:
-            client = get_blob_client()
-            if not client:
-                attempt["error"] = "Cliente de Blob Storage no inicializado"
-                attempt["diagnostico"] = "Verificar AZURE_STORAGE_CONNECTION_STRING o configuración de Managed Identity"
-                attempts.append(attempt)
-            else:
-                cc = client.get_container_client(container)
-                if not cc.exists():
-                    attempt["error"] = f"Contenedor '{container}' no existe"
-                    attempt["suggestion"] = "Verificar nombre del contenedor o crear el contenedor"
-                    attempt["contenedores_disponibles"] = str(
-                        _listar_contenedores_disponibles())
-                    attempts.append(attempt)
-                else:
-                    bc = cc.get_blob_client(ruta)
-                    if not bc.exists():
-                        attempt["error"] = f"Blob '{ruta}' no existe en contenedor '{container}'"
-                        attempt["suggestion"] = "Verificar ruta del archivo o permisos de acceso"
-                        attempts.append(attempt)
-                    else:
-                        # Lectura exitosa desde Blob
-                        data = bc.download_blob().readall()
-                        props = bc.get_blob_properties()
-
-                        result = _procesar_contenido_archivo(
-                            data, props, include_preview, max_preview_size)
-                        result["source"] = "azure_blob"
-                        result["success"] = True
-                        result["local_path"] = None
-                        attempts.append(
-                            {**attempt, "success": True, "size": len(data)})
-                        result["attempts"] = attempts
-                        return result
-
-        except PermissionError as pe:
-            attempt["error"] = f"Sin permisos para acceder al blob: {str(pe)}"
-            attempt["error_type"] = "PermissionError"
-            attempt["suggestion"] = "Verificar permisos de Managed Identity o Storage Account"
-            attempts.append(attempt)
-        except Exception as e:
-            attempt["error"] = f"Error accediendo a Blob Storage: {str(e)}"
-            attempt["error_type"] = type(e).__name__
-            attempt["suggestion"] = "Verificar conectividad y configuración de Azure Storage"
-            attempts.append(attempt)
-
-    # Prioridad 2: Sistema de archivos local
-    attempt = {"method": "local_filesystem",
-               "timestamp": datetime.now().isoformat()}
-    try:
-        # Probar diferentes rutas locales en orden de prioridad
-        rutas_locales = [
-            PROJECT_ROOT / ruta,  # Ruta normalizada desde project root
-            PROJECT_ROOT / ruta_raw,  # Ruta original desde project root
-            Path(ruta) if Path(ruta).is_absolute(
-            ) else None,  # Ruta absoluta si aplica
-            COPILOT_ROOT / ruta if 'COPILOT_ROOT' in globals() else None,  # Desde copilot root
-            PROJECT_ROOT / "src" / ruta,  # Común: src/
-            PROJECT_ROOT / "app" / ruta,  # Común: app/
-            PROJECT_ROOT / "docs" / ruta,  # Común: docs/
-        ]
-
-        rutas_intentadas = []
-        for ruta_local in filter(None, rutas_locales):
-            rutas_intentadas.append(str(ruta_local))
-            if ruta_local and ruta_local.exists() and ruta_local.is_file():
-                data = ruta_local.read_bytes()
-
-                # Simular propiedades para compatibilidad
-                mock_props = type('MockProps', (), {
-                    'size': len(data),
-                    'last_modified': datetime.fromtimestamp(ruta_local.stat().st_mtime),
-                    'content_settings': type('ContentSettings', (), {
-                        'content_type': _detect_content_type(ruta_local)
-                    })()
-                })()
-
-                result = _procesar_contenido_archivo(
-                    data, mock_props, include_preview, max_preview_size)
-                result["source"] = "local_filesystem"
-                result["local_path"] = str(ruta_local)
-                result["success"] = True
-                attempts.append({**attempt, "success": True,
-                                "path": str(ruta_local), "size": len(data)})
-                result["attempts"] = attempts
-                return result
-
-        attempt["error"] = f"Archivo no encontrado en sistema local"
-        attempt["rutas_intentadas"] = str(rutas_intentadas)
-        attempt["suggestion"] = "Verificar que el archivo existe en alguna de las ubicaciones esperadas"
-        attempts.append(attempt)
-
-    except PermissionError as pe:
-        attempt["error"] = f"Sin permisos para acceder al archivo local: {str(pe)}"
-        attempt["error_type"] = "PermissionError"
-        attempt["suggestion"] = "Verificar permisos del sistema de archivos"
-        attempts.append(attempt)
-    except Exception as e:
-        attempt["error"] = f"Error accediendo a sistema local: {str(e)}"
-        attempt["error_type"] = type(e).__name__
-        attempt["suggestion"] = "Verificar configuración del sistema de archivos"
-        attempts.append(attempt)
-
-    # Si llegamos aquí, todos los métodos fallaron
-    return {
-        "success": False,
-        "status_code": 404,
-        "error_code": "FILE_NOT_FOUND",
-        "error_message": f"No se pudo encontrar el archivo '{ruta_raw}' en ninguna ubicación disponible",
-        "attempts": attempts,
-        "diagnostico": {
-            "blob_client_available": bool(get_blob_client()),
-            "is_azure_environment": IS_AZURE,
-            "container_requested": container,
-            "project_root": str(PROJECT_ROOT),
-            "total_attempts": len(attempts),
-            "methods_tried": [a["method"] for a in attempts]
-        }
-    }
-
-
-def _procesar_contenido_archivo(data: bytes, props, include_preview: bool, max_preview_size: int) -> dict:
-    """Procesa el contenido del archivo y extrae metadata"""
-
-    size = getattr(props, 'size', len(data))
-    last_modified = getattr(props, 'last_modified', None)
-    if last_modified and hasattr(last_modified, 'isoformat'):
-        last_modified = last_modified.isoformat()
-    elif last_modified:
-        last_modified = str(last_modified)
-
-    content_type = None
-    if hasattr(props, 'content_settings') and props.content_settings:
-        content_type = getattr(props.content_settings, 'content_type', None)
-
-    etag = getattr(props, 'etag', None)
-
-    # Detectar si es texto
-    is_text = False
-    encoding = 'utf-8'
-    content = None
-    content_base64 = None
-    preview = None
-    preview_type = None
-    lines_count = 0
-    words_count = 0
-
-    try:
-        # Intentar decodificar como UTF-8
-        content = data.decode('utf-8')
-        is_text = True
-
-        # Contar líneas y palabras para archivos de texto
-        lines_count = len(content.split('\n'))
-        words_count = len(content.split())
-
-        if include_preview:
-            preview = content[:max_preview_size]
-            preview_type = "text"
-            if len(content) > max_preview_size:
-                preview += f"\n... [truncado, mostrando {max_preview_size} de {len(content)} caracteres]"
-
-    except UnicodeDecodeError:
-        # No es texto UTF-8, intentar otras codificaciones
-        for enc in ['latin-1', 'cp1252', 'iso-8859-1']:
-            try:
-                content = data.decode(enc)
-                is_text = True
-                encoding = enc
-                lines_count = len(content.split('\n'))
-                words_count = len(content.split())
-                if include_preview:
-                    preview = content[:max_preview_size]
-                    preview_type = f"text ({enc})"
-                break
-            except UnicodeDecodeError:
-                continue
-
-        if not is_text:
-            # Es binario, usar base64
-            import base64
-            content_base64 = base64.b64encode(data).decode('utf-8')
-            if include_preview:
-                preview = content_base64[:max_preview_size]
-                preview_type = "base64"
-                if len(content_base64) > max_preview_size:
-                    preview += f"... [truncado, mostrando {max_preview_size} de {len(content_base64)} caracteres en base64]"
-
-    return {
-        "content": content,
-        "content_base64": content_base64,
-        "preview": preview,
-        "preview_type": preview_type,
-        "size": size,
-        "last_modified": last_modified,
-        "content_type": content_type,
-        "etag": etag,
-        "encoding": encoding,
-        "is_text": is_text,
-        "lines_count": lines_count,
-        "words_count": words_count
-    }
-
-
-def _buscar_archivos_similares(container: str, ruta: str, ruta_raw: str) -> dict:
-    """Busca archivos similares para sugerir al usuario con mejor algoritmo de scoring"""
-
-    sugerencias = []
-    nombre_archivo = Path(ruta).name.lower()
-    extension = Path(ruta).suffix.lower()
-    directorio = str(Path(ruta).parent) if str(
-        Path(ruta).parent) != '.' else ""
-
-    try:
-        # Buscar en Blob Storage
-        client = get_blob_client()
-        if client:
-            try:
-                cc = client.get_container_client(container)
-                if cc.exists():
-                    for blob in cc.list_blobs():
-                        nombre_blob = blob.name.lower()
-                        path_blob = Path(blob.name)
-
-                        # Algoritmo de scoring mejorado
-                        score = 0
-                        motivos = []
-
-                        # Coincidencia exacta de nombre (diferente directorio)
-                        if path_blob.name.lower() == nombre_archivo:
-                            score = 100
-                            motivos.append("Nombre exacto")
-                        # Misma extensión y nombre muy similar
-                        elif path_blob.suffix.lower() == extension and nombre_archivo in nombre_blob:
-                            score = 85
-                            motivos.append("Nombre similar + misma extensión")
-                        # Nombre similar (sin extensión)
-                        elif Path(ruta).stem.lower() in nombre_blob:
-                            score = 70
-                            motivos.append("Nombre base similar")
-                        # Mismo directorio y extensión
-                        elif directorio and str(path_blob.parent).lower() == directorio.lower() and path_blob.suffix.lower() == extension:
-                            score = 65
-                            motivos.append("Mismo directorio + extensión")
-                        # Misma extensión
-                        elif extension and path_blob.suffix.lower() == extension:
-                            score = 50
-                            motivos.append("Misma extensión")
-                        # Contiene parte del nombre
-                        elif any(part in nombre_blob for part in ruta_raw.lower().split('/') if len(part) > 2):
-                            score = 40
-                            motivos.append("Contiene parte del nombre")
-                        # En mismo directorio
-                        elif directorio and str(path_blob.parent).lower() == directorio.lower():
-                            score = 30
-                            motivos.append("Mismo directorio")
-
-                        if score > 0:
-                            sugerencias.append({
-                                "nombre": blob.name,
-                                "score": score,
-                                "size": getattr(blob, 'size', 0),
-                                "last_modified": str(getattr(blob, 'last_modified', '')),
-                                "tipo_similitud": _describir_similitud(score),
-                                "motivos": motivos,
-                                "url_sugerida": f"?ruta={blob.name}&container={container}"
-                            })
-            except Exception as e:
-                logging.warning(f"Error buscando en blob storage: {e}")
-
-        # Buscar en sistema local si no estamos solo en Azure
-        if not IS_AZURE or len(sugerencias) < 5:
-            try:
-                for archivo in PROJECT_ROOT.rglob("*"):
-                    if archivo.is_file():
-                        nombre_local = archivo.name.lower()
-                        ruta_relativa = str(archivo.relative_to(
-                            PROJECT_ROOT)).replace('\\', '/')
-
-                        score = 0
-                        motivos = []
-
-                        if nombre_local == nombre_archivo:
-                            score = 95  # Ligeramente menos que blob exacto
-                            motivos.append("Nombre exacto (local)")
-                        elif extension and archivo.suffix.lower() == extension and nombre_archivo in nombre_local:
-                            score = 80
-                            motivos.append(
-                                "Nombre similar + extensión (local)")
-                        elif Path(archivo).stem.lower() == Path(ruta).stem.lower():
-                            score = 65
-                            motivos.append("Nombre base igual (local)")
-                        elif extension and archivo.suffix.lower() == extension:
-                            score = 45
-                            motivos.append("Misma extensión (local)")
-
-                        if score > 0:
-                            sugerencias.append({
-                                "nombre": ruta_relativa,
-                                "score": score,
-                                "size": archivo.stat().st_size,
-                                "last_modified": datetime.fromtimestamp(archivo.stat().st_mtime).isoformat(),
-                                "tipo_similitud": _describir_similitud(score),
-                                "motivos": motivos,
-                                "source": "local",
-                                "url_sugerida": f"?ruta={ruta_relativa}"
-                            })
-            except Exception as e:
-                logging.warning(f"Error buscando en sistema local: {e}")
-
-    except Exception as e:
-        logging.error(f"Error en búsqueda de archivos similares: {e}")
-
-    # Ordenar por score y limitar
-    sugerencias.sort(key=lambda x: x["score"], reverse=True)
-
-    return {
-        "archivos": sugerencias[:15],  # Top 15
-        "total": len(sugerencias),
-        "criterios_busqueda": {
-            "nombre_archivo": nombre_archivo,
-            "extension": extension,
-            "directorio": directorio,
-            "ruta_original": ruta_raw
-        }
-    }
-
-
-def _describir_similitud(score: int) -> str:
-    """Describe el tipo de similitud basado en el score"""
-    if score >= 95:
-        return "Coincidencia exacta"
-    elif score >= 80:
-        return "Muy similar"
-    elif score >= 65:
-        return "Similar"
-    elif score >= 45:
-        return "Mismo tipo"
-    elif score >= 30:
-        return "Relacionado"
-    else:
-        return "Posible coincidencia"
-
-
-def _generar_accion_sugerida(sugerencias: dict) -> str:
-    """Genera una acción sugerida basada en las sugerencias encontradas"""
-    archivos = sugerencias["archivos"]
-
-    if not archivos:
-        return "verificar_ruta_manual"
-    elif len(archivos) == 1:
-        return f"usar_archivo_sugerido:{archivos[0]['nombre']}"
-    elif archivos[0]["score"] >= 95:
-        return f"usar_coincidencia_exacta:{archivos[0]['nombre']}"
-    else:
-        return "seleccionar_de_lista"
-
-
-def _analizar_contenido_semantico(ruta: str, contenido: str) -> dict:
-    """Análisis semántico del contenido del archivo"""
-
-    if not contenido:
-        return {}
-
-    extension = Path(ruta).suffix.lower()
-
-    analisis = {
-        "tipo_archivo": _identificar_tipo_archivo(ruta, contenido),
-        "estadisticas": {
-            "caracteres": len(contenido),
-            "lineas": len(contenido.split('\n')),
-            "palabras": len(contenido.split()),
-            "lineas_vacias": contenido.count('\n\n'),
-            "indentacion_promedio": _calcular_indentacion_promedio(contenido)
-        },
-        "estructura": {},
-        "patrones": [],
-        "sugerencias": []
-    }
-
-    # Análisis específico por tipo de archivo
-    if extension in ['.py']:
-        analisis["estructura"] = _analizar_python(contenido)
-    elif extension in ['.js', '.ts', '.jsx', '.tsx']:
-        analisis["estructura"] = _analizar_javascript(contenido)
-    elif extension in ['.json']:
-        analisis["estructura"] = _analizar_json(contenido)
-    elif extension in ['.md', '.markdown']:
-        analisis["estructura"] = _analizar_markdown(contenido)
-    elif extension in ['.yml', '.yaml']:
-        analisis["estructura"] = _analizar_yaml(contenido)
-
-    # Detección de patrones comunes
-    analisis["patrones"] = _detectar_patrones(contenido)
-
-    # Generar sugerencias contextuales
-    analisis["sugerencias"] = _generar_sugerencias_semanticas(
-        ruta, contenido, analisis)
-
-    return analisis
-
-
-def _identificar_tipo_archivo(ruta: str, contenido: str) -> dict:
-    """Identifica el tipo de archivo basándose en extensión y contenido"""
-
-    extension = Path(ruta).suffix.lower()
-
-    # Mapeo básico por extensión
-    tipos_por_extension = {
-        '.py': {'tipo': 'python', 'categoria': 'codigo'},
-        '.js': {'tipo': 'javascript', 'categoria': 'codigo'},
-        '.ts': {'tipo': 'typescript', 'categoria': 'codigo'},
-        '.json': {'tipo': 'json', 'categoria': 'configuracion'},
-        '.yml': {'tipo': 'yaml', 'categoria': 'configuracion'},
-        '.yaml': {'tipo': 'yaml', 'categoria': 'configuracion'},
-        '.md': {'tipo': 'markdown', 'categoria': 'documentacion'},
-        '.txt': {'tipo': 'texto_plano', 'categoria': 'documentacion'},
-        '.sh': {'tipo': 'bash_script', 'categoria': 'script'},
-        '.ps1': {'tipo': 'powershell_script', 'categoria': 'script'},
-    }
-
-    tipo_base = tipos_por_extension.get(
-        extension, {'tipo': 'desconocido', 'categoria': 'otro'})
-
-    # Detección adicional basada en contenido
-    if not extension or extension == '.txt':
-        if contenido.startswith('#!/'):
-            tipo_base = {'tipo': 'script', 'categoria': 'script'}
-        elif contenido.strip().startswith('{') and contenido.strip().endswith('}'):
-            tipo_base = {'tipo': 'json', 'categoria': 'configuracion'}
-
-    return tipo_base
-
-
-def _analizar_python(contenido: str) -> dict:
-    """Análisis específico para archivos Python"""
-
-    import re
-
-    # Extraer nombres de funciones y clases
-    nombres_funciones = re.findall(r'^def\s+(\w+)', contenido, re.MULTILINE)
-    nombres_clases = re.findall(r'^class\s+(\w+)', contenido, re.MULTILINE)
-
-    estructura = {
-        "imports": len(re.findall(r'^(?:import|from)\s+', contenido, re.MULTILINE)),
-        "funciones": len(re.findall(r'^def\s+\w+', contenido, re.MULTILINE)),
-        "clases": len(re.findall(r'^class\s+\w+', contenido, re.MULTILINE)),
-        "decoradores": len(re.findall(r'^@\w+', contenido, re.MULTILINE)),
-        "comentarios": len(re.findall(r'#.*$', contenido, re.MULTILINE)),
-        "docstrings": len(re.findall(r'""".*?"""', contenido, re.DOTALL)),
-        "todos": len(re.findall(r'#\s*TODO', contenido, re.IGNORECASE)),
-        "fixmes": len(re.findall(r'#\s*FIXME', contenido, re.IGNORECASE)),
-        "nombres_funciones": nombres_funciones,
-        "nombres_clases": nombres_clases
-    }
-
-    return estructura
-
-
-def _analizar_javascript(contenido: str) -> dict:
-    """Análisis específico para archivos JavaScript/TypeScript"""
-
-    import re
-
-    estructura = {
-        "imports": len(re.findall(r'^\s*import\s+', contenido, re.MULTILINE)),
-        "exports": len(re.findall(r'^\s*export\s+', contenido, re.MULTILINE)),
-        "funciones": len(re.findall(r'function\s+\w+|const\s+\w+\s*=\s*\(|=>\s*{', contenido)),
-        "variables": len(re.findall(r'^\s*(?:const|let|var)\s+\w+', contenido, re.MULTILINE)),
-        "comentarios": len(re.findall(r'//.*$|/\*.*?\*/', contenido, re.MULTILINE)),
-        "console_logs": len(re.findall(r'console\.log', contenido)),
-        "async_functions": len(re.findall(r'async\s+function|\w+\s*=\s*async', contenido))
-    }
-
-    return estructura
-
-
-def _analizar_json(contenido: str) -> dict:
-    """Análisis específico para archivos JSON"""
-
-    try:
-        data = json.loads(contenido)
-        estructura = {
-            "valido": True,
-            "tipo_raiz": type(data).__name__,
-            "claves_principales": list(data.keys()) if isinstance(data, dict) else None,
-            "elementos": len(data) if isinstance(data, (list, dict)) else None,
-            "profundidad": _calcular_profundidad_json(data)
-        }
-    except json.JSONDecodeError as e:
-        estructura = {
-            "valido": False,
-            "error": str(e),
-            "linea_error": getattr(e, 'lineno', None),
-            "columna_error": getattr(e, 'colno', None)
-        }
-
-    return estructura
-
-
-def _analizar_markdown(contenido: str) -> dict:
-    """Análisis específico para archivos Markdown"""
-
-    import re
-
-    estructura = {
-        "headers": {
-            "h1": len(re.findall(r'^# ', contenido, re.MULTILINE)),
-            "h2": len(re.findall(r'^## ', contenido, re.MULTILINE)),
-            "h3": len(re.findall(r'^### ', contenido, re.MULTILINE)),
-            "h4": len(re.findall(r'^#### ', contenido, re.MULTILINE))
-        },
-        "enlaces": len(re.findall(r'\[.*?\]\(.*?\)', contenido)),
-        "imagenes": len(re.findall(r'!\[.*?\]\(.*?\)', contenido)),
-        "listas": len(re.findall(r'^\s*[-*+]\s+|^\s*\d+\.\s+', contenido, re.MULTILINE)),
-        "codigo_bloques": len(re.findall(r'```.*?```', contenido, re.DOTALL)),
-        "codigo_inline": len(re.findall(r'`[^`]+`', contenido)),
-        "tablas": len(re.findall(r'\|.*\|', contenido))
-    }
-
-    return estructura
-
-
-def _analizar_yaml(contenido: str) -> dict:
-    """Análisis específico para archivos YAML"""
-
-    import re
-
-    estructura = {
-        "claves_principales": len(re.findall(r'^[a-zA-Z_]\w*:', contenido, re.MULTILINE)),
-        "arrays": len(re.findall(r'^\s*-\s+', contenido, re.MULTILINE)),
-        "comentarios": len(re.findall(r'#.*$', contenido, re.MULTILINE)),
-        "niveles_indentacion": len(set(re.findall(r'^(\s*)', contenido, re.MULTILINE)))
-    }
-
-    return estructura
-
-
-def _detectar_patrones(contenido: str) -> list:
-    """Detecta patrones comunes en el contenido"""
-
-    patrones = []
-
-    # URLs
-    import re
-    if re.search(r'https?://\S+', contenido):
-        patrones.append({"tipo": "urls", "descripcion": "Contiene URLs"})
-
-    # Emails
-    if re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', contenido):
-        patrones.append(
-            {"tipo": "emails", "descripcion": "Contiene direcciones de email"})
-
-    # Fechas
-    if re.search(r'\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4}', contenido):
-        patrones.append({"tipo": "fechas", "descripcion": "Contiene fechas"})
-
-    # IPs
-    if re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', contenido):
-        patrones.append(
-            {"tipo": "ips", "descripcion": "Contiene direcciones IP"})
-
-    # Tokens/Keys (patrones genéricos)
-    if re.search(r'[A-Za-z0-9]{32,}', contenido):
-        patrones.append(
-            {"tipo": "tokens", "descripcion": "Posibles tokens o claves"})
-
-    return patrones
-
-
-def _generar_sugerencias_semanticas(ruta: str, contenido: str, analisis: dict) -> list:
-    """Genera sugerencias contextuales basadas en el análisis"""
-
-    sugerencias = []
-
-    tipo_archivo = analisis.get("tipo_archivo", {}).get("tipo", "")
-    estructura = analisis.get("estructura", {})
-
-    # Sugerencias específicas por tipo
-    if tipo_archivo == "python":
-        if estructura.get("todos", 0) > 0:
-            sugerencias.append("Hay elementos TODO pendientes en el código")
-        if estructura.get("funciones", 0) == 0 and estructura.get("clases", 0) == 0:
-            sugerencias.append(
-                "Archivo sin funciones ni clases - podría ser un script simple")
-        if estructura.get("docstrings", 0) == 0 and estructura.get("funciones", 0) > 0:
-            sugerencias.append("Las funciones no tienen documentación")
-
-    elif tipo_archivo == "javascript":
-        if estructura.get("console_logs", 0) > 0:
-            sugerencias.append(
-                "Contiene console.log - considerar remover en producción")
-        if estructura.get("imports", 0) == 0 and estructura.get("exports", 0) == 0:
-            sugerencias.append(
-                "No usa imports/exports - posible script independiente")
-
-    elif tipo_archivo == "json":
-        if not estructura.get("valido", True):
-            sugerencias.append("JSON inválido - revisar sintaxis")
-
-    # Sugerencias generales
-    if analisis["estadisticas"]["lineas"] > 500:
-        sugerencias.append(
-            "Archivo largo - considerar dividir en módulos más pequeños")
-
-    if analisis["estadisticas"]["lineas_vacias"] > analisis["estadisticas"]["lineas"] * 0.3:
-        sugerencias.append(
-            "Muchas líneas vacías - el formato podría optimizarse")
-
-    return sugerencias
-
-
-def _generar_sugerencias_contextuales(ruta: str, result: dict) -> list:
-    """Genera sugerencias contextuales sobre qué hacer con el archivo"""
-
-    sugerencias = []
-    extension = Path(ruta).suffix.lower()
-    size = result.get("size", 0)
-
-    # Sugerencias basadas en tipo de archivo
-    if extension in ['.py', '.js', '.ts']:
-        sugerencias.extend([
-            f"analizar:codigo:{ruta}",
-            f"generar:test para {ruta}",
-            f"revisar:calidad:{ruta}"
-        ])
-    elif extension == '.json':
-        sugerencias.extend([
-            f"validar:json:{ruta}",
-            f"formatear:json:{ruta}"
-        ])
-    elif extension in ['.md', '.txt']:
-        sugerencias.extend([
-            f"generar:resumen:{ruta}",
-            f"verificar:enlaces:{ruta}"
-        ])
-
-    # Sugerencias basadas en tamaño
-    if size > 100000:  # 100KB
-        sugerencias.append(f"optimizar:tamaño:{ruta}")
-
-    # Sugerencias generales
-    sugerencias.extend([
-        f"modificar:{ruta}",
-        f"copiar:{ruta}",
-        f"buscar:similar:{ruta}"
-    ])
-
-    return sugerencias[:8]  # Limitar a 8 sugerencias
-
-
-def _calcular_indentacion_promedio(contenido: str) -> float:
-    """Calcula la indentación promedio del archivo"""
-
-    import re
-    lineas_indentadas = []
-
-    for linea in contenido.split('\n'):
-        if linea.strip():  # Solo líneas no vacías
-            espacios = len(linea) - len(linea.lstrip())
-            if espacios > 0:
-                lineas_indentadas.append(espacios)
-
-    return sum(lineas_indentadas) / len(lineas_indentadas) if lineas_indentadas else 0
-
-
-def _calcular_profundidad_json(data, nivel=0):
-    """Calcula la profundidad máxima de un objeto JSON"""
-
-    if isinstance(data, dict):
-        if not data:
-            return nivel
-        return max(_calcular_profundidad_json(v, nivel + 1) for v in data.values())
-    elif isinstance(data, list):
-        if not data:
-            return nivel
-        return max(_calcular_profundidad_json(item, nivel + 1) for item in data)
-    else:
-        return nivel
-
-
-def _detect_content_type(path: Path) -> str:
-    """Detecta el content type basado en la extensión del archivo"""
-
-    extension = path.suffix.lower()
-
-    content_types = {
-        '.txt': 'text/plain',
-        '.py': 'text/x-python',
-        '.js': 'text/javascript',
-        '.ts': 'text/typescript',
-        '.json': 'application/json',
-        '.yml': 'application/x-yaml',
-        '.yaml': 'application/x-yaml',
-        '.md': 'text/markdown',
-        '.html': 'text/html',
-        '.css': 'text/css',
-        '.sh': 'text/x-shellscript',
-        '.ps1': 'text/x-powershell'
-    }
-
-    return content_types.get(extension, 'application/octet-stream')
-
-
-def _format_file_size(size_bytes: int) -> str:
-    """Formatea el tamaño del archivo en formato human-readable"""
-
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
-
-
-def _limpiar_cache_antiguo():
-    """Limpia entradas antiguas del cache para mantener el rendimiento"""
-
-    global CACHE
-
-    # Obtener entradas ordenadas por timestamp
-    entradas_ordenadas = sorted(
-        CACHE.items(),
-        key=lambda x: x[1].get("cached_at", 0)
-    )
-
-    # Mantener solo las 800 más recientes
-    entradas_a_mantener = entradas_ordenadas[-800:]
-
-    # Crear nuevo cache con solo las entradas a mantener
-    nuevo_cache = {k: v for k, v in entradas_a_mantener}
-
-    CACHE.clear()
-    CACHE.update(nuevo_cache)
-
-    logging.info(
-        f"Cache limpiado: {len(entradas_ordenadas)} -> {len(CACHE)} entradas")
-
-
 @app.function_name(name="eliminar_archivo_http")
 @app.route(route="eliminar-archivo", methods=["POST", "DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
 def eliminar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -6318,11 +5868,13 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
     if not script:
         return func.HttpResponse(
             json.dumps({
-                "error": "Parámetro 'script' es requerido",
+                "ok": False,
+                "error_code": "MISSING_SCRIPT_PARAM",
+                "mensaje": "Parámetro 'script' es requerido",
                 "ejemplo": {"script": "scripts/test.sh", "args": []},
                 "supported_extensions": [".py", ".sh", ".ps1"],
                 "note": "Can be just filename - we'll search in common directories"
-            }),
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=400
         )
@@ -6332,10 +5884,12 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
         if not isinstance(script, str) or not script.strip():
             return func.HttpResponse(
                 json.dumps({
-                    "error": "Parámetro 'script' debe ser un string no vacío",
+                    "ok": False,
+                    "error_code": "INVALID_SCRIPT_PARAM",
+                    "mensaje": "Parámetro 'script' debe ser un string no vacío",
                     "received_type": type(script).__name__,
                     "ejemplo": {"script": "scripts/test.sh", "args": []}
-                }),
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
@@ -6350,7 +5904,9 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
             search_results = _generate_smart_suggestions(script_path)
             return func.HttpResponse(
                 json.dumps({
-                    "error": "Script no encontrado",
+                    "ok": False,
+                    "error_code": "SCRIPT_NOT_FOUND",
+                    "mensaje": "Script no encontrado",
                     "buscado": script_path,
                     "rutas_intentadas": search_results["rutas_intentadas"],
                     "sugerencias": search_results["sugerencias"],
@@ -6362,7 +5918,7 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
                         "test.py",
                         "scripts/custom.sh"
                     ]
-                }),
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=404
             )
@@ -6371,16 +5927,31 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
         if not found_script_path.is_file():
             return func.HttpResponse(
                 json.dumps({
-                    "error": f"Path exists but is not a file: {found_script_path}",
+                    "ok": False,
+                    "error_code": "NOT_A_FILE",
+                    "mensaje": f"Path exists but is not a file: {found_script_path}",
                     "path_type": "directory" if found_script_path.is_dir() else "other",
-                    "suggestion": "Ensure the path points to a script file, not a directory"
-                }),
+                    "sugerencias": ["Asegúrate que la ruta apunte a un archivo de script, no a un directorio"]
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
-        # Determinar el comando basado en la extensión
+        # Validar extensión antes de ejecutar
         ext = found_script_path.suffix.lower()
+        if ext not in [".py", ".sh", ".ps1"]:
+            return func.HttpResponse(json.dumps({
+                "ok": False,
+                "error_code": "INVALID_FILE_TYPE",
+                "mensaje": f"El archivo '{script_path}' no es un script ejecutable",
+                "sugerencias": [
+                    "Usa un archivo .py para scripts de Python",
+                    "Usa un archivo .sh para scripts de Bash",
+                    "Usa un archivo .ps1 para scripts de PowerShell"
+                ]
+            }, ensure_ascii=False), mimetype="application/json", status_code=400)
+
+        # Determinar el comando basado en la extensión
         if ext == ".py":
             cmd = [sys.executable, str(found_script_path)]
         elif ext == ".sh":
@@ -6392,7 +5963,6 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
             cmd = [ps_cmd, "-ExecutionPolicy", "Bypass",
                    "-File", str(found_script_path)]
         else:
-            # Try to execute directly
             cmd = [str(found_script_path)]
 
         # ✅ MEJORA: Añadir argumentos si se proporcionan
@@ -6420,7 +5990,7 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
 
             return func.HttpResponse(
                 json.dumps({
-                    "success": result.returncode == 0,
+                    "ok": result.returncode == 0,
                     "exit_code": result.returncode,
                     "stdout": result.stdout,
                     "stderr": result.stderr,
@@ -6429,30 +5999,44 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
                     "comando_usado": " ".join(cmd),
                     "directorio_trabajo": str(found_script_path.parent),
                     "encontrado_en": str(found_script_path.relative_to(PROJECT_ROOT)) if found_script_path.is_relative_to(PROJECT_ROOT) else str(found_script_path)
-                }),
+                }, ensure_ascii=False),
                 mimetype="application/json"
             )
 
         except subprocess.TimeoutExpired:
             return func.HttpResponse(
                 json.dumps({
-                    "success": False,
-                    "error": f"Script execution timed out after {timeout} seconds",
+                    "ok": False,
+                    "error_code": "TIMEOUT",
+                    "mensaje": f"Script execution timed out after {timeout} seconds",
                     "script_ejecutado": str(found_script_path),
-                    "suggestion": "Consider increasing timeout or optimizing the script"
-                }),
+                    "sugerencias": ["Considera aumentar el timeout o optimizar el script"]
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=408
             )
+        except OSError as e:
+            return func.HttpResponse(json.dumps({
+                "ok": False,
+                "error_code": "EXECUTION_FAILED",
+                "mensaje": "El archivo no pudo ejecutarse como script",
+                "detalles": str(e),
+                "sugerencias": [
+                    "Verifica que el archivo tenga la extensión y contenido adecuados",
+                    "Prueba ejecutarlo manualmente en local para confirmar que funciona"
+                ]
+            }, ensure_ascii=False), mimetype="application/json", status_code=500)
 
     except Exception as e:
         logging.exception("ejecutar_script_local_http failed")
         return func.HttpResponse(
             json.dumps({
-                "error": str(e),
+                "ok": False,
+                "error_code": "INTERNAL_ERROR",
+                "mensaje": str(e),
                 "type": type(e).__name__,
-                "suggestion": "Check script path and permissions"
-            }),
+                "sugerencias": ["Verifica la ruta y permisos del script"]
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
         )
@@ -6652,261 +6236,134 @@ def _generate_smart_suggestions(script_name: str) -> dict:
 @app.function_name(name="ejecutar_script_http")
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Ejecuta scripts Python desde Blob Storage (descarga antes de ejecutar)
+    """
     endpoint = "/api/ejecutar-script"
     method = "POST"
     run_id = uuid.uuid4().hex[:12]
-    script_spec = "unknown"  # Initialize early to prevent unbound variable
+    script_blob_path = None
 
     try:
         try:
             body = req.get_json()
-        except:
+        except Exception:
             body = {}
 
-        # Params flexibles
-        script_spec = (body.get("script") or req.params.get(
-            "script") or "").strip()  # ej: scripts/setup.sh
+        # Obtener parámetro 'script'
+        script_blob_path = (body.get("script")
+                            or req.params.get("script") or "").strip()
         timeout_s = int(
             body.get("timeout_s", req.params.get("timeout_s") or 60))
-        sync_outputs = str(body.get("sync_outputs", req.params.get(
-            "sync_outputs") or "true")).lower() in ("1", "true", "yes", "y", "si", "sí", "on")
 
-        # args: lista JSON o CSV en query
-        args = body.get("args")
-        if isinstance(args, str):
-            args = [x.strip() for x in args.split(",") if x.strip()]
-        if args is None:
-            qargs = req.params.get("args")
-            args = [x.strip() for x in qargs.split(",")] if qargs else []
+        if not script_blob_path:
+            err = {
+                "exito": False,
+                "error": "Falta parámetro 'script'",
+                "endpoint": endpoint,
+                "run_id": run_id
+            }
+            return func.HttpResponse(json.dumps(err, ensure_ascii=False), status_code=400, mimetype="application/json")
 
-        if not script_spec:
-            err = api_err(endpoint, method, 400, "BadRequest",
-                          "Parámetro 'script' requerido", missing_params=["script"], run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-        # ✅ MEJORA: Detectar si es una ruta local con mejor verificación
-        is_local_script = script_spec.startswith(
-            ('/home/site/wwwroot/', './', '/', 'scripts/')) or Path(script_spec).is_absolute()
-
-        script_local = None
-        script_found = False
-
-        if is_local_script:
-            # ✅ SOLUCIÓN: Verificar existencia en múltiples ubicaciones posibles
-            possible_paths = []
-
-            if script_spec.startswith('./'):
-                # Relativo al directorio actual
-                possible_paths.append(Path(PROJECT_ROOT) / script_spec[2:])
-            elif script_spec.startswith('scripts/'):
-                # Relativo al directorio de scripts
-                possible_paths.extend([
-                    Path(PROJECT_ROOT) / script_spec,
-                    Path(PROJECT_ROOT) / "copiloto-function" / script_spec,
-                    Path("/home/site/wwwroot") /
-                    script_spec if IS_AZURE else None
-                ])
-            elif script_spec.startswith('/'):
-                # Ruta absoluta
-                possible_paths.append(Path(script_spec))
-            else:
-                # Intentar varias ubicaciones comunes
-                possible_paths.extend([
-                    Path(PROJECT_ROOT) / script_spec,
-                    Path(PROJECT_ROOT) / "scripts" / script_spec,
-                    Path(PROJECT_ROOT) / "copiloto-function" / script_spec,
-                    Path(PROJECT_ROOT) / "copiloto-function" /
-                    "scripts" / script_spec,
-                    Path("/home/site/wwwroot") /
-                    script_spec if IS_AZURE else None,
-                    Path("/home/site/wwwroot/scripts") /
-                    script_spec if IS_AZURE else None
-                ])
-
-            # Filtrar paths None y verificar existencia
-            for path in filter(None, possible_paths):
-                if path.exists() and path.is_file():
-                    script_local = path
-                    script_found = True
-                    break
-
-            if not script_found:
-                # ✅ SOLUCIÓN: Error detallado con ubicaciones intentadas
-                attempted_paths = [str(p)
-                                   for p in filter(None, possible_paths)]
-                err = api_err(endpoint, method, 404, "ScriptNotFound",
-                              f"No existe el script local: {script_spec}",
-                              run_id=run_id,
-                              details={
-                                  "script_solicitado": script_spec,
-                                  "ubicaciones_intentadas": attempted_paths,
-                                  "es_azure": IS_AZURE,
-                                  "project_root": str(PROJECT_ROOT),
-                                  "sugerencias": [
-                                      f"Verificar que {script_spec} existe en alguna de las ubicaciones",
-                                      "Crear el script si no existe",
-                                      "Usar ruta absoluta si el script está en otra ubicación"
-                                  ]
-                              })
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=404)
-
-            # Para scripts locales, usar directorio temporal simple
-            work_dir = Path(tempfile.mkdtemp(prefix=f"script_run_{run_id}_"))
-        else:
-            # Es un blob de storage (código original)
-            base, scripts_dir, work_dir, logs_dir = _mk_run_dirs(run_id)
-
-            # 1) Traer el script desde blob a local
-            cont, path, hint = _normalize_script_spec(script_spec)
-            if not cont or not path:
-                err = api_err(endpoint, method, 400, "ScriptSpecInvalid",
-                              f"Especificación inválida: {script_spec}", run_id=run_id)
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False),
-                                         mimetype="application/json", status_code=400)
-
-            cli = get_blob_client()
-            if not cli:
-                err = api_err(endpoint, method, 500, "StorageError",
-                              "No se pudo obtener cliente de Blob Storage", run_id=run_id)
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-            try:
-                bcs = cli.get_container_client(cont).get_blob_client(path)
-            except Exception as e:
-                err = api_err(endpoint, method, 500, "StorageError",
-                              f"Error al acceder al blob: {str(e)}", run_id=run_id)
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-            # ✅ SOLUCIÓN: Verificar existencia del blob antes de descargar
-            if not bcs.exists():
-                err = api_err(endpoint, method, 404, "ScriptNotFound",
-                              f"No existe el script '{path}' en '{cont}'",
-                              run_id=run_id,
-                              details={
-                                  "container": cont,
-                                  "blob_path": path,
-                                  "script_spec_original": script_spec,
-                                  "sugerencias": [
-                                      f"Verificar que el archivo {path} existe en el contenedor {cont}",
-                                      "Subir el script al blob storage si no existe",
-                                      "Revisar la ruta del script"
-                                  ]
-                              })
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=404)
-
-            script_local = scripts_dir / Path(path).name
-            try:
-                with open(script_local, "wb") as f:
-                    f.write(bcs.download_blob().readall())
-                script_found = True
-            except Exception as e:
-                err = api_err(endpoint, method, 500, "DownloadError",
-                              f"Error descargando script: {str(e)}", run_id=run_id)
-                return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-        # ✅ VERIFICACIÓN FINAL: Asegurar que el script existe antes de continuar
-        if not script_local or not script_local.exists():
-            err = api_err(endpoint, method, 500, "ScriptVerificationFailed",
-                          f"Error verificando script después de preparación: {script_spec}", run_id=run_id)
-            return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-        # 2) Determinar intérprete
-        ext = script_local.suffix.lower()
-        if ext == ".sh":
-            cmd = ["bash", "-e", "-u", "-o", "pipefail", str(script_local)]
-        elif ext == ".py":
-            cmd = [sys.executable, str(script_local)]
-        else:
-            # intento directo
-            cmd = [str(script_local)]
-
-        # mapear args a locales si son blobs (solo para scripts de blob)
-        staged_inputs = []
-        mapped_args = []
-        if not is_local_script:
-            for a in (args or []):
-                m, meta = _stage_arg_to_local(a, work_dir)
-                mapped_args.append(m)
-                if meta:
-                    staged_inputs.append({"arg": a, **meta, "local": m})
-        else:
-            # Para scripts locales, usar argumentos tal como vienen
-            mapped_args = args or []
-
-        cmd += mapped_args
-
-        # chmod y cwd
+        # Conectar a Blob Storage usando credenciales configuradas
         try:
-            os.chmod(script_local, 0o755)
+            blob_service_client = get_blob_client()
+            if not blob_service_client:
+                return func.HttpResponse(
+                    json.dumps(
+                        {"exito": False, "error": "Blob Storage no configurado"}),
+                    status_code=500,
+                    mimetype="application/json"
+                )
+            blob_client = blob_service_client.get_blob_client(
+                container=CONTAINER_NAME,
+                blob=script_blob_path
+            )
+        except Exception as e:
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": f"Error conectando a Blob Storage: {str(e)}"}),
+                status_code=500,
+                mimetype="application/json"
+            )
+
+        # Descargar script desde Blob Storage
+        try:
+            if not blob_client.exists():
+                return func.HttpResponse(
+                    json.dumps(
+                        {"exito": False, "error": f"No existe el script en Blob Storage: {script_blob_path}"}),
+                    status_code=404,
+                    mimetype="application/json"
+                )
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
+                temp_path = temp_file.name
+                script_content = blob_client.download_blob().readall().decode('utf-8')
+                temp_file.write(script_content)
+        except Exception as e:
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": f"Error descargando script: {str(e)}"}),
+                status_code=500,
+                mimetype="application/json"
+            )
+
+        # Verificar que se descargó correctamente
+        if not os.path.exists(temp_path):
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": "No se pudo crear archivo temporal"}),
+                status_code=500,
+                mimetype="application/json"
+            )
+
+        # Hacer el archivo ejecutable
+        try:
+            os.chmod(temp_path, 0o755)
         except Exception:
             pass
 
-        # antes de subprocess.run(...)
-        env = os.environ.copy()
-        if IS_AZURE:
-            site_pkgs = "/home/site/wwwroot/.python_packages/lib/site-packages"
-            # prepend para que tenga prioridad
-            env["PYTHONPATH"] = (
-                site_pkgs + ":" + env.get("PYTHONPATH", "")).rstrip(":")
-
-        # Timeout de seguridad - limitar a máximo 10 minutos para evitar cuelgues
-        safe_timeout = min(timeout_s, 600)  # Máximo 10 minutos
-
-        t0 = time.time()
+        # Ejecutar script
+        logging.info(f"🚀 Ejecutando script: {script_blob_path}")
         try:
             result = subprocess.run(
-                cmd,
-                cwd=str(work_dir),
+                [sys.executable, temp_path],
                 capture_output=True,
                 text=True,
-                timeout=safe_timeout,  # Usar timeout de seguridad
-                env=env
+                timeout=timeout_s,
+                cwd=tempfile.gettempdir()
+            )
+            os.unlink(temp_path)
+            respuesta = {
+                "exito": result.returncode == 0,
+                "script": script_blob_path,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            }
+            status_code = 200 if result.returncode == 0 else 400
+            return func.HttpResponse(
+                json.dumps(respuesta, ensure_ascii=False),
+                status_code=status_code,
+                mimetype="application/json"
+            )
+        except subprocess.TimeoutExpired:
+            os.unlink(temp_path)
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": f"Timeout después de {timeout_s} segundos"}),
+                status_code=408,
+                mimetype="application/json"
             )
 
-            # Respuesta simplificada según el formato solicitado
-            response_data = {
-                "ok": True,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.returncode,
-                "timeout_used": safe_timeout,
-                "script_type": "local" if is_local_script else "blob",
-                "script_path": str(script_local),
-                "script_found": script_found,
-                "script_verified": True
-            }
-
-            # Agregar información de staging solo para scripts de blob
-            if not is_local_script and staged_inputs:
-                response_data["staged_inputs"] = staged_inputs
-
-            return func.HttpResponse(json.dumps(response_data), mimetype="application/json")
-
-        except subprocess.TimeoutExpired as te:
-            return func.HttpResponse(json.dumps({
-                "ok": False,
-                "error": "Timeout",
-                "stdout": getattr(te, "stdout", "") or "",
-                "stderr": getattr(te, "stderr", "") or "",
-                "exit_code": -1,
-                "timeout_s": safe_timeout,
-                "timeout_reason": "Script excedió el tiempo límite de seguridad",
-                "script_type": "local" if is_local_script else "blob",
-                "script_path": str(script_local),
-                "script_found": script_found
-            }), mimetype="application/json")
-
     except Exception as e:
-        logging.exception("ejecutar_script_http failed")
-        return func.HttpResponse(json.dumps({
-            "ok": False,
-            "error": str(e),
-            "stdout": "",
-            "stderr": "",
-            "exit_code": -1,
-            "error_type": type(e).__name__,
-            "script_spec": script_spec if 'script_spec' in locals() else "unknown"
-        }), mimetype="application/json", status_code=500)
+        logging.error(f"❌ Error ejecutando script: {str(e)}")
+        return func.HttpResponse(
+            json.dumps(
+                {"exito": False, "error": f"Error interno: {str(e)}", "script": script_blob_path}),
+            status_code=500,
+            mimetype="application/json"
+        )
 
 
 def operacion_git(comando: str, parametros: Optional[dict] = None) -> dict:
@@ -7731,6 +7188,23 @@ def _md5_to_b64(maybe_md5) -> Optional[str]:
     if isinstance(maybe_md5, (bytes, bytearray)):
         return base64.b64encode(bytes(maybe_md5)).decode("utf-8")
     return None
+
+# ---------- helper: format file size ----------
+
+
+def _format_file_size(size_bytes: int) -> str:
+    """Convierte tamaño en bytes a formato legible (KB, MB, GB, etc.)"""
+    try:
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 ** 2:
+            return f"{size_bytes / 1024:.2f} KB"
+        elif size_bytes < 1024 ** 3:
+            return f"{size_bytes / (1024 ** 2):.2f} MB"
+        else:
+            return f"{size_bytes / (1024 ** 3):.2f} GB"
+    except Exception:
+        return str(size_bytes)
 
 # ---------- info-archivo ----------
 
@@ -10436,9 +9910,12 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         sub = os.getenv("AZURE_SUBSCRIPTION_ID")
-        rg = os.getenv("RESOURCE_GROUP") or os.getenv(
-            "AZURE_RESOURCE_GROUP") or "boat-rental-app-group"
-        site = os.getenv("WEBSITE_SITE_NAME") or "copiloto-semantico-func"
+
+        # ✅ USAR VARIABLES PERSONALIZADAS con fallback
+        rg = os.getenv("AZURE_RESOURCE_GROUP") or os.getenv(
+            "RESOURCE_GROUP") or "boat-rental-app-group"
+        site = os.getenv("CUSTOM_SITE_NAME") or os.getenv(
+            "WEBSITE_SITE_NAME") or "copiloto-semantico-func-us2"
 
         if not sub or not rg or not site:
             body = {
@@ -10447,7 +9924,7 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                 "missing": {
                     "AZURE_SUBSCRIPTION_ID": bool(sub),
                     "RESOURCE_GROUP/AZURE_RESOURCE_GROUP": bool(rg),
-                    "WEBSITE_SITE_NAME": bool(site),
+                    "CUSTOM_SITE_NAME/WEBSITE_SITE_NAME": bool(site),
                 }
             }
             return func.HttpResponse(json.dumps(body, ensure_ascii=False), mimetype="application/json", status_code=500)

@@ -1,0 +1,666 @@
+2025-09-23 00:00:07.164 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:07.166 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8582ms
+2025-09-23 00:00:17.185 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:17.187 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8348ms
+2025-09-23 00:00:27.188 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:27.190 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8250ms
+2025-09-23 00:00:37.203 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:37.205 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8671ms
+2025-09-23 00:00:47.217 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:47.219 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5536ms
+2025-09-23 00:00:57.238 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:00:57.240 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8356ms
+2025-09-23 00:01:07.242 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:07.244 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8701ms
+2025-09-23 00:01:17.243 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:17.245 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8739ms
+2025-09-23 00:01:27.250 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:27.252 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0063ms
+2025-09-23 00:01:37.263 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:37.265 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2763ms
+2025-09-23 00:01:47.274 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:47.276 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9950ms
+2025-09-23 00:01:57.288 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:01:57.290 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0041ms
+2025-09-23 00:02:07.298 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:07.300 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1061ms
+2025-09-23 00:02:13.394 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:02:13.396 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.4012ms
+2025-09-23 00:02:17.311 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:17.313 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8585ms
+2025-09-23 00:02:27.331 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:27.333 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7817ms
+2025-09-23 00:02:37.344 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:37.347 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5585ms
+2025-09-23 00:02:47.360 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:47.361 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9681ms
+2025-09-23 00:02:57.372 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:02:57.373 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8754ms
+2025-09-23 00:03:07.378 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:07.380 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9005ms
+2025-09-23 00:03:17.400 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:17.402 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8038ms
+2025-09-23 00:03:27.400 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:27.401 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7754ms
+2025-09-23 00:03:37.409 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:37.414 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.5265ms
+2025-09-23 00:03:47.421 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:47.422 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9216ms
+2025-09-23 00:03:57.431 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:03:57.433 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8709ms
+2025-09-23 00:04:07.453 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:07.454 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8431ms
+2025-09-23 00:04:17.471 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:17.473 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9866ms
+2025-09-23 00:04:27.494 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:27.495 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7362ms
+2025-09-23 00:04:37.517 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:37.519 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8332ms
+2025-09-23 00:04:47.530 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:47.531 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8401ms
+2025-09-23 00:04:57.541 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:04:57.543 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0643ms
+2025-09-23 00:05:07.543 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:07.545 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7831ms
+2025-09-23 00:05:17.566 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:17.569 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2880ms
+2025-09-23 00:05:27.582 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:27.584 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1135ms
+2025-09-23 00:05:37.586 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:37.588 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9007ms
+2025-09-23 00:05:47.602 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:47.604 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7092ms
+2025-09-23 00:05:57.610 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:05:57.612 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8639ms
+2025-09-23 00:06:07.632 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:07.634 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8776ms
+2025-09-23 00:06:17.638 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:17.640 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8802ms
+2025-09-23 00:06:27.645 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:27.647 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8823ms
+2025-09-23 00:06:37.655 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:37.657 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8046ms
+2025-09-23 00:06:47.666 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:47.668 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8171ms
+2025-09-23 00:06:57.694 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:06:57.696 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9665ms
+2025-09-23 00:07:07.741 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:07.743 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8442ms
+2025-09-23 00:07:13.745 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:07:13.746 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.5807ms
+2025-09-23 00:07:17.762 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:17.764 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8105ms
+2025-09-23 00:07:27.778 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:27.780 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7793ms
+2025-09-23 00:07:37.787 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:37.790 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.9762ms
+2025-09-23 00:07:47.793 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:47.795 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7949ms
+2025-09-23 00:07:57.802 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:07:57.805 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1529ms
+2025-09-23 00:08:07.812 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:07.814 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9231ms
+2025-09-23 00:08:17.836 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:17.838 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7828ms
+2025-09-23 00:08:27.846 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:27.848 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9945ms
+2025-09-23 00:08:37.862 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:37.864 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8832ms
+2025-09-23 00:08:47.871 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:47.873 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0723ms
+2025-09-23 00:08:57.878 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:08:57.880 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8995ms
+2025-09-23 00:09:07.894 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:07.897 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1638ms
+2025-09-23 00:09:17.915 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:17.917 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7678ms
+2025-09-23 00:09:27.923 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:27.925 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8381ms
+2025-09-23 00:09:37.940 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:37.942 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7920ms
+2025-09-23 00:09:47.943 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:47.945 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9719ms
+2025-09-23 00:09:57.982 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:09:57.984 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8353ms
+2025-09-23 00:10:08.002 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:08.004 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9117ms
+2025-09-23 00:10:18.010 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:18.012 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8084ms
+2025-09-23 00:10:28.025 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:28.027 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9194ms
+2025-09-23 00:10:38.050 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:38.052 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1481ms
+2025-09-23 00:10:48.071 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:48.073 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9101ms
+2025-09-23 00:10:58.084 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:10:58.086 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7916ms
+2025-09-23 00:11:08.105 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:08.107 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9015ms
+2025-09-23 00:11:18.187 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:18.189 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9874ms
+2025-09-23 00:11:28.201 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:28.203 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8756ms
+2025-09-23 00:11:38.215 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:38.217 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8034ms
+2025-09-23 00:11:48.230 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:48.232 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9020ms
+2025-09-23 00:11:58.245 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:11:58.247 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8270ms
+2025-09-23 00:12:08.261 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:08.264 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.5642ms
+2025-09-23 00:12:14.045 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:12:14.047 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.4774ms
+2025-09-23 00:12:18.283 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:18.285 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0094ms
+2025-09-23 00:12:28.295 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:28.296 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8545ms
+2025-09-23 00:12:34.857 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/status - - -
+2025-09-23 00:12:34.864 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/admin/host/status - 200 458 application/json;+charset=utf-8 7.1833ms
+2025-09-23 00:12:36.406 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/status - - -
+2025-09-23 00:12:36.413 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/admin/host/status - 200 458 application/json;+charset=utf-8 7.4066ms
+2025-09-23 00:12:38.315 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:38.316 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8738ms
+2025-09-23 00:12:48.329 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:48.330 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7666ms
+2025-09-23 00:12:58.340 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:12:58.342 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8580ms
+2025-09-23 00:13:08.358 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:08.360 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1858ms
+2025-09-23 00:13:18.369 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:18.371 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.6627ms
+2025-09-23 00:13:28.391 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:28.393 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8543ms
+2025-09-23 00:13:38.415 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:38.417 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9686ms
+2025-09-23 00:13:48.433 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:48.435 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9132ms
+2025-09-23 00:13:58.455 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:13:58.457 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1881ms
+2025-09-23 00:14:08.460 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:08.462 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8232ms
+2025-09-23 00:14:18.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:18.480 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9816ms
+2025-09-23 00:14:28.503 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:28.505 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0094ms
+2025-09-23 00:14:38.516 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:38.518 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8595ms
+2025-09-23 00:14:48.521 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:48.523 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0280ms
+2025-09-23 00:14:58.537 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:14:58.539 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9329ms
+2025-09-23 00:15:08.554 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:08.556 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8441ms
+2025-09-23 00:15:18.564 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:18.566 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8988ms
+2025-09-23 00:15:28.580 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:28.582 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1966ms
+2025-09-23 00:15:38.599 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:38.601 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9823ms
+2025-09-23 00:15:48.619 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:48.620 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7200ms
+2025-09-23 00:15:58.644 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:15:58.647 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2162ms
+2025-09-23 00:16:08.679 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:08.680 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7838ms
+2025-09-23 00:16:18.689 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:18.690 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7922ms
+2025-09-23 00:16:28.698 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:28.700 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9438ms
+2025-09-23 00:16:38.716 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:38.718 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9811ms
+2025-09-23 00:16:48.732 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:48.734 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8258ms
+2025-09-23 00:16:58.743 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:16:58.745 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.6940ms
+2025-09-23 00:17:08.745 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:08.750 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.5911ms
+2025-09-23 00:17:14.411 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:17:14.413 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.6928ms
+2025-09-23 00:17:18.762 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:18.764 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8020ms
+2025-09-23 00:17:28.773 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:28.775 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8825ms
+2025-09-23 00:17:38.789 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:38.791 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8447ms
+2025-09-23 00:17:48.822 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:48.823 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8554ms
+2025-09-23 00:17:58.832 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:17:58.834 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8465ms
+2025-09-23 00:18:08.853 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:08.854 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8503ms
+2025-09-23 00:18:18.872 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:18.874 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2126ms
+2025-09-23 00:18:28.891 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:28.893 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9825ms
+2025-09-23 00:18:38.898 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:38.900 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8708ms
+2025-09-23 00:18:48.916 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:48.918 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8153ms
+2025-09-23 00:18:58.933 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:18:58.934 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8286ms
+2025-09-23 00:19:08.951 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:08.953 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1113ms
+2025-09-23 00:19:18.969 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:18.971 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9484ms
+2025-09-23 00:19:28.979 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:28.981 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7361ms
+2025-09-23 00:19:38.995 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:38.997 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9814ms
+2025-09-23 00:19:49.015 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:49.016 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8832ms
+2025-09-23 00:19:59.024 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:19:59.026 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7986ms
+2025-09-23 00:20:09.044 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:09.046 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9528ms
+2025-09-23 00:20:19.057 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:19.059 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0063ms
+2025-09-23 00:20:29.069 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:29.071 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.6760ms
+2025-09-23 00:20:39.081 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:39.083 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.6877ms
+2025-09-23 00:20:49.085 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:49.088 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1697ms
+2025-09-23 00:20:59.107 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:20:59.109 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7265ms
+2025-09-23 00:21:09.117 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:21:09.119 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9421ms
+2025-09-23 00:21:19.132 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:21:19.134 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8411ms
+2025-09-23 00:21:24.665 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:21:24.667 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.4406ms
+2025-09-23 00:21:33.225 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-23 00:21:33.275 +00:00 [Information] Middleware: Destination base URL is http://172.16.3.4
+2025-09-23 00:21:33.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:21:33.490 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 12.4011ms
+2025-09-23 00:21:33.987 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-23 00:21:33.988 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-23 00:21:33.988 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-23 00:21:33.988 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-23 00:21:34.688 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:21:34.691 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.5739ms
+2025-09-23 00:21:36.070 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:8984/robots933456.txt - - -
+2025-09-23 00:21:36.433 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:8984/robots933456.txt - 404 0 - 362.9729ms
+2025-09-23 00:21:44.698 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:21:44.707 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 8.6429ms
+2025-09-23 00:21:48.611 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:21:48.642 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 30.6053ms
+2025-09-23 00:21:54.266 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-23 00:21:54.299 +00:00 [Information] Middleware: Destination base URL is http://172.16.3.6
+2025-09-23 00:21:54.772 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-23 00:21:54.774 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-23 00:21:54.774 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-23 00:21:54.774 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-23 00:21:54.692 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:21:54.778 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 86.4454ms
+2025-09-23 00:21:56.900 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9147/robots933456.txt - - -
+2025-09-23 00:21:57.222 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9147/robots933456.txt - 404 0 - 321.8550ms
+2025-09-23 00:21:58.696 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:21:58.896 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 199.9595ms
+2025-09-23 00:22:08.914 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:08.944 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 29.6580ms
+2025-09-23 00:22:18.950 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:18.955 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.3024ms
+2025-09-23 00:22:28.965 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:28.970 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 5.2316ms
+2025-09-23 00:22:39.012 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:39.016 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.9443ms
+2025-09-23 00:22:49.036 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:49.040 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.7471ms
+2025-09-23 00:22:59.064 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:22:59.070 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 5.3699ms
+2025-09-23 00:23:09.085 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:09.092 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 6.8279ms
+2025-09-23 00:23:19.100 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:19.105 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.9230ms
+2025-09-23 00:23:29.112 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:29.115 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.9419ms
+2025-09-23 00:23:39.125 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:39.129 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.1693ms
+2025-09-23 00:23:49.149 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:49.155 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 5.9171ms
+2025-09-23 00:23:59.159 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:23:59.163 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.8889ms
+2025-09-23 00:24:09.169 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:09.173 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.9393ms
+2025-09-23 00:24:19.185 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:19.188 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.9599ms
+2025-09-23 00:24:29.202 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:29.207 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 5.0185ms
+2025-09-23 00:24:39.209 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:39.213 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.8978ms
+2025-09-23 00:24:49.225 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:49.229 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.1286ms
+2025-09-23 00:24:59.257 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:24:59.260 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.7999ms
+2025-09-23 00:25:09.268 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:09.270 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.8326ms
+2025-09-23 00:25:19.275 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:19.278 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.0922ms
+2025-09-23 00:25:29.289 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:29.292 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.0180ms
+2025-09-23 00:25:39.292 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:39.296 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.2932ms
+2025-09-23 00:25:49.313 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:49.316 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.0903ms
+2025-09-23 00:25:59.323 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:25:59.326 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5424ms
+2025-09-23 00:26:09.330 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:09.334 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.1624ms
+2025-09-23 00:26:19.344 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:19.347 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.8981ms
+2025-09-23 00:26:29.362 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:29.368 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 5.9990ms
+2025-09-23 00:26:39.381 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:39.385 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.3954ms
+2025-09-23 00:26:49.399 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:49.402 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.8461ms
+2025-09-23 00:26:55.018 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:26:55.021 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.9950ms
+2025-09-23 00:26:59.411 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:26:59.414 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.4473ms
+2025-09-23 00:27:09.423 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:27:09.428 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.9273ms
+2025-09-23 00:27:19.434 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:27:19.436 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2717ms
+2025-09-23 00:27:29.446 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:27:29.448 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.3703ms
+2025-09-23 00:27:35.037 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:27:35.039 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.4328ms
+2025-09-23 00:27:40.904 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:27:40.906 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1445ms
+2025-09-23 00:27:45.048 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:27:45.050 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.9422ms
+2025-09-23 00:27:55.065 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:27:55.066 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.8297ms
+2025-09-23 00:27:56.105 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:27:56.107 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2530ms
+2025-09-23 00:28:05.069 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:28:05.071 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.8784ms
+2025-09-23 00:28:06.123 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:06.125 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5990ms
+2025-09-23 00:28:16.159 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:16.162 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.6689ms
+2025-09-23 00:28:26.169 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:26.172 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5349ms
+2025-09-23 00:28:36.177 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:36.179 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.7172ms
+2025-09-23 00:28:46.198 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:46.200 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2725ms
+2025-09-23 00:28:56.209 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:28:56.211 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1123ms
+2025-09-23 00:29:06.224 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:06.226 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2040ms
+2025-09-23 00:29:16.243 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:16.245 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4034ms
+2025-09-23 00:29:26.248 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:26.250 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1530ms
+2025-09-23 00:29:36.255 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:36.257 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4043ms
+2025-09-23 00:29:46.261 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:46.266 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.5968ms
+2025-09-23 00:29:56.274 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:29:56.277 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.1027ms
+2025-09-23 00:30:06.286 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:06.288 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5253ms
+2025-09-23 00:30:16.295 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:16.298 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.6709ms
+2025-09-23 00:30:26.318 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:26.322 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.2374ms
+2025-09-23 00:30:36.329 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:36.333 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.3920ms
+2025-09-23 00:30:46.351 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:46.354 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.8294ms
+2025-09-23 00:30:56.373 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:30:56.377 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.7077ms
+2025-09-23 00:31:06.402 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:06.404 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.9157ms
+2025-09-23 00:31:16.419 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:16.421 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4021ms
+2025-09-23 00:31:26.427 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:26.429 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1750ms
+2025-09-23 00:31:36.447 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:36.449 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2760ms
+2025-09-23 00:31:46.469 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:46.471 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9499ms
+2025-09-23 00:31:56.488 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:31:56.490 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0912ms
+2025-09-23 00:32:06.501 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:06.504 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2828ms
+2025-09-23 00:32:16.503 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:16.505 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1313ms
+2025-09-23 00:32:26.523 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:26.525 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9956ms
+2025-09-23 00:32:36.534 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:36.536 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9580ms
+2025-09-23 00:32:46.551 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:46.553 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2085ms
+2025-09-23 00:32:56.571 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:32:56.573 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0287ms
+2025-09-23 00:33:05.394 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:33:05.396 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.7164ms
+2025-09-23 00:33:06.591 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:06.593 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7036ms
+2025-09-23 00:33:16.616 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:16.618 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5172ms
+2025-09-23 00:33:26.629 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:26.631 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.3645ms
+2025-09-23 00:33:36.639 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:36.640 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8146ms
+2025-09-23 00:33:46.661 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:46.663 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0159ms
+2025-09-23 00:33:56.681 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:33:56.683 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0008ms
+2025-09-23 00:34:06.693 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:06.695 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8868ms
+2025-09-23 00:34:16.698 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:16.700 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9428ms
+2025-09-23 00:34:26.719 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:26.721 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0294ms
+2025-09-23 00:34:36.742 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:36.744 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1070ms
+2025-09-23 00:34:46.749 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:46.751 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7527ms
+2025-09-23 00:34:56.768 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:34:56.770 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0093ms
+2025-09-23 00:35:06.781 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:06.783 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9934ms
+2025-09-23 00:35:16.806 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:16.808 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0254ms
+2025-09-23 00:35:26.816 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:26.818 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7897ms
+2025-09-23 00:35:36.836 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:36.837 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.6680ms
+2025-09-23 00:35:46.849 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:46.851 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9113ms
+2025-09-23 00:35:56.855 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:35:56.857 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0044ms
+2025-09-23 00:36:06.873 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:06.876 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4789ms
+2025-09-23 00:36:16.876 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:16.878 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9123ms
+2025-09-23 00:36:26.893 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:26.895 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8705ms
+2025-09-23 00:36:36.906 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:36.909 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.1806ms
+2025-09-23 00:36:46.913 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:46.915 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0301ms
+2025-09-23 00:36:56.936 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:36:56.938 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8616ms
+2025-09-23 00:37:06.970 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:06.971 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8100ms
+2025-09-23 00:37:16.984 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:16.986 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1975ms
+2025-09-23 00:37:27.004 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:27.006 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0178ms
+2025-09-23 00:37:37.010 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:37.012 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9774ms
+2025-09-23 00:37:47.021 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:47.023 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9093ms
+2025-09-23 00:37:57.041 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:37:57.043 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1514ms
+2025-09-23 00:38:05.669 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:38:05.671 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.7100ms
+2025-09-23 00:38:07.061 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:07.063 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0009ms
+2025-09-23 00:38:17.074 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:17.077 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0760ms
+2025-09-23 00:38:27.095 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:27.097 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9287ms
+2025-09-23 00:38:37.107 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:37.109 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9224ms
+2025-09-23 00:38:47.127 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:47.129 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.3163ms
+2025-09-23 00:38:57.145 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:38:57.147 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0690ms
+2025-09-23 00:39:07.161 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:07.163 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9232ms
+2025-09-23 00:39:17.166 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:17.168 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0057ms
+2025-09-23 00:39:27.180 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:27.182 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0185ms
+2025-09-23 00:39:37.195 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:37.197 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0336ms
+2025-09-23 00:39:47.209 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:47.211 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4328ms
+2025-09-23 00:39:57.223 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:39:57.225 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2283ms
+2025-09-23 00:40:07.232 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:07.234 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8887ms
+2025-09-23 00:40:17.246 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:17.248 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1250ms
+2025-09-23 00:40:27.261 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:27.263 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2909ms
+2025-09-23 00:40:37.269 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:37.271 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2336ms
+2025-09-23 00:40:47.286 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:47.288 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1012ms
+2025-09-23 00:40:57.295 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:40:57.297 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8753ms
+2025-09-23 00:41:07.314 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:07.316 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8932ms
+2025-09-23 00:41:17.332 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:17.333 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8070ms
+2025-09-23 00:41:27.338 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:27.340 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9655ms
+2025-09-23 00:41:37.348 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:37.351 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.4549ms
+2025-09-23 00:41:47.360 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:47.362 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2497ms
+2025-09-23 00:41:57.368 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:41:57.370 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7204ms
+2025-09-23 00:42:07.386 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:07.391 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 4.6881ms
+2025-09-23 00:42:17.400 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:17.402 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1175ms
+2025-09-23 00:42:27.411 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:27.413 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0917ms
+2025-09-23 00:42:37.429 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:37.432 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0626ms
+2025-09-23 00:42:47.436 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:47.438 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9608ms
+2025-09-23 00:42:57.450 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:42:57.452 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9364ms
+2025-09-23 00:43:05.996 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:43:05.998 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.4169ms
+2025-09-23 00:43:07.463 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:07.465 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9049ms
+2025-09-23 00:43:17.476 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:17.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9530ms
+2025-09-23 00:43:27.510 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:27.512 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9300ms
+2025-09-23 00:43:37.516 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:37.518 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7963ms
+2025-09-23 00:43:47.531 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:47.533 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9478ms
+2025-09-23 00:43:57.554 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:43:57.556 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9682ms
+2025-09-23 00:44:07.570 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:07.572 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9349ms
+2025-09-23 00:44:17.581 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:17.583 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.5924ms
+2025-09-23 00:44:27.608 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:27.610 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9614ms
+2025-09-23 00:44:37.634 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:37.636 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9900ms
+2025-09-23 00:44:47.655 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:47.657 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2558ms
+2025-09-23 00:44:57.670 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:44:57.672 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9891ms
+2025-09-23 00:45:07.682 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:07.684 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9667ms
+2025-09-23 00:45:17.697 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:17.699 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0173ms
+2025-09-23 00:45:27.708 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:27.710 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9032ms
+2025-09-23 00:45:37.720 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:37.722 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9995ms
+2025-09-23 00:45:47.727 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:47.729 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9867ms
+2025-09-23 00:45:57.743 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:45:57.745 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9869ms
+2025-09-23 00:46:07.750 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:46:07.753 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 3.7478ms
+2025-09-23 00:46:16.225 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:46:16.228 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.3209ms
+2025-09-23 00:46:23.309 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:46:23.311 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1189ms
+2025-09-23 00:46:26.224 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:46:26.228 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 3.8108ms
+2025-09-23 00:46:33.318 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:46:33.321 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.3421ms
+2025-09-23 00:46:43.330 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:46:43.332 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9954ms
+2025-09-23 00:46:53.354 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:46:53.356 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.1308ms
+2025-09-23 00:47:03.367 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:03.369 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8472ms
+2025-09-23 00:47:13.415 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:13.417 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.8277ms
+2025-09-23 00:47:23.432 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:23.433 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7158ms
+2025-09-23 00:47:33.462 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:33.463 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9030ms
+2025-09-23 00:47:43.529 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:43.531 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2907ms
+2025-09-23 00:47:53.559 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:47:53.562 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2253ms
+2025-09-23 00:48:03.572 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:03.574 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9939ms
+2025-09-23 00:48:13.584 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:13.586 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.2051ms
+2025-09-23 00:48:23.637 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:23.639 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0284ms
+2025-09-23 00:48:33.644 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:33.646 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.3701ms
+2025-09-23 00:48:43.656 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:43.658 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 2.0165ms
+2025-09-23 00:48:53.659 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:48:53.661 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.9264ms
+2025-09-23 00:48:56.401 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:48:56.402 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.4840ms
+2025-09-23 00:49:04.449 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:49:04.451 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.7509ms
+2025-09-23 00:49:06.399 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:49:06.400 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 1.8112ms
+2025-09-23 00:49:16.401 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:49:16.403 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 2.1580ms
+2025-09-23 00:49:19.597 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:49:19.598 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 1.6959ms
+2025-09-23 00:49:26.430 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:49:26.434 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 4.2612ms
+2025-09-23 00:49:29.889 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-23 00:49:29.909 +00:00 [Information] Middleware: Destination base URL is http://172.16.3.4
+2025-09-23 00:49:30.420 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-23 00:49:30.421 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-23 00:49:30.421 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-23 00:49:30.421 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-23 00:49:32.899 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9354/robots933456.txt - - -
+2025-09-23 00:49:33.218 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9354/robots933456.txt - 404 0 - 316.9756ms
+2025-09-23 00:49:36.429 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:49:36.438 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 8.9867ms
+2025-09-23 00:49:39.831 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:49:39.879 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 48.6623ms
+2025-09-23 00:49:46.448 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-23 00:49:46.456 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 8.0211ms
+2025-09-23 00:49:49.883 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - - -
+2025-09-23 00:49:50.024 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/host/ping - 200 0 - 140.1493ms

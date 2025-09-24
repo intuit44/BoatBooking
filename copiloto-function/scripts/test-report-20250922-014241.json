@@ -1,0 +1,313 @@
+{
+    "ByTag":  {
+                  "Internal":  {
+                                   "Failed":  5,
+                                   "Total":  11,
+                                   "Passed":  6
+                               },
+                  "Azure Configuration":  {
+                                              "Failed":  1,
+                                              "Total":  9,
+                                              "Passed":  8
+                                          },
+                  "Bridge":  {
+                                 "Failed":  0,
+                                 "Total":  3,
+                                 "Passed":  3
+                             },
+                  "CLI":  {
+                              "Failed":  0,
+                              "Total":  3,
+                              "Passed":  3
+                          },
+                  "DiagnÃ³stico":  {
+                                       "Failed":  1,
+                                       "Total":  6,
+                                       "Passed":  5
+                                   },
+                  "Testing":  {
+                                  "Failed":  2,
+                                  "Total":  14,
+                                  "Passed":  12
+                              },
+                  "Azure Storage":  {
+                                        "Failed":  3,
+                                        "Total":  24,
+                                        "Passed":  21
+                                    },
+                  "Azure Deployment":  {
+                                           "Failed":  2,
+                                           "Total":  9,
+                                           "Passed":  7
+                                       }
+              },
+    "FailedTests":  [
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "prepararScript",
+                            "StatusCode":  400,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "local_path":  "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\setup_1304.py"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/preparar-script",
+                            "ResponseTime":  129
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "ejecutarScript",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "ok":  false,
+                                          "endpoint":  "/api/ejecutar-script",
+                                          "method":  "POST",
+                                          "status":  404,
+                                          "runId":  "1023a3ecf47a",
+                                          "error":  {
+                                                        "code":  "ScriptNotFound",
+                                                        "reason":  "No existe el script local: scripts/test_1426.py",
+                                                        "missing_params":  [
+
+                                                                           ]
+                                                    },
+                                          "details":  {
+                                                          "script_solicitado":  "scripts/test_1426.py",
+                                                          "ubicaciones_intentadas":  [
+                                                                                         "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\test_1426.py",
+                                                                                         "C:\\ProyectosSimbolicos\\boat-rental-app\\copiloto-function\\scripts\\test_1426.py"
+                                                                                     ],
+                                                          "es_azure":  false,
+                                                          "project_root":  "C:\\ProyectosSimbolicos\\boat-rental-app",
+                                                          "sugerencias":  [
+                                                                              "Verificar que scripts/test_1426.py existe en alguna de las ubicaciones",
+                                                                              "Crear el script si no existe",
+                                                                              "Usar ruta absoluta si el script está en otra ubicación"
+                                                                          ]
+                                                      }
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/ejecutar-script",
+                            "ResponseTime":  187
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "leerArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/leer-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "auditarDeploy",
+                            "StatusCode":  408,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error_code":  "TIMEOUT_ERROR",
+                                          "mensaje":  "Timeout consultando ARM API (15s)",
+                                          "sugerencia":  "Reintentar la operación"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/auditar-deploy",
+                            "ResponseTime":  16003
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  133
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  138
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "renderError",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/render-error",
+                            "ResponseTime":  137
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "actualizarContenedor",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/actualizar-contenedor",
+                            "ResponseTime":  30010
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "Primitivo JSON no válido: ."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  297
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "proxyLocal",
+                            "StatusCode":  404,
+                            "ExpectedStatus":  [
+                                                   400,
+                                                   422,
+                                                   500
+                                               ],
+                            "Error":  {
+                                          "error":  "JSON no válido: HTTP request does not contain valid JSON data",
+                                          "body_recibido":  "invalid json {[",
+                                          "ejemplo_correcto":  {
+                                                                   "comando":  "docker build -t mi-imagen ."
+                                                               },
+                                          "formato_requerido":  "application/json"
+                                      },
+                            "Scenario":  "Invalid_MalformedBody",
+                            "Path":  "/api/proxy-local",
+                            "ResponseTime":  174
+                        },
+                        {
+                            "Method":  "GET",
+                            "OperationId":  "infoArchivo",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/info-archivo",
+                            "ResponseTime":  0
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  155
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "desplegarFuncion",
+                            "StatusCode":  500,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   400,
+                                                   422
+                                               ],
+                            "Error":  {
+                                          "exito":  false,
+                                          "error":  "Comando \u0027az\u0027 no encontrado",
+                                          "codigo_error":  "COMMAND_NOT_FOUND",
+                                          "solucion":  "Verificar que Azure CLI esté instalado y en el PATH"
+                                      },
+                            "Scenario":  "Invalid_MissingRequired",
+                            "Path":  "/api/desplegar-funcion",
+                            "ResponseTime":  159
+                        },
+                        {
+                            "Method":  "POST",
+                            "OperationId":  "configurarAppSettings",
+                            "StatusCode":  0,
+                            "ExpectedStatus":  [
+                                                   200,
+                                                   201
+                                               ],
+                            "Error":  {
+                                          "error":  "No se puede llamar a un método en una expresión con valor NULL."
+                                      },
+                            "Scenario":  "Valid_MinimalRequired",
+                            "Path":  "/api/configurar-app-settings",
+                            "ResponseTime":  30002
+                        }
+                    ],
+    "ByMethod":  {
+
+                 },
+    "ValidationErrors":  [
+
+                         ],
+    "Summary":  {
+                    "SuccessRate":  83.13,
+                    "Timestamp":  "2025-09-22 01:42:41",
+                    "TotalTests":  83,
+                    "Failed":  14,
+                    "Passed":  69
+                }
+}
