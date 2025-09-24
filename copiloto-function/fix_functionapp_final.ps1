@@ -123,7 +123,6 @@ $settings = @{
   "WEBSITE_MOUNT_ENABLED"                       = "1"
   "DOCKER_ENABLE_CI"                            = "true"
   "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
-  "AZURE_CLIENT_ID"                             = "768637f1-4a55-4f42-8526-cb57782a0285"
   "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
   # Variables de Voice Live
   "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
@@ -131,6 +130,8 @@ $settings = @{
   "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
+  "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
+  "AZURE_RESOURCE_GROUP"                        = "boat-rental-app-group"
 }
 
 

@@ -1,0 +1,509 @@
+2025-09-03 00:00:07.468 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:00:07.499 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 31.3974ms
+2025-09-03 00:05:07.774 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:05:07.856 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 82.3102ms
+2025-09-03 00:10:08.160 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:10:08.192 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 32.0100ms
+2025-09-03 00:15:08.507 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:15:08.688 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 180.4406ms
+2025-09-03 00:20:08.853 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:20:08.886 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 33.4514ms
+2025-09-03 00:25:09.218 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:25:09.254 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 35.7768ms
+2025-09-03 00:30:09.499 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:30:09.534 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 34.7679ms
+2025-09-03 00:35:09.809 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:35:09.837 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 27.0143ms
+2025-09-03 00:40:10.105 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:40:10.150 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 44.3799ms
+2025-09-03 00:45:10.427 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:45:10.544 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 116.8362ms
+2025-09-03 00:50:10.695 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:50:10.715 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 19.8106ms
+2025-09-03 00:55:10.986 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 00:55:11.007 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 20.6142ms
+2025-09-03 01:00:11.318 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:00:11.368 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 49.9827ms
+2025-09-03 01:05:11.617 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:05:11.641 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 23.4936ms
+2025-09-03 01:10:11.886 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:10:11.906 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 19.9790ms
+2025-09-03 01:15:12.232 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:15:12.278 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 46.3065ms
+2025-09-03 01:20:12.536 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:20:12.574 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 37.6521ms
+2025-09-03 01:25:12.803 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:25:12.842 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 38.6735ms
+2025-09-03 01:30:13.133 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:30:13.151 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 17.9450ms
+2025-09-03 01:35:13.498 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:35:13.536 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 38.1863ms
+2025-09-03 01:40:13.754 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:40:13.782 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.4772ms
+2025-09-03 01:45:14.055 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:45:14.118 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 63.3736ms
+2025-09-03 01:50:14.387 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:50:14.410 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 22.5916ms
+2025-09-03 01:55:14.695 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 01:55:14.723 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.4816ms
+2025-09-03 02:00:14.971 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:00:15.012 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 39.2777ms
+2025-09-03 02:05:15.285 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:05:15.319 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 34.6105ms
+2025-09-03 02:10:15.639 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:10:15.671 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 31.2208ms
+2025-09-03 02:15:15.950 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:15:15.988 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 37.7435ms
+2025-09-03 02:20:16.278 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:20:16.297 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 18.9272ms
+2025-09-03 02:25:16.548 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:25:16.571 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 22.2422ms
+2025-09-03 02:30:16.876 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:30:16.917 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 40.7965ms
+2025-09-03 02:35:17.201 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:35:17.228 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 27.5856ms
+2025-09-03 02:40:17.572 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:40:17.593 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 20.6859ms
+2025-09-03 02:45:17.876 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:45:18.014 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 137.7867ms
+2025-09-03 02:50:18.157 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:50:18.197 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 39.5318ms
+2025-09-03 02:55:18.444 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 02:55:18.472 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.4350ms
+2025-09-03 03:00:18.752 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:00:18.791 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 38.8909ms
+2025-09-03 03:05:19.106 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:05:19.171 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 64.5809ms
+2025-09-03 03:10:19.490 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:10:19.561 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 71.4492ms
+2025-09-03 03:15:19.807 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:15:20.103 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 295.0721ms
+2025-09-03 03:20:20.098 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:20:20.340 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 241.9094ms
+2025-09-03 03:25:20.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:25:20.802 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 313.1044ms
+2025-09-03 03:30:20.802 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:30:21.037 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 235.5712ms
+2025-09-03 03:35:20.936 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:35:20.965 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.2146ms
+2025-09-03 03:40:21.297 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:40:21.319 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 21.4772ms
+2025-09-03 03:45:21.591 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:45:21.703 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 111.5541ms
+2025-09-03 03:50:21.884 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:50:21.919 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 19.4407ms
+2025-09-03 03:55:22.217 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 03:55:22.240 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 22.6218ms
+2025-09-03 04:00:22.558 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:00:22.626 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 67.2124ms
+2025-09-03 04:05:22.889 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:05:22.910 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 20.4223ms
+2025-09-03 04:10:23.198 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:10:23.227 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.8342ms
+2025-09-03 04:15:23.679 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:15:23.752 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 73.1309ms
+2025-09-03 04:20:23.831 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:20:23.876 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 45.1676ms
+2025-09-03 04:25:24.205 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:25:24.227 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 21.7111ms
+2025-09-03 04:30:24.487 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:30:24.513 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 26.2664ms
+2025-09-03 04:35:24.765 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:35:24.788 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 22.2928ms
+2025-09-03 04:40:25.077 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:40:25.096 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 18.8991ms
+2025-09-03 04:45:25.325 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:45:25.374 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 48.4258ms
+2025-09-03 04:50:25.634 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:50:25.663 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 29.0949ms
+2025-09-03 04:55:25.959 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 04:55:25.986 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 26.3155ms
+2025-09-03 05:00:26.250 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:00:26.269 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 18.9586ms
+2025-09-03 05:05:26.558 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:05:26.595 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 36.0629ms
+2025-09-03 05:10:26.821 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:10:26.847 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 25.7392ms
+2025-09-03 05:15:27.150 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:15:27.210 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 60.2940ms
+2025-09-03 05:20:27.424 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:20:27.455 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 30.5133ms
+2025-09-03 05:25:27.758 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:25:27.799 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 41.0940ms
+2025-09-03 05:30:28.111 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:30:28.190 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 78.7573ms
+2025-09-03 05:35:28.362 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:35:28.397 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 35.3453ms
+2025-09-03 05:40:28.659 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:40:28.691 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 31.5423ms
+2025-09-03 05:45:28.934 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:45:29.035 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 100.4514ms
+2025-09-03 05:47:55.097 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 05:47:55.183 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 86.4709ms
+2025-09-03 05:49:01.968 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 05:49:01.981 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 13.0163ms
+2025-09-03 05:50:06.982 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 05:50:06.994 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 11.9601ms
+2025-09-03 05:50:29.230 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:50:29.245 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 14.9808ms
+2025-09-03 05:55:29.544 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:55:29.576 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 31.5125ms
+2025-09-03 05:57:39.690 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:57:39.711 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 20.2880ms
+2025-09-03 05:57:49.712 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 05:57:49.759 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 46.3259ms
+2025-09-03 06:00:07.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 06:00:07.507 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 28.3735ms
+2025-09-03 06:01:20.229 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:01:20.289 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 06:01:21.033 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:01:21.033 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:01:21.033 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:01:21.033 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:01:25.148 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:4834/robots933456.txt - - -
+2025-09-03 06:01:26.163 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:4834/robots933456.txt - 404 0 - 1015.7412ms
+2025-09-03 06:01:46.342 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 06:01:46.473 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 130.9990ms
+2025-09-03 06:02:50.086 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:02:50.124 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 37.8305ms
+2025-09-03 06:07:50.448 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:07:50.508 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 59.5022ms
+2025-09-03 06:12:50.955 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:12:51.736 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 780.0460ms
+2025-09-03 06:15:30.096 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/status - application/json 0
+2025-09-03 06:15:30.172 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/status - 404 0 - 75.7702ms
+2025-09-03 06:16:41.113 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint - application/json 46
+2025-09-03 06:16:41.144 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint - 404 0 - 31.0715ms
+2025-09-03 06:17:46.312 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint - application/json 97
+2025-09-03 06:17:46.368 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint - 404 0 - 55.9547ms
+2025-09-03 06:17:50.997 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:17:51.021 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 24.9012ms
+2025-09-03 06:18:16.961 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint?endpoint=https://copiloto-semantico-func-us2.azurewebsites.net/api/health - application/json 0
+2025-09-03 06:18:16.973 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/probar-endpoint?endpoint=https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 12.5182ms
+2025-09-03 06:21:21.194 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:21:21.243 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 48.7005ms
+2025-09-03 06:21:31.219 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:21:31.450 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 231.0209ms
+2025-09-03 06:25:52.092 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:25:52.262 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.2
+2025-09-03 06:25:53.237 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:25:53.238 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:25:53.239 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:25:53.239 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:25:55.044 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9792/robots933456.txt - - -
+2025-09-03 06:25:56.000 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9792/robots933456.txt - 404 0 - 955.6328ms
+2025-09-03 06:26:11.567 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:26:11.729 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 161.8576ms
+2025-09-03 06:26:21.490 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:26:21.520 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 29.4887ms
+2025-09-03 06:28:23.710 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:28:23.781 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 06:28:24.504 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:28:24.504 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:28:24.505 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:28:24.505 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:28:29.987 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:7528/robots933456.txt - - -
+2025-09-03 06:28:30.910 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:7528/robots933456.txt - 404 0 - 923.6887ms
+2025-09-03 06:31:21.812 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:31:21.905 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 92.5378ms
+2025-09-03 06:32:11.863 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:32:11.930 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 67.3980ms
+2025-09-03 06:32:21.900 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:32:21.942 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 41.5245ms
+2025-09-03 06:33:05.705 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 06:33:14.270 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 8565.0721ms
+2025-09-03 06:37:29.029 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:37:40.193 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 11222.4017ms
+2025-09-03 06:37:53.346 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:37:53.456 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.2
+2025-09-03 06:37:55.067 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:37:55.114 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:37:55.115 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:37:55.115 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:37:59.548 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:6608/robots933456.txt - - -
+2025-09-03 06:38:00.834 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:6608/robots933456.txt - 404 0 - 1295.0092ms
+2025-09-03 06:39:15.015 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 06:39:15.065 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 50.0510ms
+2025-09-03 06:40:11.294 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/status - - -
+2025-09-03 06:40:11.305 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/status - 404 0 - 10.6012ms
+2025-09-03 06:42:22.722 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:42:25.617 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 2895.4495ms
+2025-09-03 06:47:22.888 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:47:23.020 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 132.4341ms
+2025-09-03 06:48:52.852 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:48:52.886 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 33.4806ms
+2025-09-03 06:49:02.852 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:49:02.893 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 41.6598ms
+2025-09-03 06:51:44.921 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 06:51:46.568 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 1649.5759ms
+2025-09-03 06:53:12.826 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:53:12.966 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.5
+2025-09-03 06:53:15.088 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:53:15.088 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:53:15.088 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:53:15.088 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:53:17.543 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:6557/robots933456.txt - - -
+2025-09-03 06:53:19.163 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:6557/robots933456.txt - 404 0 - 1620.4331ms
+2025-09-03 06:54:11.685 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 06:54:11.816 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.3
+2025-09-03 06:54:13.403 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 06:54:13.404 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 06:54:13.404 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 06:54:13.404 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 06:54:15.811 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:8977/robots933456.txt - - -
+2025-09-03 06:54:16.575 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:8977/robots933456.txt - 404 0 - 763.2833ms
+2025-09-03 06:59:03.394 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 06:59:03.582 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 188.1837ms
+2025-09-03 07:00:53.493 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:00:53.549 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 55.2760ms
+2025-09-03 07:01:03.523 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:01:03.605 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 82.1374ms
+2025-09-03 07:01:40.842 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 07:01:43.247 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 2404.6730ms
+2025-09-03 07:06:03.384 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 07:06:04.078 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 07:06:06.727 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:06:09.914 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 07:06:09.963 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 07:06:09.963 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 07:06:09.963 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 07:06:11.102 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 4377.2052ms
+2025-09-03 07:06:16.456 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:8078/robots933456.txt - - -
+2025-09-03 07:06:17.562 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:8078/robots933456.txt - 404 0 - 1115.5124ms
+2025-09-03 07:11:04.458 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:11:06.373 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 1914.4538ms
+2025-09-03 07:15:14.495 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:15:15.339 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 846.4710ms
+2025-09-03 07:15:24.572 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:15:24.733 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 161.1748ms
+2025-09-03 07:16:33.503 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 07:16:34.068 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.5
+2025-09-03 07:16:39.480 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 07:16:39.481 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 07:16:39.481 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 07:16:39.481 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 07:16:47.538 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9382/robots933456.txt - - -
+2025-09-03 07:16:50.235 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9382/robots933456.txt - 404 0 - 2733.7991ms
+2025-09-03 07:17:50.781 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 07:17:50.912 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 07:17:53.103 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 07:17:53.104 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 07:17:53.104 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 07:17:53.104 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 07:17:59.442 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:5745/robots933456.txt - - -
+2025-09-03 07:18:00.739 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:5745/robots933456.txt - 404 0 - 1297.2926ms
+2025-09-03 07:18:04.362 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 07:18:04.593 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 220.1419ms
+2025-09-03 07:20:24.588 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:20:24.686 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 99.3223ms
+2025-09-03 07:25:24.914 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:25:24.994 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 80.3601ms
+2025-09-03 07:25:34.916 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:25:34.926 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 9.8311ms
+2025-09-03 07:25:44.915 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:25:44.943 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 28.5048ms
+2025-09-03 07:26:04.970 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:26:05.181 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 210.8269ms
+2025-09-03 07:26:14.953 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:26:14.994 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 40.3341ms
+2025-09-03 07:26:59.341 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 07:27:05.478 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 6130.1118ms
+2025-09-03 07:30:45.647 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:30:46.924 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 1274.9265ms
+2025-09-03 07:30:55.435 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:30:56.126 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 690.6637ms
+2025-09-03 07:31:05.464 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:31:05.585 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 120.7963ms
+2025-09-03 07:35:23.029 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 07:35:23.198 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.7
+2025-09-03 07:35:26.323 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 07:35:26.324 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 07:35:26.324 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 07:35:26.324 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 07:35:27.523 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:35:29.015 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 1493.3730ms
+2025-09-03 07:35:33.136 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9498/robots933456.txt - - -
+2025-09-03 07:35:34.905 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9498/robots933456.txt - 404 0 - 1770.3716ms
+2025-09-03 07:35:35.646 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:35:35.966 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 320.6855ms
+2025-09-03 07:52:06.638 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 07:52:06.920 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.2
+2025-09-03 07:52:08.824 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 07:52:08.833 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 07:52:08.833 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 07:52:08.833 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 07:52:14.001 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:4655/robots933456.txt - - -
+2025-09-03 07:52:16.303 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:4655/robots933456.txt - 404 0 - 2341.5921ms
+2025-09-03 07:52:21.653 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 07:52:21.794 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 140.4735ms
+2025-09-03 07:53:46.629 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:53:46.719 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 89.3498ms
+2025-09-03 07:54:57.090 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 07:54:57.363 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 273.7119ms
+2025-09-03 07:55:20.255 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 07:55:20.342 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 86.8810ms
+2025-09-03 07:55:42.184 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 07:55:42.273 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 89.3811ms
+2025-09-03 07:58:46.907 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:58:46.955 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 48.4790ms
+2025-09-03 07:59:16.969 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:59:17.010 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 40.5166ms
+2025-09-03 07:59:26.972 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 07:59:27.043 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 71.5807ms
+2025-09-03 08:00:07.255 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:00:07.939 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 684.1237ms
+2025-09-03 08:00:17.642 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:00:17.891 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 249.6187ms
+2025-09-03 08:02:28.788 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 08:02:31.272 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 2495.1417ms
+2025-09-03 08:03:07.323 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 08:03:07.513 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 08:03:08.510 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 08:03:08.520 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 08:03:08.520 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 08:03:08.520 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 08:03:14.789 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:4451/robots933456.txt - - -
+2025-09-03 08:03:15.744 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:4451/robots933456.txt - 404 0 - 954.2298ms
+2025-09-03 08:05:30.770 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 08:05:30.862 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 08:05:31.928 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 08:05:31.929 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 08:05:31.929 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 08:05:31.929 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 08:05:39.924 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9625/robots933456.txt - - -
+2025-09-03 08:05:42.217 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9625/robots933456.txt - 404 0 - 2292.8182ms
+2025-09-03 08:09:47.928 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:09:48.408 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 479.4233ms
+2025-09-03 08:14:48.120 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:14:48.547 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 499 0 - 428.7963ms
+2025-09-03 08:19:48.271 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:19:48.322 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 51.1891ms
+2025-09-03 08:24:48.562 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:24:48.591 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 29.2869ms
+2025-09-03 08:29:48.902 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 08:29:48.952 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 50.4678ms
+2025-09-03 08:33:21.781 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 08:33:22.142 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 08:33:24.854 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 08:33:24.855 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 08:33:24.855 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 08:33:24.855 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 08:33:39.092 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:8981/robots933456.txt - - -
+2025-09-03 08:33:42.087 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:8981/robots933456.txt - 404 0 - 2995.2587ms
+2025-09-03 08:59:23.918 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 08:59:24.131 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 08:59:25.931 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 08:59:25.932 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 08:59:25.932 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 08:59:25.932 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 08:59:28.803 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:4537/robots933456.txt - - -
+2025-09-03 08:59:29.738 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:4537/robots933456.txt - 404 0 - 935.6764ms
+2025-09-03 09:01:18.997 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 09:01:19.189 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 09:01:20.255 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 09:01:20.262 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 09:01:20.262 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 09:01:20.262 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 09:01:34.697 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:9870/robots933456.txt - - -
+2025-09-03 09:01:37.822 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:9870/robots933456.txt - 404 0 - 3134.1330ms
+2025-09-03 09:03:38.862 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8181'.
+2025-09-03 09:03:39.246 +00:00 [Information] Middleware: Destination base URL is http://172.16.1.4
+2025-09-03 09:03:43.779 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8181
+2025-09-03 09:03:43.780 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 09:03:43.781 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 09:03:43.781 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 09:03:51.431 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://127.0.0.1:7012/robots933456.txt - - -
+2025-09-03 09:03:55.793 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://127.0.0.1:7012/robots933456.txt - 404 0 - 4362.9665ms
+2025-09-03 09:04:21.271 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:04:21.452 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 180.6538ms
+2025-09-03 09:04:31.197 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:04:31.247 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 49.5923ms
+2025-09-03 09:05:19.480 +00:00 [Warning] Microsoft.AspNetCore.Hosting.Diagnostics: Overriding HTTP_PORTS '8080' and HTTPS_PORTS ''. Binding to values defined by URLS instead 'http://0.0.0.0:8080'.
+2025-09-03 09:05:19.560 +00:00 [Information] Middleware: Destination base URL is http://169.254.130.3
+2025-09-03 09:05:20.192 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:20.1837651Z","SiteName":"copiloto-semantico-func-us2","TaskName":"AutoHealingMiddlewareInformation","Message":"/var/middleware/config/autoheal.xml does not exist","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":7}
+2025-09-03 09:05:20.314 +00:00 [Information] Microsoft.Hosting.Lifetime: Now listening on: http://0.0.0.0:8080
+2025-09-03 09:05:20.323 +00:00 [Information] Microsoft.Hosting.Lifetime: Application started. Press Ctrl+C to shut down.
+2025-09-03 09:05:20.323 +00:00 [Information] Microsoft.Hosting.Lifetime: Hosting environment: Production
+2025-09-03 09:05:20.324 +00:00 [Information] Microsoft.Hosting.Lifetime: Content root path: /app
+2025-09-03 09:05:20.555 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://localhost:8080/ - - -
+2025-09-03 09:05:21.188 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.1693489Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"EasyAuthConfig","SettingValue":"{\"ConfigHelper\":{},\"platform\":{\"enabled\":false},\"globalValidation\":{\"excludedPaths\":[],\"unauthenticatedClientAction\":0,\"redirectToProvider\":null,\"ExcludedPathPrefixesSet\":[],\"ExcludedExactPathsSet\":[]},\"identityProviders\":{\"azureActiveDirectory\":{\"enabled\":true,\"registration\":{\"openIdIssuer\":null,\"clientId\":null,\"clientIdSettingName\":null,\"clientSecretSettingName\":null,\"clientSecretCertificateThumbprint\":null,\"clientSecretCertificateSubjectAlternativeName\":null,\"clientSecretCertificateIssuer\":null,\"OpenIdIssuerValue\":null,\"OpenIdConfigurationUrl\":null},\"login\":{\"loginParameters\":null,\"disableWwwAuthenticate\":false},\"validation\":{\"jwtClaimChecks\":null,\"defaultAuthorizationPolicy\":null,\"allowedAudiences\":null}},\"facebook\":{\"enabled\":true,\"registration\":{\"appId\":null,\"appIdSettingName\":null,\"appSecretSettingName\":null},\"login\":{\"scopes\":null},\"graphApiVersion\":null},\"gitHub\":{\"enabled\":true,\"registration\":{\"clientId\":null,\"clientIdSettingName\":null,\"clientSecretSettingName\":null},\"login\":{\"scopes\":null}},\"twitter\":{\"enabled\":true,\"registration\":{\"consumerKey\":null,\"consumerKeySettingName\":null,\"consumerSecretSettingName\":null}},\"legacyMicrosoftAccount\":{\"enabled\":true,\"registration\":{\"clientId\":null,\"clientIdSettingName\":null,\"clientSecretSettingName\":null},\"login\":{\"scopes\":null},\"validation\":{\"allowedAudiences\":null}},\"google\":{\"enabled\":true,\"registration\":{\"clientId\":null,\"clientIdSettingName\":null,\"clientSecretSettingName\":null},\"login\":{\"scopes\":null},\"validation\":{\"allowedAudiences\":null}},\"apple\":{\"enabled\":true,\"registration\":{\"clientId\":null,\"clientIdSettingName\":null,\"clientSecretSettingName\":null},\"login\":{\"scopes\":null}},\"azureStaticWebApps\":{\"enabled\":true,\"registration\":{\"clientId\":null},\"validation\":null},\"customOpenIdConnectProviders\":null},\"login\":{\"routes\":{\"logoutPath\":null,\"loginPath\":null,\"loginCompletionPath\":null,\"loginIFrameReceiverPath\":null},\"tokenStore\":{\"enabled\":false,\"tokenRefreshExtensionHours\":72.0,\"fileSystem\":{\"directory\":\"/home/data/.auth\",\"Path\":\"/home/data/.auth/tokens\"},\"azureBlobStorage\":{\"ConfigHelper\":{},\"blobContainerUri\":null,\"clientId\":null,\"managedIdentityResourceId\":null,\"sasUrlSettingName\":\"WEBSITE_AUTH_TOKEN_CONTAINER_SASURL\"}},\"preserveUrlFragmentsForLogins\":false,\"shouldLogoutOfProvider\":true,\"allowedExternalRedirectUrls\":null,\"cookieExpiration\":{\"convention\":0,\"timeToExpiration\":\"08:00:00\"},\"nonce\":{\"validateNonce\":true,\"nonceExpirationInterval\":\"00:05:00\"}},\"httpSettings\":{\"requireHttps\":true,\"routes\":{\"apiPrefix\":\"/.auth\"},\"forwardProxy\":{\"convention\":0,\"customHostHeaderName\":null,\"customProtoHeaderName\":null}},\"legacyProperties\":{\"legacyMobileCompatibilityMode\":false,\"customIdentityProviderSettings\":[],\"customAuthorizationSettings\":{\"url\":null,\"allowInsecureRequests\":false},\"authFilePath\":null,\"configVersion\":null,\"legacyVersion\":null},\"clearInboundClaimsMapping\":false,\"AppTracingLevel\":31}","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.196 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.1892819Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"CorsConfig","SettingValue":"{\"AllowedOrigins\":\"*\",\"SupportCredentials\":false}","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.206 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.1987892Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"IsMiseEnabled","SettingValue":"False","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.208 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.2082268Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"WEBSITE_AUTH_HIDE_DEPRECATED_SID","SettingValue":"False","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.208 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.2085989Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"WEBSITE_AUTH_ZUMO_USE_TOKEN_STORE_CLAIMS","SettingValue":"False","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.208 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.208907Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"WEBSITE_AUTH_USE_LEGACY_CLAIMS","SettingValue":"True","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.209 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.2092161Z","SiteName":"copiloto-semantico-func-us2","TaskName":"TraceConfigurationSetting","ModuleRuntimeVersion":"1.12.0","SettingName":"FUNCTIONS_EXTENSION_VERSION","SettingValue":"~4","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":4}
+2025-09-03 09:05:21.993 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:21.9935398Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:05:22.043 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://localhost:8080/ - 204 - - 1497.2916ms
+2025-09-03 09:05:41.327 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:05:41.406 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:41.4060606Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:05:41.407 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 79.1433ms
+2025-09-03 09:05:51.269 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:05:51.282 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:05:51.2812081Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:05:51.283 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 13.7527ms
+2025-09-03 09:08:07.460 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 09:08:07.512 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:08:07.5122636Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:08:07.571 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 111.0720ms
+2025-09-03 09:10:51.642 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:10:51.785 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:10:51.7842276Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:10:51.866 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 162.5846ms
+2025-09-03 09:11:55.712 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/ - - -
+2025-09-03 09:11:55.936 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:11:55.9363462Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:11:56.145 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/ - 200 149794 text/html 438.9910ms
+2025-09-03 09:12:01.210 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/HttpTrigger - - -
+2025-09-03 09:12:01.462 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:12:01.4627485Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:12:01.463 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/HttpTrigger - 404 0 - 252.8182ms
+2025-09-03 09:15:51.879 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:15:51.928 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:15:51.9283077Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:15:51.929 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 50.3187ms
+2025-09-03 09:17:05.178 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 09:17:05.217 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:17:05.2174546Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:17:05.218 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 48.6826ms
+2025-09-03 09:19:02.614 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/bateria-endpoints - - -
+2025-09-03 09:19:02.645 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:19:02.6455367Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:19:02.652 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/bateria-endpoints - 404 0 - 39.1430ms
+2025-09-03 09:19:43.880 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health?code=TU_CLAVE_AQUI - - -
+2025-09-03 09:19:43.910 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:19:43.91025Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:19:43.913 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health?code=TU_CLAVE_AQUI - 404 0 - 31.2720ms
+2025-09-03 09:20:52.131 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - - -
+2025-09-03 09:20:52.152 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:20:52.1521575Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:20:52.152 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/admin/warmup - 200 0 - 29.2820ms
+2025-09-03 09:20:57.041 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 09:20:57.062 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:20:57.0616853Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:20:57.062 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 21.1584ms
+2025-09-03 09:21:18.768 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/status - - -
+2025-09-03 09:21:18.782 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:18.7822203Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:18.782 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/status - 404 0 - 13.4603ms
+2025-09-03 09:21:29.243 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar - application/json 25
+2025-09-03 09:21:29.358 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:29.3583121Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:29.364 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar - 404 0 - 120.8394ms
+2025-09-03 09:21:31.061 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/listar-blobs - - -
+2025-09-03 09:21:31.067 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:31.0663095Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:31.084 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/listar-blobs - 404 0 - 6.0106ms
+2025-09-03 09:21:37.762 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli - application/json 60
+2025-09-03 09:21:37.876 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:37.8762939Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:37.885 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli - 404 0 - 122.3684ms
+2025-09-03 09:21:54.682 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/health - - -
+2025-09-03 09:21:54.706 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:54.7049742Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:54.715 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/health - 404 0 - 33.3052ms
+2025-09-03 09:21:54.754 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/status - - -
+2025-09-03 09:21:54.760 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:54.7606043Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:54.768 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/status - 404 0 - 6.4417ms
+2025-09-03 09:21:54.823 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/listar-blobs - - -
+2025-09-03 09:21:54.841 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:54.8410224Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:54.851 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/listar-blobs - 404 0 - 26.8955ms
+2025-09-03 09:21:54.890 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/diagnostico-listar - - -
+2025-09-03 09:21:54.901 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:54.9011219Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:54.901 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/diagnostico-listar - 404 0 - 11.0330ms
+2025-09-03 09:21:54.961 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 GET http://copiloto-semantico-func-us2.azurewebsites.net/api/auditar-deploy - - -
+2025-09-03 09:21:54.972 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:21:54.9719678Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:21:54.972 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 GET https://copiloto-semantico-func-us2.azurewebsites.net/api/auditar-deploy - 404 0 - 11.2203ms
+2025-09-03 09:22:13.295 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar - application/json 26
+2025-09-03 09:22:13.387 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:22:13.3869853Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:22:13.387 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar - 404 0 - 91.8570ms
+2025-09-03 09:22:13.477 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli - application/json 26
+2025-09-03 09:22:13.638 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:22:13.6378631Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:22:13.639 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar-cli - 404 0 - 161.7298ms
+2025-09-03 09:22:13.727 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request starting HTTP/1.1 POST http://copiloto-semantico-func-us2.azurewebsites.net/api/invocar - application/json 26
+2025-09-03 09:22:13.821 +00:00 [Information] MiddlewareConsoleLogs: {"Timestamp":"2025-09-03T09:22:13.8211066Z","SiteName":"copiloto-semantico-func-us2","TaskName":"MiddlewareInformation","Message":"Handling CORS regular (non-preflight) request with origin ''","ModuleRuntimeVersion":"1.12.0","ProviderName":"Microsoft-Azure-AppService-Middleware","Level":4,"EventId":1}
+2025-09-03 09:22:13.821 +00:00 [Information] Microsoft.AspNetCore.Hosting.Diagnostics: Request finished HTTP/1.1 POST https://copiloto-semantico-func-us2.azurewebsites.net/api/invocar - 404 0 - 112.4444ms

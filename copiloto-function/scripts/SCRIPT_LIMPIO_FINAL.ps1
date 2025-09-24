@@ -184,11 +184,13 @@ function Get-SpecialCaseBody {
 function Initialize-TestFiles {
   param($TestCase, $Scenario)
   
-  # Variable global para la raz del proyecto (ajusta segn tu estructura)
+  # Deshabilitado: No crear archivos reales en disco durante pruebas
+  <#
+  # Variable global para la raíz del proyecto (ajusta según tu estructura)
   if (-not $global:PROYECTO_RAIZ) {
-    $global:PROYECTO_RAIZ = "."
+    $global:PROYECTO_RAIZ = "C:\ProyectosSimbolicos\boat-rental-app"
   }
-  
+
   # Crear archivo origen para /api/copiar-archivo
   if ($TestCase.Path -eq "/api/copiar-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
     $origen = $Scenario.Body.origen
@@ -205,129 +207,11 @@ function Initialize-TestFiles {
       Write-Debug "Archivo origen creado: $origenPath"
     }
   }
-  
-  # Crear archivo origen para /api/mover-archivo
-  if ($TestCase.Path -eq "/api/mover-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $origen = $Scenario.Body.origen
-    if ($origen) {
-      $origenPath = Join-Path $global:PROYECTO_RAIZ $origen
-      $origenDir = Split-Path $origenPath -Parent
-      if (!(Test-Path $origenDir)) {
-        New-Item -ItemType Directory -Path $origenDir -Force | Out-Null
-      }
-      if (!(Test-Path $origenPath)) {
-        New-Item -ItemType File -Path $origenPath -Force | Out-Null
-        Set-Content -Path $origenPath -Value "Contenido generado automticamente para pruebas - $(Get-Date)"
-      }
-      Write-Debug "Archivo origen creado: $origenPath"
-    }
-  }
-
-  # Crear archivo para /api/leer-archivo
-  if ($TestCase.Path -eq "/api/leer-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    Write-Host " Initialize-TestFiles: Procesando /api/leer-archivo" -ForegroundColor Yellow
-    $ruta = $Scenario.QueryParams["ruta"]
-    Write-Host " Ruta inicial: '$ruta'" -ForegroundColor Yellow
-    if (-not $ruta) {
-      # Fallback: generar ruta si no existe
-      $ruta = "test/sample_$(Get-Random -Maximum 9999).txt"
-      $Scenario.QueryParams["ruta"] = $ruta
-      Write-Host " Ruta generada: '$ruta'" -ForegroundColor Yellow
-    }  #  CIERRE FALTANTE AQU
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      Write-Host " Creando directorio: '$rutaDir'" -ForegroundColor Yellow
-      if (!(Test-Path $rutaDir)) {
-        New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
-      }
-      Write-Host " Creando archivo: '$rutaPath'" -ForegroundColor Yellow
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "Archivo de lectura para prueba - $(Get-Date)"
-      }
-      Write-Host "  Archivo de lectura creado: $rutaPath" -ForegroundColor Green
-      Write-Host " QueryParams final: $($Scenario.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Yellow
-    }
-  }
-
-  # Crear archivo para /api/info-archivo
-  if ($TestCase.Path -eq "/api/info-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $ruta = $Scenario.QueryParams["ruta"]
-    if (-not $ruta) {
-      # Fallback: generar ruta si no existe
-      $ruta = "test/info_$(Get-Random -Maximum 9999).txt"
-      $Scenario.QueryParams["ruta"] = $ruta
-    }
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      if (!(Test-Path $rutaDir)) {
-        New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
-      }
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "Archivo para info - $(Get-Date)"
-      }
-      Write-Debug "Archivo para info creado: $rutaPath"
-    }
-  }
-
-  # Crear archivo para /api/preparar-script
-  if ($TestCase.Path -eq "/api/preparar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $ruta = $Scenario.Body["ruta"]
-    if ($ruta) {
-      $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
-      $rutaDir = Split-Path $rutaPath -Parent
-      if (!(Test-Path $rutaDir)) {
-        New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
-      }
-      if (!(Test-Path $rutaPath)) {
-        New-Item -ItemType File -Path $rutaPath -Force | Out-Null
-        Set-Content -Path $rutaPath -Value "#!/usr/bin/env python3`nprint('Preparar script $(Get-Date)')"
-      }
-      Write-Debug "Script preparado: $rutaPath"
-      # Poblar campos adicionales requeridos
-      $Scenario.Body["scriptName"] = [System.IO.Path]::GetFileNameWithoutExtension($ruta)
-      $Scenario.Body["tipo"] = "python"
-    }
-  }
-
-  # Crear archivo para /api/ejecutar-script
-  if ($TestCase.Path -eq "/api/ejecutar-script" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $script = $Scenario.Body["script"]
-    if ($script) {
-      $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
-      $scriptDir = Split-Path $scriptPath -Parent
-      if (!(Test-Path $scriptDir)) {
-        New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-      }
-      if (!(Test-Path $scriptPath)) {
-        New-Item -ItemType File -Path $scriptPath -Force | Out-Null
-        Set-Content -Path $scriptPath -Value "print('Test script ejecutado - $(Get-Date)')"
-      }
-      Write-Debug "Script creado: $scriptPath"
-    }
-  }
-
-  # Crear archivo para /api/ejecutar-script-local
-  if ($TestCase.Path -eq "/api/ejecutar-script-local" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    $script = $Scenario.Body["script"]
-    if ($script) {
-      $scriptPath = Join-Path $global:PROYECTO_RAIZ $script
-      $scriptDir = Split-Path $scriptPath -Parent
-      if (!(Test-Path $scriptDir)) {
-        New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-      }
-      if (!(Test-Path $scriptPath)) {
-        New-Item -ItemType File -Path $scriptPath -Force | Out-Null
-        Set-Content -Path $scriptPath -Value "print('Script ejecutado')"
-      }
-      Write-Debug "Script local creado: $scriptPath"
-    }
-  }
+  # ... (resto de creaciones de archivos)
+  #>
+  # Usar archivos virtuales o rutas ficticias si es necesario para simular
+  return $null
 }
-# ============ GENERADOR DE VALORES DE EJEMPLO ============
 function Get-SampleValue {
 
   param($Schema, $ParamName)
@@ -414,12 +298,12 @@ function New-SampleBody {
       comando = "group list"
     }
     "/api/ejecutar-script"         = @{
-      script    = "scripts/test_$(Get-Random -Maximum 9999).py"
+      script    = "copiloto-function/scripts/test_$(Get-Random -Maximum 9999).py"
       args      = @()
       timeout_s = 30
     }
     "/api/preparar-script"         = @{
-      ruta = "scripts/setup_$(Get-Random -Maximum 9999).py"
+      ruta = "copiloto-function/scripts/setup_$(Get-Random -Maximum 9999).py"
     }
     "/api/ejecutar-script-local"   = @{
       script = "scripts/test_$(Get-Random -Maximum 9999).py"

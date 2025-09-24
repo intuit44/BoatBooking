@@ -8,9 +8,13 @@ RUN apt-get update && \
 
 # Variables obligatorias de Azure Functions
 ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
-  AzureFunctionsJobHost__Logging__Console__IsEnabled=true
+  AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
+  WEBSITES_PORT=80
 
-# Directorio de trabajo (se usa /home/site/wwwroot porque ahí vive la Function App)
+# Puerto específico (IMPORTANTE)
+EXPOSE 80
+
+# Directorio de trabajo
 WORKDIR /home/site/wwwroot
 
 # Copiar todo el proyecto
@@ -21,3 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Asegurar permisos
 RUN chmod -R 755 /home/site/wwwroot
+
+# ✅ COMANDO CORRECTO PARA AZURE FUNCTIONS (ESENCIAL)
+CMD ["/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"]
