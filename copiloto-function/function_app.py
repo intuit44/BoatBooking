@@ -1,4 +1,5 @@
 # --- Imports mínimos requeridos ---
+from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource.resources.models import (
     ResourceGroup,
     Deployment,
@@ -5259,6 +5260,111 @@ def _status_from_result(res: dict) -> int:
     return 404 if ("no existe" in msg or "no encontrado" in msg) else 400
 
 
+@app.function_name(name="escribir_archivo_local_http")
+@app.route(route="escribir-archivo-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint HTTP para crear/escribir archivos en filesystem LOCAL"""
+    try:
+        # Handle JSON parsing errors safely
+        try:
+            body = req.get_json()
+        except ValueError:
+            body = {}
+
+        if not body:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Request body must be valid JSON",
+                    "ejemplo": {"ruta": "scripts/test.txt", "contenido": "Hola mundo"}
+                }, ensure_ascii=False),
+                mimetype="application/json", status_code=400
+            )
+
+        ruta = (body.get("path") or body.get("ruta") or "").strip()
+        contenido = body.get("content") or body.get("contenido") or ""
+
+        if not ruta:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetro 'ruta' o 'path' es requerido"
+                }, ensure_ascii=False),
+                mimetype="application/json", status_code=400
+            )
+
+        # 🔥 NUEVA FUNCIÓN ESPECÍFICA PARA FILESYSTEM LOCAL
+        res = crear_archivo_local(ruta, contenido)
+
+        return func.HttpResponse(
+            json.dumps(res, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=201 if res.get("exito") else 400
+        )
+    except Exception as e:
+        logging.exception("escribir_archivo_local_http failed")
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json", status_code=500
+        )
+
+
+def crear_archivo_local(ruta: str, contenido: str) -> dict:
+    """Crea/sobrescribe archivo con manejo robusto de encoding"""
+    try:
+        # Asegurar que la ruta esté dentro del directorio permitido
+        base_dir = "/home/site/wwwroot"
+        ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
+
+        # Seguridad: prevenir path traversal
+        if not os.path.abspath(ruta_completa).startswith(os.path.abspath(base_dir)):
+            return {
+                "exito": False,
+                "error": f"Ruta fuera del directorio permitido: {ruta}",
+                "directorio_base": base_dir
+            }
+
+        # Crear directorios padres si no existen
+        os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
+
+        # Escribir archivo con encoding UTF-8 explícito
+        with open(ruta_completa, 'w', encoding='utf-8') as f:
+            f.write(contenido)
+
+        # Agregar encoding declaration si es un script Python
+        if ruta_completa.endswith('.py'):
+            with open(ruta_completa, 'r+', encoding='utf-8') as f:
+                content = f.read()
+                if not content.startswith('# -*- coding:'):
+                    f.seek(0, 0)
+                    f.write('# -*- coding: utf-8 -*-\n' + content)
+
+        return {
+            "exito": True,
+            "mensaje": f"Archivo creado con encoding UTF-8: {ruta}",
+            "encoding": "utf-8",
+            "tamaño_bytes": os.path.getsize(ruta_completa),
+            "ubicacion": f"file://{ruta_completa}",
+            "ruta_absoluta": ruta_completa,
+            "tipo_operacion": "crear_archivo_local",
+            "modo_acceso": "local_filesystem",
+            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar"
+        }
+
+    except UnicodeEncodeError as e:
+        return {
+            "exito": False,
+            "error": f"Error de encoding: {str(e)}",
+            "sugerencia": "Use solo caracteres UTF-8 o especifique encoding"
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": f"Error escribiendo archivo local: {str(e)}",
+            "ruta_intentada": ruta
+        }
+
+
 @app.function_name(name="modificar_archivo_http")
 @app.route(route="modificar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -8651,65 +8757,243 @@ def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+def debug_auth_environment():
+    """Debug completo del entorno de autenticación"""
+    env_vars = {
+        'IDENTITY_ENDPOINT': os.getenv('IDENTITY_ENDPOINT'),
+        'WEBSITE_INSTANCE_ID': os.getenv('WEBSITE_INSTANCE_ID'),
+        'AZURE_CLIENT_ID': 'SET' if os.getenv('AZURE_CLIENT_ID') else 'NOT SET',
+        'FUNCTIONS_WORKER_RUNTIME': os.getenv('FUNCTIONS_WORKER_RUNTIME')
+    }
+    az_available = shutil.which("az") is not None
+    auth_status = "UNKNOWN"
+    try:
+        result = subprocess.run(
+            ['az', 'account', 'show'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            account_info = json.loads(result.stdout)
+            auth_status = f"AUTHENTICATED - Type: {account_info.get('user', {}).get('type', 'unknown')}"
+        else:
+            auth_status = f"NOT_AUTHENTICATED - Error: {result.stderr}"
+    except Exception as e:
+        auth_status = f"CHECK_FAILED - {str(e)}"
+    return {
+        "environment_vars": env_vars,
+        "az_cli_available": az_available,
+        "authentication_status": auth_status
+    }
+
+
 @app.function_name(name="gestionar_despliegue_http")
 @app.route(route="gestionar-despliegue", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Gestiona el proceso de despliegue con detección de cambios y deducción automática de intención"""
+    """Gestiona el proceso de despliegue con detección de cambios y deducción automática de intención.
+    Ahora acepta tanto acciones internas ('detectar', 'preparar', 'desplegar') como alias estándar ('deploy', 'rollback', 'validate', 'status').
+    Errores esperados → controlados con if y return.
+    Errores inesperados → capturados por el except final y devuelven 500.
+    Además, se atrapan errores específicos en cada rama (TimeoutExpired, JSONDecodeError, ValueError, etc.) y se devuelve un 400 o 408 más claro.
+    """
 
-    # Initialize body to ensure it's always available
-    body = {}
+    import json
+
+    # 🔐 VERIFICAR AUTENTICACIÓN PRIMERO
+    ok = ensure_mi_login()
+    if not ok:
+        return func.HttpResponse(
+            json.dumps({
+                "error": "No se pudo autenticar con Azure",
+                "detalle": "Fallo Managed Identity, Service Principal y no hay sesión interactiva",
+                "recomendacion": "En Azure: habilita MI; En local: define SP o haz 'az login'. Si usas User Assigned MI, añade AZURE_CLIENT_ID (clientId de la identidad) en App Settings para ayudar a az login --identity. Para System Assigned no es necesario, pero no estorba.",
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=401,
+        )
+
+    debug_env = debug_auth_environment()
+
+    equivalencias = {
+        "deploy": "desplegar",
+        "validate": "preparar",
+    }
+
+    acciones_validas = ["detectar", "preparar", "desplegar",
+                        "deploy", "rollback", "validate", "status"]
 
     try:
-        body = req.get_json() if req.get_body() else {}
+        try:
+            body = req.get_json()
+        except (ValueError, json.JSONDecodeError) as e:
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "JSON inválido en el cuerpo de la solicitud",
+                    "detalle": str(e),
+                    "ejemplo": {"accion": "desplegar", "tag": "v12"},
+                    "debug_auth_environment": debug_env
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+        except Exception as e:
+            body = {}
 
-        # 🔍 Deducción automática de intención si no se especifica
-        accion = body.get("accion")
+        accion_recibida = body.get("accion")
+        accion_real = equivalencias.get(
+            accion_recibida, accion_recibida) if accion_recibida else None
 
-        if not accion:
-            # Deducción automática basada en el contenido
+        if not accion_real:
             if "tag" in body:
-                accion = "desplegar"
+                accion_real = "desplegar"
             elif body.get("preparar", False) is True:
-                accion = "preparar"
+                accion_real = "preparar"
             else:
-                accion = "detectar"
+                accion_real = "detectar"
 
-        if accion == "detectar":
-            # ✅ VALIDACIÓN: Verificar si function_app.py existe antes de intentar leerlo
+        logging.info(
+            f"[gestionar_despliegue] Acción recibida: '{accion_recibida}' → Acción real: '{accion_real}'")
+
+        alias_usado = None
+        for k, v in equivalencias.items():
+            if accion_recibida == k:
+                alias_usado = k
+                break
+
+        # --- Rollback ---
+        if accion_recibida == "rollback":
+            tag_anterior = body.get("tag_anterior")
+            if not tag_anterior:
+                return func.HttpResponse(
+                    json.dumps({
+                        "error": "Falta el parámetro 'tag_anterior' para rollback",
+                        "accion": "rollback",
+                        "ejemplo": {"accion": "rollback", "tag_anterior": "v12"},
+                        "debug_auth_environment": debug_env
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=400
+                )
+            comandos_rollback = [
+                f"az functionapp config container set -g boat-rental-app-group -n copiloto-semantico-func-us2 --docker-custom-image-name boatrentalacr.azurecr.io/copiloto-func-azcli:{tag_anterior}",
+                "az functionapp restart -g boat-rental-app-group -n copiloto-semantico-func-us2"
+            ]
+            return func.HttpResponse(
+                json.dumps({
+                    "accion": "rollback",
+                    "tag_anterior": tag_anterior,
+                    "comandos_sugeridos": comandos_rollback,
+                    "mensaje": f"Rollback sugerido a la versión {tag_anterior}. Ejecuta los comandos indicados.",
+                    "nota": "Implementa lógica real de rollback si lo necesitas.",
+                    "debug_auth_environment": debug_env
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+
+        # --- Status ---
+        if accion_real == "status":
+            az_disponible = shutil.which("az") is not None
+            imagen_actual = "desconocido"
+            ultimo_tag = "v0"
+            estado_funcion_app = "desconocido"
+            if az_disponible:
+                try:
+                    result = _run_az([
+                        "functionapp", "config", "container", "show",
+                        "-g", "boat-rental-app-group",
+                        "-n", "copiloto-semantico-func-us2",
+                        "--query", "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value",
+                        "-o", "tsv"
+                    ], timeout=30)
+                    imagen_actual = result.stdout.strip(
+                    ) if result.returncode == 0 else f"error_az: {result.stderr.strip()}"
+                except subprocess.TimeoutExpired as te:
+                    imagen_actual = f"timeout_az: {str(te)}"
+                except Exception as e:
+                    imagen_actual = f"error_az: {str(e)}"
+                try:
+                    tags_result = _run_az([
+                        "acr", "repository", "show-tags",
+                        "-n", "boatrentalacr",
+                        "--repository", "copiloto-func-azcli",
+                        "--orderby", "time_desc",
+                        "--top", "1"
+                    ], timeout=30)
+                    if tags_result.returncode == 0 and tags_result.stdout:
+                        tags = json.loads(tags_result.stdout)
+                        ultimo_tag = tags[0] if tags else "v0"
+                    else:
+                        ultimo_tag = f"error_acr: {tags_result.stderr.strip()}"
+                except subprocess.TimeoutExpired as te:
+                    ultimo_tag = f"timeout_acr: {str(te)}"
+                except Exception as e:
+                    ultimo_tag = f"error_acr: {str(e)}"
+                try:
+                    estado_result = _run_az([
+                        "functionapp", "show",
+                        "-g", "boat-rental-app-group",
+                        "-n", "copiloto-semantico-func-us2",
+                        "--query", "state",
+                        "-o", "tsv"
+                    ], timeout=30)
+                    estado_funcion_app = estado_result.stdout.strip(
+                    ) if estado_result.returncode == 0 else f"error_az: {estado_result.stderr.strip()}"
+                except subprocess.TimeoutExpired as te:
+                    estado_funcion_app = f"timeout_az: {str(te)}"
+                except Exception as e:
+                    estado_funcion_app = f"error_az: {str(e)}"
+            else:
+                imagen_actual = "az_cli_no_disponible"
+                ultimo_tag = "az_cli_no_disponible"
+                estado_funcion_app = "az_cli_no_disponible"
+            return func.HttpResponse(
+                json.dumps({
+                    "accion": "status",
+                    "alias_usado": alias_usado,
+                    "imagen_actual": imagen_actual,
+                    "ultimo_tag_acr": ultimo_tag,
+                    "estado_funcion_app": estado_funcion_app,
+                    "az_cli_disponible": az_disponible,
+                    "mensaje": "Estado actual del despliegue consultado.",
+                    "recomendacion": "Verifica que la imagen y el estado sean correctos antes de desplegar una nueva versión.",
+                    "debug_auth_environment": debug_env
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+
+        # --- Detectar ---
+        if accion_real == "detectar":
             function_app_path = Path("function_app.py")
             if not function_app_path.exists():
-                # Buscar en ubicaciones alternativas
                 possible_paths = [
                     Path("/home/site/wwwroot/function_app.py"),
                     Path("./function_app.py"),
                     PROJECT_ROOT / "function_app.py"
                 ]
-
                 function_app_path = None
                 for path in possible_paths:
                     if path.exists():
                         function_app_path = path
                         break
-
                 if not function_app_path:
                     return func.HttpResponse(
                         json.dumps({
                             "error": "No se encontró function_app.py en ninguna ubicación",
-                            "accion_deducida": accion,
+                            "accion_deducida": accion_real,
+                            "alias_usado": alias_usado,
                             "ubicaciones_buscadas": [str(p) for p in possible_paths],
                             "directorio_actual": str(Path.cwd()),
-                            "recomendacion": "Verifica que el archivo function_app.py existe en el directorio correcto"
+                            "recomendacion": "Verifica que el archivo function_app.py existe en el directorio correcto",
+                            "debug_auth_environment": debug_env
                         }, ensure_ascii=False),
                         mimetype="application/json",
                         status_code=404
                     )
-
-            # Obtener hash actual del archivo
             import hashlib
             try:
                 with open(function_app_path, "r", encoding='utf-8') as f:
                     contenido = f.read()
-                    # Buscar la función ejecutar_cli_http
                     inicio = contenido.find("def ejecutar_cli_http")
                     fin = contenido.find("\n@app.function_name", inicio + 1)
                     if inicio > -1:
@@ -8721,76 +9005,55 @@ def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
                         hash_actual = "funcion_no_encontrada"
             except Exception as e:
                 hash_actual = f"error_lectura: {str(e)}"
-
-            # ✅ VALIDACIÓN: Verificar si az CLI está disponible antes de ejecutar comandos
             az_disponible = shutil.which("az") is not None
-
             imagen_actual = "desconocido"
             ultimo_tag = "v0"
-
             if az_disponible:
                 try:
-                    # Obtener última versión desplegada
-                    result = subprocess.run(
-                        ["az", "functionapp", "config", "container", "show",
-                         "-g", "boat-rental-app-group",
-                         "-n", "copiloto-semantico-func-us2",
-                         "--query", "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value",
-                         "-o", "tsv"],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-
+                    result = _run_az([
+                        "functionapp", "config", "container", "show",
+                        "-g", "boat-rental-app-group",
+                        "-n", "copiloto-semantico-func-us2",
+                        "--query", "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value",
+                        "-o", "tsv"
+                    ], timeout=30)
                     imagen_actual = result.stdout.strip(
                     ) if result.returncode == 0 else f"error_az: {result.stderr.strip()}"
-                except subprocess.TimeoutExpired:
-                    imagen_actual = "timeout_az_config"
-                except FileNotFoundError:
-                    imagen_actual = "az_no_encontrado"
+                except subprocess.TimeoutExpired as te:
+                    imagen_actual = f"timeout_az: {str(te)}"
                 except Exception as e:
                     imagen_actual = f"error_az: {str(e)}"
-
                 try:
-                    # Obtener próxima versión
-                    tags_result = subprocess.run(
-                        ["az", "acr", "repository", "show-tags",
-                         "-n", "boatrentalacr",
-                         "--repository", "copiloto-func-azcli",
-                         "--orderby", "time_desc",
-                         "--top", "1"],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-
+                    tags_result = _run_az([
+                        "acr", "repository", "show-tags",
+                        "-n", "boatrentalacr",
+                        "--repository", "copiloto-func-azcli",
+                        "--orderby", "time_desc",
+                        "--top", "1"
+                    ], timeout=30)
                     if tags_result.returncode == 0 and tags_result.stdout:
                         tags = json.loads(tags_result.stdout)
                         ultimo_tag = tags[0] if tags else "v0"
                     else:
                         ultimo_tag = f"error_acr: {tags_result.stderr.strip()}"
-                except subprocess.TimeoutExpired:
-                    ultimo_tag = "timeout_acr"
-                except FileNotFoundError:
-                    ultimo_tag = "az_no_encontrado"
+                except subprocess.TimeoutExpired as te:
+                    ultimo_tag = f"timeout_acr: {str(te)}"
                 except Exception as e:
                     ultimo_tag = f"error_acr: {str(e)}"
             else:
                 imagen_actual = "az_cli_no_disponible"
                 ultimo_tag = "az_cli_no_disponible"
-
-            # Calcular próximo tag de forma segura
             import re
-            proximo_tag = "v1"  # Default
+            proximo_tag = "v1"
             if isinstance(ultimo_tag, str) and not ultimo_tag.startswith("error") and not ultimo_tag.startswith("timeout"):
                 match = re.search(r'v(\d+)', ultimo_tag)
                 if match:
                     ultimo_numero = int(match.group(1))
                     proximo_tag = f"v{ultimo_numero + 1}"
-
             return func.HttpResponse(
                 json.dumps({
-                    "accion_deducida": accion,
+                    "accion_deducida": accion_real,
+                    "alias_usado": alias_usado,
                     "archivo_verificado": str(function_app_path) if function_app_path else "no_encontrado",
                     "hash_funcion": hash_actual,
                     "imagen_actual": imagen_actual,
@@ -8805,49 +9068,46 @@ def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
                         "az acr login -n boatrentalacr",
                         f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{proximo_tag}",
                         f"Luego llama a /api/actualizar-contenedor con tag={proximo_tag}"
-                    ] if az_disponible else ["Azure CLI no está disponible"]
+                    ] if az_disponible else ["Azure CLI no está disponible"],
+                    "debug_auth_environment": debug_env
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=200
             )
 
-        elif accion == "preparar":
-            # ✅ VALIDACIÓN: Verificar az CLI antes de ejecutar comandos
+        # --- Preparar ---
+        elif accion_real == "preparar":
             if not shutil.which("az"):
                 return func.HttpResponse(
                     json.dumps({
                         "error": "Azure CLI no está disponible",
-                        "accion_deducida": accion,
-                        "mensaje": "Se requiere Azure CLI para preparar el script de despliegue"
+                        "accion_deducida": accion_real,
+                        "alias_usado": alias_usado,
+                        "mensaje": "Se requiere Azure CLI para preparar el script de despliegue",
+                        "debug_auth_environment": debug_env
                     }, ensure_ascii=False),
                     mimetype="application/json",
                     status_code=500
                 )
-
-            # Generar script de despliegue
             try:
-                tags_result = subprocess.run(
-                    ["az", "acr", "repository", "show-tags",
-                     "-n", "boatrentalacr",
-                     "--repository", "copiloto-func-azcli",
-                     "--orderby", "time_desc",
-                     "--top", "1"],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-
+                tags_result = _run_az([
+                    "acr", "repository", "show-tags",
+                    "-n", "boatrentalacr",
+                    "--repository", "copiloto-func-azcli",
+                    "--orderby", "time_desc",
+                    "--top", "1"
+                ], timeout=30)
                 tags = json.loads(
                     tags_result.stdout) if tags_result.returncode == 0 and tags_result.stdout else []
                 ultimo_tag = tags[0] if tags else "v0"
+            except subprocess.TimeoutExpired as te:
+                ultimo_tag = f"timeout_acr: {str(te)}"
             except Exception as e:
-                ultimo_tag = "v0"  # Fallback seguro
-
+                ultimo_tag = "v0"
             import re
             match = re.search(r'v(\d+)', ultimo_tag)
             ultimo_numero = int(match.group(1)) if match else 0
             proximo_tag = f"v{ultimo_numero + 1}"
-
             script = f"""#!/bin/bash
 # Auto-generated deployment script
 VERSION={proximo_tag}
@@ -8860,156 +9120,188 @@ docker push boatrentalacr.azurecr.io/copiloto-func-azcli:$VERSION
 
 echo "✅ Image pushed. Call /api/actualizar-contenedor with tag=$VERSION"
 """
-
-            # ✅ VALIDACIÓN: Verificar directorio /tmp antes de escribir
             try:
                 tmp_dir = Path("/tmp")
                 if not tmp_dir.exists():
                     tmp_dir = Path(tempfile.gettempdir())
-
                 script_path = tmp_dir / "deploy.sh"
                 with open(script_path, "w") as f:
                     f.write(script)
-
                 script_guardado = True
                 ubicacion_script = str(script_path)
             except Exception as e:
                 script_guardado = False
                 ubicacion_script = f"Error guardando: {str(e)}"
-
             return func.HttpResponse(
                 json.dumps({
-                    "accion_deducida": accion,
+                    "accion_deducida": accion_real,
+                    "alias_usado": alias_usado,
                     "script_generado": True,
                     "script_guardado": script_guardado,
                     "ubicacion_script": ubicacion_script,
                     "version": proximo_tag,
                     "script_content": script,
                     "mensaje": f"Script preparado para desplegar {proximo_tag}. Ejecútalo localmente.",
-                    "nota": f"El script está en {ubicacion_script}" if script_guardado else "Error guardando el script"
+                    "nota": f"El script está en {ubicacion_script}" if script_guardado else "Error guardando el script",
+                    "debug_auth_environment": debug_env
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=200
             )
 
-        elif accion == "desplegar":
+        # --- Desplegar ---
+        elif accion_real == "desplegar":
             tag = body.get("tag")
             if not tag:
                 return func.HttpResponse(
                     json.dumps({
                         "error": "Falta el parámetro 'tag'. Ejemplo: {\"tag\": \"v12\"} o {\"accion\": \"desplegar\", \"tag\": \"v12\"}",
-                        "accion_deducida": accion
+                        "accion_deducida": accion_real,
+                        "alias_usado": alias_usado,
+                        "debug_auth_environment": debug_env
                     }, ensure_ascii=False),
                     mimetype="application/json",
                     status_code=400
                 )
-
-            # ✅ VALIDACIÓN: Verificar disponibilidad de herramientas necesarias
             herramientas_faltantes = []
             if not shutil.which("docker"):
                 herramientas_faltantes.append("docker")
             if not shutil.which("az"):
                 herramientas_faltantes.append("az")
-
             if herramientas_faltantes:
                 return func.HttpResponse(
                     json.dumps({
                         "error": f"Herramientas faltantes: {', '.join(herramientas_faltantes)}",
-                        "accion_deducida": accion,
+                        "accion_deducida": accion_real,
+                        "alias_usado": alias_usado,
                         "herramientas_requeridas": ["docker", "az"],
-                        "mensaje": "No se puede proceder con el despliegue sin las herramientas necesarias"
+                        "mensaje": "No se puede proceder con el despliegue sin las herramientas necesarias",
+                        "debug_auth_environment": debug_env
                     }, ensure_ascii=False),
                     mimetype="application/json",
                     status_code=500
                 )
-
+            # Definir comandos con ejecución segura
             comandos = [
-                f"docker build -t copiloto-func-azcli:{tag} .",
-                f"docker tag copiloto-func-azcli:{tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-                "az acr login -n boatrentalacr",
-                f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-                f"az functionapp config container set -g boat-rental-app-group -n copiloto-semantico-func-us2 --docker-custom-image-name boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}",
-                "az functionapp restart -g boat-rental-app-group -n copiloto-semantico-func-us2"
+                {
+                    "tipo": "docker",
+                    "comando": f"docker build -t copiloto-func-azcli:{tag} ."
+                },
+                {
+                    "tipo": "docker",
+                    "comando": f"docker tag copiloto-func-azcli:{tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"
+                },
+                {
+                    "tipo": "az",
+                    "comando": ["acr", "login", "-n", "boatrentalacr"]
+                },
+                {
+                    "tipo": "docker",
+                    "comando": f"docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"
+                },
+                {
+                    "tipo": "az",
+                    "comando": ["functionapp", "config", "container", "set",
+                                "-g", "boat-rental-app-group",
+                                "-n", "copiloto-semantico-func-us2",
+                                "--docker-custom-image-name", f"boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"]
+                },
+                {
+                    "tipo": "az",
+                    "comando": ["functionapp", "restart", "-g", "boat-rental-app-group", "-n", "copiloto-semantico-func-us2"]
+                }
             ]
 
             resultados = []
-            for cmd in comandos:
+            for cmd_info in comandos:
                 try:
-                    result = subprocess.run(
-                        cmd, shell=True, capture_output=True, text=True, timeout=300)
-                    resultados.append({
-                        "comando": cmd,
-                        "returncode": result.returncode,
-                        "stdout": result.stdout.strip(),
-                        "stderr": result.stderr.strip(),
-                        "exito": result.returncode == 0
-                    })
+                    if cmd_info["tipo"] == "docker":
+                        result = _run_docker(cmd_info["comando"], timeout=300)
+                        resultados.append({
+                            "comando": cmd_info["comando"],
+                            "returncode": result.returncode,
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "exito": result.returncode == 0
+                        })
 
-                    # Si un comando falla, detener el proceso
-                    if result.returncode != 0:
+                    elif cmd_info["tipo"] == "az":
+                        result = _run_az(cmd_info["comando"], timeout=300)
+                        resultados.append({
+                            "comando": f"az {' '.join(cmd_info['comando'])}",
+                            "returncode": result.returncode,
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "exito": result.returncode == 0
+                        })
+
+                    # Si falla, detener la ejecución
+                    if not resultados[-1]["exito"]:
                         break
 
-                except subprocess.TimeoutExpired:
+                except subprocess.TimeoutExpired as te:
                     resultados.append({
-                        "comando": cmd,
+                        "comando": cmd_info["comando"] if isinstance(cmd_info["comando"], str) else f"az {' '.join(cmd_info['comando'])}",
                         "returncode": -1,
                         "stdout": "",
-                        "stderr": "Timeout después de 5 minutos",
+                        "stderr": f"Timeout después de 5 minutos: {te}",
                         "exito": False
                     })
                     break
-                except FileNotFoundError:
+                except Exception as e:
                     resultados.append({
-                        "comando": cmd,
+                        "comando": cmd_info["comando"] if isinstance(cmd_info["comando"], str) else f"az {' '.join(cmd_info['comando'])}",
                         "returncode": -1,
                         "stdout": "",
-                        "stderr": "Comando no encontrado",
+                        "stderr": f"Error ejecutando comando: {str(e)}",
                         "exito": False
                     })
                     break
 
-            # Verificar si todos los comandos fueron exitosos
+            # Resto de tu lógica actual...
             todos_exitosos = all(r["exito"] for r in resultados)
             status_code = 200 if todos_exitosos else 500
 
             return func.HttpResponse(
                 json.dumps({
                     "accion": "desplegar",
-                    "accion_deducida": accion,
+                    "accion_deducida": accion_real,
+                    "alias_usado": alias_usado,
                     "tag": tag,
-                    "comandos_ejecutados": comandos,
+                    "comandos_ejecutados": [r["comando"] for r in resultados],
                     "resultados": resultados,
                     "exito": todos_exitosos,
                     "mensaje": f"Despliegue automático {'completado exitosamente' if todos_exitosos else 'falló'} para la versión {tag}",
                     "comandos_exitosos": len([r for r in resultados if r["exito"]]),
-                    "total_comandos": len(comandos)
+                    "total_comandos": len(comandos),
+                    "debug_auth_environment": debug_env
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=status_code
             )
 
+        # --- Acción no reconocida ---
         else:
             return func.HttpResponse(
                 json.dumps({
-                    "error": f"Acción '{accion}' no reconocida",
-                    "acciones_validas": ["detectar", "preparar", "desplegar"],
-                    "accion_recibida": body.get("accion"),
-                    "accion_deducida": accion,
-                    "deduccion_activa": body.get("accion") is None
+                    "error": f"Acción '{accion_recibida}' no reconocida",
+                    "acciones_validas": acciones_validas,
+                    "accion_recibida": accion_recibida,
+                    "accion_deducida": accion_real,
+                    "alias_usado": alias_usado,
+                    "deduccion_activa": accion_recibida is None,
+                    "debug_auth_environment": debug_env
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
     except Exception as e:
-        logging.error(f"Error en gestionar_despliegue_http: {str(e)}")
         return func.HttpResponse(
             json.dumps({
-                "error": str(e),
+                "error": f"Error inesperado: {str(e)}",
                 "tipo_error": type(e).__name__,
-                "body_recibido": body,
-                "accion_detectada": locals().get("accion", "no_detectada"),
-                "mensaje": "Error inesperado en el gestor de despliegue"
+                "debug_auth_environment": debug_env
             }, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
@@ -9233,55 +9525,136 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+def _run_az(args, timeout=30):
+    """Ejecuta comandos Azure CLI con encoding UTF-8 forzado"""
+    az_bin = shutil.which("az.cmd") or shutil.which("az") or "az"
+
+    # Forzar entorno UTF-8
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['LANG'] = 'en_US.UTF-8'
+
+    try:
+        result = subprocess.run(
+            [az_bin] + args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding='utf-8',      # 👈 Forzar UTF-8
+            errors='replace',      # 👈 Reemplazar caracteres inválidos
+            env=env               # 👈 Pasar variables de entorno
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout ejecutando: az {' '.join(args)}")
+        raise
+    except Exception as e:
+        logging.error(f"Error ejecutando az CLI: {e}")
+        raise
+
+
+def _run_docker(command, timeout=300):
+    """Ejecuta comandos Docker con encoding UTF-8"""
+    # Forzar entorno UTF-8
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['LANG'] = 'en_US.UTF-8'
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding='utf-8',      # 👈 Forzar UTF-8
+            errors='replace',      # 👈 Reemplazar caracteres inválidos
+            env=env
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout ejecutando: {command}")
+        raise
+    except Exception as e:
+        logging.error(f"Error ejecutando Docker: {e}")
+        raise
+
+
 def ensure_mi_login():
     """
     Autenticación inteligente:
-    - MI en Azure
-    - SP en local
-    - Interactivo como fallback
+    - PRIORIDAD 1: Managed Identity (en Azure)
+    - PRIORIDAD 2: Sesión ya iniciada
+    - PRIORIDAD 3: Service Principal (local)
+    - PRIORIDAD 4: Login interactivo (evitado)
     """
+    def run_az(args):
+        az_bin = shutil.which("az.cmd") or shutil.which("az") or "az"
+        return subprocess.run(
+            [az_bin] + args,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            encoding="utf-8",    # 👈 forzar utf-8
+            errors="replace"     # 👈 evita que se rompa con caracteres raros
+        )
+
+    env = {
+        "IDENTITY_ENDPOINT": os.getenv("IDENTITY_ENDPOINT"),
+        "WEBSITE_INSTANCE_ID": os.getenv("WEBSITE_INSTANCE_ID"),
+        "AZURE_CLIENT_ID": os.getenv("AZURE_CLIENT_ID"),
+        "FUNCTIONS_WORKER_RUNTIME": os.getenv("FUNCTIONS_WORKER_RUNTIME")
+    }
+
+    # 🔹 Prioridad 1: Managed Identity (si detectamos que estamos en Azure)
+    if env["IDENTITY_ENDPOINT"] or env["WEBSITE_INSTANCE_ID"]:
+        logging.info(
+            "🔐 Azure environment detectado. Probando Managed Identity...")
+        try:
+            result = run_az(["account", "show"])
+            if result.returncode == 0:
+                user = json.loads(result.stdout).get("user", {}).get("type")
+                if user == "managedIdentity":
+                    logging.info("✅ Ya autenticado con Managed Identity")
+                    return True
+            mi_result = run_az(
+                ["login", "--identity", "--allow-no-subscriptions"])
+            if mi_result.returncode == 0:
+                logging.info("✅ Autenticado con Managed Identity")
+                return True
+            logging.warning(f"⚠️ Falló MI: {mi_result.stderr}")
+        except Exception as e:
+            logging.warning(f"⚠️ Error en MI: {str(e)}")
+
+    # 🔹 Prioridad 2: Ya autenticado
     try:
-        result = subprocess.run(
-            ['az', 'account', 'show'], capture_output=True, text=True, timeout=10)
+        result = run_az(["account", "show"])
         if result.returncode == 0:
             logging.info("✅ Ya autenticado en Azure CLI")
             return True
-    except:
-        pass
+    except Exception as e:
+        logging.warning(f"⚠️ Error verificando autenticación: {str(e)}")
 
-    # Azure Functions / App Service (Managed Identity)
-    if os.getenv('IDENTITY_ENDPOINT') or os.getenv('WEBSITE_INSTANCE_ID'):
-        logging.info("🔐 Autenticando con Managed Identity")
-        try:
-            subprocess.run(
-                ['az', 'login', '--identity', '--allow-no-subscriptions'],
-                check=True,
-                timeout=30
-            )
-            logging.info("✅ Autenticado con Managed Identity")
-            return True
-        except subprocess.CalledProcessError as e:
-            logging.warning(f"⚠️ Falló Managed Identity: {e}")
-
-    # Local con Service Principal
-    client_id = os.getenv('AZURE_CLIENT_ID')
-    client_secret = os.getenv('AZURE_CLIENT_SECRET')
-    tenant_id = os.getenv('AZURE_TENANT_ID')
-
+    # 🔹 Prioridad 3: Service Principal
+    client_id = os.getenv("AZURE_CLIENT_ID")
+    client_secret = os.getenv("AZURE_CLIENT_SECRET")
+    tenant_id = os.getenv("AZURE_TENANT_ID")
     if client_id and client_secret and tenant_id:
-        logging.info("🔐 Autenticando con Service Principal")
+        logging.info("🔐 Intentando login con Service Principal")
         try:
-            subprocess.run([
-                'az', 'login', '--service-principal',
-                '-u', client_id, '-p', client_secret,
-                '--tenant', tenant_id, '--allow-no-subscriptions'
-            ], check=True, timeout=30)
-            logging.info("✅ Autenticado con Service Principal")
-            return True
-        except subprocess.CalledProcessError as e:
-            logging.warning(f"⚠️ Falló Service Principal: {e}")
+            sp_result = run_az([
+                "login", "--service-principal",
+                "-u", client_id, "-p", client_secret,
+                "--tenant", tenant_id, "--allow-no-subscriptions"
+            ])
+            if sp_result.returncode == 0:
+                logging.info("✅ Login SP exitoso")
+                return True
+            logging.warning(f"⚠️ Falló SP: {sp_result.stderr}")
+        except Exception as e:
+            logging.warning(f"⚠️ Error SP: {str(e)}")
 
-    # Fallback
+    # 🔹 Fallback interactivo → NO usado en backend
     logging.warning(
         "🚨 No hay credenciales automáticas, requiere login interactivo")
     return False

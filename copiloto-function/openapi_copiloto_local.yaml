@@ -347,44 +347,104 @@
     },
     "/api/preparar-script": {
       "post": {
-        "summary": "Preparar script para ejecución",
-        "operationId": "prepararScript",
-        "tags": ["Testing"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/PrepararScriptRequest"}
-            }
-          }
-        },
-        "responses": {
-          "200": {"description": "Script preparado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
+      "summary": "Preparar script para ejecución",
+      "operationId": "prepararScript",
+      "tags": ["Testing"],
+      "security": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+        "application/json": {
+          "schema": {"$ref": "#/components/schemas/PrepararScriptRequest"}
         }
+        }
+      },
+      "responses": {
+        "200": {"description": "Script preparado correctamente"},
+        "400": {"description": "Solicitud inválida"},
+        "500": {"description": "Error del servidor"}
+      }
       }
     },
     "/api/gestionar-despliegue": {
       "post": {
-        "summary": "Gestionar despliegue de aplicación",
-        "operationId": "gestionarDespliegue",
-        "tags": ["Azure Deployment"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {"$ref": "#/components/schemas/GestionarDespliegueRequest"}
-            }
+      "summary": "Gestiona el proceso completo de despliegue",
+      "description": "Orquestador principal que unifica detección, preparación, despliegue y rollback. Soporta deducción automática de intención y alias para acciones comunes.",
+      "operationId": "gestionarDespliegue",
+      "tags": ["Azure Deployment", "Despliegues"],
+      "security": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+        "application/json": {
+          "schema": {
+          "oneOf": [
+            { "$ref": "#/components/schemas/AccionDesplegar" },
+            { "$ref": "#/components/schemas/AccionRollback" },
+            { "$ref": "#/components/schemas/AccionStatus" },
+            { "$ref": "#/components/schemas/AccionDetectar" },
+            { "$ref": "#/components/schemas/AccionPreparar" }
+          ]
+          },
+          "examples": {
+          "despliegue": {
+            "summary": "Despliegue completo",
+            "value": { "accion": "deploy", "tag": "v1.2.3" }
+          },
+          "rollback": {
+            "summary": "Rollback de emergencia",
+            "value": { "accion": "rollback", "tag_anterior": "v1.2.2", "motivo": "fallo_critico" }
+          },
+          "status": {
+            "summary": "Consulta de estado",
+            "value": { "accion": "status" }
+          },
+          "deteccion": {
+            "summary": "Detección automática",
+            "value": { "accion": "detectar", "tag": "v1.2.3" }
+          },
+          "validacion": {
+            "summary": "Validación y preparación",
+            "value": { "accion": "validate", "ambiente": "staging" }
           }
-        },
-        "responses": {
-          "200": {"description": "Despliegue gestionado correctamente"},
-          "400": {"description": "Solicitud inválida"},
-          "500": {"description": "Error del servidor"}
+          }
         }
+        }
+      },
+      "responses": {
+        "200": {
+        "description": "Operación completada exitosamente",
+        "content": {
+          "application/json": {
+          "schema": {
+            "oneOf": [
+            { "$ref": "#/components/schemas/RespuestaStatus" },
+            { "$ref": "#/components/schemas/RespuestaDetectar" },
+            { "$ref": "#/components/schemas/RespuestaPreparar" },
+            { "$ref": "#/components/schemas/RespuestaDesplegar" },
+            { "$ref": "#/components/schemas/RespuestaRollback" }
+            ]
+          }
+          }
+        }
+        },
+        "400": {
+        "description": "Solicitud mal formada o parámetros inválidos",
+        "content": {
+          "application/json": {
+          "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+        },
+        "500": {
+        "description": "Error interno del servidor",
+        "content": {
+          "application/json": {
+          "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+        }
+      }
       }
     },
     "/api/ejecutar-script": {
@@ -552,6 +612,83 @@
           "201": {"description": "Archivo creado correctamente"},
           "400": {"description": "Solicitud inválida"},
           "500": {"description": "Error del servidor"}
+        }
+      }
+    },
+    "/api/escribir-archivo-local": {
+      "post": {
+        "summary": "Crear o guardar un archivo en el filesystem LOCAL del contenedor",
+        "operationId": "escribirArchivoLocal",
+        "tags": ["Local Storage"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ruta": {
+                    "type": "string",
+                    "description": "Ruta relativa dentro de `/home/site/wwwroot` (ej: `scripts/test_local.txt`)"
+                  },
+                  "contenido": {
+                    "type": "string",
+                    "description": "Contenido del archivo a escribir"
+                  }
+                },
+                "required": ["ruta", "contenido"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Archivo creado correctamente en filesystem local",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "example": "Archivo creado exitosamente en filesystem local: scripts/test_local.txt"
+                    },
+                    "ubicacion": {
+                      "type": "string",
+                      "example": "file:///home/site/wwwroot/scripts/test_local.txt"
+                    },
+                    "ruta_absoluta": {
+                      "type": "string",
+                      "example": "/home/site/wwwroot/scripts/test_local.txt"
+                    },
+                    "tipo_operacion": {
+                      "type": "string",
+                      "example": "crear_archivo_local"
+                    },
+                    "tamaño_bytes": {
+                      "type": "integer",
+                      "example": 1024
+                    },
+                    "modo_acceso": {
+                      "type": "string",
+                      "example": "local_filesystem"
+                    },
+                    "advertencia": {
+                      "type": "string",
+                      "example": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Solicitud inválida (ruta inválida o JSON malformado)"},
+          "500": {"description": "Error interno del servidor"}
         }
       }
     },
@@ -1100,6 +1237,7 @@
         }
       }
     },
+    
     "/api/configurar-app-settings": {
       "post": {
         "summary": "Configurar App Settings de Function App",
@@ -1137,7 +1275,8 @@
     {"name": "Azure Deployment", "description": "Deployment de recursos con ARM templates"},
     {"name": "Azure Configuration", "description": "Configuración de recursos Azure"},
     {"name": "Testing", "description": "Pruebas y validación de endpoints"},
-    {"name": "Internal", "description": "Operaciones internas de la Function App"}
+    {"name": "Internal", "description": "Operaciones internas de la Function App"},
+    {"name": "Local Storage", "description": "Operaciones en el filesystem local del contenedor"}
   ],
   "components": {
     "schemas": {
