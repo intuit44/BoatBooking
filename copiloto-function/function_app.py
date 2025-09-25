@@ -9234,21 +9234,57 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 
 
 def ensure_mi_login():
+    """
+    Autenticación inteligente:
+    - MI en Azure
+    - SP en local
+    - Interactivo como fallback
+    """
     try:
-        subprocess.run(
-            ["az", "account", "show"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    except subprocess.CalledProcessError:
         result = subprocess.run(
-            ["az", "login", "--identity"],
-            capture_output=True,
-            text=True
-        )
-        logging.info(
-            f"az login --identity ejecutado: {result.stdout or result.stderr}")
+            ['az', 'account', 'show'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            logging.info("✅ Ya autenticado en Azure CLI")
+            return True
+    except:
+        pass
+
+    # Azure Functions / App Service (Managed Identity)
+    if os.getenv('IDENTITY_ENDPOINT') or os.getenv('WEBSITE_INSTANCE_ID'):
+        logging.info("🔐 Autenticando con Managed Identity")
+        try:
+            subprocess.run(
+                ['az', 'login', '--identity', '--allow-no-subscriptions'],
+                check=True,
+                timeout=30
+            )
+            logging.info("✅ Autenticado con Managed Identity")
+            return True
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"⚠️ Falló Managed Identity: {e}")
+
+    # Local con Service Principal
+    client_id = os.getenv('AZURE_CLIENT_ID')
+    client_secret = os.getenv('AZURE_CLIENT_SECRET')
+    tenant_id = os.getenv('AZURE_TENANT_ID')
+
+    if client_id and client_secret and tenant_id:
+        logging.info("🔐 Autenticando con Service Principal")
+        try:
+            subprocess.run([
+                'az', 'login', '--service-principal',
+                '-u', client_id, '-p', client_secret,
+                '--tenant', tenant_id, '--allow-no-subscriptions'
+            ], check=True, timeout=30)
+            logging.info("✅ Autenticado con Service Principal")
+            return True
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"⚠️ Falló Service Principal: {e}")
+
+    # Fallback
+    logging.warning(
+        "🚨 No hay credenciales automáticas, requiere login interactivo")
+    return False
 
 
 @app.function_name(name="ejecutar_cli_http")
