@@ -38,6 +38,8 @@ import json
 from datetime import datetime
 import os
 
+from azure.functions import HttpRequest, HttpResponse
+
 # Validation helpers
 
 
@@ -9529,6 +9531,10 @@ def _run_az(args, timeout=30):
     """Ejecuta comandos Azure CLI con encoding UTF-8 forzado"""
     az_bin = shutil.which("az.cmd") or shutil.which("az") or "az"
 
+    # Si el ejecutable es az.cmd, no repitas "az" en args
+    if az_bin.endswith("az.cmd") and args and args[0] == "az":
+        args = args[1:]
+
     # Forzar entorno UTF-8
     env = os.environ.copy()
     env['PYTHONIOENCODING'] = 'utf-8'
@@ -9663,7 +9669,7 @@ def ensure_mi_login():
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta comandos Azure CLI exactamente como se envían"""
+    """Ejecuta cualquier comando recibido en el body, sin prefijos ni modificaciones."""
     try:
         # 🔑 Asegurar login con MI en cada request
         ensure_mi_login()
@@ -9671,7 +9677,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json()
         comando = body.get("comando")
 
-        if not comando:
+        if not comando or not isinstance(comando, str) or not comando.strip():
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
@@ -9682,20 +9688,13 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400
             )
 
-        # Detectar Azure CLI de forma universal (Windows/Linux/Container)
-        if platform.system() == "Windows":
-            AZ_BIN = shutil.which("az.cmd") or shutil.which("az") or "az"
-        else:
-            AZ_BIN = shutil.which("az") or "/usr/bin/az" or "az"
-
-        cmd_parts = [AZ_BIN] + comando.split()
-
-        logging.info(
-            f"Ejecutando en {platform.system()}: {' '.join(cmd_parts)}")
+        comando = comando.strip()
+        logging.info(f"Ejecutando comando: {comando}")
 
         try:
             result = subprocess.run(
-                cmd_parts,
+                comando,
+                shell=True,
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -9707,7 +9706,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                         "exito": False,
                         "codigo_salida": result.returncode,
                         "error": result.stderr.strip() if result.stderr else "Comando falló sin error específico",
-                        "comando_ejecutado": " ".join(cmd_parts),
+                        "comando_ejecutado": comando,
                         "sistema_operativo": platform.system()
                     }),
                     mimetype="application/json",
@@ -9726,7 +9725,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 json.dumps({
                     "exito": True,
                     "stdout": salida,
-                    "comando_ejecutado": " ".join(cmd_parts),
+                    "comando_ejecutado": comando,
                     "codigo_salida": result.returncode,
                     "sistema_operativo": platform.system()
                 }),
@@ -9739,7 +9738,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 json.dumps({
                     "exito": False,
                     "error": "Comando excedió tiempo límite (60s)",
-                    "comando_ejecutado": " ".join(cmd_parts),
+                    "comando_ejecutado": comando,
                     "sistema_operativo": platform.system()
                 }),
                 mimetype="application/json",
@@ -9750,11 +9749,10 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": f"Azure CLI no está instalado o no está disponible en {platform.system()}",
-                    "comando_ejecutado": " ".join(cmd_parts),
-                    "sugerencia": f"Asegúrate de que Azure CLI esté instalado correctamente en {platform.system()}",
-                    "sistema_operativo": platform.system(),
-                    "az_bin_usado": AZ_BIN
+                    "error": f"Comando no encontrado o no disponible en {platform.system()}",
+                    "comando_ejecutado": comando,
+                    "sugerencia": f"Verifica que el comando esté instalado correctamente en {platform.system()}",
+                    "sistema_operativo": platform.system()
                 }),
                 mimetype="application/json",
                 status_code=200
@@ -9767,6 +9765,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "exito": False,
                     "error": str(e),
                     "tipo_error": type(e).__name__,
+                    "comando_ejecutado": comando,
                     "sistema_operativo": platform.system()
                 }),
                 mimetype="application/json",
@@ -10198,7 +10197,6 @@ def diagnosticar_function_app_con_sdk() -> dict:
         })
 
     return diagnostico
-# ========== DIAGNOSTICO RECURSOS ==========
 
 
 @app.function_name(name="diagnostico_recursos_completo_http")
