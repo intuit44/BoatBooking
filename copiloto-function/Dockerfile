@@ -1,6 +1,38 @@
 FROM mcr.microsoft.com/azure-functions/python:4-python3.11
 
-# Instalar Azure CLI dentro del contenedor
+# 🔧 Herramientas esenciales de diagnóstico y operaciones
+RUN apt-get update && \
+  apt-get install -y \
+  iproute2 \
+  traceroute \
+  tcpdump \
+  mtr \
+  iputils-ping \
+  curl \
+  wget \
+  dnsutils \
+  net-tools \
+  jq \
+  git \
+  vim-tiny \
+  unzip \
+  zip \
+  less \
+  procps \
+  htop \
+  tree \
+  file \
+  lsof \
+  strace \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+# 🔐 Docker CLI (solo cliente, sin engine)
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && \
+  sh get-docker.sh --docker-engine=false --docker-cli=true && \
+  rm get-docker.sh
+
+# 🐍 Azure CLI
 RUN apt-get update && \
   apt-get install -y curl apt-transport-https lsb-release gnupg && \
   curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
@@ -11,10 +43,7 @@ ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
   AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
   WEBSITES_PORT=80
 
-# Puerto específico (IMPORTANTE)
 EXPOSE 80
-
-# Directorio de trabajo
 WORKDIR /home/site/wwwroot
 
 # Copiar todo el proyecto
@@ -26,5 +55,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Asegurar permisos
 RUN chmod -R 755 /home/site/wwwroot
 
-# ✅ COMANDO CORRECTO PARA AZURE FUNCTIONS (ESENCIAL)
+# Comando de inicio para Azure Functions
 CMD ["/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"]
