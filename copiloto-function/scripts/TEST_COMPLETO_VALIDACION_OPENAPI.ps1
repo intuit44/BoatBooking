@@ -1,5 +1,5 @@
 # TEST_COMPLETO_VALIDACION_OPENAPI.ps1
-# Script de validaciÃ³n completa que simula comportamiento del agente AI
+# Script de validaciÃƒÂ³n completa que simula comportamiento del agente AI
 
 param(
   [string]$BaseUrl = "http://localhost:7071",
@@ -9,7 +9,7 @@ param(
   [switch]$AutoDeploy
 )
 
-# ============ CONFIGURACIÃ“N ============
+# ============ CONFIGURACIÃƒâ€œN ============
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 
@@ -36,7 +36,7 @@ function ConvertFrom-OpenApi {
   catch {
     try {
       if (!(Get-Module -ListAvailable -Name powershell-yaml)) {
-        Write-Warn "Instalando mÃ³dulo powershell-yaml..."
+        Write-Warn "Instalando mÃƒÂ³dulo powershell-yaml..."
         Install-Module -Name powershell-yaml -Force -Scope CurrentUser
       }
       Import-Module powershell-yaml
@@ -105,7 +105,7 @@ function New-TestScenarios {
     
   $validScenario = @{
     Name           = "Valid_MinimalRequired"
-    Description    = "Llamada con parÃ¡metros mÃ­nimos requeridos"
+    Description    = "Llamada con parÃƒÂ¡metros mÃƒÂ­nimos requeridos"
     ExpectedStatus = @(200, 201)
     Body           = $null
     QueryParams    = @{}
@@ -131,7 +131,7 @@ function New-TestScenarios {
   if ($Operation.parameters -or $Operation.requestBody) {
     $invalidScenario = @{
       Name           = "Invalid_MissingRequired"
-      Description    = "Llamada sin parÃ¡metros requeridos"
+      Description    = "Llamada sin parÃƒÂ¡metros requeridos"
       ExpectedStatus = @(200, 400, 422)
       Body           = @{}
       QueryParams    = @{}
@@ -158,7 +158,7 @@ function New-TestScenarios {
   return $scenarios
 }
 
-# ============ CASOS ESPECIALES PARA PATHS ESPECÃFICOS ============
+# ============ CASOS ESPECIALES PARA PATHS ESPECÃƒÂFICOS ============
 function Get-SpecialCaseBody {
   param($Path, $Schema)
     
@@ -180,11 +180,11 @@ function Get-SpecialCaseBody {
   return $null
 }
 
-# ============ PREPARACIÃ“N DE ARCHIVOS PARA PRUEBAS ============
+# ============ PREPARACIÃƒâ€œN DE ARCHIVOS PARA PRUEBAS ============
 function Initialize-TestFiles {
   param($TestCase, $Scenario)
   
-  # Variable global para la raÃ­z del proyecto (ajusta segÃºn tu estructura)
+  # Variable global para la raÃƒÂ­z del proyecto (ajusta segÃƒÂºn tu estructura)
   if (-not $global:PROYECTO_RAIZ) {
     $global:PROYECTO_RAIZ = "."
   }
@@ -200,7 +200,7 @@ function Initialize-TestFiles {
       }
       if (!(Test-Path $origenPath)) {
         New-Item -ItemType File -Path $origenPath -Force | Out-Null
-        Set-Content -Path $origenPath -Value "Contenido generado automÃ¡ticamente para pruebas - $(Get-Date)"
+        Set-Content -Path $origenPath -Value "Contenido generado automÃƒÂ¡ticamente para pruebas - $(Get-Date)"
       }
       Write-Debug "Archivo origen creado: $origenPath"
     }
@@ -217,7 +217,7 @@ function Initialize-TestFiles {
       }
       if (!(Test-Path $origenPath)) {
         New-Item -ItemType File -Path $origenPath -Force | Out-Null
-        Set-Content -Path $origenPath -Value "Contenido generado automÃ¡ticamente para pruebas - $(Get-Date)"
+        Set-Content -Path $origenPath -Value "Contenido generado automÃƒÂ¡ticamente para pruebas - $(Get-Date)"
       }
       Write-Debug "Archivo origen creado: $origenPath"
     }
@@ -225,29 +225,29 @@ function Initialize-TestFiles {
 
   # Crear archivo para /api/leer-archivo
   if ($TestCase.Path -eq "/api/leer-archivo" -and $Scenario.Name -eq "Valid_MinimalRequired") {
-    Write-Host "ðŸ”§ Initialize-TestFiles: Procesando /api/leer-archivo" -ForegroundColor Yellow
+    Write-Host "Ã°Å¸â€Â§ Initialize-TestFiles: Procesando /api/leer-archivo" -ForegroundColor Yellow
     $ruta = $Scenario.QueryParams["ruta"]
-    Write-Host "ðŸ”§ Ruta inicial: '$ruta'" -ForegroundColor Yellow
+    Write-Host "Ã°Å¸â€Â§ Ruta inicial: '$ruta'" -ForegroundColor Yellow
     if (-not $ruta) {
       # Fallback: generar ruta si no existe
       $ruta = "test/sample_$(Get-Random -Maximum 9999).txt"
       $Scenario.QueryParams["ruta"] = $ruta
-      Write-Host "ðŸ”§ Ruta generada: '$ruta'" -ForegroundColor Yellow
-    }  # â† CIERRE FALTANTE AQUÃ
+      Write-Host "Ã°Å¸â€Â§ Ruta generada: '$ruta'" -ForegroundColor Yellow
+    }  # Ã¢â€Â CIERRE FALTANTE AQUÃƒÂ
     if ($ruta) {
       $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
       $rutaDir = Split-Path $rutaPath -Parent
-      Write-Host "ðŸ”§ Creando directorio: '$rutaDir'" -ForegroundColor Yellow
+      Write-Host "Ã°Å¸â€Â§ Creando directorio: '$rutaDir'" -ForegroundColor Yellow
       if (!(Test-Path $rutaDir)) {
         New-Item -ItemType Directory -Path $rutaDir -Force | Out-Null
       }
-      Write-Host "ðŸ”§ Creando archivo: '$rutaPath'" -ForegroundColor Yellow
+      Write-Host "Ã°Å¸â€Â§ Creando archivo: '$rutaPath'" -ForegroundColor Yellow
       if (!(Test-Path $rutaPath)) {
         New-Item -ItemType File -Path $rutaPath -Force | Out-Null
         Set-Content -Path $rutaPath -Value "Archivo de lectura para prueba - $(Get-Date)"
       }
-      Write-Host "ðŸ”§ âœ… Archivo de lectura creado: $rutaPath" -ForegroundColor Green
-      Write-Host "ðŸ”§ QueryParams final: $($Scenario.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Yellow
+      Write-Host "Ã°Å¸â€Â§ Ã¢Å“â€¦ Archivo de lectura creado: $rutaPath" -ForegroundColor Green
+      Write-Host "Ã°Å¸â€Â§ QueryParams final: $($Scenario.QueryParams | ConvertTo-Json -Compress)" -ForegroundColor Yellow
     }
   }
 

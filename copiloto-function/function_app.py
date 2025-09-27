@@ -61,6 +61,26 @@ def validate_required_params(body, required_fields):
     return None
 
 
+def setup_git_credentials():
+    """Configura ~/.git-credentials si GIT_INIT_SCRIPT_BASE64 está presente."""
+    script_b64 = os.environ.get("GIT_INIT_SCRIPT_BASE64")
+    if script_b64:
+        try:
+            script = base64.b64decode(script_b64).decode('utf-8')
+            script_path = "/tmp/git-init.sh"
+            with open(script_path, "w") as f:
+                f.write(script)
+            subprocess.run(["bash", script_path], check=True)
+            os.remove(script_path)
+            print("✅ Git configurado desde script base64")
+        except Exception as e:
+            print(f"⚠️ Error configurando git: {e}")
+
+
+# Ejecutar solo si no existe ~/.git-credentials
+if not os.path.exists(os.path.expanduser("~/.git-credentials")):
+    setup_git_credentials()
+
 # --- Built-ins y estándar ---
 
 # --- Azure Core ---
@@ -9673,6 +9693,9 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     try:
         # 🔑 Asegurar login con MI en cada request
         ensure_mi_login()
+
+        # Ejecutar setup_git_credentials SIEMPRE antes de usar git
+        setup_git_credentials()
 
         body = req.get_json()
         comando = body.get("comando")

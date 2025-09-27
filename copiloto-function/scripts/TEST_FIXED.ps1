@@ -1,4 +1,4 @@
-﻿# TEST_COMPLETO_VALIDACION_OPENAPI.ps1
+# TEST_COMPLETO_VALIDACION_OPENAPI.ps1
 # Script de validaciÃ³n completa que simula comportamiento del agente AI
 
 param(
@@ -678,7 +678,7 @@ foreach ($testCase in $testCases) {
       Write-Pass "✓ PASS ($($result.StatusCode), $($result.ResponseTime)ms)"
     }
     elseif ($result.Success -and $validationErrors.Count -gt 0) {
-      Write-Warn "âš  PASS con advertencias ($($result.StatusCode), $($validationErrors.Count) errores de validaciÃ³n)"
+      Write-Warn "âš PASS con advertencias ($($result.StatusCode), $($validationErrors.Count) errores de validaciÃ³n)"
       if ($VerboseOutput) {
         foreach ($err in $validationErrors) {
           Write-Warn "    - $err"
@@ -774,7 +774,7 @@ if ($report.ValidationErrors.Count -gt 0) {
   Write-Host ""
     
   foreach ($validation in $report.ValidationErrors) {
-    Write-Warn "âš  $($validation.Method) $($validation.Path)"
+    Write-Warn "âš $($validation.Method) $($validation.Path)"
     foreach ($err in $validation.Errors) {
       Write-Host "   - $err"
     }

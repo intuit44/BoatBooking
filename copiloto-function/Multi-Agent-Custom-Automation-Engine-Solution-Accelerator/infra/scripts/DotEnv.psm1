@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Carga variables de entorno desde el archivo .env ubicado en la raíz del proyecto
+Carga variables de entorno desde el archivo .env ubicado en la raÃ­z del proyecto
 #>
 function Import-DotEnv {
     [CmdletBinding()]
@@ -10,20 +10,20 @@ function Import-DotEnv {
     )
 
     if (-not (Test-Path $Path)) {
-        Write-Warning "⚠️ Archivo .env no encontrado en $Path"
+        Write-Warning "âšï¸ Archivo .env no encontrado en $Path"
         return $false
     }
 
     Get-Content $Path | Where-Object {
-        $_ -notmatch '^\s*(#|$)'  # Excluye comentarios y líneas vacías
+        $_ -notmatch '^\s*(#|$)'  # Excluye comentarios y lÃ­neas vacÃ­as
     } | ForEach-Object {
         $name, $value = $_ -split '=', 2
         $value = $value.Trim('''"')
         [Environment]::SetEnvironmentVariable($name.Trim(), $value)
-        Write-Verbose "✅ Variable cargada: $($name.Trim())"
+        Write-Verbose "âœ… Variable cargada: $($name.Trim())"
     }
 
-    Write-Host "✅ Variables de entorno cargadas desde $Path" -ForegroundColor Green
+    Write-Host "âœ… Variables de entorno cargadas desde $Path" -ForegroundColor Green
     return $true
 }
 

@@ -7,7 +7,7 @@ param(
   [switch]$VerboseOutput
 )
 
-# ============ CONFIGURACIÓN ============
+# ============ CONFIGURACIÃ“N ============
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
@@ -48,7 +48,7 @@ function Get-OpenApiEndpoints {
     $path = $match.Value.Trim().Replace(':', '')
     if ($path -in $SAFE_ENDPOINTS) {
       $endpoints[$path] = @{
-        Methods = @("GET", "POST")  # Asumir métodos comunes
+        Methods = @("GET", "POST")  # Asumir mÃ©todos comunes
       }
     }
   }
@@ -152,7 +152,7 @@ function Invoke-SafeTest {
   return $result
 }
 
-# ============ VALIDACIÓN DE RESPUESTA ============
+# ============ VALIDACIÃ“N DE RESPUESTA ============
 function Test-Response {
   param($Result, $Endpoint)
     
@@ -162,21 +162,21 @@ function Test-Response {
   }
     
   if (-not $Result.Success) {
-    $validation.Issues += "Endpoint no respondió (HTTP $($Result.StatusCode))"
+    $validation.Issues += "Endpoint no respondiÃ³ (HTTP $($Result.StatusCode))"
     return $validation
   }
     
-  # Validar código de estado
+  # Validar cÃ³digo de estado
   if ($Result.StatusCode -ne 200) {
-    $validation.Issues += "Código HTTP inesperado: $($Result.StatusCode)"
+    $validation.Issues += "CÃ³digo HTTP inesperado: $($Result.StatusCode)"
   }
     
   # Validar que sea JSON
   if (-not $Result.Content) {
-    $validation.Issues += "Respuesta no es JSON válido"
+    $validation.Issues += "Respuesta no es JSON vÃ¡lido"
   }
   else {
-    # Validaciones básicas de estructura según el endpoint
+    # Validaciones bÃ¡sicas de estructura segÃºn el endpoint
     switch ($Endpoint) {
       "/api/health" {
         if ($Result.Content.psobject.Properties.Name -notcontains "status") {
@@ -202,13 +202,13 @@ function Test-Response {
 
 # ============ PROGRAMA PRINCIPAL ============
 Write-Host ""
-Write-Info "🤖 VALIDADOR SEGURO OPENAPI vs ENDPOINTS"
+Write-Info "ðŸ¤– VALIDADOR SEGURO OPENAPI vs ENDPOINTS"
 Write-Host "========================================"
 Write-Host ""
 
 try {
   # 1. Obtener endpoints del OpenAPI
-  Write-Info "📋 Obteniendo endpoints desde OpenAPI..."
+  Write-Info "ðŸ“‹ Obteniendo endpoints desde OpenAPI..."
   $openApiEndpoints = Get-OpenApiEndpoints -Path $OpenApiPath
     
   if ($openApiEndpoints.Count -eq 0) {
@@ -216,23 +216,23 @@ try {
     exit 1
   }
     
-  Write-Success "✅ Encontrados $($openApiEndpoints.Count) endpoints seguros en OpenAPI"
+  Write-Success "âœ… Encontrados $($openApiEndpoints.Count) endpoints seguros en OpenAPI"
   $openApiEndpoints.Keys | ForEach-Object { Write-Debug "   - $_" }
 
   # 2. Verificar conectividad
-  Write-Info "🌐 Verificando conectividad con $BaseUrl..."
+  Write-Info "ðŸŒ Verificando conectividad con $BaseUrl..."
   try {
     $testResponse = Invoke-WebRequest -Uri "$BaseUrl/api/health" -TimeoutSec 10
-    Write-Success "✅ Servidor respondiendo correctamente"
+    Write-Success "âœ… Servidor respondiendo correctamente"
   }
   catch {
-    Write-Error "❌ No se puede conectar con el servidor: $($_.Exception.Message)"
+    Write-Error "âŒ No se puede conectar con el servidor: $($_.Exception.Message)"
     exit 1
   }
 
   # 3. Ejecutar pruebas
   Write-Host ""
-  Write-Info "🧪 Ejecutando validación cruzada..."
+  Write-Info "ðŸ§ª Ejecutando validaciÃ³n cruzada..."
   Write-Host ""
 
   $results = @()
@@ -254,10 +254,10 @@ try {
     $validation = Test-Response -Result $result -Endpoint $endpoint
 
     if ($validation.IsValid) {
-      Write-Success "✅ PASÓ ($($result.StatusCode), $($result.ResponseTime)ms)"
+      Write-Success "âœ… PASÃ“ ($($result.StatusCode), $($result.ResponseTime)ms)"
     }
     else {
-      Write-Error "❌ FALLÓ"
+      Write-Error "âŒ FALLÃ“"
       if ($VerboseOutput) {
         foreach ($issue in $validation.Issues) {
           Write-Warning "   - $issue"
@@ -279,7 +279,7 @@ try {
 
   # 4. Generar reporte
   Write-Host ""
-  Write-Info "📊 REPORTE DE VALIDACIÓN"
+  Write-Info "ðŸ“Š REPORTE DE VALIDACIÃ“N"
   Write-Host "========================"
 
   $totalTests = $results.Count
@@ -291,28 +291,28 @@ try {
   if (($totalTests - $passedTests) -gt 0) {
     Write-Error "Pruebas fallidas: $($totalTests - $passedTests)"
   }
-  Write-Host "Tasa de éxito: $successRate%"
+  Write-Host "Tasa de Ã©xito: $successRate%"
 
-  # 5. Análisis de agente AI simulado
+  # 5. AnÃ¡lisis de agente AI simulado
   Write-Host ""
-  Write-Info "🤖 ANÁLISIS AGENTE AI"
+  Write-Info "ðŸ¤– ANÃLISIS AGENTE AI"
   Write-Host "===================="
 
   if ($successRate -eq 100) {
-    Write-Success "✅ EXCELENTE: Todos los endpoints responden correctamente"
-    Write-Host "   La API está en perfecto estado. OpenAPI y implementación coinciden."
+    Write-Success "âœ… EXCELENTE: Todos los endpoints responden correctamente"
+    Write-Host "   La API estÃ¡ en perfecto estado. OpenAPI y implementaciÃ³n coinciden."
   }
   elseif ($successRate -ge 80) {
-    Write-Warning "⚠️  ACEPTABLE: La mayoría de endpoints funcionan"
+    Write-Warning "âšï¸  ACEPTABLE: La mayorÃ­a de endpoints funcionan"
     Write-Host "   Revisar los endpoints fallidos, pero el estado general es bueno."
   }
   elseif ($successRate -ge 50) {
-    Write-Warning "⚠️  REGULAR: Hay problemas significativos"
-    Write-Host "   Revisar la implementación de los endpoints fallidos."
+    Write-Warning "âšï¸  REGULAR: Hay problemas significativos"
+    Write-Host "   Revisar la implementaciÃ³n de los endpoints fallidos."
   }
   else {
-    Write-Error "�️ CRÍTICO: Múltiples endpoints fallaron"
-    Write-Host "   Revisar urgentemente la implementación y el OpenAPI."
+    Write-Error "ï¿½ï¸ CRÃTICO: MÃºltiples endpoints fallaron"
+    Write-Host "   Revisar urgentemente la implementaciÃ³n y el OpenAPI."
   }
 
   # 6. Guardar reporte detallado
@@ -334,20 +334,20 @@ try {
   }
 
   $report | ConvertTo-Json -Depth 5 | Set-Content $reportPath
-  Write-Success "📄 Reporte guardado en: $reportPath"
+  Write-Success "ðŸ“„ Reporte guardado en: $reportPath"
 
-  # 7. Recomendación final
+  # 7. RecomendaciÃ³n final
   Write-Host ""
   if ($successRate -ge 80) {
-    Write-Success "🎉 La validación fue exitosa. La API está lista para uso productivo."
+    Write-Success "ðŸŽ‰ La validaciÃ³n fue exitosa. La API estÃ¡ lista para uso productivo."
   }
   else {
-    Write-Error "🚫 Se recomienda revisar los problemas antes de usar en producción."
+    Write-Error "ðŸš« Se recomienda revisar los problemas antes de usar en producciÃ³n."
   }
 
 }
 catch {
-  Write-Error "❌ Error durante la ejecución: $($_.Exception.Message)"
+  Write-Error "âŒ Error durante la ejecuciÃ³n: $($_.Exception.Message)"
   exit 1
 }
 

@@ -1,4 +1,4 @@
-﻿# TEST_COMPLETO_VALIDACION_OPENAPI.ps1
+# TEST_COMPLETO_VALIDACION_OPENAPI.ps1
 # Script de validaciÃƒÂ³n completa que simula comportamiento del agente AI
 
 param(
@@ -233,7 +233,7 @@ function Initialize-TestFiles {
       $ruta = "test/sample_$(Get-Random -Maximum 9999).txt"
       $Scenario.QueryParams["ruta"] = $ruta
       Write-Host "Ã°Å¸â€Â§ Ruta generada: '$ruta'" -ForegroundColor Yellow
-    }  # Ã¢â€ Â CIERRE FALTANTE AQUÃƒÂ
+    }  # Ã¢â€Â CIERRE FALTANTE AQUÃƒÂ
     if ($ruta) {
       $rutaPath = Join-Path $global:PROYECTO_RAIZ $ruta
       $rutaDir = Split-Path $rutaPath -Parent
