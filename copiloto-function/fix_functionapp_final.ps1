@@ -1,4 +1,4 @@
-﻿# fix_functionapp_final.ps1
+# fix_functionapp_final.ps1
 # ==========================================
 # SCRIPT PROFESIONAL DE CORRECCIÓN DEFINITIVA
 # ==========================================
@@ -438,6 +438,5 @@ else {
   Write-Info "   az functionapp create -g $ResourceGroup -n $FunctionApp --plan <PLAN> --deployment-container-image-name $fullImage --runtime custom"
 }
 
-# Registrar timestamp de ejecución final
 Write-Info "Ejecución completada en: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 Write-Host "`nScript completado.`n" -ForegroundColor Cyan
