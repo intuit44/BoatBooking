@@ -1,28 +1,28 @@
 ﻿# fix_functionapp_final.ps1
 # ==========================================
-# SCRIPT PROFESIONAL DE CORRECCIÓN DEFINITIVA
+# SCRIPT PROFESIONAL DE CORRECCIÃ“N DEFINITIVA
 # ==========================================
 
 param(
   [string]$ResourceGroup = "boat-rental-app-group",
   [string]$FunctionApp = "copiloto-semantico-func-us2",
   [string]$ACR = "boatrentalacr",
-  [string]$ImageTag = "",  # Ahora vacío por defecto para usar auto-incremento
+  [string]$ImageTag = "",  # Ahora vacÃ­o por defecto para usar auto-incremento
   [switch]$Force
 )
 
 # Colores para output
 function Write-Step { param($msg) Write-Host "`n[$($args[0])] $msg" -ForegroundColor Cyan }
-function Write-Success { param($msg) Write-Host "✓ $msg" -ForegroundColor Green }
-function Write-Error { param($msg) Write-Host "✗ $msg" -ForegroundColor Red }
-function Write-Warning { param($msg) Write-Host "⚠ $msg" -ForegroundColor Yellow }
-function Write-Info { param($msg) Write-Host "→ $msg" -ForegroundColor Gray }
+function Write-Success { param($msg) Write-Host "âœ“ $msg" -ForegroundColor Green }
+function Write-Error { param($msg) Write-Host "âœ— $msg" -ForegroundColor Red }
+function Write-Warning { param($msg) Write-Host "âš $msg" -ForegroundColor Yellow }
+function Write-Info { param($msg) Write-Host "â†’ $msg" -ForegroundColor Gray }
 
 # ==========================================
 # AUTO-INCREMENTO DE TAG
 # ==========================================
 if ([string]::IsNullOrEmpty($ImageTag)) {
-  Write-Info "Calculando siguiente tag automáticamente..."
+  Write-Info "Calculando siguiente tag automÃ¡ticamente..."
 
   $allTags = az acr repository show-tags `
     -n $ACR `
@@ -41,25 +41,25 @@ if ([string]::IsNullOrEmpty($ImageTag)) {
     if ($latestVersionTag -match "^v(\d+)$") {
       $nextVersion = [int]$Matches[1] + 1
       $ImageTag = "v$nextVersion"
-      Write-Info "→ Usando siguiente tag: $ImageTag"
+      Write-Info "â†’ Usando siguiente tag: $ImageTag"
     }
   }
   else {
-    # No hay tags previos → arrancar en v1
+    # No hay tags previos â†’ arrancar en v1
     $ImageTag = "v1"
-    Write-Warning "→ No se encontraron tags vNN previos. Iniciando en $ImageTag"
+    Write-Warning "â†’ No se encontraron tags vNN previos. Iniciando en $ImageTag"
   }
 }
 
 
 # ==========================================
-# FASE 1: VALIDACIÓN INICIAL
+# FASE 1: VALIDACIÃ“N INICIAL
 # ==========================================
 Write-Host "`n========================================" -ForegroundColor Magenta
-Write-Host "CORRECCIÓN DEFINITIVA FUNCTION APP v3.0" -ForegroundColor Magenta
+Write-Host "CORRECCIÃ“N DEFINITIVA FUNCTION APP v3.0" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
 
-Write-Step "FASE 1: VALIDACIÓN INICIAL" 1
+Write-Step "FASE 1: VALIDACIÃ“N INICIAL" 1
 
 # Verificar que la Function App existe
 $appExists = az functionapp show -g $ResourceGroup -n $FunctionApp 2>$null
@@ -77,7 +77,7 @@ if ($planDetails.sku.tier -eq "Dynamic") {
   Write-Info "Ejecuta: az functionapp plan update --name $($planDetails.name) -g $ResourceGroup --sku EP1"
   if (-not $Force) { exit 1 }
 }
-Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) ✓"
+Write-Success "Plan de servicio: $($planDetails.sku.name) - $($planDetails.sku.tier) âœ“"
 
 # ==========================================
 # FASE 2: OBTENER CREDENCIALES Y STORAGE KEY
@@ -89,7 +89,7 @@ Write-Info "Obteniendo Storage Account Key..."
 $storageKey = az storage account keys list -n boatrentalstorage -g $ResourceGroup --query "[0].value" -o tsv 2>$null
 if (-not $storageKey) {
   Write-Error "No se pudo obtener la Storage Key"
-  # Intentar con otro método
+  # Intentar con otro mÃ©todo
   $storageKey = "IzbvFwD7WupP22swwnpo4k+yKgPLOGnR84jViNT1AxYLUxvjW8Qs/Nxm9IDnpQegi1B2F2fNOY9Q+AStZy8ACA=="
   Write-Warning "Usando Storage Key hardcodeada como fallback"
 }
@@ -107,7 +107,7 @@ if (-not $acrUsername -or -not $acrPassword) {
 Write-Success "Credenciales ACR obtenidas"
 
 # ==========================================
-# FASE 3: CONFIGURAR APP SETTINGS CRÍTICOS
+# FASE 3: CONFIGURAR APP SETTINGS CRÃTICOS
 # ==========================================
 Write-Step "FASE 3: CONFIGURAR APP SETTINGS" 3
 
@@ -128,9 +128,9 @@ $settings = @{
   "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
   "AZURE_VOICE_LIVE_DEPLOYMENT"                 = "gpt-4o-mini"
   "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
-  # 🔐 CREDENCIALES GITHUB (IMPORTANTE)
+  # ðŸ” CREDENCIALES GITHUB (IMPORTANTE)
   "GITHUB_PAT"                                  = "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"
-  # Dejarlo de último
+  # Dejarlo de Ãºltimo
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
   "AZURE_RESOURCE_GROUP"                        = "boat-rental-app-group"
@@ -139,7 +139,7 @@ $settings = @{
 
 
 
-Write-Info "Aplicando settings críticos..."
+Write-Info "Aplicando settings crÃ­ticos..."
 foreach ($key in $settings.Keys) {
   $value = $settings[$key]
   $applied = $false
@@ -160,42 +160,12 @@ foreach ($key in $settings.Keys) {
     }
   }
   if (-not $applied -and -not $Force) {
-    Write-Error "No se pudo configurar $key después de 3 intentos"
+    Write-Error "No se pudo configurar $key despuÃ©s de 3 intentos"
     exit 1
   }
 }
 
 Write-Success "App Settings configurados"
-
-
-# ==========================================
-# FASE 3.1: CONFIGURAR GIT CREDENTIALS
-# ==========================================
-Write-Step "FASE 3.1: CONFIGURAR GIT CREDENTIALS" 3.1
-
-try {
-  $gitScript = @"
-git config --global user.email 'copiloto@azure.com'
-git config --global user.name 'Azure Copiloto'
-git config --global credential.helper 'store --file ~/.git-credentials'
-echo 'https://x-access-token:$GITHUB_PAT@github.com' > ~/.git-credentials
-chmod 600 ~/.git-credentials
-"@
-
-  $gitScriptBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($gitScript))
-
-  az functionapp config appsettings set `
-    -g $ResourceGroup `
-    -n $FunctionApp `
-    --settings `
-    "GIT_INIT_SCRIPT_BASE64=$gitScriptBase64" `
-    "GITHUB_PAT=$GITHUB_PAT" 1>$null
-
-  Write-Success "Configuración Git aplicada (base64)"
-}
-catch {
-  Write-Warning "Error configurando Git credentials: $($_.Exception.Message)"
-}
 
 # ==========================================
 # FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)
@@ -206,7 +176,7 @@ Write-Step "FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)" 3.5
 $StorageAccount = "boatrentalstorage"
 $ContainerName = "boat-rental-project"
 
-# 3.5.1 – Asignar RBAC a la MI de la Function App (Data Contributor)
+# 3.5.1 â€“ Asignar RBAC a la MI de la Function App (Data Contributor)
 try {
   $mi = az functionapp show -g $ResourceGroup -n $FunctionApp --query identity.principalId -o tsv
   $saId = az storage account show -g $ResourceGroup -n $StorageAccount --query id -o tsv
@@ -218,13 +188,13 @@ try {
 
   Write-Info "Asignando rol 'Storage Blob Data Contributor' a la MI de la app..."
   az role assignment create --assignee $mi --role "Storage Blob Data Contributor" --scope $saId 1>$null 2>$null
-  Write-Success "RBAC aplicado (puede tardar 1–3 min en propagarse)"
+  Write-Success "RBAC aplicado (puede tardar 1â€“3 min en propagarse)"
 }
 catch {
   Write-Warning "No se pudo asignar RBAC (posible duplicado). Continuo..."
 }
 
-# 3.5.2 – Garantizar acceso público de red al endpoint de blobs (sin abrir anonimato)
+# 3.5.2 â€“ Garantizar acceso pÃºblico de red al endpoint de blobs (sin abrir anonimato)
 try {
   $pna = az storage account show -g $ResourceGroup -n $StorageAccount --query publicNetworkAccess -o tsv
   $dfa = az storage account show -g $ResourceGroup -n $StorageAccount --query networkRuleSet.defaultAction -o tsv
@@ -240,10 +210,10 @@ try {
   Write-Success "Red de Storage OK (PNA=Enabled / defaultAction=Allow)"
 }
 catch {
-  Write-Warning "No se pudo actualizar configuración de red de Storage. Reviso de todos modos..."
+  Write-Warning "No se pudo actualizar configuraciÃ³n de red de Storage. Reviso de todos modos..."
 }
 
-# 3.5.3 – Forzar ruta MI en tu código: solo BLOB_ACCOUNT_URL, sin connection string de datos
+# 3.5.3 â€“ Forzar ruta MI en tu cÃ³digo: solo BLOB_ACCOUNT_URL, sin connection string de datos
 try {
   $blobUrl = "https://$StorageAccount.blob.core.windows.net"
   az functionapp config appsettings set -g $ResourceGroup -n $FunctionApp --settings BLOB_ACCOUNT_URL="$blobUrl" 1>$null
@@ -255,21 +225,46 @@ catch {
   if (-not $Force) { exit 1 }
 }
 
-# 3.5.4 – Asegurar que existe el contenedor que usa tu código (CONTAINER_NAME)
+# 3.5.4 â€“ Asegurar que existe el contenedor que usa tu cÃ³digo (CONTAINER_NAME)
 try {
   Write-Info "Creando contenedor '$ContainerName' (idempotente) con AAD..."
   az storage container create -n $ContainerName --account-name $StorageAccount --auth-mode login 1>$null
   Write-Success "Contenedor verificado/creado"
 }
 catch {
-  Write-Warning "No se pudo crear/verificar el contenedor (quizá ya existe)."
+  Write-Warning "No se pudo crear/verificar el contenedor (quizÃ¡ ya existe)."
 }
 
-# 3.5.5 – Reinicio rápido para recoger RBAC/AppSettings
+
+# 3.5.5 â€“ Reinicio rÃ¡pido para recoger RBAC/AppSettings
 Write-Info "Reiniciando para recoger MI/RBAC..."
 az functionapp restart -g $ResourceGroup -n $FunctionApp 1>$null
-Write-Info "Esperando propagación de RBAC (75s)..."
+Write-Info "Esperando propagaciÃ³n de RBAC (75s)..."
 Start-Sleep -Seconds 75
+
+# ==========================================
+# FASE 3.6: CONFIGURAR GIT CREDENTIALS
+# ==========================================
+Write-Step "FASE 3.6: CONFIGURAR GIT CREDENTIALS" 3.6
+
+try {
+  $gitCredCmd = @"
+git config --global user.email 'bot@azure.com'
+git config --global user.name 'Azure Function'
+git config --global credential.helper 'store --file ~/.git-credentials'
+echo "https://x-access-token:${env:GITHUB_PAT}@github.com" > ~/.git-credentials
+"@
+
+  az functionapp config appsettings set `
+    -g $ResourceGroup `
+    -n $FunctionApp `
+    --settings "GIT_INIT_SCRIPT=$gitCredCmd" 1>$null
+
+  Write-Success "Git configurado (helper + credenciales en ~/.git-credentials)"
+}
+catch {
+  Write-Warning "No se pudo configurar Git credentials automÃ¡ticamente"
+}
 
 # ==========================================
 # FASE 3.9: CONSTRUIR Y PUBLICAR IMAGEN DOCKER
@@ -282,7 +277,7 @@ $fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
 Write-Info "Construyendo imagen Docker: $fullImage"
 docker build -t $fullImage .
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló la construcción de la imagen Docker"
+  Write-Error "FallÃ³ la construcciÃ³n de la imagen Docker"
   if (-not $Force) { exit 1 }
 }
 Write-Success "Imagen Docker construida exitosamente"
@@ -291,7 +286,7 @@ Write-Success "Imagen Docker construida exitosamente"
 Write-Info "Autenticando con ACR: $ACR"
 az acr login -n $ACR
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló autenticación con ACR"
+  Write-Error "FallÃ³ autenticaciÃ³n con ACR"
   if (-not $Force) { exit 1 }
 }
 Write-Success "Login en ACR exitoso"
@@ -300,7 +295,7 @@ Write-Success "Login en ACR exitoso"
 Write-Info "Publicando imagen en ACR: $fullImage"
 docker push $fullImage
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló la publicación de la imagen en ACR"
+  Write-Error "FallÃ³ la publicaciÃ³n de la imagen en ACR"
   if (-not $Force) { exit 1 }
 }
 Write-Success "Imagen Docker publicada exitosamente"
@@ -323,7 +318,7 @@ if (-not $tagExists) {
 }
 Write-Success "Imagen encontrada en ACR: $ImageTag"
 
-# Verificación opcional del contenido de la imagen Docker
+# VerificaciÃ³n opcional del contenido de la imagen Docker
 Write-Info "Verificando contenido de la imagen Docker..."
 try {
   $dockerContent = docker run --rm $fullImage ls -la /home/site/wwwroot 2>&1
@@ -341,7 +336,7 @@ catch {
   Write-Warning "Docker no disponible o imagen no accesible localmente"
 }
 
-# Intentar configurar con credenciales explícitas
+# Intentar configurar con credenciales explÃ­citas
 $containerResult = az functionapp config container set `
   -g $ResourceGroup `
   -n $FunctionApp `
@@ -351,7 +346,7 @@ $containerResult = az functionapp config container set `
   --registry-password $acrPassword 2>&1
 
 if ($LASTEXITCODE -ne 0) {
-  Write-Warning "Primer intento falló, reintentando sin https..."
+  Write-Warning "Primer intento fallÃ³, reintentando sin https..."
       
   $containerResult = az functionapp config container set `
     -g $ResourceGroup `
@@ -364,7 +359,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Success "Contenedor configurado"
 
-# Verificar que se aplicó
+# Verificar que se aplicÃ³
 $containerConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp | ConvertFrom-Json
 $dockerImageSetting = $containerConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }
 
@@ -372,7 +367,7 @@ if ($dockerImageSetting.value -like "*$ImageTag*") {
   Write-Success "Imagen verificada: $($dockerImageSetting.value)"
 }
 else {
-  Write-Error "La imagen no se configuró correctamente"
+  Write-Error "La imagen no se configurÃ³ correctamente"
   if (-not $Force) { exit 1 }
 }
 
@@ -401,9 +396,9 @@ for ($i = 1; $i -le $waitTime; $i++) {
 Write-Progress -Activity "Esperando inicio del contenedor" -Completed
 
 # ==========================================
-# FASE 6: VERIFICACIÓN DE ENDPOINTS
+# FASE 6: VERIFICACIÃ“N DE ENDPOINTS
 # ==========================================
-Write-Step "FASE 6: VERIFICACIÓN DE ENDPOINTS" 6
+Write-Step "FASE 6: VERIFICACIÃ“N DE ENDPOINTS" 6
 
 $baseUrl = "https://$FunctionApp.azurewebsites.net"
 $successCount = 0
@@ -434,13 +429,13 @@ for ($i = 1; $i -le $max; $i++) {
 if ($ok) { $successCount++ }
 
 # ==========================================
-# FASE 7: DIAGNÓSTICO FINAL
+# FASE 7: DIAGNÃ“STICO FINAL
 # ==========================================
-Write-Step "FASE 7: DIAGNÓSTICO FINAL" 7
+Write-Step "FASE 7: DIAGNÃ“STICO FINAL" 7
 
 if ($successCount -gt 0) {
   Write-Host "`n========================================" -ForegroundColor Green
-  Write-Host "✓ ÉXITO: Function App OPERATIVA" -ForegroundColor Green
+  Write-Host "EXITO: Function App OPERATIVA" -ForegroundColor Green
   Write-Host "========================================" -ForegroundColor Green
   Write-Success "$successCount de 3 endpoints funcionando"
   Write-Info "URL: $baseUrl"
@@ -449,13 +444,13 @@ if ($successCount -gt 0) {
   Write-Info "`nFunciones registradas:"
   $functions = az functionapp function list -g $ResourceGroup -n $FunctionApp --query "[].name" -o tsv 2>$null
   foreach ($func in $functions) {
-    Write-Info "  • $func"
+    Write-Info "  â€¢ $func"
   }
       
 }
 else {
   Write-Host "`n========================================" -ForegroundColor Red
-  Write-Host "✗ PROBLEMA PERSISTE" -ForegroundColor Red
+  Write-Host "[ERROR] PROBLEMA PERSISTE" -ForegroundColor Red
   Write-Host "========================================" -ForegroundColor Red
       
   Write-Warning "Acciones adicionales requeridas:"
@@ -470,6 +465,7 @@ else {
   Write-Info "   az functionapp create -g $ResourceGroup -n $FunctionApp --plan <PLAN> --deployment-container-image-name $fullImage --runtime custom"
 }
 
-# Registrar timestamp de ejecución final
-Write-Info "Ejecución completada en: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host "`nScript completado.`n" -ForegroundColor Cyan 
+
+Write-Info "EjecuciÃ³n completada en: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Host "`nScript completado.`n" -ForegroundColor Cyan
+
