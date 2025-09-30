@@ -1,0 +1,8 @@
+{"tipo": "inicio_sistema", "fecha": "2025-09-27T10:00:00Z", "origen": "sistema", "mensaje": "Archivo de log semántico inicializado."}
+{"tipo": "rollback", "fix_id": "3637bb64", "timestamp": "2025-09-29T03:11:26.828458", "mensaje": "Rollback ejecutado para fix 3637bb64"}
+{"tipo": "rollback_skip", "fix_id": "3637bb64", "timestamp": "2025-09-29T03:36:18.323698Z", "mensaje": "Rollback omitido, archivo scripts/fail.sh no existe"}
+{"tipo": "deploy_automatico", "fecha": "2025-09-28T23:50:58.092597", "origen": "auto_promoter", "trigger": "fix_fix-001", "resultado": "fallido"}
+{"tipo": "promocion_batch", "fecha": "2025-09-28T23:50:58.665469", "origen": "auto_promoter", "reporte": {"timestamp": "2025-09-28T23:50:58.665469", "total_pendientes_revisadas": 9, "promovidos_count": 2, "fallidos_count": 0, "detalles_promovidos": ["fix-001", "fix-002"], "detalles_fallidos": []}}
+{"tipo": "promocion_batch", "fecha": "2025-09-29T01:55:48.990324", "origen": "auto_promoter", "reporte": {"timestamp": "2025-09-29T01:55:48.990324", "total_pendientes_revisadas": 1, "promovidos_count": 0, "fallidos_count": 0, "detalles_promovidos": [], "detalles_fallidos": []}}
+{"tipo": "promocion_batch", "fecha": "2025-09-29T02:12:26.483019", "origen": "auto_promoter", "reporte": {"timestamp": "2025-09-29T02:12:26.483019", "total_pendientes_revisadas": 3, "promovidos_count": 0, "fallidos_count": 0, "detalles_promovidos": [], "detalles_fallidos": []}}
+{"tipo": "promocion_batch", "fecha": "2025-09-29T02:13:11.882130", "origen": "auto_promoter", "reporte": {"timestamp": "2025-09-29T02:13:11.882130", "total_pendientes_revisadas": 3, "promovidos_count": 0, "fallidos_count": 0, "detalles_promovidos": [], "detalles_fallidos": []}}

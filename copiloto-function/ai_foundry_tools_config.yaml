@@ -76,3 +76,131 @@ tools:
               type: object
               required: false
               description: Metadata adicional del contenedor
+
+  - name: autocorrector_agent
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/autocorregir
+          method: POST
+          description: Registrar una corrección propuesta por un agente AI
+          headers:
+            X-Agent-Auth:
+              type: string
+              required: true
+              default: COPILOT-AGENT
+          parameters:
+            accion:
+              type: string
+              required: true
+            target:
+              type: string
+              required: true
+            propuesta:
+              type: string
+              required: true
+            tipo:
+              type: string
+              required: true
+            detonante:
+              type: string
+              required: false
+              default: "manual"
+            origen:
+              type: string
+              required: false
+              default: "AI Agent"
+        - path: /api/revisar-correcciones
+          method: GET
+          description: Ver todas las correcciones pendientes registradas
+
+  - name: fix_promoter
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/revisar-correcciones
+          method: GET
+          description: Correcciones pendientes
+        
+        - path: /api/promover
+          method: POST
+          description: Dispara ejecución del promotor
+        
+        - path: /api/rollback
+          method: POST
+          description: Revertir una corrección aplicada
+      pipeline:
+      - if: "hay correcciones pendientes && prioridad >= 9 && validado == true"
+        then: call fix_promoter:/api/promover
+
+agents:
+  - name: supervisor_de_operaciones
+    role: "Supervisor de Operaciones Azure"
+    description: >
+      Agente supervisor responsable de analizar, diagnosticar y sugerir pasos antes de ejecutar acciones.
+      Prioriza la evaluación y las recomendaciones sobre la ejecución inmediata.
+    modo: "suggestive-first"
+    capabilities:
+      diagnosticar:
+        tool: azure_cli_executor:/api/diagnostico-recursos
+        description: "Analiza estado de recursos Azure"
+      sugerir:
+        tool: autocorrector_agent:/api/revisar-correcciones
+        description: "Revisa correcciones pendientes y sugiere acciones"
+      validar:
+        tool: autocorrector_agent:/api/revisar-correcciones
+        description: "Valida que las correcciones tengan pruebas unitarias e integración"
+      registrar:
+        tool: azure_cli_executor:/api/status
+        description: "Registrar en logs internos el estado antes y después de cada decisión"
+      ejecutar_condicional:
+        tool: fix_promoter:/api/promover
+        description: "Ejecuta correcciones solo si cumplen criterios"
+      revertir:
+        tool: fix_promoter:/api/rollback
+        description: "Rollback automático si falla la ejecución"
+    policies:
+      - rule: "Siempre entregar Diagnóstico + Pasos sugeridos + Comando propuesto"
+      - rule: "Solo ejecutar si se cumplen criterios de validación (prioridad alta, correcciones críticas)"
+      - rule: "Documentar todas las decisiones y justificaciones"
+      - rule: "Validar pruebas unitarias e integración antes de ejecutar"
+      - rule: "Registrar estado antes y después de cada acción"
+      - rule: "Rollback automático si la ejecución falla"
+      - rule: "Nunca ejecutar sin análisis previo completo"
+    workflow:
+      - step: "registrar"
+        tool: azure_cli_executor:/api/status
+        condition: "always"
+        description: "Log estado inicial"
+      - step: "diagnosticar"
+        tool: azure_cli_executor:/api/diagnostico-recursos
+        condition: "always"
+        description: "Análisis completo de recursos"
+      - step: "sugerir"
+        tool: autocorrector_agent:/api/revisar-correcciones
+        condition: "if diagnostico shows issues"
+        description: "Generar propuestas de corrección"
+      - step: "validar"
+        tool: autocorrector_agent:/api/revisar-correcciones
+        condition: "if sugerir shows fixes with missing validations"
+        description: "Verificar pruebas unitarias e integración"
+      - step: "ejecutar_condicional"
+        tool: fix_promoter:/api/promover
+        condition: "if priority >= 8 AND validated == true AND tests_passed == true"
+        description: "Ejecutar solo si cumple todos los criterios"
+      - step: "registrar"
+        tool: azure_cli_executor:/api/status
+        condition: "after execution"
+        description: "Log estado post-ejecución"
+      - step: "revertir"
+        tool: fix_promoter:/api/rollback
+        condition: "if execution failed OR validation failed post-execution"
+        description: "Rollback automático en caso de fallo"
+    context:
+      environment: "production"
+      risk_tolerance: "low"
+      approval_required: true
+
+  

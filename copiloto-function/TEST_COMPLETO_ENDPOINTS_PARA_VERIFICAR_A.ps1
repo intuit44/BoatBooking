@@ -1,7 +1,7 @@
 TEST COMPLETO ENDPOINTS PARA VERIFICAR ANTES DE HACER PRUEBAS CON EL AGENTE 
 
 # ============ Config ============
-$fn = "https://copiloto-semantico-func.azurewebsites.net"
+$fn = "https://copiloto-semantico-func-us2.azurewebsites.net"
 
 # ============ Helpers ===========
 function J($o) { $o | ConvertTo-Json -Depth 20 -Compress }

@@ -270,7 +270,277 @@
           }
         }
       }
-    },
+     },
+      "/api/autocorregir": {
+        "post": {
+        "summary": "Registrar corrección propuesta por un agente AI",
+        "description": "Permite registrar una corrección sugerida por un agente de inteligencia artificial para revisión o aplicación posterior.",
+        "operationId": "autocorregirHttp",
+        "tags": ["Autocorrección"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "required": ["accion", "target", "propuesta", "tipo"],
+            "properties": {
+              "accion": {"type": "string"},
+              "target": {"type": "string"},
+              "propuesta": {"type": "string"},
+              "tipo": {"type": "string"},
+              "detonante": {"type": "string", "default": "manual"},
+              "origen": {"type": "string", "default": "AI Agent"}
+            }
+            }
+          }
+          }
+        },
+        "responses": {
+          "200": {"description": "Corrección registrada"},
+          "401": {"description": "No autorizado (falta header X-Agent-Auth)"},
+          "400": {"description": "Body inválido"}
+        }
+        }
+      },
+      "/api/aplicar-correccion-manual": {
+        "post": {
+        "summary": "Aplicar corrección manual",
+        "description": "Permite aplicar una corrección previamente registrada de forma manual, confirmando su ejecución.",
+        "operationId": "aplicarCorreccionManual",
+        "tags": ["Autocorrección"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {"type": "string"},
+              "confirmado": {"type": "boolean", "default": true}
+            }
+            }
+          }
+          }
+        },
+        "responses": {
+          "200": {"description": "Corrección aplicada"},
+          "404": {"description": "Corrección no encontrada"},
+          "400": {"description": "Solicitud inválida"}
+        }
+        }
+      },
+      "/api/revisar-correcciones": {
+        "get": {
+        "summary": "Ver todas las correcciones pendientes",
+        "description": "Devuelve una lista de todas las correcciones propuestas, filtrables por estado o tipo, para su revisión y gestión.",
+        "operationId": "revisarCorrecciones",
+        "tags": ["Autocorrección"],
+        "security": [],
+        "parameters": [
+          {"name": "estado", "in": "query", "schema": {"type": "string", "enum": ["pendiente", "aplicada", "rechazada"]}},
+          {"name": "tipo", "in": "query", "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+          "description": "Lista de correcciones",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+              "correcciones": {
+                "type": "array",
+                "items": {
+                "type": "object",
+                "properties": {
+                  "id": {"type": "string"},
+                  "accion": {"type": "string"},
+                  "target": {"type": "string"},
+                  "propuesta": {"type": "string"},
+                  "tipo": {"type": "string"},
+                  "estado": {"type": "string"},
+                  "timestamp": {"type": "string"}
+                }
+                }
+              },
+              "total": {"type": "integer"}
+              }
+            }
+            }
+          }
+          }
+        }
+        }
+      },
+      "/api/promocion-reporte": {
+        "post": {
+        "summary": "Generar reporte de promoción de correcciones",
+        "description": "Genera un reporte detallado sobre las correcciones promovidas, con filtros opcionales y formatos de salida personalizables.",
+        "operationId": "promocionReporteHttp",
+        "tags": ["Autocorrección"],
+        "security": [],
+        "requestBody": {
+          "content": {
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "properties": {
+              "filtros": {
+              "type": "object",
+              "properties": {
+                "prioridad_minima": {"type": "integer", "default": 1},
+                "validado": {"type": "boolean"},
+                "tipo": {"type": "string"}
+              }
+              },
+              "formato": {"type": "string", "enum": ["json", "html", "texto"], "default": "json"}
+            }
+            }
+          }
+          }
+        },
+        "responses": {
+          "200": {
+          "description": "Reporte generado",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+              "reporte": {"type": "object"},
+              "estadisticas": {"type": "object"},
+              "correcciones_promovidas": {"type": "array"}
+              }
+            }
+            }
+          }
+          }
+        }
+        }
+      },
+      "/api/promover": {
+        "post": {
+          "summary": "Promover correcciones automáticamente",
+          "description": "Ejecuta el promotor automático que aplica correcciones pendientes según criterios de prioridad y validación.",
+          "operationId": "promoverCorrecciones",
+          "tags": ["Autocorrección"],
+          "security": [],
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "correccion_id": {
+                      "type": "string",
+                      "description": "ID específico de corrección a promover (opcional)"
+                    },
+                    "forzar": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Forzar promoción ignorando algunos criterios"
+                    },
+                    "prioridad_minima": {
+                      "type": "integer",
+                      "default": 8,
+                      "description": "Prioridad mínima para promoción automática"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Promoción ejecutada exitosamente",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "exito": {"type": "boolean"},
+                      "mensaje": {"type": "string"},
+                      "correcciones_aplicadas": {"type": "integer"},
+                      "detalles": {"type": "array", "items": {"type": "object"}},
+                      "timestamp": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Solicitud inválida",
+              "content": {
+                "application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}
+              }
+            },
+            "500": {
+              "description": "Error en la promoción",
+              "content": {
+                "application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}
+              }
+            }
+          }
+        }
+      },
+      "/api/rollback": {
+        "post": {
+          "summary": "Revertir corrección aplicada",
+          "description": "Revierte una corrección previamente aplicada, restaurando el estado anterior.",
+          "operationId": "rollbackCorreccion",
+          "tags": ["Autocorrección"],
+          "security": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["correccion_id"],
+                  "properties": {
+                    "correccion_id": {
+                      "type": "string",
+                      "description": "ID de la corrección a revertir"
+                    },
+                    "motivo": {
+                      "type": "string",
+                      "description": "Motivo del rollback"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Rollback ejecutado exitosamente",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "exito": {"type": "boolean"},
+                      "mensaje": {"type": "string"},
+                      "correccion_revertida": {"type": "string"},
+                      "timestamp": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Corrección no encontrada"
+            },
+            "400": {
+              "description": "Solicitud inválida"
+            }
+          }
+        }
+      },
     "/api/status": {
       "get": {
         "summary": "Estado detallado (ambiente y storage)",
@@ -1276,7 +1546,11 @@
     {"name": "Azure Configuration", "description": "Configuración de recursos Azure"},
     {"name": "Testing", "description": "Pruebas y validación de endpoints"},
     {"name": "Internal", "description": "Operaciones internas de la Function App"},
-    {"name": "Local Storage", "description": "Operaciones en el filesystem local del contenedor"}
+    {"name": "Local Storage", "description": "Operaciones en el filesystem local del contenedor"},
+    {"name": "Autocorrección", "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."},
+    {"name": "Bridge", "description": "Endpoints tolerantes para agentes problemáticos"},
+    {"name": "CLI", "description": "Ejecución de comandos CLI vía SDK"},
+    {"name": "Despliegues", "description": "Gestión completa de procesos de despliegue"}
   ],
   "components": {
     "schemas": {

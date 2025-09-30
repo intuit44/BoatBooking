@@ -22,7 +22,7 @@ function copiloto {
     modo       = $modo
   } | ConvertTo-Json
     
-  $uri = "https://copiloto-semantico-func.azurewebsites.net/api/ejecutar?code=$functionKey"
+  $uri = "https://copiloto-semantico-func-us2.azurewebsites.net/api/ejecutar?code=$functionKey"
     
   try {
     $response = Invoke-RestMethod -Uri $uri -Method POST -Body $body -ContentType "application/json"
@@ -52,28 +52,28 @@ function cop {
 }
 
 # Función para ejecutar comandos Azure CLI a través del copiloto
-function cop-az {
+function Invoke-CopAz {
   param([string]$comando)
     
   copiloto -intencion "ejecutar:azure" -parametros @{comando = "az $comando" }
 }
 
 # Función para modo guiado
-function cop-guia {
+function Show-CopGuia {
   param([string]$tema)
     
   copiloto -intencion "guia:$tema" -modo "guiado"
 }
 
 # Función para orquestar flujos
-function cop-flow {
+function Start-CopFlow {
   param([string]$flujo)
     
   copiloto -intencion "orquestar:$flujo" -modo "orquestador"
 }
 
 # Mostrar ayuda
-function cop-help {
+function Show-CopHelp {
   @"
 🤖 COPILOTO SEMÁNTICO - Comandos Disponibles
 
@@ -84,17 +84,17 @@ COMANDOS BÁSICOS:
   cop report        - Generar reporte del proyecto
 
 COMANDOS AZURE:
-  cop-az "functionapp list"                    - Listar function apps
-  cop-az "storage blob list --container-name boat-rental-project"  - Listar archivos
+  Invoke-CopAz "functionapp list"                    - Listar function apps
+  Invoke-CopAz "storage blob list --container-name boat-rental-project"  - Listar archivos
 
 MODO GUIADO:
-  cop-guia configurar_blob     - Guía para configurar Blob Storage
-  cop-guia optimizar_performance  - Guía de optimización
-  cop-guia debug_errores       - Guía de debugging
+  Show-CopGuia configurar_blob     - Guía para configurar Blob Storage
+  Show-CopGuia optimizar_performance  - Guía de optimización
+  Show-CopGuia debug_errores       - Guía de debugging
 
 FLUJOS ORQUESTADOS:
-  cop-flow deployment          - Flujo completo de deployment
-  cop-flow monitoreo          - Flujo de monitoreo
+  Start-CopFlow deployment          - Flujo completo de deployment
+  Start-CopFlow monitoreo           - Flujo de monitoreo
 
 COMANDOS DIRECTOS:
   copiloto -intencion "buscar:*.py" -parametros @{limite=10}
@@ -102,12 +102,12 @@ COMANDOS DIRECTOS:
 
 EJEMPLOS:
   cop dash                     # Ver dashboard
-  cop-az "monitor metrics list --resource <id>"  # Métricas de Azure
-  cop-guia configurar_blob     # Guía paso a paso
+  Invoke-CopAz "monitor metrics list --resource <id>"  # Métricas de Azure
+  Show-CopGuia configurar_blob     # Guía paso a paso
 "@
 }
 
-Write-Host "✅ Alias de copiloto configurados. Escribe 'cop-help' para ver comandos disponibles." -ForegroundColor Green
+Write-Host "✅ Alias de copiloto configurados. Escribe 'Show-CopHelp' para ver comandos disponibles." -ForegroundColor Green
 Write-Host "🔑 Function Key guardada en variable `$functionKey" -ForegroundColor Yellow
 
 function cld {
