@@ -7,7 +7,7 @@
           {
             "name": "BaseURL",
             "type": "string",
-            "value": "https://copiloto-semantico-func.azurewebsites.net/api"
+            "value": "https://copiloto-semantico-func-us2.azurewebsites.net/api"
           }
         ]
       },
@@ -428,4 +428,3 @@
     }
   }
 }
-

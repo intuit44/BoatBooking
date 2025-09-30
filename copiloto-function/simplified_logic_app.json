@@ -53,14 +53,16 @@
     "Initialize_BaseURL": {
       "type": "InitializeVariable",
       "runAfter": {
-        "Initialize_MasterKey": ["Succeeded"]
+        "Initialize_MasterKey": [
+          "Succeeded"
+        ]
       },
       "inputs": {
         "variables": [
           {
             "name": "BaseURL",
             "type": "string",
-            "value": "https://copiloto-semantico-func.azurewebsites.net/api"
+            "value": "https://copiloto-semantico-func-us2.azurewebsites.net/api"
           }
         ]
       }
@@ -68,7 +70,9 @@
     "Process_Request": {
       "type": "Switch",
       "runAfter": {
-        "Initialize_BaseURL": ["Succeeded"]
+        "Initialize_BaseURL": [
+          "Succeeded"
+        ]
       },
       "expression": "@coalesce(triggerBody()?['endpoint'], 'ejecutar')",
       "cases": {
@@ -108,7 +112,9 @@
     "Response_Success": {
       "type": "Response",
       "runAfter": {
-        "Process_Request": ["Succeeded"]
+        "Process_Request": [
+          "Succeeded"
+        ]
       },
       "inputs": {
         "statusCode": 200,
@@ -121,7 +127,11 @@
     "Response_Error": {
       "type": "Response",
       "runAfter": {
-        "Process_Request": ["Failed", "Skipped", "TimedOut"]
+        "Process_Request": [
+          "Failed",
+          "Skipped",
+          "TimedOut"
+        ]
       },
       "inputs": {
         "statusCode": 500,

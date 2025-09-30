@@ -1,6 +1,7 @@
 # --- Imports mínimos requeridos ---
 import azure.functions as func
 import json
+import re
 from datetime import datetime
 import os
 
@@ -60,7 +61,11 @@ except ImportError:
 
 # --- Semantic utilities ---
 try:
-    from utils_semantic import render_tool_response
+    from utils_semantic import render_tool_response as _original_render_tool_response
+
+    def render_tool_response(status: int, payload: dict) -> str:
+        # Adapt parameter name for compatibility
+        return _original_render_tool_response(status_code=status, payload=payload)
 except ImportError:
     def render_tool_response(status: int, payload: dict) -> str:
         return f"Status {status}: {payload.get('error', 'Unknown error')}"
@@ -934,7 +939,7 @@ def invocar_endpoint_directo(endpoint: str, method: str = "GET", params: Optiona
     """
     try:
         # Base URL de la Function App
-        base_url = "https://copiloto-semantico-func.azurewebsites.net"
+        base_url = "https://copiloto-semantico-func-us2.azurewebsites.net"
 
         # Si estamos en modo local, usar localhost
         if not IS_AZURE:
@@ -2614,205 +2619,176 @@ def generar_proximas_acciones(intencion: str, resultado: dict) -> list:
 
 
 # --- PARSER ROBUSTO PARA AGENT RESPONSE ---
-def clean_agent_response(agent_response: str) -> dict:
+def clean_agent_response(agent_response):
     """
-    Parser súper robusto y defensivo
+    Parser robusto que acepta dict, str (JSON o texto), y maneja casos comunes.
+    Añade logging para depuración y mejora la robustez semántica.
+    Normaliza endpoints a usar guion medio (ej: listar-blobs, probar-endpoint).
     """
     try:
-        logging.info(f"🔍 Parseando: {agent_response[:50]}...")
+        logging.info(
+            f"[clean_agent_response] Tipo: {type(agent_response).__name__}, Preview: {str(agent_response)[:80]}")
+        # Si ya es un dict, devolver tal cual
+        if isinstance(agent_response, dict):
+            return agent_response
 
-        # Caso 1: Comandos simples
-        simple_commands = {
-            "ping": {"endpoint": "ping"},
-            "status": {"endpoint": "status"},
-            "health": {"endpoint": "health"},
-            "estado": {"endpoint": "status"}
-        }
+        # Si es string, intentar parsear como JSON directo
+        if isinstance(agent_response, str):
+            stripped = agent_response.strip()
+            # Si parece JSON puro
+            if stripped.startswith("{") and stripped.endswith("}"):
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
+                    pass
 
-        clean_text = agent_response.strip().lower()
-        if clean_text in simple_commands:
-            logging.info(f"✅ Comando simple detectado: {clean_text}")
-            return simple_commands[clean_text]
+            # Caso 1: Comandos simples
+            simple_commands = {
+                "ping": {"endpoint": "ping"},
+                "status": {"endpoint": "status"},
+                "health": {"endpoint": "health"},
+                "estado": {"endpoint": "status"}
+            }
+            clean_text = stripped.lower()
+            if clean_text in simple_commands:
+                return simple_commands[clean_text]
 
-        # Caso 2: Buscar JSON de forma más defensiva
-        try:
-            # Buscar múltiples patrones de JSON
+            # Caso 2: Buscar JSON embebido en texto
             patterns = [
-                r"```json\s*(\{.*?\})\s*```",  # ```json { } ```
-                r"```\s*(\{.*?\})\s*```",     # ``` { } ```
-                # Cualquier { } que contenga "endpoint"
-                r"(\{[^}]*\"endpoint\"[^}]*\})",
+                r"```json\s*(\{.*?\})\s*```",  # ```json { ... } ```
+                r"```\s*(\{.*?\})\s*```",     # ``` { ... } ```
+                r"(\{[^}]*\"endpoint\"[^}]*\})",  # { ... "endpoint": ... }
             ]
-
             json_found = None
             for pattern in patterns:
                 match = re.search(pattern, agent_response,
                                   re.DOTALL | re.IGNORECASE)
                 if match:
                     json_found = match.group(1).strip()
-                    logging.info(
-                        f"✅ JSON encontrado con patrón: {pattern[:20]}...")
                     break
-
             if json_found:
                 try:
                     parsed_json = json.loads(json_found)
-                    logging.info(
-                        f"✅ JSON parseado exitosamente: {list(parsed_json.keys())}")
-
-                    if not isinstance(parsed_json, dict):
-                        logging.warning("⚠️ JSON no es un objeto")
-                        return {"error": "JSON debe ser un objeto"}
-
-                    # Asegurar campos mínimos
-                    if "endpoint" not in parsed_json:
-                        parsed_json["endpoint"] = "ejecutar"
-                        logging.info(
-                            "➕ Agregado endpoint por defecto: ejecutar")
-
-                    if "method" not in parsed_json:
-                        parsed_json["method"] = "POST"
-                        logging.info("➕ Agregado method por defecto: POST")
-
-                    return parsed_json
-
-                except json.JSONDecodeError as e:
-                    logging.error(f"❌ Error parseando JSON: {str(e)}")
-                    logging.error(f"JSON problemático: {json_found[:100]}...")
+                    if isinstance(parsed_json, dict):
+                        if "endpoint" not in parsed_json:
+                            parsed_json["endpoint"] = "ejecutar"
+                        if "method" not in parsed_json:
+                            parsed_json["method"] = "POST"
+                        # Normalizar endpoint a guion medio
+                        if "endpoint" in parsed_json:
+                            parsed_json["endpoint"] = parsed_json["endpoint"].replace(
+                                "_", "-")
+                        return parsed_json
+                except Exception as e:
                     return {"error": f"JSON inválido: {str(e)}", "raw": json_found[:100]}
 
-        except Exception as e:
-            logging.error(f"❌ Error en búsqueda de JSON: {str(e)}")
+            # Caso 3: Palabras clave y semántica mínima
+            keywords_map = {
+                "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard", "method": "POST"},
+                "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo", "method": "POST"},
+                "diagnóstico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo", "method": "POST"},
+                "resumen": {"endpoint": "ejecutar", "intencion": "generar:resumen", "method": "POST"},
+                "listar archivos": {"endpoint": "ejecutar", "intencion": "buscar:archivos", "method": "POST"},
+                "listar blobs": {"endpoint": "listar-blobs", "method": "GET"},
+                "leer archivo": {"endpoint": "leer-archivo", "method": "GET"},
+                "bateria": {"endpoint": "bateria-endpoints", "method": "GET"},
+                "probar endpoint": {"endpoint": "probar-endpoint", "method": "POST"},
+            }
+            for keyword, command in keywords_map.items():
+                if keyword in clean_text:
+                    # Normalizar endpoint a guion medio
+                    if "endpoint" in command:
+                        command = dict(command)
+                        command["endpoint"] = command["endpoint"].replace(
+                            "_", "-")
+                    return command
 
-        # Caso 3: Palabras clave (más defensivo)
-        keywords_map = {
-            "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard"},
-            "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
-            "diagnóstico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
-            "resumen": {"endpoint": "ejecutar", "intencion": "generar:resumen"}
-        }
+            # Caso 4: Atajo para comandos tipo "ejecutar:algo"
+            if clean_text.startswith("ejecutar:"):
+                intencion = clean_text.split(":", 1)[1]
+                return {"endpoint": "ejecutar", "intencion": intencion, "method": "POST"}
 
-        for keyword, command in keywords_map.items():
-            if keyword in clean_text:
-                logging.info(f"✅ Palabra clave detectada: {keyword}")
-                return command
+            # Fallback: intentar parsear como JSON plano
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, dict):
+                    # Normalizar endpoint si existe
+                    if "endpoint" in parsed:
+                        parsed["endpoint"] = parsed["endpoint"].replace(
+                            "_", "-")
+                    return parsed
+            except Exception:
+                pass
 
-        # Caso 4: Fallback seguro
-        logging.info("ℹ️ Usando fallback para texto libre")
-        return {
-            "endpoint": "copiloto",
-            "mensaje": agent_response[:100],  # Limitar tamaño
-            "method": "GET"
-        }
+            # Fallback seguro: texto libre, usar POST por defecto
+            return {
+                "endpoint": "copiloto",
+                "mensaje": stripped[:100],
+                "method": "POST"
+            }
 
+        # Si no es dict ni str, error
+        return {"error": "Formato de agent_response no soportado"}
     except Exception as e:
-        logging.error(f"💥 Error crítico en parser: {str(e)}")
-        # Fallback ultra-seguro
-        return {
-            "endpoint": "ping",  # Usar ping como fallback más seguro
-            "error_parser": str(e)
-        }
-
-
-def hybrid_executor_fixed(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Endpoint hybrid con parser mejorado
-    """
-    logging.info('🤖 Endpoint hybrid activado (versión mejorada)')
-
-    try:
-        req_body = req.get_json()
-
-        if "agent_response" not in req_body:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Falta agent_response",
-                    "expected_format": {
-                        "agent_response": "string con comando o JSON embebido",
-                        "agent_name": "nombre del agente (opcional)"
-                    }
-                }, indent=2),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        agent_response = req_body["agent_response"]
-        agent_name = req_body.get("agent_name", "Architect_BoatRental")
-
-        logging.info(f'Raw agent_response: {agent_response[:200]}...')
-
-        # USAR EL PARSER MEJORADO
-        parsed_command = clean_agent_response(agent_response)
-
-        logging.info(f'Comando parseado: {parsed_command}')
-
-        # Manejar errores de parsing
-        if "error" in parsed_command:
-            return func.HttpResponse(
-                json.dumps({
-                    "success": False,
-                    "parsing_error": parsed_command["error"],
-                    "raw_response": parsed_command.get("raw", agent_response[:100]),
-                    "suggestion": "Verifica el formato del JSON embebido o usa comandos simples como 'ping'"
-                }, indent=2),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Ejecutar comando parseado
-        try:
-            result = execute_parsed_command(parsed_command)
-
-            # Generar respuesta amigable
-            user_response = generate_user_friendly_response_v2(
-                agent_response, result)
-
-            return func.HttpResponse(
-                json.dumps({
-                    "success": True,
-                    "parsed_command": parsed_command,
-                    "execution_result": result,
-                    "user_response": user_response,
-                    "metadata": {
-                        "timestamp": datetime.now().isoformat(),
-                        "agent": agent_name,
-                        "parser_version": "2.0"
-                    }
-                }, indent=2, ensure_ascii=False),
-                mimetype="application/json"
-            )
-
-        except Exception as e:
-            logging.error(f"Error ejecutando comando: {str(e)}")
-            return func.HttpResponse(
-                json.dumps({
-                    "success": False,
-                    "execution_error": str(e),
-                    "parsed_command": parsed_command,
-                    "suggestion": "Error interno ejecutando el comando"
-                }, indent=2),
-                mimetype="application/json",
-                status_code=500
-            )
-
-    except Exception as e:
-        logging.error(f"Error general en hybrid_executor: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({
-                "error": str(e),
-                "type": type(e).__name__,
-                "suggestion": "Error interno del servidor"
-            }, indent=2),
-            mimetype="application/json",
-            status_code=500
-        )
+        return {"error": f"Parsing failed: {str(e)}"}
 
 
 def execute_parsed_command(command: dict) -> dict:
-    """Ejecuta un comando ya parseado"""
+    """
+    Ejecuta un comando ya parseado usando _resolve_handler para enrutar dinámicamente.
+    """
     endpoint = command.get("endpoint", "ping")
-    logging.info(f"🚀 Ejecutando endpoint: {endpoint}")
+    method = command.get("method", "GET").upper()
+    data = command.get("data") or command.get("parametros") or {}
 
+    logging.info(
+        f"🚀 Ejecutando endpoint dinámico: {endpoint} (method={method})")
+
+    # Usar _resolve_handler para obtener el handler dinámicamente
+    path, handler = _resolve_handler(endpoint)
+    if handler:
+        try:
+            # Asegurar que todos los params sean string para GET
+            params = {}
+            if method == "GET" and isinstance(data, dict):
+                params = {str(k): str(v) for k, v in data.items()}
+            payload = json.dumps(data, ensure_ascii=False).encode(
+                "utf-8") if method in {"POST", "PUT", "PATCH"} and data else b""
+
+            req_mock = func.HttpRequest(
+                method=method,
+                url=f"http://localhost{path}",
+                body=payload,
+                headers={"Content-Type": "application/json"},
+                params=params
+            )
+            resp = handler(req_mock)
+            # Intentar parsear JSON
+            try:
+                result = json.loads(resp.get_body().decode())
+                result["endpoint_invocado"] = path
+                result["method"] = method
+                result["status_code"] = resp.status_code
+                return result
+            except Exception:
+                return {
+                    "exito": True,
+                    "endpoint_invocado": path,
+                    "method": method,
+                    "status_code": resp.status_code,
+                    "raw_response": resp.get_body().decode()
+                }
+        except Exception as e:
+            logging.error(f"Error ejecutando handler para {endpoint}: {e}")
+            return {
+                "exito": False,
+                "error": f"Error ejecutando handler para {endpoint}: {str(e)}",
+                "tipo_error": type(e).__name__
+            }
+
+    # Fallbacks para comandos simples
     if endpoint == "ping":
         logging.info("✅ Ejecutando ping")
         return {
@@ -2829,21 +2805,9 @@ def execute_parsed_command(command: dict) -> dict:
     elif endpoint == "ejecutar":
         intencion = command.get("intencion", "dashboard")
         parametros = command.get("parametros", {})
-        logging.info(f"🎯 Ejecutando intencion: {intencion}")
-        if intencion == "dashboard":
-            logging.info("📊 Iniciando generación de dashboard...")
-            try:
-                result = generar_dashboard_insights()
-                logging.info("✅ Dashboard generado exitosamente")
-                return result
-            except Exception as e:
-                logging.error(f"💥 Error en dashboard: {str(e)}")
-                return {
-                    "exito": False,
-                    "error": f"Error en dashboard: {str(e)}",
-                    "fallback": True
-                }
-        return procesar_intencion_semantica(intencion, parametros)
+        logging.info(f"🎯 Ejecutando intencion extendida: {intencion}")
+        # Procesar cualquier intención extendida (no hardcodear dashboard aquí)
+        return procesar_intencion_extendida(intencion, parametros)
 
     elif endpoint == "copiloto":
         mensaje = command.get("mensaje", "")
@@ -2852,6 +2816,9 @@ def execute_parsed_command(command: dict) -> dict:
             archivo = mensaje.split(":", 1)[1]
             logging.info(f"📖 Leyendo archivo: {archivo}")
             return leer_archivo_dinamico(archivo)
+        elif mensaje.startswith("buscar:"):
+            patron = mensaje.split(":", 1)[1]
+            return buscar_archivos_semantico(patron)
         else:
             return {
                 "exito": True,
@@ -2860,10 +2827,11 @@ def execute_parsed_command(command: dict) -> dict:
             }
 
     else:
-        logging.warning(f"❌ Endpoint no implementado: {endpoint}")
+        logging.warning(
+            f"❌ Endpoint no implementado ni encontrado: {endpoint}")
         return {
             "exito": False,
-            "error": f"Endpoint '{endpoint}' no implementado"
+            "error": f"Endpoint '{endpoint}' no implementado ni encontrado"
         }
 
 
@@ -4871,12 +4839,16 @@ def comando_bash(cmd: str, seguro: bool = False) -> dict:
 
 def procesar_intencion_extendida(intencion: str, parametros: Optional[Dict[str, Any]] = None) -> dict:
     """
-    Procesa intenciones semánticas extendidas no cubiertas en el procesador base
+    Procesa intenciones semánticas extendidas no cubiertas en el procesador base.
+    Si la intención es exactamente igual a una clave del mapa, ejecuta directamente la función asociada.
+    Si no, busca coincidencias parciales como fallback.
     """
     if parametros is None:
         parametros = {}
 
     intenciones_map = {
+        "dashboard": generar_dashboard_insights,
+        "diagnosticar:completo": diagnosticar_sistema_completo,
         "verificar:almacenamiento": verificar_almacenamiento,
         "limpiar:cache": limpiar_cache,
         "sincronizar:blobs": sincronizar_blob_storage if 'sincronizar_blob_storage' in globals() else lambda p: {"exito": False, "error": "Función no implementada"},
@@ -4892,6 +4864,11 @@ def procesar_intencion_extendida(intencion: str, parametros: Optional[Dict[str, 
         "cancelar:accion": cancelar_operacion if 'cancelar_operacion' in globals() else lambda p: {"exito": False, "error": "Función no implementada"}
     }
 
+    # Ejecución directa si la intención es exactamente igual a una clave
+    if intencion in intenciones_map:
+        return intenciones_map[intencion](parametros)
+
+    # Fallback: buscar coincidencias parciales
     for patron, funcion in intenciones_map.items():
         if intencion.startswith(patron) or patron in intencion:
             return funcion(parametros)
@@ -5061,7 +5038,7 @@ def interpretar_intencion_semantica(intencion: str, params: dict) -> dict:
     intencion_lower = intencion.lower()
     for keyword, mapped_intent in keywords_map.items():
         if keyword in intencion_lower:
-            return procesar_intencion_extendida(mapped_intent, params)
+            return procesar_intencion_semantica(mapped_intent, params)
     return {
         "exito": False,
         "mensaje": f"No pude interpretar la intención: '{intencion}'",

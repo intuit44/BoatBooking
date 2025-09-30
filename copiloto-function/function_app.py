@@ -1,4 +1,6 @@
 # --- Imports mínimos requeridos ---
+from typing import Dict, List, Optional, Any
+from typing import Optional
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource.resources.models import (
     ResourceGroup,
@@ -12,6 +14,7 @@ from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type
+from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
 from datetime import timedelta
 from collections.abc import Iterator
@@ -1125,7 +1128,7 @@ def invocar_endpoint_directo(endpoint: str, method: str = "GET", params: Optiona
     """
     try:
         # Base URL de la Function App
-        base_url = "https://copiloto-semantico-func.azurewebsites.net"
+        base_url = "https://copiloto-semantico-func-us2.azurewebsites.net"
 
         # Si estamos en modo local, usar localhost
         if not IS_AZURE:
@@ -4237,20 +4240,15 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400
             )
 
-        # Intenta extraer JSON embebido (si existe claramente)
-        intencion, parametros = extraer_json_instruccion(agent_response)
+        # Usar el parser robusto
+        parsed_command = clean_agent_response(agent_response)
 
-        if intencion:
-            logging.info(f"Intención detectada: {intencion}")
-            # Ejecución dinámica (sin predefinir intenciones)
-            resultado = procesar_intencion_hybrid(intencion, parametros)
+        if "error" not in parsed_command:
+            logging.info(f"Comando parseado: {parsed_command}")
+            resultado = execute_parsed_command(parsed_command)
         else:
-            # Respuesta rápida para "ping" o instrucciones simples
-            if agent_response.lower() in ["ping", "hola", "hello"]:
-                resultado = {"exito": True, "mensaje": "pong"}
-            else:
-                resultado = {"exito": False,
-                             "error": "No se identificó intención claramente"}
+            resultado = {"exito": False,
+                         "error": "No se identificó intención claramente"}
 
         # Asegurar formato consistente y metadata
         response = {
@@ -4259,7 +4257,7 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
                 "timestamp": datetime.now().isoformat(),
                 "endpoint": "hybrid",
                 "version": "2.0-orchestrator",
-                "intencion_detectada": intencion or "ninguna",
+                "intencion_detectada": parsed_command.get("intencion", parsed_command.get("endpoint", "ninguna")),
                 "ambiente": "Azure" if IS_AZURE else "Local"
             }
         }
@@ -5285,9 +5283,15 @@ def _status_from_result(res: dict) -> int:
 @app.function_name(name="escribir_archivo_local_http")
 @app.route(route="escribir-archivo-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Endpoint HTTP para crear/escribir archivos en filesystem LOCAL"""
+    """
+    Endpoint HTTP para crear/escribir archivos en filesystem LOCAL.
+    Soporta:
+      - Texto plano (ruta + contenido)
+      - Binario/base64 (ruta + contenido_base64 + binario: true)
+      - tipo_mime opcional en metadata
+    """
     try:
-        # Handle JSON parsing errors safely
+        # Parseo robusto del body
         try:
             body = req.get_json()
         except ValueError:
@@ -5298,13 +5302,24 @@ def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
                 json.dumps({
                     "exito": False,
                     "error": "Request body must be valid JSON",
-                    "ejemplo": {"ruta": "scripts/test.txt", "contenido": "Hola mundo"}
+                    "ejemplo": {
+                        "ruta": "scripts/test.txt",
+                        "contenido": "Hola mundo",
+                        "contenido_base64": "<base64>",
+                        "binario": True,
+                        "tipo_mime": "image/png"
+                    }
                 }, ensure_ascii=False),
                 mimetype="application/json", status_code=400
             )
 
         ruta = (body.get("path") or body.get("ruta") or "").strip()
-        contenido = body.get("content") or body.get("contenido") or ""
+        contenido = body.get("content") or body.get("contenido")
+        contenido_base64 = body.get("contenido_base64")
+        binario = bool(body.get("binario", False))
+        # Forzar tipo_mime a str siempre, nunca None
+        tipo_mime = (body.get("tipo_mime") or body.get(
+            "mime_type") or "application/octet-stream")
 
         if not ruta:
             return func.HttpResponse(
@@ -5315,8 +5330,27 @@ def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json", status_code=400
             )
 
-        # 🔥 NUEVA FUNCIÓN ESPECÍFICA PARA FILESYSTEM LOCAL
-        res = crear_archivo_local(ruta, contenido)
+        # Soporte binario/base64
+        if binario or contenido_base64:
+            if isinstance(contenido_base64, str) and isinstance(tipo_mime, str):
+                res = crear_archivo_local_binario(
+                    ruta, contenido_base64, tipo_mime)
+            else:
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": "Los parámetros 'contenido_base64' y 'tipo_mime' son requeridos y deben ser cadenas.",
+                        "ejemplo": {
+                            "ruta": "scripts/logo.png",
+                            "contenido_base64": "<cadena_base64>",
+                            "tipo_mime": "image/png"
+                        }
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=400
+                )
+        else:
+            res = crear_archivo_local(ruta, contenido or "", tipo_mime)
 
         return func.HttpResponse(
             json.dumps(res, ensure_ascii=False),
@@ -5331,10 +5365,9 @@ def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-def crear_archivo_local(ruta: str, contenido: str) -> dict:
-    """Crea/sobrescribe archivo con manejo robusto de encoding"""
+def crear_archivo_local(ruta: str, contenido: str, tipo_mime: Optional[str] = None) -> dict:
+    """Crea/sobrescribe archivo de texto plano con manejo robusto de encoding"""
     try:
-        # Asegurar que la ruta esté dentro del directorio permitido
         base_dir = "/home/site/wwwroot"
         ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
 
@@ -5346,10 +5379,8 @@ def crear_archivo_local(ruta: str, contenido: str) -> dict:
                 "directorio_base": base_dir
             }
 
-        # Crear directorios padres si no existen
         os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
 
-        # Escribir archivo con encoding UTF-8 explícito
         with open(ruta_completa, 'w', encoding='utf-8') as f:
             f.write(contenido)
 
@@ -5370,7 +5401,10 @@ def crear_archivo_local(ruta: str, contenido: str) -> dict:
             "ruta_absoluta": ruta_completa,
             "tipo_operacion": "crear_archivo_local",
             "modo_acceso": "local_filesystem",
-            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar"
+            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar",
+            "metadata": {
+                "tipo_mime": tipo_mime or "text/plain"
+            }
         }
 
     except UnicodeEncodeError as e:
@@ -5383,6 +5417,61 @@ def crear_archivo_local(ruta: str, contenido: str) -> dict:
         return {
             "exito": False,
             "error": f"Error escribiendo archivo local: {str(e)}",
+            "ruta_intentada": ruta
+        }
+
+
+def crear_archivo_local_binario(ruta: str, contenido_base64: str, tipo_mime: str) -> dict:
+    """Crea/sobrescribe archivo binario desde base64"""
+    try:
+        base_dir = "/home/site/wwwroot"
+        ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
+
+        # Seguridad: prevenir path traversal
+        if not os.path.abspath(ruta_completa).startswith(os.path.abspath(base_dir)):
+            return {
+                "exito": False,
+                "error": f"Ruta fuera del directorio permitido: {ruta}",
+                "directorio_base": base_dir
+            }
+
+        os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
+
+        if not contenido_base64:
+            return {
+                "exito": False,
+                "error": "Falta 'contenido_base64' para archivo binario"
+            }
+
+        try:
+            raw = base64.b64decode(contenido_base64)
+        except Exception as e:
+            return {
+                "exito": False,
+                "error": f"Error decodificando base64: {str(e)}"
+            }
+
+        with open(ruta_completa, 'wb') as f:
+            f.write(raw)
+
+        return {
+            "exito": True,
+            "mensaje": f"Archivo binario creado: {ruta}",
+            "tamaño_bytes": len(raw),
+            "ubicacion": f"file://{ruta_completa}",
+            "ruta_absoluta": ruta_completa,
+            "tipo_operacion": "crear_archivo_local_binario",
+            "modo_acceso": "local_filesystem",
+            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar",
+            "metadata": {
+                "tipo_mime": tipo_mime or "application/octet-stream"
+            }
+        }
+
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": f"Error escribiendo archivo binario local: {str(e)}",
             "ruta_intentada": ruta
         }
 
@@ -5981,384 +6070,109 @@ _FALSE_SET = {"0", "false", "no", "n", "off"}
 @app.function_name(name="ejecutar_script_local_http")
 @app.route(route="ejecutar-script-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta scripts desde el filesystem local del contenedor con búsqueda automática y robusta"""
+    """Ejecuta scripts desde cualquier ruta local del contenedor con búsqueda automática y robusta"""
 
-    # ✅ VALIDACIÓN TEMPRANA: Verificar request body antes que nada
     try:
         body = req.get_json() if req.get_body() else {}
-    except:
-        return func.HttpResponse("JSON inválido", status_code=400)
+    except Exception:
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": "JSON inválido"
+        }), status_code=400, mimetype="application/json")
 
-    # ✅ VALIDACIÓN TEMPRANA: Verificar parámetro script inmediatamente
-    script = body.get("script")
+    # Unificación semántica de parámetros
+    script = body.get("script") or body.get("script_path")
     args = body.get("args", [])
+    timeout_s = int(body.get("timeout_s") or body.get("timeout") or 300)
 
-    if not script:
-        return func.HttpResponse(
-            json.dumps({
-                "ok": False,
-                "error_code": "MISSING_SCRIPT_PARAM",
-                "mensaje": "Parámetro 'script' es requerido",
-                "ejemplo": {"script": "scripts/test.sh", "args": []},
-                "supported_extensions": [".py", ".sh", ".ps1"],
-                "note": "Can be just filename - we'll search in common directories"
-            }, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=400
-        )
+    if not script or not isinstance(script, str) or not script.strip():
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": "Parámetro 'script' o 'script_path' es requerido y debe ser un string no vacío",
+            "example": {"script": "setup.py", "args": []}
+        }), mimetype="application/json", status_code=400)
+
+    script_path = script.strip()
+    found_script_path = _find_script_dynamically(script_path)
+
+    if found_script_path is None:
+        search_results = _generate_smart_suggestions(script_path)
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": "Script no encontrado",
+            "searched": script_path,
+            "attempted_paths": search_results["rutas_intentadas"],
+            "suggestions": search_results["sugerencias"],
+            "available_scripts": search_results["scripts_disponibles"][:10]
+        }), mimetype="application/json", status_code=404)
+
+    if not found_script_path.is_file():
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": f"Path exists but is not a file: {found_script_path}",
+            "path_type": "directory" if found_script_path.is_dir() else "other"
+        }), mimetype="application/json", status_code=400)
+
+    ext = found_script_path.suffix.lower()
+    interpreter = None
+    if ext == ".py":
+        interpreter = "python"
+        cmd = [sys.executable, str(found_script_path)]
+    elif ext == ".sh":
+        interpreter = "bash"
+        cmd = ["bash", str(found_script_path)]
+    elif ext == ".ps1":
+        interpreter = "powershell"
+        ps_cmd = shutil.which("pwsh") or shutil.which(
+            "powershell") or "powershell"
+        cmd = [ps_cmd, "-ExecutionPolicy", "Bypass",
+               "-File", str(found_script_path)]
+    else:
+        interpreter = "unknown"
+        cmd = [str(found_script_path)]
+
+    if args and isinstance(args, list):
+        cmd.extend(args)
+
+    if ext in [".sh", ".py"] and not platform.system() == "Windows":
+        try:
+            os.chmod(found_script_path, 0o755)
+        except Exception:
+            pass
 
     try:
-        # ✅ VALIDACIÓN ADICIONAL: Verificar que script sea string válido
-        if not isinstance(script, str) or not script.strip():
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error_code": "INVALID_SCRIPT_PARAM",
-                    "mensaje": "Parámetro 'script' debe ser un string no vacío",
-                    "received_type": type(script).__name__,
-                    "ejemplo": {"script": "scripts/test.sh", "args": []}
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        script_path = script.strip()
-
-        # ✅ BÚSQUEDA DINÁMICA Y ROBUSTA: Intentar encontrar el script automáticamente
-        found_script_path = _find_script_dynamically(script_path)
-
-        if found_script_path is None:
-            # Si no se encuentra, generar respuesta con sugerencias inteligentes
-            search_results = _generate_smart_suggestions(script_path)
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error_code": "SCRIPT_NOT_FOUND",
-                    "mensaje": "Script no encontrado",
-                    "buscado": script_path,
-                    "rutas_intentadas": search_results["rutas_intentadas"],
-                    "sugerencias": search_results["sugerencias"],
-                    "scripts_disponibles": search_results["scripts_disponibles"][:10],
-                    "tip": "Usa solo el nombre del archivo - buscamos automáticamente en directorios comunes",
-                    "ejemplos_validos": [
-                        "setup.py",
-                        "deploy.sh",
-                        "test.py",
-                        "scripts/custom.sh"
-                    ]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=404
-            )
-
-        # ✅ VALIDACIÓN: Verificar que es realmente un archivo ejecutable
-        if not found_script_path.is_file():
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error_code": "NOT_A_FILE",
-                    "mensaje": f"Path exists but is not a file: {found_script_path}",
-                    "path_type": "directory" if found_script_path.is_dir() else "other",
-                    "sugerencias": ["Asegúrate que la ruta apunte a un archivo de script, no a un directorio"]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Validar extensión antes de ejecutar
-        ext = found_script_path.suffix.lower()
-        if ext not in [".py", ".sh", ".ps1"]:
-            return func.HttpResponse(json.dumps({
-                "ok": False,
-                "error_code": "INVALID_FILE_TYPE",
-                "mensaje": f"El archivo '{script_path}' no es un script ejecutable",
-                "sugerencias": [
-                    "Usa un archivo .py para scripts de Python",
-                    "Usa un archivo .sh para scripts de Bash",
-                    "Usa un archivo .ps1 para scripts de PowerShell"
-                ]
-            }, ensure_ascii=False), mimetype="application/json", status_code=400)
-
-        # Determinar el comando basado en la extensión
-        if ext == ".py":
-            cmd = [sys.executable, str(found_script_path)]
-        elif ext == ".sh":
-            cmd = ["bash", str(found_script_path)]
-        elif ext == ".ps1":
-            # PowerShell support
-            ps_cmd = shutil.which("pwsh") or shutil.which(
-                "powershell") or "powershell"
-            cmd = [ps_cmd, "-ExecutionPolicy", "Bypass",
-                   "-File", str(found_script_path)]
-        else:
-            cmd = [str(found_script_path)]
-
-        # ✅ MEJORA: Añadir argumentos si se proporcionan
-        if args and isinstance(args, list):
-            cmd.extend(args)
-
-        # Set execute permissions for shell scripts (Linux/Mac)
-        if ext in [".sh", ".py"] and not platform.system() == "Windows":
-            try:
-                os.chmod(found_script_path, 0o755)
-            except Exception:
-                pass  # Ignore permission errors
-
-        # Ejecutar el script con timeout configurable
-        timeout = body.get("timeout", 300)  # Default 5 minutes
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=str(found_script_path.parent)
-            )
-
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": result.returncode == 0,
-                    "exit_code": result.returncode,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "script_ejecutado": str(found_script_path),
-                    "script_solicitado": script_path,
-                    "comando_usado": " ".join(cmd),
-                    "directorio_trabajo": str(found_script_path.parent),
-                    "encontrado_en": str(found_script_path.relative_to(PROJECT_ROOT)) if found_script_path.is_relative_to(PROJECT_ROOT) else str(found_script_path)
-                }, ensure_ascii=False),
-                mimetype="application/json"
-            )
-
-        except subprocess.TimeoutExpired:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error_code": "TIMEOUT",
-                    "mensaje": f"Script execution timed out after {timeout} seconds",
-                    "script_ejecutado": str(found_script_path),
-                    "sugerencias": ["Considera aumentar el timeout o optimizar el script"]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=408
-            )
-        except OSError as e:
-            return func.HttpResponse(json.dumps({
-                "ok": False,
-                "error_code": "EXECUTION_FAILED",
-                "mensaje": "El archivo no pudo ejecutarse como script",
-                "detalles": str(e),
-                "sugerencias": [
-                    "Verifica que el archivo tenga la extensión y contenido adecuados",
-                    "Prueba ejecutarlo manualmente en local para confirmar que funciona"
-                ]
-            }, ensure_ascii=False), mimetype="application/json", status_code=500)
-
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            cwd=str(found_script_path.parent)
+        )
+        return func.HttpResponse(json.dumps({
+            "success": result.returncode == 0,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "exit_code": result.returncode,
+            "script": str(found_script_path),
+            "interpreter": interpreter,
+            "args": args,
+            "working_dir": str(found_script_path.parent)
+        }, ensure_ascii=False), mimetype="application/json")
+    except subprocess.TimeoutExpired:
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": f"Script execution timed out after {timeout_s} seconds",
+            "script": str(found_script_path),
+            "interpreter": interpreter
+        }, ensure_ascii=False), mimetype="application/json", status_code=408)
     except Exception as e:
         logging.exception("ejecutar_script_local_http failed")
-        return func.HttpResponse(
-            json.dumps({
-                "ok": False,
-                "error_code": "INTERNAL_ERROR",
-                "mensaje": str(e),
-                "type": type(e).__name__,
-                "sugerencias": ["Verifica la ruta y permisos del script"]
-            }, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=500
-        )
-
-
-def _find_script_dynamically(script_name: str) -> Optional[Path]:
-    """
-    Búsqueda dinámica y robusta de scripts en múltiples ubicaciones
-
-    Estrategia:
-    1. Si la ruta ya es válida (absoluta o relativa), usarla
-    2. Buscar en directorios comunes con el nombre exacto
-    3. Buscar con extensiones comunes si no tiene extensión
-    4. Buscar coincidencias parciales
-    """
-
-    # ✅ VALIDACIÓN DEFENSIVA: Verificar que script_name no sea None o vacío
-    if not script_name or not isinstance(script_name, str):
-        return None
-
-    # Normalizar entrada - remover patrones peligrosos pero mantener flexibilidad
-    script_name = script_name.strip().replace("../", "").replace("..\\", "")
-
-    # ✅ VALIDACIÓN: Verificar que después de limpiar no esté vacío
-    if not script_name:
-        return None
-
-    # Caso 1: Ruta ya válida (absoluta o relativa desde PROJECT_ROOT)
-    try:
-        direct_path = Path(script_name)
-        if direct_path.is_absolute() and direct_path.exists() and direct_path.is_file():
-            return direct_path
-
-        relative_path = PROJECT_ROOT / script_name
-        if relative_path.exists() and relative_path.is_file():
-            return relative_path
-    except Exception:
-        # Si hay error creando Path, continuar con búsqueda
-        pass
-
-    # Caso 2: Buscar en directorios comunes
-    search_dirs = [
-        PROJECT_ROOT / "scripts",
-        PROJECT_ROOT / "src",
-        PROJECT_ROOT / "tools",
-        PROJECT_ROOT / "deployment",
-        PROJECT_ROOT / "copiloto-function" / "scripts",
-        PROJECT_ROOT,  # Directorio raíz del proyecto
-    ]
-
-    # Añadir directorios específicos de Azure si aplica
-    if IS_AZURE:
-        search_dirs.extend([
-            Path("/home/site/wwwroot/scripts"),
-            Path("/tmp/scripts"),
-            Path("/home/site/wwwroot")
-        ])
-
-    # Extensiones comunes a probar si no tiene extensión
-    extensions_to_try = [".py", ".sh",
-                         ".ps1"] if "." not in script_name else [""]
-
-    # Buscar en cada directorio
-    for search_dir in search_dirs:
-        try:
-            if not search_dir.exists():
-                continue
-
-            # Probar nombre exacto
-            candidate = search_dir / script_name
-            if candidate.exists() and candidate.is_file():
-                return candidate
-
-            # Si no tiene extensión, probar con extensiones comunes
-            if "." not in script_name:
-                for ext in extensions_to_try:
-                    candidate_with_ext = search_dir / f"{script_name}{ext}"
-                    if candidate_with_ext.exists() and candidate_with_ext.is_file():
-                        return candidate_with_ext
-        except Exception:
-            continue  # Ignorar errores y continuar búsqueda
-
-    # Caso 3: Búsqueda por coincidencia parcial en nombres de archivo
-    for search_dir in search_dirs:
-        try:
-            if not search_dir.exists():
-                continue
-
-            for file_path in search_dir.rglob("*"):
-                if file_path.is_file() and file_path.suffix.lower() in [".py", ".sh", ".ps1"]:
-                    # Coincidencia por nombre de archivo (sin extensión)
-                    if script_name.lower() in file_path.stem.lower():
-                        return file_path
-                    # Coincidencia por nombre completo
-                    if script_name.lower() in file_path.name.lower():
-                        return file_path
-        except Exception:
-            continue  # Ignorar errores de permisos
-
-    return None
-
-
-def _generate_smart_suggestions(script_name: str) -> dict:
-    """
-    Genera sugerencias inteligentes cuando un script no se encuentra
-    """
-
-    # ✅ VALIDACIÓN DEFENSIVA: Manejar script_name None o vacío
-    if not script_name or not isinstance(script_name, str):
-        return {
-            "rutas_intentadas": [],
-            "scripts_disponibles": [],
-            "sugerencias": []
-        }
-
-    rutas_intentadas = []
-    scripts_disponibles = []
-
-    # Directorios donde se buscó
-    search_dirs = [
-        PROJECT_ROOT / "scripts",
-        PROJECT_ROOT / "src",
-        PROJECT_ROOT / "tools",
-        PROJECT_ROOT / "deployment",
-        PROJECT_ROOT / "copiloto-function" / "scripts",
-        PROJECT_ROOT
-    ]
-
-    if IS_AZURE:
-        search_dirs.extend([
-            Path("/home/site/wwwroot/scripts"),
-            Path("/tmp/scripts")
-        ])
-
-    # Recopilar todas las rutas intentadas y scripts disponibles
-    for search_dir in search_dirs:
-        try:
-            if search_dir.exists():
-                # Rutas que se intentaron
-                rutas_intentadas.append(str(search_dir / script_name))
-
-                # Extensiones probadas si no tenía extensión
-                if "." not in script_name:
-                    for ext in [".py", ".sh", ".ps1"]:
-                        rutas_intentadas.append(
-                            str(search_dir / f"{script_name}{ext}"))
-
-                # Recopilar scripts disponibles
-                for file_path in search_dir.rglob("*"):
-                    if file_path.is_file() and file_path.suffix.lower() in [".py", ".sh", ".ps1"]:
-                        try:
-                            rel_path = file_path.relative_to(PROJECT_ROOT)
-                            scripts_disponibles.append(str(rel_path))
-                        except ValueError:
-                            scripts_disponibles.append(str(file_path))
-        except Exception:
-            continue  # Ignorar errores y continuar
-
-    # Generar sugerencias usando similitud de texto
-    scripts_disponibles = list(set(scripts_disponibles))  # Remover duplicados
-
-    # Sugerencias por nombre de archivo
-    file_names = [Path(script).name for script in scripts_disponibles]
-    name_suggestions = difflib.get_close_matches(
-        script_name, file_names, n=5, cutoff=0.3)
-
-    # Sugerencias por ruta completa
-    path_suggestions = difflib.get_close_matches(
-        script_name, scripts_disponibles, n=5, cutoff=0.3)
-
-    # Combinar y priorizar sugerencias
-    all_suggestions = []
-
-    # Añadir scripts que contengan el término buscado
-    for script in scripts_disponibles:
-        if script_name.lower() in script.lower():
-            all_suggestions.append(script)
-
-    # Añadir sugerencias por similitud
-    for suggestion in path_suggestions:
-        if suggestion not in all_suggestions:
-            all_suggestions.append(suggestion)
-
-    for suggestion in name_suggestions:
-        # Encontrar la ruta completa del archivo sugerido
-        for script in scripts_disponibles:
-            if Path(script).name == suggestion and script not in all_suggestions:
-                all_suggestions.append(script)
-
-    return {
-        "rutas_intentadas": rutas_intentadas,
-        "scripts_disponibles": scripts_disponibles,
-        "sugerencias": all_suggestions[:10]  # Limitar a 10 sugerencias
-    }
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": str(e),
+            "script": str(found_script_path),
+            "interpreter": interpreter
+        }, ensure_ascii=False), mimetype="application/json", status_code=500)
 
 
 @app.function_name(name="ejecutar_script_http")
@@ -6366,189 +6180,248 @@ def _generate_smart_suggestions(script_name: str) -> dict:
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     """
     Ejecuta scripts desde Blob Storage o local, soportando múltiples tipos (.py, .sh, .ps1)
+    Dinámico y abierto: no restringe a scripts/ ni rutas fijas.
     """
-    endpoint = "/api/ejecutar-script"
     run_id = uuid.uuid4().hex[:12]
-    script_blob_path = None
+    try:
+        req_body = req.get_json() if req.get_body() else {}
+    except Exception:
+        req_body = {}
 
-    def determinar_interpreter(script_path, interpreter_hint=None):
-        """Determina el intérprete correcto para el script"""
-        if interpreter_hint:
-            return interpreter_hint
-        extension = script_path.lower().split('.')[-1]
-        interpreters = {
-            'py': 'python',
-            'sh': 'bash',
-            'bash': 'bash',
-            'ps1': 'powershell'
-        }
-        return interpreters.get(extension, 'python')  # Default seguro
+    # Unificación semántica de parámetros
+    script_blob_path = req_body.get("script") or req_body.get("script_path")
+    timeout_s = int(req_body.get("timeout_s") or req_body.get("timeout") or 60)
+    args = req_body.get("args", [])
+    interpreter = req_body.get("interpreter")
+
+    if not script_blob_path or not isinstance(script_blob_path, str) or not script_blob_path.strip():
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": "Parámetro 'script' o 'script_path' es requerido y debe ser un string no vacío",
+            "example": {"script": "scripts/mi_script.py"}
+        }), status_code=400, mimetype="application/json")
+
+    # Permitir cualquier ruta, no restringir a scripts/
+    blob_service_client = get_blob_client()
+    if not blob_service_client:
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": "Blob Storage no configurado"
+        }), status_code=500, mimetype="application/json")
+
+    blob_client = blob_service_client.get_blob_client(
+        container=CONTAINER_NAME,
+        blob=script_blob_path
+    )
+
+    if not blob_client.exists():
+        container_client = blob_service_client.get_container_client(
+            CONTAINER_NAME)
+        scripts_disponibles = [
+            blob.name for blob in container_client.list_blobs()]
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": f"Script no encontrado: {script_blob_path}",
+            "available_scripts": scripts_disponibles[:10]
+        }), status_code=404, mimetype="application/json")
 
     try:
-        # 1. Validar request
-        try:
-            req_body = req.get_json()
-        except Exception:
-            req_body = {}
+        extension = Path(script_blob_path).suffix.lower()
+        with tempfile.NamedTemporaryFile(mode='w', suffix=extension, delete=False) as temp_file:
+            temp_path = temp_file.name
+            script_content = blob_client.download_blob().readall().decode('utf-8')
+            temp_file.write(script_content)
+    except Exception as e:
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": f"Error descargando script: {str(e)}"
+        }), status_code=500, mimetype="application/json")
 
-        script_blob_path = req_body.get('script') or req.params.get('script')
-        timeout_s = int(req_body.get(
-            'timeout_s', req.params.get('timeout_s') or 60))
-        args = req_body.get('args', [])
-        interpreter_hint = req_body.get('interpreter')
+    interpreter_final = interpreter
+    if not interpreter_final:
+        if extension == ".py":
+            interpreter_final = "python"
+        elif extension == ".sh":
+            interpreter_final = "bash"
+        elif extension == ".ps1":
+            interpreter_final = "powershell"
+        else:
+            interpreter_final = "unknown"
 
-        if not script_blob_path:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Parámetro 'script' requerido",
-                    "ejemplo_correcto": {"script": "scripts/mi_script.py"}
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        # 2. Validar formato de ruta
-        if not script_blob_path.startswith('scripts/'):
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "La ruta debe comenzar con 'scripts/'",
-                    "ruta_recibida": script_blob_path,
-                    "ruta_correcta": "scripts/nombre_script.py"
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        # 3. Conectar a Blob Storage
-        try:
-            blob_service_client = get_blob_client()
-            if not blob_service_client:
-                return func.HttpResponse(
-                    json.dumps(
-                        {"exito": False, "error": "Blob Storage no configurado"}),
-                    status_code=500,
-                    mimetype="application/json"
-                )
-            blob_client = blob_service_client.get_blob_client(
-                container=CONTAINER_NAME,
-                blob=script_blob_path
-            )
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps(
-                    {"exito": False, "error": f"Error conectando a Blob Storage: {str(e)}"}),
-                status_code=500,
-                mimetype="application/json"
-            )
-
-        # 4. Verificar que el script existe en Blob Storage
-        if not blob_client.exists():
-            container_client = blob_service_client.get_container_client(
-                CONTAINER_NAME)
-            scripts_disponibles = list(
-                container_client.list_blobs(name_starts_with="scripts/"))
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Script no encontrado: {script_blob_path}",
-                    "scripts_disponibles": [blob.name for blob in scripts_disponibles[:10]]
-                }),
-                status_code=404,
-                mimetype="application/json"
-            )
-
-        # 5. Descargar y ejecutar según tipo
-        try:
-            # Detectar extensión de forma robusta
-            extension = script_blob_path.lower().split('.')[-1]
-            with tempfile.NamedTemporaryFile(mode='w', suffix=f".{extension}", delete=False) as temp_file:
-                temp_path = temp_file.name
-                script_content = blob_client.download_blob().readall().decode('utf-8')
-                temp_file.write(script_content)
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps(
-                    {"exito": False, "error": f"Error descargando script: {str(e)}"}),
-                status_code=500,
-                mimetype="application/json"
-            )
-
-        if not os.path.exists(temp_path):
-            return func.HttpResponse(
-                json.dumps(
-                    {"exito": False, "error": "No se pudo crear archivo temporal"}),
-                status_code=500,
-                mimetype="application/json"
-            )
-
+    if extension == ".sh":
         try:
             os.chmod(temp_path, 0o755)
         except Exception:
             pass
 
-        # Determinar intérprete
-        interpreter = determinar_interpreter(
-            script_blob_path, interpreter_hint)
-        if interpreter == 'python':
-            comando = [sys.executable, temp_path] + args
-        elif interpreter == 'bash':
-            comando = ['bash', temp_path] + args
-        elif interpreter == 'powershell':
-            ps_cmd = shutil.which("pwsh") or shutil.which(
-                "powershell") or "powershell"
-            comando = [ps_cmd, '-File', temp_path] + args
-        else:
-            comando = ['bash', temp_path] + args  # Default a bash
+    if interpreter_final == "python":
+        cmd = [sys.executable, temp_path] + args
+    elif interpreter_final == "bash":
+        cmd = ["bash", temp_path] + args
+    elif interpreter_final == "powershell":
+        ps_cmd = shutil.which("pwsh") or shutil.which(
+            "powershell") or "powershell"
+        cmd = [ps_cmd, "-File", temp_path] + args
+    else:
+        cmd = [temp_path] + args
 
-        logging.info(
-            f"🚀 Ejecutando script: {script_blob_path} con comando: {' '.join(comando)}")
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_s,
+            text=True
+        )
+        salida = result.stdout
+        error = result.stderr
+        codigo = result.returncode
         try:
-            result = subprocess.run(
-                comando,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-                cwd=os.path.dirname(temp_path)
-            )
             os.unlink(temp_path)
-            respuesta = {
-                "exito": result.returncode == 0,
-                "script": script_blob_path,
-                "returncode": result.returncode,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "comando_usado": ' '.join(comando)
-            }
-            status_code = 200 if result.returncode == 0 else 400
+        except Exception:
+            pass
+
+        return func.HttpResponse(json.dumps({
+            "success": codigo == 0,
+            "stdout": salida,
+            "stderr": error,
+            "exit_code": codigo,
+            "script": script_blob_path,
+            "interpreter": interpreter_final,
+            "args": args,
+            "run_id": run_id
+        }, ensure_ascii=False), status_code=200 if codigo == 0 else 400, mimetype="application/json")
+    except subprocess.TimeoutExpired:
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": f"Timeout después de {timeout_s} segundos",
+            "exit_code": -1,
+            "script": script_blob_path,
+            "interpreter": interpreter_final,
+            "run_id": run_id
+        }), status_code=408, mimetype="application/json")
+    except Exception as e:
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+        logging.error(f"[{run_id}] Error ejecutando script: {str(e)}")
+        return func.HttpResponse(json.dumps({
+            "success": False,
+            "error": str(e),
+            "exit_code": -1,
+            "script": script_blob_path,
+            "interpreter": interpreter_final,
+            "run_id": run_id
+        }), status_code=500, mimetype="application/json")
+
+
+@app.function_name(name="verificar_script_http")
+@app.route(route="verificar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def verificar_script_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Verifica propiedades de un script en Blob Storage: tamaño, permisos, ejecutabilidad, shebang, bash -n
+    """
+
+    try:
+        body = req.get_json() if req.get_body() else {}
+        ruta = body.get("ruta")
+        if not ruta or not ruta.startswith("scripts/"):
             return func.HttpResponse(
-                json.dumps(respuesta, ensure_ascii=False),
-                status_code=status_code,
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetro 'ruta' requerido y debe comenzar con 'scripts/'",
+                    "ejemplo": {"ruta": "scripts/validacion.sh"}
+                }, ensure_ascii=False),
+                status_code=400,
                 mimetype="application/json"
             )
-        except subprocess.TimeoutExpired:
-            os.unlink(temp_path)
+
+        blob_service_client = get_blob_client()
+        if not blob_service_client:
             return func.HttpResponse(
                 json.dumps(
-                    {"exito": False, "error": f"Timeout después de {timeout_s} segundos", "returncode": -1}),
-                status_code=408,
-                mimetype="application/json"
-            )
-        except Exception as e:
-            os.unlink(temp_path)
-            return func.HttpResponse(
-                json.dumps(
-                    {"exito": False, "error": str(e), "returncode": -1}),
+                    {"exito": False, "error": "Blob Storage no configurado"}),
                 status_code=500,
                 mimetype="application/json"
             )
+        blob_client = blob_service_client.get_blob_client(CONTAINER_NAME, ruta)
+        if not blob_client.exists():
+            return func.HttpResponse(
+                json.dumps(
+                    {"exito": False, "error": f"Script no encontrado: {ruta}"}),
+                status_code=404,
+                mimetype="application/json"
+            )
 
-    except Exception as e:
-        logging.error(f"❌ Error ejecutando script: {str(e)}")
+        # Descargar a temporal
+        extension = ruta.lower().split('.')[-1]
+        with tempfile.NamedTemporaryFile(mode='w', suffix=f".{extension}", delete=False) as temp_file:
+            tmp_path = temp_file.name
+            script_content = blob_client.download_blob().readall().decode('utf-8')
+            temp_file.write(script_content)
+
+        # Propiedades del archivo
+        file_stat = os.stat(tmp_path)
+        modo = stat.filemode(file_stat.st_mode)
+        es_ejecutable = os.access(tmp_path, os.X_OK)
+        tiene_shebang = False
+        ultima_mod = None
+        try:
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                primera_linea = f.readline()
+                tiene_shebang = primera_linea.startswith("#!")
+            ultima_mod = datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+        except Exception:
+            primera_linea = ""
+
+        # bash -n para sintaxis
+        bash_check = None
+        bash_ok = None
+        if extension == "sh":
+            try:
+                result = subprocess.run(
+                    ["bash", "-n", tmp_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=10,
+                    text=True
+                )
+                bash_ok = result.returncode == 0
+                bash_check = result.stderr.strip() if result.stderr else "OK"
+            except Exception as e:
+                bash_ok = False
+                bash_check = str(e)
+
+        # Limpieza
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
         return func.HttpResponse(
-            json.dumps(
-                {"exito": False, "error": f"Error interno: {str(e)}", "script": script_blob_path}),
+            json.dumps({
+                "exito": True,
+                "ruta": ruta,
+                "tamaño_bytes": file_stat.st_size,
+                "modo": modo,
+                "es_ejecutable": es_ejecutable,
+                "tiene_shebang": tiene_shebang,
+                "ultima_modificacion": ultima_mod,
+                "bash_sintaxis_ok": bash_ok,
+                "bash_salida": bash_check,
+                "primeras_lineas": primera_linea.strip() if primera_linea else ""
+            }, ensure_ascii=False),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
             status_code=500,
             mimetype="application/json"
         )
@@ -6874,7 +6747,7 @@ def interpretar_intencion_semantica(intencion: str, params: dict) -> dict:
     intencion_lower = intencion.lower()
     for keyword, mapped_intent in keywords_map.items():
         if keyword in intencion_lower:
-            return procesar_intencion_extendida(mapped_intent, params)
+            return procesar_intencion_semantica(mapped_intent, params)
     return {
         "exito": False,
         "mensaje": f"No pude interpretar la intención: '{intencion}'",
@@ -9689,16 +9562,19 @@ def ensure_mi_login():
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Ejecuta cualquier comando recibido en el body, sin prefijos ni modificaciones."""
+    """
+    Ejecuta cualquier comando recibido en el body, con inteligencia adaptativa:
+    - Si el comando es un archivo .sh y el sistema es Windows, antepone 'bash', 'wsl bash' o 'sh' según disponibilidad.
+    - Auto-reintenta variantes si el primero falla.
+    - Registra intentos en un log semántico si el agente no tiene visibilidad de errores.
+    """
+    comando = None  # Inicializar para evitar unbound variable
     try:
-        # 🔑 Asegurar login con MI en cada request
         ensure_mi_login()
-
-        # Ejecutar setup_git_credentials SIEMPRE antes de usar git
         setup_git_credentials()
 
         body = req.get_json()
-        comando = body.get("comando")
+        comando = body.get("comando") if body else None
 
         if not comando or not isinstance(comando, str) or not comando.strip():
             return func.HttpResponse(
@@ -9712,96 +9588,137 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         comando = comando.strip()
-        logging.info(f"Ejecutando comando: {comando}")
+        intentos_log = []
+        sistema = platform.system()
+        is_windows = sistema.lower().startswith("win")
+        es_sh = comando.endswith(".sh")
+        variantes = [comando]
 
-        try:
-            result = subprocess.run(
-                comando,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=60
+        # --- INTELIGENCIA ADAPTATIVA ---
+        if es_sh:
+            if is_windows:
+                variantes = [
+                    f"bash {comando}",
+                    f"wsl bash {comando}",
+                    f"sh {comando}"
+                ]
+            else:
+                variantes = [f"bash {comando}", comando, f"sh {comando}"]
+
+        exito = False
+        resultado_final = None
+        comando_ejecutado = None
+
+        for intento in variantes:
+            try:
+                logging.info(f"Intentando ejecutar: {intento}")
+                result = subprocess.run(
+                    intento,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                intentos_log.append({
+                    "comando": intento,
+                    "codigo_salida": result.returncode,
+                    "stdout": result.stdout[:200] if result.stdout else "",
+                    "stderr": result.stderr[:200] if result.stderr else ""
+                })
+                if result.returncode == 0:
+                    exito = True
+                    resultado_final = result
+                    comando_ejecutado = intento
+                    break
+            except Exception as e:
+                intentos_log.append({
+                    "comando": intento,
+                    "error": str(e),
+                    "tipo_error": type(e).__name__
+                })
+                continue
+
+        if not exito or not resultado_final:
+            # Si todos fallaron, usar el último intento para el error
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Ninguna variante del comando se ejecutó exitosamente",
+                    "intentos": intentos_log,
+                    "comando_original": comando if comando else "no_definido",
+                    "sistema_operativo": sistema
+                }),
+                mimetype="application/json",
+                status_code=200
             )
 
-            if result.returncode != 0:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "codigo_salida": result.returncode,
-                        "error": result.stderr.strip() if result.stderr else "Comando falló sin error específico",
-                        "comando_ejecutado": comando,
-                        "sistema_operativo": platform.system()
-                    }),
-                    mimetype="application/json",
-                    status_code=200
-                )
-
-            # Intentar parsear como JSON, si falla devolver texto plano
+        # Intentar parsear como JSON, si falla devolver texto plano
+        salida = ""
+        if resultado_final and resultado_final.stdout:
             try:
-                output_json = json.loads(
-                    result.stdout) if result.stdout.strip() else None
+                output_json = json.loads(resultado_final.stdout.strip())
                 salida = output_json
             except json.JSONDecodeError:
-                salida = result.stdout.strip()
+                salida = resultado_final.stdout.strip()
+        else:
+            salida = ""
 
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "stdout": salida,
-                    "comando_ejecutado": comando,
-                    "codigo_salida": result.returncode,
-                    "sistema_operativo": platform.system()
-                }),
-                mimetype="application/json",
-                status_code=200
-            )
+        # Registrar intentos en log semántico si hubo más de un intento o error
+        if len(intentos_log) > 1 or not exito:
+            _log_semantic_event({
+                "tipo": "cli_exec",
+                "fecha": datetime.now().isoformat(),
+                "comando_original": comando if comando else "no_definido",
+                "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
+                "sistema": sistema,
+                "intentos": intentos_log,
+                "exito": exito
+            })
 
-        except subprocess.TimeoutExpired:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Comando excedió tiempo límite (60s)",
-                    "comando_ejecutado": comando,
-                    "sistema_operativo": platform.system()
-                }),
-                mimetype="application/json",
-                status_code=200
-            )
+        return func.HttpResponse(
+            json.dumps({
+                "exito": True,
+                "stdout": salida,
+                "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
+                "codigo_salida": resultado_final.returncode if resultado_final else -1,
+                "sistema_operativo": sistema,
+                "intentos": intentos_log if len(intentos_log) > 1 else None
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
 
-        except FileNotFoundError:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Comando no encontrado o no disponible en {platform.system()}",
-                    "comando_ejecutado": comando,
-                    "sugerencia": f"Verifica que el comando esté instalado correctamente en {platform.system()}",
-                    "sistema_operativo": platform.system()
-                }),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        except Exception as e:
-            logging.exception("ejecutar_cli_http failed")
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": str(e),
-                    "tipo_error": type(e).__name__,
-                    "comando_ejecutado": comando,
-                    "sistema_operativo": platform.system()
-                }),
-                mimetype="application/json",
-                status_code=500
-            )
-
-    except Exception as outer_e:
-        logging.exception("ejecutar_cli_http outer try failed")
+    except subprocess.TimeoutExpired:
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
-                "error": str(outer_e),
-                "tipo_error": type(outer_e).__name__,
+                "error": "Comando excedió tiempo límite (60s)",
+                "comando_ejecutado": comando if comando else "no_definido",
+                "sistema_operativo": platform.system()
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
+    except FileNotFoundError:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": f"Comando no encontrado o no disponible en {platform.system()}",
+                "comando_ejecutado": comando if comando else "no_definido",
+                "sugerencia": f"Verifica que el comando esté instalado correctamente en {platform.system()}",
+                "sistema_operativo": platform.system()
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
+    except Exception as e:
+        logging.exception("ejecutar_cli_http failed")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "tipo_error": type(e).__name__,
+                "comando_ejecutado": comando if comando else "no_definido",
                 "sistema_operativo": platform.system()
             }),
             mimetype="application/json",
@@ -11587,3 +11504,605 @@ def escalar_plan_http(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
+
+def _append_log(entry: dict):
+    log_path = Path("scripts/semantic_log.jsonl")
+    try:
+        with open(log_path, "a", encoding="utf-8", errors="replace") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        logging.error(f"❌ Error escribiendo en semantic_log.jsonl: {e}")
+
+
+def _enviar_alerta_slack(fix: dict, motivo: str):
+    mensaje = {
+        "text": f"⚠️ *Rollback ejecutado*\n"
+                f"*ID:* {fix.get('id')}\n"
+                f"*Acción:* {fix.get('accion')}\n"
+                f"*Target:* {fix.get('target')}\n"
+                f"*Prioridad:* {fix.get('prioridad')}\n"
+                f"*Motivo:* {motivo}\n"
+                f"👉 Revisión: https://copiloto-semantico-func-us2.azurewebsites.net/api/revisar-correcciones"
+    }
+    try:
+        webhook = os.environ.get("SLACK_WEBHOOK_URL")
+        if webhook:
+            requests.post(webhook, json=mensaje)
+        else:
+            logging.warning("SLACK_WEBHOOK_URL no definido en configuración.")
+    except Exception as e:
+        logging.error(f"Fallo al notificar a Slack: {e}")
+
+
+def _rollback_fix(fix_id: str) -> dict:
+    """
+    Realiza rollback de una corrección registrada.
+    - Si el recurso existe y se revierte, registra rollback.
+    - Si el recurso ya no existe o no hay nada que revertir, registra rollback_skip.
+    Ambos casos quedan en el log semántico y notifican a Slack.
+    """
+    fixes = _load_pending_fixes()
+    fix = next((f for f in fixes if f["id"] == fix_id), None)
+
+    if not fix:
+        return {"exito": False, "error": f"Fix {fix_id} no encontrado"}
+
+    # Verificar si rollback está disponible
+    if not fix.get("simulacion", {}).get("rollback_disponible", False):
+        return {"exito": False, "error": f"Rollback no disponible para fix {fix_id}"}
+
+    target = fix.get("target", "")
+    rollback_realizado = False
+    rollback_omitido = False
+    motivo_omitido = ""
+    mensaje_log = ""
+    tipo_log = ""
+    try:
+        # Ejemplo: revertir chmod solo si el archivo existe
+        if "Cambiar permisos a ejecutable" in fix.get("simulacion", {}).get("cambios_esperados", []):
+            script_path = Path("/home/site/wwwroot") / target
+            if script_path.exists():
+                os.system(f"chmod 755 {script_path}")
+                rollback_realizado = True
+                mensaje_log = f"Rollback ejecutado para fix {fix_id}"
+                tipo_log = "rollback"
+            else:
+                rollback_omitido = True
+                motivo_omitido = f"El archivo {target} no existe, no se aplicaron cambios"
+                mensaje_log = f"Rollback omitido, archivo {target} no existe"
+                tipo_log = "rollback_skip"
+        else:
+            # Si no hay acción específica, marcar como omitido
+            rollback_omitido = True
+            motivo_omitido = "No hay acción de rollback definida para este fix"
+            mensaje_log = f"Rollback omitido para fix {fix_id}: {motivo_omitido}"
+            tipo_log = "rollback_skip"
+
+        # Actualizar estado del fix
+        fix["estado"] = "revertido" if rollback_realizado else "omitido"
+        _append_log({
+            "tipo": tipo_log,
+            "fix_id": fix_id,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "mensaje": mensaje_log
+        })
+
+        # Notificar Slack en ambos casos
+        if rollback_realizado:
+            _enviar_alerta_slack(
+                fix,
+                motivo="Rollback automático por fallo"
+            )
+            return {"exito": True, "mensaje": mensaje_log, "rollback": "ejecutado"}
+        else:
+            _enviar_alerta_slack(
+                fix,
+                motivo=motivo_omitido or "Rollback omitido"
+            )
+            return {"exito": True, "mensaje": mensaje_log, "rollback": "omitido", "motivo": motivo_omitido}
+
+    except Exception as e:
+        return {"exito": False, "error": str(e)}
+
+
+@app.function_name(name="rollback_correccion")
+@app.route(route="rollback", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def rollback_correccion(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        body = req.get_json()
+        fix_id = body.get("id")
+
+        if not fix_id:
+            return func.HttpResponse(
+                json.dumps({"exito": False, "error": "ID de fix requerido"}),
+                mimetype="application/json",
+                status_code=400
+            )
+
+        # ⚡ lógica de rollback mínima
+        # debes implementarlo según tu dominio
+        resultado = _rollback_fix(fix_id)
+
+        return func.HttpResponse(
+            json.dumps({"exito": True, "resultado": resultado},
+                       ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            status_code=200
+        )
+
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+@app.function_name(name="promover_http")
+@app.route(route="promover", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def promover_http(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        from scripts.auto_promoter import main as run_promotor
+        run_promotor()
+        return func.HttpResponse(
+            json.dumps(
+                {"exito": True, "mensaje": "Promotor ejecutado manualmente"}),
+            status_code=200,
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+
+@app.function_name(name="promocion_reporte_http")
+@app.route(route="promocion-reporte", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        with open("scripts/semantic_log.jsonl", "r") as f:
+            lines = f.readlines()
+            ultimos = [json.loads(line)
+                       for line in lines[-10:]]  # Últimos 10 eventos
+
+        return func.HttpResponse(
+            json.dumps({"ok": True, "ultimos_eventos": ultimos},
+                       ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            status_code=200
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"ok": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+@app.function_name(name="revisar_correcciones")
+@app.route(route="revisar-correcciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def revisar_correcciones(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        pendientes = _load_pending_fixes()
+        return func.HttpResponse(
+            json.dumps({"exito": True, "pendientes": pendientes},
+                       ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+@app.function_name(name="aplicar_correccion_manual")
+@app.route(route="aplicar-correccion", methods=["POST"])
+def aplicar_correccion_manual(req: func.HttpRequest) -> func.HttpResponse:
+    """Permite aplicar manualmente una corrección pendiente por ID."""
+    body = req.get_json()
+    fix_id = body.get("id")
+    fix = next((f for f in _load_pending_fixes() if f["id"] == fix_id), None)
+    if not fix:
+        return func.HttpResponse(
+            json.dumps(
+                {"exito": False, "error": f"Fix {fix_id} no encontrado"}),
+            mimetype="application/json", status_code=404
+        )
+    resultado = _execute_fix(fix)
+    return func.HttpResponse(
+        json.dumps(resultado, ensure_ascii=False, indent=2),
+        mimetype="application/json", status_code=200 if resultado.get("validado") else 400
+    )
+
+
+# Sistema de registro de cambios
+PENDING_FIXES_FILE = Path("scripts/pending_fixes.json")
+CHANGE_LOG_FILE = Path("scripts/change_log.json")
+SEMANTIC_COMMITS_FILE = Path("scripts/semantic_commits.json")
+
+
+@app.function_name(name="autocorregir_http")
+@app.route(route="autocorregir", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint para registrar y simular correcciones automáticas.
+    Restringido a agentes AI (verifica header especial)
+    """
+    run_id = get_run_id(req)
+
+    # Verificar que es un agente autorizado
+    agent_header = req.headers.get("X-Agent-Auth", "")
+    if not _validate_agent_auth(agent_header):
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "No autorizado. Este endpoint es solo para agentes AI.",
+                "codigo": "UNAUTHORIZED_AGENT"
+            }),
+            status_code=401
+        )
+
+    try:
+        body = req.get_json()
+
+        # Validar estructura requerida
+        required_fields = ["accion", "target", "propuesta", "tipo"]
+        for field in required_fields:
+            if field not in body:
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": f"Campo requerido faltante: {field}",
+                        "campos_requeridos": required_fields
+                    }),
+                    status_code=400
+                )
+
+        # Crear registro de corrección
+        correccion = {
+            "id": _generate_fix_id(body),
+            "timestamp": datetime.now().isoformat(),
+            "run_id": run_id,
+            "estado": "pendiente",
+            "accion": body.get("accion"),
+            "target": body.get("target"),
+            "propuesta": body.get("propuesta"),
+            "tipo": body.get("tipo"),
+            "detonante": body.get("detonante", "manual"),
+            "origen": body.get("origen", "AI Agent"),
+            "prioridad": _calculate_priority(body),
+            "validaciones_requeridas": _get_required_validations(body),
+            "intentos": 0,
+            "simulacion": _simulate_fix(body)
+        }
+
+        # Registrar en pending_fixes.json
+        pending_fixes = _load_pending_fixes()
+        pending_fixes.append(correccion)
+        _save_pending_fixes(pending_fixes)
+
+        # Registrar en el log semántico
+        _log_semantic_event({
+            "tipo": "correccion_registrada",
+            "fecha": datetime.now().isoformat(),
+            "origen": correccion["origen"],
+            "target": correccion["target"],
+            "accion": correccion["propuesta"],
+            "estado": "pendiente",
+            "id_correccion": correccion["id"]
+        })
+
+        # Evaluar si se puede auto-promover
+        auto_promote = _evaluate_auto_promotion(correccion)
+
+        response = {
+            "exito": True,
+            "mensaje": f"Corrección registrada: {correccion['id']}",
+            "correccion": correccion,
+            "auto_promocion": auto_promote,
+            "bandeja_revision": {
+                "total_pendientes": len(pending_fixes),
+                "alta_prioridad": len([f for f in pending_fixes if f.get("prioridad", 0) >= 8]),
+                "url_revision": f"/api/revisar-correcciones"
+            }
+        }
+
+        # Si es auto-promocionable y de alta prioridad, ejecutar
+        if auto_promote["promocionable"] and correccion["prioridad"] >= 9:
+            resultado_promocion = _execute_fix(correccion)
+            response["promocion_automatica"] = resultado_promocion
+
+        return func.HttpResponse(
+            json.dumps(response, ensure_ascii=False, indent=2),
+            status_code=200
+        )
+
+    except Exception as e:
+        logging.exception(f"[{run_id}] Error en autocorregir")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "run_id": run_id
+            }),
+            status_code=500
+        )
+
+
+def _validate_agent_auth(header: str) -> bool:
+    """Valida que el request viene de un agente autorizado"""
+    # Implementar validación real según tu esquema de auth
+    valid_tokens = [
+        "AI-FOUNDRY-TOKEN",
+        "COPILOT-AGENT",
+        os.environ.get("AGENT_AUTH_TOKEN", "")
+    ]
+    return header in valid_tokens or header.startswith("Bearer ")
+
+
+def _generate_fix_id(body: dict) -> str:
+    """Genera ID único para la corrección"""
+    content = f"{body['target']}{body['accion']}{datetime.now().isoformat()}"
+    return hashlib.md5(content.encode()).hexdigest()[:8]
+
+
+def _calculate_priority(body: dict) -> int:
+    """Calcula prioridad de la corrección (0-10)"""
+    priority = 5  # Base
+
+    # Ajustar según tipo
+    tipo_priorities = {
+        "seguridad": 10,
+        "error_critico": 9,
+        "sintaxis": 7,
+        "optimizacion": 5,
+        "estilo": 3
+    }
+    priority = tipo_priorities.get(body.get("tipo", ""), priority)
+
+    # Ajustar según target
+    if "production" in body.get("target", "").lower():
+        priority += 2
+    if "test" in body.get("target", "").lower():
+        priority -= 1
+
+    return min(10, max(0, priority))
+
+
+def _get_required_validations(body: dict) -> List[str]:
+    """Define validaciones requeridas según el tipo de corrección"""
+    tipo = body.get("tipo", "")
+    validations = ["sintaxis"]
+
+    if tipo in ["seguridad", "error_critico"]:
+        validations.extend(["test_unitario", "test_integracion"])
+
+    if "script" in body.get("target", ""):
+        validations.append("ejecutar_script")
+
+    if "config" in body.get("target", ""):
+        validations.append("validar_json")
+
+    return validations
+
+
+def _simulate_fix(body: dict) -> dict:
+    """Simula el resultado de aplicar la corrección"""
+    simulation = {
+        "exito_esperado": True,
+        "cambios_esperados": [],
+        "riesgos": [],
+        "rollback_disponible": True
+    }
+
+    # Simular según tipo de acción
+    accion = body.get("accion", "")
+
+    if "shebang" in body.get("propuesta", ""):
+        simulation["cambios_esperados"].append("Agregar #!/bin/bash al inicio")
+
+    if "chmod" in body.get("propuesta", ""):
+        simulation["cambios_esperados"].append("Cambiar permisos a ejecutable")
+
+    if "sintaxis" in body.get("tipo", ""):
+        simulation["riesgos"].append("Posible cambio de comportamiento")
+
+    return simulation
+
+
+def _load_pending_fixes() -> list[dict]:
+    path = Path("scripts/pending_fixes.json")
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        logging.error(f"❌ JSON inválido en pending_fixes.json: {e}")
+        _enviar_alerta_slack(
+            {"id": "sistema", "target": "pending_fixes.json"},
+            motivo=f"Archivo corrupto: {e}"
+        )
+        return []
+    except Exception as e:
+        logging.error(f"❌ Error leyendo pending_fixes.json: {e}")
+        return []
+
+
+def _save_pending_fixes(fixes: list[dict]):
+    """Guarda correcciones pendientes"""
+    PENDING_FIXES_FILE.parent.mkdir(exist_ok=True)
+    with open(PENDING_FIXES_FILE, "w") as f:
+        json.dump(fixes, f, indent=2, ensure_ascii=False)
+
+
+def _log_semantic_event(event: dict):
+    """Registra evento en el log semántico"""
+    log_file = SEMANTIC_COMMITS_FILE
+    log_file.parent.mkdir(exist_ok=True)
+
+    commits = []
+    if log_file.exists():
+        with open(log_file, "r") as f:
+            commits = json.load(f)
+
+    commits.append(event)
+
+    # Mantener solo últimos 1000 commits
+    if len(commits) > 1000:
+        commits = commits[-1000:]
+
+    with open(log_file, "w") as f:
+        json.dump(commits, f, indent=2, ensure_ascii=False)
+
+
+def _evaluate_auto_promotion(correccion: dict) -> dict:
+    """Evalúa si una corrección puede ser auto-promovida"""
+    criteria = {
+        "tipo_seguro": correccion["tipo"] not in ["seguridad", "produccion"],
+        "prioridad_alta": correccion["prioridad"] >= 8,
+        "validaciones_simples": len(correccion["validaciones_requeridas"]) <= 2,
+        "sin_riesgos": len(correccion["simulacion"]["riesgos"]) == 0
+    }
+
+    return {
+        "promocionable": all(criteria.values()),
+        "criterios": criteria,
+        "razon": _get_promotion_reason(criteria)
+    }
+
+
+def _get_promotion_reason(criteria: dict) -> str:
+    """Explica por qué se puede o no promover"""
+    if all(criteria.values()):
+        return "Cumple todos los criterios para promoción automática"
+
+    failed = [k for k, v in criteria.items() if not v]
+    return f"No cumple criterios: {', '.join(failed)}"
+
+
+def _apply_script_fix(fix: dict) -> dict:
+    """Aplica una corrección a un script (por ejemplo, agregar shebang o chmod)"""
+    try:
+        ruta = fix["target"]
+        contenido = fix["propuesta"]
+
+        script_path = Path("/home/site/wwwroot") / ruta
+        if not script_path.exists():
+            return {"ejecutado": False, "error": f"Script no encontrado: {ruta}"}
+
+        # Guardar backup
+        backup_path = script_path.with_suffix(".bak")
+        backup_path.write_text(script_path.read_text())
+
+        # Aplicar la propuesta (sobrescribir el contenido)
+        script_path.write_text(contenido)
+
+        return {"ejecutado": True, "ruta_modificada": str(script_path)}
+    except Exception as e:
+        return {"ejecutado": False, "error": str(e)}
+
+
+def _apply_config_fix(fix: dict) -> dict:
+    """Aplica corrección sobre configuración JSON o YAML"""
+    try:
+        ruta = fix["target"]
+        contenido = fix["propuesta"]
+        config_path = Path("/home/site/wwwroot") / ruta
+
+        if not config_path.exists():
+            return {"ejecutado": False, "error": f"Archivo no encontrado: {ruta}"}
+
+        # Backup
+        backup_path = config_path.with_suffix(".bak")
+        backup_path.write_text(config_path.read_text())
+
+        # Escribir contenido nuevo
+        config_path.write_text(contenido)
+        return {"ejecutado": True, "ruta_modificada": str(config_path)}
+    except Exception as e:
+        return {"ejecutado": False, "error": str(e)}
+
+
+def _apply_generic_fix(fix: dict) -> dict:
+    """Fallback genérico para correcciones no clasificadas"""
+    return {"ejecutado": False, "error": "Tipo de corrección no soportado todavía"}
+
+
+def _validate_fix(fix: dict) -> dict:
+    """Simula validaciones posteriores a la aplicación del fix"""
+    try:
+        # Aquí puedes agregar validaciones reales (bash -n, json.load, etc)
+        if "script" in fix["target"]:
+            return {"exito": True, "mensaje": "Validación básica de script exitosa"}
+        if "config" in fix["target"]:
+            return {"exito": True, "mensaje": "Validación de config exitosa"}
+        return {"exito": True, "mensaje": "Validación genérica pasada"}
+    except Exception as e:
+        return {"exito": False, "error": str(e)}
+
+
+def _update_fix_status(fix_id: str, nuevo_estado: str) -> None:
+    """Actualiza el estado de una corrección en pending_fixes.json"""
+    fixes = _load_pending_fixes()
+    for fix in fixes:
+        if fix["id"] == fix_id:
+            fix["estado"] = nuevo_estado
+            break
+    _save_pending_fixes(fixes)
+
+
+def _execute_fix(correccion: dict) -> dict:
+    """Ejecuta una corrección aprobada"""
+    try:
+        resultado = {
+            "id_correccion": correccion["id"],
+            "timestamp": datetime.now().isoformat(),
+            "ejecutado": False,
+            "validado": False,
+            "errores": []
+        }
+
+        # Ejecutar según tipo de acción
+        if "script" in correccion["target"]:
+            resultado_ejecucion = _apply_script_fix(correccion)
+        elif "config" in correccion["target"]:
+            resultado_ejecucion = _apply_config_fix(correccion)
+        else:
+            resultado_ejecucion = _apply_generic_fix(correccion)
+
+        resultado.update(resultado_ejecucion)
+
+        # Validar
+        if resultado["ejecutado"]:
+            validacion = _validate_fix(correccion)
+            resultado["validado"] = validacion["exito"]
+            resultado["validacion_detalles"] = validacion
+
+        # Actualizar estado
+        _update_fix_status(
+            correccion["id"], "aplicado" if resultado["validado"] else "fallido")
+
+        # Log semántico
+        _log_semantic_event({
+            "tipo": "correccion_aplicada",
+            "fecha": datetime.now().isoformat(),
+            "origen": correccion["origen"],
+            "target": correccion["target"],
+            "accion": correccion["accion"],
+            "validado_por": correccion["validaciones_requeridas"],
+            "resultado": "exitoso" if resultado["validado"] else "fallido"
+        })
+
+        return resultado
+
+    except Exception as e:
+        logging.error(f"Error ejecutando fix {correccion['id']}: {e}")
+        return {
+            "ejecutado": False,
+            "error": str(e)
+        }

@@ -1,0 +1,101 @@
+[
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-27T21:51:45.628746",
+    "origen": "AI Agent",
+    "target": "scripts/test_script.sh",
+    "accion": "#!/bin/bash\necho Hello world",
+    "estado": "pendiente",
+    "id_correccion": "b39bdb84"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-28T17:16:51.179171",
+    "origen": "Agent161",
+    "target": "scripts/test_script.sh",
+    "accion": "#!/bin/bash\necho Hello",
+    "estado": "pendiente",
+    "id_correccion": "16c8ef8c"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-28T17:20:14.815242",
+    "origen": "Agent161",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "3791abe3"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-28T17:35:42.371477",
+    "origen": "Agent161",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "3637bb64"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-28T17:43:43.392711",
+    "origen": "Agent161",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "229e6d7f"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-28T23:39:27.304580",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "dcee1bef"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-29T01:12:06.716968",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "9e54828a"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-29T01:18:00.979881",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "1a35305b"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-29T01:52:52.892396",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "dbfafafc"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-29T02:07:21.613693",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 777 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "d40be929"
+  },
+  {
+    "tipo": "correccion_registrada",
+    "fecha": "2025-09-29T02:10:53.448482",
+    "origen": "AI Agent",
+    "target": "scripts/fail.sh",
+    "accion": "chmod 755 fail.sh",
+    "estado": "pendiente",
+    "id_correccion": "01c70f66"
+  }
+]

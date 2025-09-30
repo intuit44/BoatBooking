@@ -1,5 +1,101 @@
 # utils_semantic.py
 import re
+from pathlib import Path
+import difflib
+import os
+from typing import Optional
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+IS_AZURE = os.environ.get("WEBSITE_INSTANCE_ID") is not None
+CONTAINER_NAME = os.environ.get("BLOB_CONTAINER", "boat-rental-project")
+
+
+def _find_script_dynamically(script_name: str) -> Optional[Path]:
+    """
+    Busca un script dinámicamente:
+    - Si es ruta absoluta y existe → úsala.
+    - Si es relativa → prueba en múltiples directorios conocidos.
+    - Si estamos en Azure → busca también en /home/site/wwwroot, /tmp/scripts, etc.
+    """
+    if not script_name or not isinstance(script_name, str):
+        return None
+
+    script_name = script_name.strip()
+
+    # Caso 1: ruta absoluta
+    p = Path(script_name)
+    if p.is_absolute() and p.exists() and p.is_file():
+        return p
+
+    # Caso 2: buscar en dirs comunes
+    search_dirs = [
+        PROJECT_ROOT / "scripts",
+        PROJECT_ROOT / "src",
+        PROJECT_ROOT / "tools",
+        PROJECT_ROOT,
+    ]
+    if IS_AZURE:
+        search_dirs += [Path("/home/site/wwwroot"), Path("/tmp/scripts")]
+
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        candidate = d / script_name
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    # Caso 3: búsqueda parcial
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for f in d.rglob("*"):
+            if f.is_file() and script_name.lower() in f.name.lower():
+                return f
+
+    return None
+
+
+def _generate_smart_suggestions(script_name: str) -> dict:
+    """
+    Genera sugerencias dinámicas basadas en coincidencia de nombre.
+    """
+    rutas_intentadas = []
+    scripts_disponibles = []
+
+    search_dirs = [
+        PROJECT_ROOT / "scripts",
+        PROJECT_ROOT / "src",
+        PROJECT_ROOT,
+    ]
+    if IS_AZURE:
+        search_dirs += [Path("/home/site/wwwroot"), Path("/tmp/scripts")]
+
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        rutas_intentadas.append(str(d / script_name))
+        for f in d.rglob("*"):
+            if f.is_file() and f.suffix.lower() in (".py", ".sh", ".ps1"):
+                try:
+                    rel = f.relative_to(PROJECT_ROOT)
+                    scripts_disponibles.append(str(rel))
+                except ValueError:
+                    scripts_disponibles.append(str(f))
+
+    # Limpiar duplicados
+    scripts_disponibles = list(set(scripts_disponibles))
+
+    # Buscar similitudes con difflib
+    suggestions = difflib.get_close_matches(
+        script_name, [Path(s).name for s in scripts_disponibles], n=5, cutoff=0.3
+    )
+
+    return {
+        "rutas_intentadas": rutas_intentadas,
+        "scripts_disponibles": scripts_disponibles,
+        "sugerencias": suggestions
+    }
 
 
 def explain_arm_cause(cause_text: str) -> dict:

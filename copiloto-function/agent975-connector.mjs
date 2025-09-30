@@ -26,7 +26,7 @@ class Agent975CopilotoConnector {
     // Configuración del Copiloto
     this.copilotoConfig = {
       functionApp: "copiloto-semantico-func",
-      baseUrl: "https://copiloto-semantico-func.azurewebsites.net/api",
+      baseUrl: "https://copiloto-semantico-func-us2.azurewebsites.net/api",
       logicAppUrl: "https://prod-15.eastus.logic.azure.com:443/workflows/4711b810bb5f478aa4d8dc5662c61c53/triggers/When_a_HTTP_request_is_received/paths/invoke",
       logicAppParams: "?api-version=2019-05-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=IUqo-n0TnqdRiQF7qSGSBnofI5LZPmuzdYHCdmsahss"
     };

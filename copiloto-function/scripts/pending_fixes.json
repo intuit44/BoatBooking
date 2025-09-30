@@ -1,0 +1,86 @@
+[
+    {
+        "id": "dbfafafc",
+        "timestamp": "2025-09-29T01:52:52.735670",
+        "run_id": "f1098be81e83",
+        "estado": "pendiente",
+        "accion": "parchar script inseguro",
+        "target": "scripts/fail.sh",
+        "propuesta": "chmod 777 fail.sh",
+        "tipo": "seguridad",
+        "detonante": "manual",
+        "origen": "AI Agent",
+        "prioridad": 10,
+        "validaciones_requeridas": [
+            "sintaxis",
+            "test_unitario",
+            "test_integracion",
+            "ejecutar_script"
+        ],
+        "intentos": 0,
+        "simulacion": {
+            "exito_esperado": true,
+            "cambios_esperados": [
+                "Cambiar permisos a ejecutable"
+            ],
+            "riesgos": [],
+            "rollback_disponible": true
+        }
+    },
+    {
+        "id": "d40be929",
+        "timestamp": "2025-09-29T02:07:21.609697",
+        "run_id": "f4f2c0b21305",
+        "estado": "pendiente",
+        "accion": "parchar script inseguro",
+        "target": "scripts/fail.sh",
+        "propuesta": "chmod 777 fail.sh",
+        "tipo": "seguridad",
+        "detonante": "manual",
+        "origen": "AI Agent",
+        "prioridad": 10,
+        "validaciones_requeridas": [
+            "sintaxis",
+            "test_unitario",
+            "test_integracion",
+            "ejecutar_script"
+        ],
+        "intentos": 0,
+        "simulacion": {
+            "exito_esperado": true,
+            "cambios_esperados": [
+                "Cambiar permisos a ejecutable"
+            ],
+            "riesgos": [],
+            "rollback_disponible": true
+        }
+    },
+    {
+        "id": "01c70f66",
+        "timestamp": "2025-09-29T02:10:53.447481",
+        "run_id": "fa20c2ab90c6",
+        "estado": "pendiente",
+        "accion": "parchar script inseguro",
+        "target": "scripts/fail.sh",
+        "propuesta": "chmod 755 fail.sh",
+        "tipo": "seguridad",
+        "detonante": "manual",
+        "origen": "AI Agent",
+        "prioridad": 10,
+        "validaciones_requeridas": [
+            "sintaxis",
+            "test_unitario",
+            "test_integracion",
+            "ejecutar_script"
+        ],
+        "intentos": 0,
+        "simulacion": {
+            "exito_esperado": true,
+            "cambios_esperados": [
+                "Cambiar permisos a ejecutable"
+            ],
+            "riesgos": [],
+            "rollback_disponible": true
+        }
+    }
+]
