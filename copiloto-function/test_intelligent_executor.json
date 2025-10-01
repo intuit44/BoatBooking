@@ -1,0 +1,9 @@
+{
+  "comando": "az monitor",
+  "intencion": "crear alerta HTTP 500 para function app",
+  "parametros": {
+    "resource_group": "boat-rental-app-group",
+    "function_app": "copiloto-semantico-func-us2",
+    "subscription_id": "380fa841-83f3-42fe-adc4-582a5ebe139b"
+  }
+}
