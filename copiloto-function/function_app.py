@@ -5531,13 +5531,14 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # Detectar si debe usar local o blob basado en la ruta
-        if ruta.startswith("C:/") or ruta.startswith("/tmp/") or "scripts/" in ruta or not IS_AZURE:
-            # Usar función local
+        # Solo rutas absolutas van a local, rutas relativas van a blob
+        if ruta.startswith("C:/") or ruta.startswith("/tmp/") or ruta.startswith("/home/"):
+            # Usar función local para rutas absolutas
             res = crear_archivo_local(ruta, contenido)
         else:
-            # Usar función blob
+            # Usar función blob para rutas relativas (scripts/, etc.)
             res = crear_archivo(ruta, contenido)
-            
+
         return func.HttpResponse(
             json.dumps(res, ensure_ascii=False),
             mimetype="application/json",
@@ -6271,6 +6272,23 @@ def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
         }, ensure_ascii=False), mimetype="application/json", status_code=500)
 
 
+def normalizar_blob_path(script_path: str) -> str:
+    """
+    Normaliza la ruta eliminando el prefijo blob:// y barras iniciales.
+    Ejemplo: blob://container/path → path
+    """
+    if isinstance(script_path, str):
+        if script_path.startswith("blob://"):
+            # blob://container/path → container/path, pero queremos solo path
+            partes = script_path.replace("blob://", "", 1).split("/", 1)
+            if len(partes) == 2:
+                return partes[1]
+            return partes[-1]
+        if script_path.startswith("/"):
+            return script_path.lstrip("/")
+    return script_path
+
+
 @app.function_name(name="ejecutar_script_http")
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -6296,6 +6314,9 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             "error": "Parámetro 'script' o 'script_path' es requerido y debe ser un string no vacío",
             "example": {"script": "scripts/mi_script.py"}
         }), status_code=400, mimetype="application/json")
+
+    # 4. Normalizar ruta del script en blob
+    script_blob_path = normalizar_blob_path(script_blob_path)
 
     # Permitir cualquier ruta, no restringir a scripts/
     blob_service_client = get_blob_client()
@@ -6353,7 +6374,22 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     if interpreter_final == "python":
         cmd = [sys.executable, temp_path] + args
     elif interpreter_final == "bash":
-        cmd = ["bash", temp_path] + args
+        # En Windows, usar WSL o Git Bash si está disponible
+        if platform.system() == "Windows":
+            # Intentar WSL primero, luego Git Bash
+            wsl_bash = shutil.which("wsl")
+            git_bash = shutil.which("bash")
+            if wsl_bash:
+                # Convertir ruta de Windows a WSL
+                wsl_path = temp_path.replace("\\", "/").replace("C:", "/mnt/c")
+                cmd = ["wsl", "bash", wsl_path] + args
+            elif git_bash:
+                cmd = ["bash", temp_path] + args
+            else:
+                # Fallback: intentar ejecutar directamente
+                cmd = [temp_path] + args
+        else:
+            cmd = ["bash", temp_path] + args
     elif interpreter_final == "powershell":
         ps_cmd = shutil.which("pwsh") or shutil.which(
             "powershell") or "powershell"
@@ -6386,7 +6422,7 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             "interpreter": interpreter_final,
             "args": args,
             "run_id": run_id
-        }, ensure_ascii=False), status_code=200 if codigo == 0 else 400, mimetype="application/json")
+        }, ensure_ascii=False), status_code=200, mimetype="application/json")
     except subprocess.TimeoutExpired:
         try:
             os.unlink(temp_path)
