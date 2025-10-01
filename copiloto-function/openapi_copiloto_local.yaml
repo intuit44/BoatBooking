@@ -107,51 +107,7 @@
       }
     },
 
-    "/api/ejecutar-cli": {
-      "post": {
-        "summary": "Ejecutar comandos CLI vía SDK de Azure",
-        "operationId": "ejecutarCLI",
-        "tags": ["CLI"],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {"comando": {"type": "string", "example": "storage account list"}},
-                    "required": ["comando"]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "servicio": {"type": "string", "example": "storage"},
-                      "comando": {"type": "string", "example": "account list"}
-                    },
-                    "required": ["servicio", "comando"]
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Respuesta del comando ejecutado",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object", "additionalProperties": true}
-              }
-            }
-          },
-          "400": {"description": "Solicitud inválida"},
-          "403": {"description": "Operación no permitida"},
-          "408": {"description": "Timeout excedido"}
-        }
-      }
-    },
+
     "/api/diagnostico-recursos": {
       "get": {
         "summary": "Diagnóstico completo de recursos Azure",
@@ -885,7 +841,142 @@
         }
       }
     },
-      "/api/escribir-archivo-local": {
+    "/api/ejecutar-cli": {
+      "post": {
+        "summary": "[LEGACY] Ejecutar comandos Azure CLI - Usar /api/ejecutar-comando-inteligente para nuevos casos",
+        "description": "⚠️ ENDPOINT LEGACY: Para nuevos casos usar /api/ejecutar-comando-inteligente que incluye autocorrección. Este endpoint solo ejecuta comandos Azure CLI directos con formato: {\"comando\": \"group list\"}",
+        "operationId": "ejecutarCLI",
+        "tags": ["Azure CLI - Legacy"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {"comando": {"type": "string", "example": "storage account list"}},
+                    "required": ["comando"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "servicio": {"type": "string", "example": "storage"},
+                      "comando": {"type": "string", "example": "account list"}
+                    },
+                    "required": ["servicio", "comando"]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Respuesta del comando ejecutado",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object", "additionalProperties": true}
+              }
+            }
+          },
+          "400": {"description": "Solicitud inválida"},
+          "403": {"description": "Operación no permitida"},
+          "408": {"description": "Timeout excedido"}
+        }
+      }
+    },
+    "/api/ejecutar-comando-inteligente": {
+      "post": {
+        "summary": "🚀 EJECUTOR INTELIGENTE UNIVERSAL - help → validar → ejecutar → autocorregir",
+        "description": "⭐ ENDPOINT PRINCIPAL PARA COMANDOS CLI. Campo 'comando' es OBLIGATORIO. Formato: {\"comando\": \"az monitor\", \"intencion\": \"crear alerta\"}. Incluye autocorrección automática.",
+        "operationId": "ejecutarComandoInteligente",
+        "tags": ["🚀 Intelligent Executor - USAR ESTE"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comando": {
+                    "type": "string", 
+                    "description": "Comando base CLI (ej: 'az group', 'kubectl get', 'git status')",
+                    "example": "az group"
+                  },
+                  "intencion": {
+                    "type": "string", 
+                    "description": "Descripción de lo que quiere hacer",
+                    "example": "listar todos los grupos de recursos"
+                  },
+                  "parametros": {
+                    "type": "object",
+                    "description": "Parámetros adicionales opcionales",
+                    "properties": {
+                      "resource_group": {"type": "string"},
+                      "function_app": {"type": "string"}
+                    }
+                  }
+                },
+                "required": ["comando"],
+                "additionalProperties": false
+              },
+              "examples": {
+                "listar_grupos": {
+                  "summary": "Listar grupos de recursos",
+                  "value": {
+                    "comando": "az group",
+                    "intencion": "listar todos los grupos de recursos"
+                  }
+                },
+                "crear_alerta": {
+                  "summary": "Crear alerta Azure Monitor HTTP 500",
+                  "value": {
+                    "comando": "az monitor",
+                    "intencion": "crear alerta HTTP 500 para function app",
+                    "parametros": {
+                      "resource_group": "boat-rental-app-group",
+                      "function_app": "copiloto-semantico-func-us2",
+                      "subscription_id": "380fa841-83f3-42fe-adc4-582a5ebe139b"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Comando procesado exitosamente o con autocorrección"}
+        }
+      }
+    },
+    "/api/crear-alerta-azure": {
+      "post": {
+        "summary": "Crear alerta Azure Monitor para HTTP 500",
+        "operationId": "crearAlertaAzure",
+        "tags": ["Azure Monitor"],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource_group": {"type": "string", "default": "boat-rental-app-group"},
+                  "function_app": {"type": "string", "default": "copiloto-semantico-func-us2"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Alerta procesada"}
+        }
+      }
+    },
+
+    "/api/escribir-archivo-local": {
         "post": {
         "summary": "Crear o guardar un archivo en el filesystem LOCAL (no Azure Blob), usando rutas absolutas o relativas",
         "description": "Permite crear o sobrescribir archivos en el sistema de archivos local del contenedor o máquina, usando rutas absolutas (ej: C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py, /tmp/test.txt) o relativas (ej: scripts/test_local.py). No utiliza Azure Blob Storage. Útil para pruebas, logs o scripts temporales. ⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar.",
@@ -1576,7 +1667,8 @@
   },
   "tags": [
     {"name": "Azure Storage", "description": "Operaciones de Azure Blob Storage"},
-    {"name": "Azure CLI", "description": "Ejecución de comandos Azure CLI"},
+    {"name": "Azure CLI - Legacy", "description": "Comandos Azure CLI básicos (usar Intelligent Executor para nuevos casos)"},
+    {"name": "🚀 Intelligent Executor - USAR ESTE", "description": "Ejecutor inteligente universal con autocorrección automática"},
     {"name": "Diagnóstico", "description": "Diagnóstico y monitoreo de recursos"},
     {"name": "Azure Deployment", "description": "Deployment de recursos con ARM templates"},
     {"name": "Azure Configuration", "description": "Configuración de recursos Azure"},
