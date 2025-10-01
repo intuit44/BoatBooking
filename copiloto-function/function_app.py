@@ -2136,6 +2136,27 @@ def procesar_intencion_semantica(intencion: str, parametros: Optional[Dict[str, 
             if part.startswith("/api/"):
                 return invocar_endpoint_directo(part, "GET")
 
+    # --- REGLA EXPLÍCITA PARA ESCRIBIR ARCHIVO LOCAL ---
+    keywords_map = {
+        "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard"},
+        "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
+        "diagnóstico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
+        "resumen": {"endpoint": "ejecutar", "intencion": "generar:resumen"},
+        "escribir archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+        "crear archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+    }
+
+    for keyword, command in keywords_map.items():
+        if keyword in intencion_lower:
+            return invocar_endpoint_directo(
+                endpoint=f"/api/{command['endpoint']}",
+                method=command.get("method", "POST"),
+                body=parametros if command.get(
+                    "method", "POST") == "POST" else None,
+                params=parametros if command.get(
+                    "method", "POST") == "GET" else None
+            )
+
     # Continuar con el procesamiento normal existente...
     partes = intencion.split(':')
     comando = partes[0].lower()
@@ -3611,6 +3632,20 @@ def clean_agent_response(agent_response: str) -> dict:
     try:
         logging.info(f"🔍 Parseando: {agent_response[:50]}...")
 
+        # Caso 0: Detectar JSON directo con campos de archivo
+        try:
+            direct_json = json.loads(agent_response)
+            if isinstance(direct_json, dict) and ("ruta" in direct_json or "path" in direct_json):
+                logging.info("✅ JSON directo con campos de archivo detectado")
+                # Determinar endpoint basado en contenido
+                if "contenido" in direct_json or "content" in direct_json:
+                    # Usar escribir-archivo-local por defecto para archivos locales
+                    direct_json["endpoint"] = "escribir-archivo-local"
+                    direct_json["method"] = "POST"
+                    return direct_json
+        except json.JSONDecodeError:
+            pass  # No es JSON válido, continuar con otros casos
+
         # Caso 1: Comandos simples
         simple_commands = {
             "ping": {"endpoint": "ping"},
@@ -3620,6 +3655,40 @@ def clean_agent_response(agent_response: str) -> dict:
         }
 
         clean_text = agent_response.strip().lower()
+        text_lower = clean_text
+
+        # REGLA NUEVA: Si el texto incluye "local" y "archivo", entonces endpoint = "escribir-archivo-local"
+        if "archivo" in text_lower and "local" in text_lower:
+            logging.info(
+                "✅ Detectado 'archivo' y 'local' en el texto, usando escribir-archivo-local")
+            # Intentar parsear JSON para preservar campos originales
+            try:
+                original_data = json.loads(agent_response)
+                if isinstance(original_data, dict):
+                    original_data["endpoint"] = "escribir-archivo-local"
+                    original_data["method"] = "POST"
+                    return original_data
+            except:
+                pass
+            return {"endpoint": "escribir-archivo-local", "method": "POST"}
+
+        # Regla reforzada para detectar "local" o rutas locales
+        if "local" in clean_text or clean_text.startswith("c:/") or clean_text.startswith("/tmp/"):
+            logging.info(
+                "✅ Detectado comando/ruta local, mapeando a escribir-archivo-local")
+            return {"endpoint": "escribir-archivo-local", "method": "POST"}
+
+        # Palabras clave directas para escribir archivo local
+        keywords_map = {
+            "escribir archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+            "crear archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+            "guardar en local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+        }
+        for keyword, command in keywords_map.items():
+            if keyword in clean_text:
+                logging.info(f"✅ Palabra clave directa detectada: {keyword}")
+                return command
+
         if clean_text in simple_commands:
             logging.info(f"✅ Comando simple detectado: {clean_text}")
             return simple_commands[clean_text]
@@ -3675,14 +3744,14 @@ def clean_agent_response(agent_response: str) -> dict:
             logging.error(f"❌ Error en búsqueda de JSON: {str(e)}")
 
         # Caso 3: Palabras clave (más defensivo)
-        keywords_map = {
+        semantic_keywords_map = {
             "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard"},
             "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
             "diagnóstico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
             "resumen": {"endpoint": "ejecutar", "intencion": "generar:resumen"}
         }
 
-        for keyword, command in keywords_map.items():
+        for keyword, command in semantic_keywords_map.items():
             if keyword in clean_text:
                 logging.info(f"✅ Palabra clave detectada: {keyword}")
                 return command
@@ -3799,62 +3868,69 @@ def hybrid_executor_fixed(req: func.HttpRequest) -> func.HttpResponse:
 
 
 def execute_parsed_command(command: dict) -> dict:
-    """Ejecuta un comando ya parseado"""
-    endpoint = command.get("endpoint", "ping")
-    logging.info(f"🚀 Ejecutando endpoint: {endpoint}")
+    """
+    Ejecuta un comando ya parseado, detectando entorno (Azure/local) y usando la estrategia adecuada.
+    Adapta el router para aceptar el mismo formato que el agente ya envía, sin obligar a cambiar.
+    Si el agente manda directamente ruta y contenido en el JSON, se recoge igual y se pasa al endpoint.
+    """
+    endpoint = command.get("endpoint")
+    method = command.get("method", "POST").upper()
+    # Recoge todos los campos excepto endpoint y method, sin obligar a usar "data" o "parametros"
+    data = {k: v for k, v in command.items() if k not in {
+        "endpoint", "method"}}
+    # Si el agente manda "data" o "parametros", los prioriza
+    if "data" in command and isinstance(command["data"], dict):
+        data = command["data"]
+    elif "parametros" in command and isinstance(command["parametros"], dict):
+        data = command["parametros"]
 
-    if endpoint == "ping":
-        logging.info("✅ Ejecutando ping")
-        return {
-            "exito": True,
-            "message": "pong",
-            "status": "Function App funcionando correctamente",
-            "timestamp": datetime.now().isoformat()
-        }
+    logging.debug(
+        f"[execute_parsed_command] endpoint={endpoint}, method={method}, data={data}")
 
-    elif endpoint == "status":
-        logging.info("🔎 Consultando status")
-        return build_status()
+    IS_AZURE = is_running_in_azure()
 
-    elif endpoint == "ejecutar":
-        intencion = command.get("intencion", "dashboard")
-        parametros = command.get("parametros", {})
-        logging.info(f"🎯 Ejecutando intencion: {intencion}")
-        if intencion == "dashboard":
-            logging.info("📊 Iniciando generación de dashboard...")
+    if IS_AZURE:
+        # 🔹 Invocar SIEMPRE vía HTTP en Azure
+        base_url = os.environ.get("FUNCTION_BASE_URL", "http://localhost:7071")
+        endpoint_str = endpoint or ""
+        ep = endpoint_str if endpoint_str.startswith(
+            "api/") or endpoint_str.startswith("/api/") else f"/api/{endpoint_str}"
+        if not ep.startswith("/"):
+            ep = "/" + ep
+        url = f"{base_url}{ep}"
+        try:
+            resp = requests.request(method, url, json=data, timeout=30)
             try:
-                result = generar_dashboard_insights()
-                logging.info("✅ Dashboard generado exitosamente")
-                return result
-            except Exception as e:
-                logging.error(f"💥 Error en dashboard: {str(e)}")
-                return {
-                    "exito": False,
-                    "error": f"Error en dashboard: {str(e)}",
-                    "fallback": True
-                }
-        return procesar_intencion_semantica(intencion, parametros)
-
-    elif endpoint == "copiloto":
-        mensaje = command.get("mensaje", "")
-        logging.info(f"🤖 Procesando comando copiloto: {mensaje}")
-        if mensaje.startswith("leer:"):
-            archivo = mensaje.split(":", 1)[1]
-            logging.info(f"📖 Leyendo archivo: {archivo}")
-            return leer_archivo_dinamico(archivo)
-        else:
-            return {
-                "exito": True,
-                "mensaje": f"Comando copiloto procesado: {mensaje}",
-                "tipo": "copiloto_response"
-            }
-
+                return resp.json()
+            except Exception:
+                return {"exito": False, "error": resp.text, "status": resp.status_code}
+        except Exception as e:
+            return {"exito": False, "error": str(e), "endpoint": endpoint, "status": 500}
     else:
-        logging.warning(f"❌ Endpoint no implementado: {endpoint}")
-        return {
-            "exito": False,
-            "error": f"Endpoint '{endpoint}' no implementado"
-        }
+        # 🔹 Local: usar _resolve_handler
+        endpoint_str = endpoint if isinstance(
+            endpoint, str) and endpoint else ""
+        path, handler = _resolve_handler(endpoint_str)
+        if handler:
+            payload = json.dumps(data, ensure_ascii=False).encode(
+                "utf-8") if method in {"POST", "PUT", "PATCH"} and data else b""
+            req_mock = func.HttpRequest(
+                method=method,
+                url=f"http://localhost{path}",
+                body=payload,
+                headers={"Content-Type": "application/json"},
+                params=data if method == "GET" else {}
+            )
+            try:
+                response = handler(req_mock)
+                try:
+                    return json.loads(response.get_body().decode())
+                except Exception:
+                    return {"exito": True, "raw_response": response.get_body().decode(), "status_code": response.status_code}
+            except Exception as e:
+                return {"exito": False, "error": str(e), "endpoint": endpoint, "status": 500}
+        else:
+            return {"exito": False, "error": f"Endpoint '{endpoint}' no implementado localmente"}
 
 
 def generate_user_friendly_response_v2(original_response: str, result: dict) -> str:
@@ -4201,7 +4277,227 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-# --- ENDPOINT HYBRID MEJORADO ---
+@app.function_name(name="escribir_archivo_local_http")
+@app.route(route="escribir-archivo-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Endpoint HTTP para crear/escribir archivos en filesystem LOCAL.
+    Permite rutas absolutas (C:\\..., /tmp/...) en local.
+    Soporta:
+      - Texto plano (ruta + contenido)
+      - Binario/base64 (ruta + contenido_base64 + binario: true)
+      - tipo_mime opcional en metadata
+    """
+    try:
+        # Parseo robusto del body
+        try:
+            body = req.get_json()
+        except ValueError:
+            body = {}
+
+        if not body:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Request body must be valid JSON",
+                    "ejemplo": {
+                        "ruta": "scripts/test.txt",
+                        "contenido": "Hola mundo",
+                        "contenido_base64": "<base64>",
+                        "binario": True,
+                        "tipo_mime": "image/png"
+                    }
+                }, ensure_ascii=False),
+                mimetype="application/json", status_code=400
+            )
+
+        ruta = (body.get("path") or body.get("ruta") or "").strip()
+        contenido = body.get("content") or body.get("contenido")
+        contenido_base64 = body.get("contenido_base64")
+        binario = bool(body.get("binario", False))
+        tipo_mime = (body.get("tipo_mime") or body.get(
+            "mime_type") or "application/octet-stream")
+
+        if not ruta:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetro 'ruta' o 'path' es requerido"
+                }, ensure_ascii=False),
+                mimetype="application/json", status_code=400
+            )
+
+        IS_AZURE = is_running_in_azure()
+
+        # Soporte binario/base64
+        if binario or contenido_base64:
+            if isinstance(contenido_base64, str) and isinstance(tipo_mime, str):
+                res = crear_archivo_local(
+                    ruta, contenido_base64, tipo_mime, binario=True, is_azure=IS_AZURE)
+            else:
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": "Los parámetros 'contenido_base64' y 'tipo_mime' son requeridos y deben ser cadenas.",
+                        "ejemplo": {
+                            "ruta": "scripts/logo.png",
+                            "contenido_base64": "<cadena_base64>",
+                            "tipo_mime": "image/png"
+                        }
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=400
+                )
+        else:
+            res = crear_archivo_local(
+                ruta, contenido or "", tipo_mime, binario=False, is_azure=IS_AZURE)
+
+        return func.HttpResponse(
+            json.dumps(res, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=201 if res.get("exito") else 400
+        )
+    except Exception as e:
+        logging.exception("escribir_archivo_local_http failed")
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json", status_code=500
+        )
+
+
+def crear_archivo_local(
+    ruta: str,
+    contenido: str,
+    tipo_mime: Optional[str] = None,
+    binario: bool = False,
+    is_azure: Optional[bool] = None
+) -> dict:
+    """
+    Crea/sobrescribe archivo de texto plano o binario con manejo robusto de encoding.
+    En Azure, fuerza directorio base wwwroot y valida la ruta.
+    En local, permite rutas absolutas sin restricción.
+    """
+    try:
+        if is_azure is None:
+            is_azure = is_running_in_azure()
+
+        if is_azure:
+            base_dir = "/home/site/wwwroot"
+            ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
+            # Seguridad: prevenir path traversal en Azure
+            if not os.path.abspath(ruta_completa).startswith(os.path.abspath(base_dir)):
+                return {
+                    "exito": False,
+                    "error": f"Ruta fuera del directorio permitido: {ruta}",
+                    "directorio_base": base_dir
+                }
+        else:
+            # En local: permitir rutas absolutas y relativas libremente
+            ruta_completa = os.path.abspath(ruta)
+
+        os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
+
+        if binario:
+            # contenido debe ser base64
+            if not contenido:
+                return {
+                    "exito": False,
+                    "error": "Falta 'contenido_base64' para archivo binario"
+                }
+            try:
+                raw = base64.b64decode(contenido)
+            except Exception as e:
+                return {
+                    "exito": False,
+                    "error": f"Error decodificando base64: {str(e)}"
+                }
+            with open(ruta_completa, 'wb') as f:
+                f.write(raw)
+            tamaño_bytes = len(raw)
+        else:
+            with open(ruta_completa, 'w', encoding='utf-8') as f:
+                f.write(contenido)
+            tamaño_bytes = os.path.getsize(ruta_completa)
+            # Agregar encoding declaration si es un script Python
+            if ruta_completa.endswith('.py'):
+                with open(ruta_completa, 'r+', encoding='utf-8') as f:
+                    content = f.read()
+                    if not content.startswith('# -*- coding:'):
+                        f.seek(0, 0)
+                        f.write('# -*- coding: utf-8 -*-\n' + content)
+
+        return {
+            "exito": True,
+            "mensaje": f"Archivo {'binario' if binario else 'de texto'} creado: {ruta}",
+            "encoding": "utf-8" if not binario else None,
+            "tamaño_bytes": tamaño_bytes,
+            "ubicacion": f"file://{ruta_completa}",
+            "ruta_absoluta": ruta_completa,
+            "tipo_operacion": "crear_archivo_local_binario" if binario else "crear_archivo_local",
+            "modo_acceso": "local_filesystem",
+            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar" if is_azure else "",
+            "metadata": {
+                "tipo_mime": tipo_mime or ("application/octet-stream" if binario else "text/plain")
+            }
+        }
+
+    except UnicodeEncodeError as e:
+        return {
+            "exito": False,
+            "error": f"Error de encoding: {str(e)}",
+            "sugerencia": "Use solo caracteres UTF-8 o especifique encoding"
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": f"Error escribiendo archivo local: {str(e)}",
+            "ruta_intentada": ruta
+        }
+
+
+def _resolve_handler(endpoint: str):
+    if not endpoint:
+        return None, None
+
+    path = endpoint.strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    if not path.startswith("/api/"):
+        path = "/api" + path
+
+    # Excepción explícita para escribir-archivo-local
+    if endpoint == "escribir-archivo-local" or path == "/api/escribir-archivo-local":
+        # 1) Buscar directamente en globals
+        fn = globals().get("escribir_archivo_local_http")
+        if fn:
+            return path, fn
+        # 2) Buscar en funciones registradas en app
+        for f in app.get_functions():
+            if getattr(f, "name", None) == "escribir_archivo_local_http":
+                return path, f.get_user_function()  # <--- aquí está el handler real
+
+    # Otras excepciones
+    name = _INVOCAR_EXCEPTIONS.get(path) or _INVOCAR_EXCEPTIONS.get(endpoint)
+    if name:
+        fn = globals().get(name)
+        if fn:
+            return path, fn
+        for f in app.get_functions():
+            if getattr(f, "name", None) == name:
+                return path, f.get_user_function()
+
+    # Heurística
+    stem = path[len("/api/"):]
+    cand = stem.replace("-", "_") + "_http"
+    fn = globals().get(cand)
+    if fn:
+        return path, fn
+    for f in app.get_functions():
+        if getattr(f, "name", None) == cand:
+            return path, f.get_user_function()
+
+    return path, None
+
 
 @app.function_name(name="hybrid")
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -4522,31 +4818,12 @@ def generate_user_friendly_response(processed: dict, execution_result: dict) -> 
 
 # Excepciones de nombre (handlers que no siguen *_http)
 _INVOCAR_EXCEPTIONS = {
-    "/api/health":  "health",
-    "/api/status":  "status",
+    "/api/health": "health",
+    "/api/status": "status",
     "/api/copiloto": "copiloto",
+    "/api/escribir-archivo-local": "escribir_archivo_local_http",
+    "escribir-archivo-local": "escribir_archivo_local_http",
 }
-
-
-def _resolve_handler(endpoint: str):
-    if not endpoint:
-        return None, None
-    path = endpoint.strip()
-    if not path.startswith("/"):
-        path = "/" + path
-    if not path.startswith("/api/"):
-        path = "/api" + path
-
-    # Excepciones primero
-    name = _INVOCAR_EXCEPTIONS.get(path)
-    if name and name in globals():
-        return path, globals()[name]
-
-    # Heurística: /api/descargar-archivo -> descargar_archivo_http
-    stem = path[len("/api/"):]
-    cand = stem.replace("-", "_") + "_http"
-    fn = globals().get(cand)
-    return path, fn
 
 
 @app.function_name(name="bridge_cli")
@@ -5253,7 +5530,14 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json", status_code=400
             )
 
-        res = crear_archivo(ruta, contenido)
+        # Detectar si debe usar local o blob basado en la ruta
+        if ruta.startswith("C:/") or ruta.startswith("/tmp/") or "scripts/" in ruta or not IS_AZURE:
+            # Usar función local
+            res = crear_archivo_local(ruta, contenido)
+        else:
+            # Usar función blob
+            res = crear_archivo(ruta, contenido)
+            
         return func.HttpResponse(
             json.dumps(res, ensure_ascii=False),
             mimetype="application/json",
@@ -5280,200 +5564,12 @@ def _status_from_result(res: dict) -> int:
     return 404 if ("no existe" in msg or "no encontrado" in msg) else 400
 
 
-@app.function_name(name="escribir_archivo_local_http")
-@app.route(route="escribir-archivo-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Endpoint HTTP para crear/escribir archivos en filesystem LOCAL.
-    Soporta:
-      - Texto plano (ruta + contenido)
-      - Binario/base64 (ruta + contenido_base64 + binario: true)
-      - tipo_mime opcional en metadata
-    """
-    try:
-        # Parseo robusto del body
-        try:
-            body = req.get_json()
-        except ValueError:
-            body = {}
-
-        if not body:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Request body must be valid JSON",
-                    "ejemplo": {
-                        "ruta": "scripts/test.txt",
-                        "contenido": "Hola mundo",
-                        "contenido_base64": "<base64>",
-                        "binario": True,
-                        "tipo_mime": "image/png"
-                    }
-                }, ensure_ascii=False),
-                mimetype="application/json", status_code=400
-            )
-
-        ruta = (body.get("path") or body.get("ruta") or "").strip()
-        contenido = body.get("content") or body.get("contenido")
-        contenido_base64 = body.get("contenido_base64")
-        binario = bool(body.get("binario", False))
-        # Forzar tipo_mime a str siempre, nunca None
-        tipo_mime = (body.get("tipo_mime") or body.get(
-            "mime_type") or "application/octet-stream")
-
-        if not ruta:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Parámetro 'ruta' o 'path' es requerido"
-                }, ensure_ascii=False),
-                mimetype="application/json", status_code=400
-            )
-
-        # Soporte binario/base64
-        if binario or contenido_base64:
-            if isinstance(contenido_base64, str) and isinstance(tipo_mime, str):
-                res = crear_archivo_local_binario(
-                    ruta, contenido_base64, tipo_mime)
-            else:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "error": "Los parámetros 'contenido_base64' y 'tipo_mime' son requeridos y deben ser cadenas.",
-                        "ejemplo": {
-                            "ruta": "scripts/logo.png",
-                            "contenido_base64": "<cadena_base64>",
-                            "tipo_mime": "image/png"
-                        }
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=400
-                )
-        else:
-            res = crear_archivo_local(ruta, contenido or "", tipo_mime)
-
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=201 if res.get("exito") else 400
-        )
-    except Exception as e:
-        logging.exception("escribir_archivo_local_http failed")
-        return func.HttpResponse(
-            json.dumps({"exito": False, "error": str(e)}),
-            mimetype="application/json", status_code=500
-        )
-
-
-def crear_archivo_local(ruta: str, contenido: str, tipo_mime: Optional[str] = None) -> dict:
-    """Crea/sobrescribe archivo de texto plano con manejo robusto de encoding"""
-    try:
-        base_dir = "/home/site/wwwroot"
-        ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
-
-        # Seguridad: prevenir path traversal
-        if not os.path.abspath(ruta_completa).startswith(os.path.abspath(base_dir)):
-            return {
-                "exito": False,
-                "error": f"Ruta fuera del directorio permitido: {ruta}",
-                "directorio_base": base_dir
-            }
-
-        os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
-
-        with open(ruta_completa, 'w', encoding='utf-8') as f:
-            f.write(contenido)
-
-        # Agregar encoding declaration si es un script Python
-        if ruta_completa.endswith('.py'):
-            with open(ruta_completa, 'r+', encoding='utf-8') as f:
-                content = f.read()
-                if not content.startswith('# -*- coding:'):
-                    f.seek(0, 0)
-                    f.write('# -*- coding: utf-8 -*-\n' + content)
-
-        return {
-            "exito": True,
-            "mensaje": f"Archivo creado con encoding UTF-8: {ruta}",
-            "encoding": "utf-8",
-            "tamaño_bytes": os.path.getsize(ruta_completa),
-            "ubicacion": f"file://{ruta_completa}",
-            "ruta_absoluta": ruta_completa,
-            "tipo_operacion": "crear_archivo_local",
-            "modo_acceso": "local_filesystem",
-            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar",
-            "metadata": {
-                "tipo_mime": tipo_mime or "text/plain"
-            }
-        }
-
-    except UnicodeEncodeError as e:
-        return {
-            "exito": False,
-            "error": f"Error de encoding: {str(e)}",
-            "sugerencia": "Use solo caracteres UTF-8 o especifique encoding"
-        }
-    except Exception as e:
-        return {
-            "exito": False,
-            "error": f"Error escribiendo archivo local: {str(e)}",
-            "ruta_intentada": ruta
-        }
-
-
-def crear_archivo_local_binario(ruta: str, contenido_base64: str, tipo_mime: str) -> dict:
-    """Crea/sobrescribe archivo binario desde base64"""
-    try:
-        base_dir = "/home/site/wwwroot"
-        ruta_completa = os.path.join(base_dir, ruta.lstrip('/'))
-
-        # Seguridad: prevenir path traversal
-        if not os.path.abspath(ruta_completa).startswith(os.path.abspath(base_dir)):
-            return {
-                "exito": False,
-                "error": f"Ruta fuera del directorio permitido: {ruta}",
-                "directorio_base": base_dir
-            }
-
-        os.makedirs(os.path.dirname(ruta_completa), exist_ok=True)
-
-        if not contenido_base64:
-            return {
-                "exito": False,
-                "error": "Falta 'contenido_base64' para archivo binario"
-            }
-
-        try:
-            raw = base64.b64decode(contenido_base64)
-        except Exception as e:
-            return {
-                "exito": False,
-                "error": f"Error decodificando base64: {str(e)}"
-            }
-
-        with open(ruta_completa, 'wb') as f:
-            f.write(raw)
-
-        return {
-            "exito": True,
-            "mensaje": f"Archivo binario creado: {ruta}",
-            "tamaño_bytes": len(raw),
-            "ubicacion": f"file://{ruta_completa}",
-            "ruta_absoluta": ruta_completa,
-            "tipo_operacion": "crear_archivo_local_binario",
-            "modo_acceso": "local_filesystem",
-            "advertencia": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar",
-            "metadata": {
-                "tipo_mime": tipo_mime or "application/octet-stream"
-            }
-        }
-
-    except Exception as e:
-        return {
-            "exito": False,
-            "error": f"Error escribiendo archivo binario local: {str(e)}",
-            "ruta_intentada": ruta
-        }
+def is_running_in_azure() -> bool:
+    # Detectar Azure SOLO si no estás en el emulador local
+    return bool(
+        os.environ.get("WEBSITE_INSTANCE_ID")
+        and not os.environ.get("AZURE_FUNCTIONS_ENVIRONMENT") == "Development"
+    )
 
 
 @app.function_name(name="modificar_archivo_http")

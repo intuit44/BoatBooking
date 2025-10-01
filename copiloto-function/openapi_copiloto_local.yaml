@@ -859,7 +859,7 @@
     },
     "/api/escribir-archivo": {
       "post": {
-        "summary": "Crear/guardar un archivo",
+        "summary": "Crear/guardar un archivo en Azure Blob Storage (contenedor predeterminado)",
         "operationId": "escribirArchivo",
         "tags": ["Azure Storage"],
         "security": [],
@@ -885,83 +885,119 @@
         }
       }
     },
-    "/api/escribir-archivo-local": {
-      "post": {
-        "summary": "Crear o guardar un archivo en el filesystem LOCAL del contenedor",
+      "/api/escribir-archivo-local": {
+        "post": {
+        "summary": "Crear o guardar un archivo en el filesystem LOCAL (no Azure Blob), usando rutas absolutas o relativas",
+        "description": "Permite crear o sobrescribir archivos en el sistema de archivos local del contenedor o máquina, usando rutas absolutas (ej: C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py, /tmp/test.txt) o relativas (ej: scripts/test_local.py). No utiliza Azure Blob Storage. Útil para pruebas, logs o scripts temporales. ⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar.",
         "operationId": "escribirArchivoLocal",
         "tags": ["Local Storage"],
         "security": [],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ruta": {
-                    "type": "string",
-                    "description": "Ruta relativa dentro de `/home/site/wwwroot` (ej: `scripts/test_local.txt`)"
-                  },
-                  "contenido": {
-                    "type": "string",
-                    "description": "Contenido del archivo a escribir"
-                  }
-                },
-                "required": ["ruta", "contenido"]
+          "application/json": {
+            "schema": {
+            "type": "object",
+            "properties": {
+              "ruta": {
+              "type": "string",
+              "description": "Ruta del archivo local. Ejemplo absoluto: C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py o /tmp/test.txt. Ejemplo relativo: scripts/test_local.py. En Azure se restringe a /home/site/wwwroot."
+              },
+              "contenido": {
+              "type": "string",
+              "description": "Contenido del archivo a escribir (texto plano)"
+              },
+              "contenido_base64": {
+              "type": "string",
+              "description": "Contenido en base64 si es un archivo binario"
+              },
+              "binario": {
+              "type": "boolean",
+              "description": "Indica si el contenido es binario"
+              },
+              "tipo_mime": {
+              "type": "string",
+              "description": "Tipo MIME opcional (ej: text/plain, image/png)"
+              }
+            },
+            "required": ["ruta", "contenido"]
+            },
+            "examples": {
+            "absoluta_windows": {
+              "summary": "Ruta absoluta en Windows",
+              "value": {
+              "ruta": "C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py",
+              "contenido": "print('Hola mundo')"
+              }
+            },
+            "absoluta_linux": {
+              "summary": "Ruta absoluta en Linux",
+              "value": {
+              "ruta": "/tmp/test.txt",
+              "contenido": "Archivo temporal local"
+              }
+            },
+            "relativa": {
+              "summary": "Ruta relativa",
+              "value": {
+              "ruta": "scripts/test_local.py",
+              "contenido": "print('Archivo relativo')"
               }
             }
+            }
+          }
           }
         },
         "responses": {
           "201": {
-            "description": "Archivo creado correctamente en filesystem local",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exito": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "example": "Archivo creado exitosamente en filesystem local: scripts/test_local.txt"
-                    },
-                    "ubicacion": {
-                      "type": "string",
-                      "example": "file:///home/site/wwwroot/scripts/test_local.txt"
-                    },
-                    "ruta_absoluta": {
-                      "type": "string",
-                      "example": "/home/site/wwwroot/scripts/test_local.txt"
-                    },
-                    "tipo_operacion": {
-                      "type": "string",
-                      "example": "crear_archivo_local"
-                    },
-                    "tamaño_bytes": {
-                      "type": "integer",
-                      "example": 1024
-                    },
-                    "modo_acceso": {
-                      "type": "string",
-                      "example": "local_filesystem"
-                    },
-                    "advertencia": {
-                      "type": "string",
-                      "example": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar"
-                    }
-                  }
-                }
+          "description": "Archivo creado correctamente en filesystem local",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+              "exito": {
+                "type": "boolean",
+                "example": true
+              },
+              "mensaje": {
+                "type": "string",
+                "example": "Archivo creado exitosamente en: C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py"
+              },
+              "ubicacion": {
+                "type": "string",
+                "example": "file://C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py"
+              },
+              "ruta_absoluta": {
+                "type": "string",
+                "example": "C:/ProyectosSimbolicos/boat-rental-app/scripts/test_local.py"
+              },
+              "tipo_operacion": {
+                "type": "string",
+                "example": "crear_archivo_local"
+              },
+              "tamaño_bytes": {
+                "type": "integer",
+                "example": 1024
+              },
+              "modo_acceso": {
+                "type": "string",
+                "example": "local_filesystem"
+              },
+              "advertencia": {
+                "type": "string",
+                "example": "⚠️ En Azure, los archivos locales son VOLÁTILES y se pierden al reiniciar"
+              }
               }
             }
+            }
+          }
           },
           "400": {"description": "Solicitud inválida (ruta inválida o JSON malformado)"},
           "500": {"description": "Error interno del servidor"}
         }
-      }
-    },
+        }
+      },
     "/api/leer-archivo": {
       "get": {
         "summary": "Leer archivo desde blob o sistema local",

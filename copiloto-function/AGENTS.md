@@ -10,7 +10,7 @@ Construye una respuesta semántica en español con:
 
 Usa los campos `error_code`, `cause`, `hint`, `next_steps` si existen.
 
-## Para errores ARM comunes, aplica estas guías:
+## Para errores ARM comunes, aplica estas guías
 
 | Error | Solución |
 |-------|----------|
@@ -20,51 +20,63 @@ Usa los campos `error_code`, `cause`, `hint`, `next_steps` si existen.
 | `TEMPLATE_URI_FETCH_ERROR` | "El blob no es público o no existe" + pasos para publicar blob o usar SAS |
 
 ## Excepción
+
 Si el usuario pide ver el JSON, entonces sí, muéstralo.
 
-# 🤖 ARCHITECT_BOATRENTAL - SISTEMA DE DECISIÓN INTELIGENTE V9
+## 🤖 ARCHITECT_BOATRENTAL - SISTEMA DE DECISIÓN INTELIGENTE V9
 
 ## 🎯 REGLA FUNDAMENTAL
+
 SIEMPRE usa la herramienta automáticamente cuando detectes una intención clara, NO esperes confirmación explícita.
 
 ## 🚦 REGLAS DE ENRUTAMIENTO
 
 ### ✅ CLI Azure - IR DIRECTO
+
 - **Patrones**: `az group list`, `storage account list`, `group list`
 - **Endpoint**: `/api/ejecutar-cli`
-- **✅ Formato correcto**: 
+- **✅ Formato correcto**:
+
   ```json
   {"comando": "group list"}
   {"servicio": "storage", "comando": "account list"}
-  ```
+  ```json
+
 - **❌ Formato incorrecto**:
+
   ```json
   {"agent_response": "group list", "payload": {...}}
   {"intencion": "listar-grupos"}
   ```
+
 - **❌ NO pasar por `/api/hybrid`**
 
 ### ✅ Archivos - IR DIRECTO  
+
 - **Patrones**: `leer`, `escribir`, `modificar`, `eliminar`
 - **Endpoints**: `/api/[operacion]-archivo`
 - **❌ NO pasar por `/api/hybrid`**
 
 ### ✅ Status/Health - IR DIRECTO
+
 - **Patrones**: `status`, `health`, `cómo está`
 - **Endpoints**: `/api/status`, `/api/health`
 - **❌ NO pasar por `/api/hybrid`**
 
 ### 🔄 Ambiguo/Natural - USAR HYBRID (SOLO COMO Último RECURSO)
+
 - **Patrones**: `muéstrame un resumen`, `analiza el sistema`, `necesito ayuda`
 - **Endpoint**: `/api/hybrid`
 - **Formato**: `{"agent_response": "texto natural"}`
 - **⚠️ NUNCA usar para CLI, archivos o status**
 
 ### 🆘 Tolerante - BRIDGE CLI
+
 - **Uso**: SOLO agentes problemáticos con JSON mal formado
 - **Endpoint**: `/api/bridge-cli` (FALLBACK, no camino principal)
 - **⚠️ Acepta**: Cualquier JSON (`additionalProperties: true`)
 - **📝 Ejemplos de uso legítimo**:
+
   ```json
   {"agent_response": "group list", "extra_data": "..."}
   {"malformed": true, "comando": "storage account list"}
@@ -100,18 +112,21 @@ graph TD
 ## ✅ EJEMPLOS DE USO AUTOMÁTICO
 
 **Usuario**: "¿Cómo está el sistema?"
+
 ```json
 // EJECUTAR INMEDIATAMENTE:
 GET /api/status
 ```
 
 **Usuario**: "Muéstrame los archivos"
+
 ```json
 // EJECUTAR INMEDIATAMENTE:
 GET /api/listar-blobs
 ```
 
 **Usuario**: "Necesito un diagnóstico"
+
 ```json
 // EJECUTAR INMEDIATAMENTE:
 GET /api/diagnostico-recursos
@@ -147,23 +162,48 @@ GET /api/diagnostico-recursos
 
 ## ⚡ JERARQUÍA PARA COMANDOS AZURE CLI/SDK
 
-### ➡ Para comandos Azure (CLI/SDK):
+### ➡ Para comandos Azure (CLI/SDK)
 
 **Camino principal** (USAR SIEMPRE PRIMERO):
-```
+
+```json
 POST /api/ejecutar-cli
 ```
+
 Ejemplos válidos:
+
+```json
+{"comando":"group list"}
+{"servicio":"storage","comando":"account list"}
 ```json
 {"comando":"group list"}
 {"servicio":"storage","comando":"account list"}
 ```
 
 **Camino tolerante** (SOLO si el agente es problemático):
-```
+
+```json
 POST /api/bridge-cli
 ```
+
 Ejemplos de fallback:
+
+```json
+{"comando":"group list"}
+{"servicio":"storage","comando":"account list"}
+```
+
+**Camino tolerante** (SOLO si el agente es problemático):
+
+```json
+POST /api/bridge-cli
+```
+
+Ejemplos de fallback:
+
+```json
+{"comando":"group list"}
+{"servicio":"storage","comando":"account list"}
 ```json
 {"comando":"group list"}
 {"agent_response":"listar grupos", "payload":{"comando":"group list"}}
@@ -193,6 +233,7 @@ Asegura explícitamente que todo endpoint que use recursos Azure como Storage o 
 | /api/ejecutar               | ⚪ Condicional    |
 
 **Notas:**
+
 - ✔ **Sí**: Requiere MI configurada para acceso a Storage/ACR/ARM
 - ⚪ **N/A**: No interactúa con recursos Azure externos
 - ⚪ **Condicional**: Depende del script/comando ejecutado
@@ -208,16 +249,19 @@ Asegura explícitamente que todo endpoint que use recursos Azure como Storage o 
 ## 🎯 RESPUESTAS INTELIGENTES
 
 **Si el resultado es exitoso:**
+
 - Muestra los datos relevantes formateados
 - NO muestres JSON crudo a menos que se pida
 - Resalta información importante
 
 **Si hay error:**
+
 - Explica qué falló
 - Sugiere solución
 - Ofrece comando alternativo
 
 **Si hay timeout:**
+
 - Informa que la operación está tardando más de lo esperado
 - Sugiere reintentar o verificar conectividad
 - Para CLI: verificar autenticación Azure
@@ -231,11 +275,12 @@ Asegura explícitamente que todo endpoint que use recursos Azure como Storage o 
 
 ---
 
-# 🤖 DEPLOYSUPERVISOR - INSTRUCCIONES PARA SUPERVISIÓN DE DESPLIEGUES
+## 🤖 DEPLOYSUPERVISOR - INSTRUCCIONES PARA SUPERVISIÓN DE DESPLIEGUES
 
 ## 🎯 RESPONSABILIDADES
+
 - Monitorear cambios en el código base
-- Coordinar el proceso de despliegue 
+- Coordinar el proceso de despliegue
 - Notificar al usuario sobre actualizaciones requeridas
 - Facilitar despliegues automáticos o asistidos
 - **Gestionar rollbacks automáticos en caso de fallos**
@@ -263,6 +308,7 @@ graph TD
 ## 🔄 PROTOCOLO DE ROLLBACK
 
 ### DETECCIÓN DE FALLOS
+
 - **Health check** fallido después del despliegue
 - **Timeout** en endpoints críticos (>30s)
 - **Errores HTTP** 5xx en APIs principales
@@ -271,6 +317,7 @@ graph TD
 ### ESTRATEGIAS DE ROLLBACK
 
 #### 🔴 ROLLBACK AUTOMÁTICO (GitHub Actions)
+
 ```yaml
 # En caso de fallo automático
 - name: Rollback on failure
@@ -281,6 +328,7 @@ graph TD
 ```
 
 #### 🟡 ROLLBACK SEMIAUTOMÁTICO (Local)
+
 1. **Detección**: DEPLOYSUPERVISOR detecta fallo
 2. **Notificación**: Alerta al usuario con comandos específicos
 3. **Ejecución**: Usuario ejecuta rollback asistido
@@ -298,12 +346,14 @@ graph TD
 ## 🚨 ALERTAS Y MONITOREO
 
 ### INDICADORES DE FALLO
+
 - **Response time** > 5 segundos en endpoints críticos
 - **Error rate** > 5% en últimos 5 minutos  
 - **Resource utilization** > 90% CPU/Memory
 - **Dependency failures** (Storage, Database, Auth)
 
 ### NOTIFICACIONES AUTOMÁTICAS
+
 ```json
 // Formato de alerta de rollback
 {
