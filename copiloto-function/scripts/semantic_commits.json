@@ -97,5 +97,19 @@
     "accion": "chmod 755 fail.sh",
     "estado": "pendiente",
     "id_correccion": "01c70f66"
+  },
+  {
+    "tipo": "error_webhook",
+    "fecha": "2025-10-02T19:21:46.161322",
+    "origen": "Webhook Handler",
+    "error": "HTTP request does not contain valid JSON data",
+    "run_id": "36273b4fb9ac"
+  },
+  {
+    "tipo": "error_webhook",
+    "fecha": "2025-10-02T20:50:45.548306",
+    "origen": "Webhook Handler",
+    "error": "HTTP request does not contain valid JSON data",
+    "run_id": "b6ef188d1494"
   }
 ]

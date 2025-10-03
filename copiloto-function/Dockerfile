@@ -38,10 +38,12 @@ RUN apt-get update && \
   curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
   az version
 
-# Variables obligatorias de Azure Functions
+# Variables obligatorias de Azure Functions + Application Insights
 ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
   AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
-  WEBSITES_PORT=80
+  WEBSITES_PORT=80 \
+  APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53" \
+  APPINSIGHTS_INSTRUMENTATIONKEY="bc768980-75a6-4f2d-b6dd-fcb1e524f1ed"
 
 EXPOSE 80
 WORKDIR /home/site/wwwroot
