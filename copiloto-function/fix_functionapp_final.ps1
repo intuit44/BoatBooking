@@ -130,6 +130,11 @@ $settings = @{
   "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
   # 🔐 CREDENCIALES GITHUB (IMPORTANTE)
   "GITHUB_PAT"                                  = "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"
+  # Cosmos DB
+  "COSMOSDB_ENDPOINT"                           = "https://copiloto-cosmos.documents.azure.com:443/"
+  "COSMOSDB_KEY"                                = "iwsmeHZcWSoogZZg5HBS13qSei3yWcOUHaIJZWhy5SqZljmAxxIB13ffJxlniKwZ7PGKeD2oiuELACDbvr66Rg=="
+  "COSMOSDB_DATABASE"                           = "agentMemory"
+  "COSMOSDB_CONTAINER"                          = "memory"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"

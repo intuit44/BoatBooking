@@ -26,16 +26,19 @@ def apply_tolerant_patch():
             alert_data = req.get_json() or {}
             
             # Log del evento de webhook
-            _log_semantic_event({
-                "tipo": "webhook_recibido",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Webhook Externo",
-                "user_agent": user_agent,
-                "content_type": content_type,
-                "headers": dict(req.headers),
-                "body_preview": str(alert_data)[:200] if alert_data else "sin body",
-                "run_id": run_id
-            })
+            try:
+                from services.memory_service import memory_service
+                if memory_service:
+                    memory_service.log_event("webhook_recibido", {
+                        "fecha": datetime.now().isoformat(),
+                        "origen": "Webhook Externo",
+                        "user_agent": user_agent,
+                        "content_type": content_type,
+                        "headers": dict(req.headers),
+                        "body_preview": str(alert_data)[:200] if alert_data else "sin body"
+                    }, session_id=run_id)
+            except ImportError:
+                pass  # memory_service no disponible
             
             # Crear fix automático para cualquier webhook
             auto_fix = {
@@ -82,13 +85,16 @@ def apply_tolerant_patch():
             
         except Exception as e:
             # Log del error
-            _log_semantic_event({
-                "tipo": "error_webhook",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Webhook Handler",
-                "error": str(e),
-                "run_id": run_id
-            })
+            try:
+                from services.memory_service import memory_service
+                if memory_service:
+                    memory_service.log_event("error_webhook", {
+                        "fecha": datetime.now().isoformat(),
+                        "origen": "Webhook Handler",
+                        "error": str(e)
+                    }, session_id=run_id)
+            except ImportError:
+                pass  # memory_service no disponible
             
             return func.HttpResponse(
                 json.dumps({

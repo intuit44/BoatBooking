@@ -9886,15 +9886,19 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Registrar intentos en log semántico si hubo más de un intento o error
         if len(intentos_log) > 1 or not exito:
-            _log_semantic_event({
-                "tipo": "cli_exec",
-                "fecha": datetime.now().isoformat(),
-                "comando_original": comando if comando else "no_definido",
-                "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
-                "sistema": sistema,
-                "intentos": intentos_log,
-                "exito": exito
-            })
+            try:
+                from services.memory_service import memory_service
+                if memory_service:
+                    memory_service.log_event("cli_exec", {
+                        "fecha": datetime.now().isoformat(),
+                        "comando_original": comando if comando else "no_definido",
+                        "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
+                        "sistema": sistema,
+                        "intentos": intentos_log,
+                        "exito": exito
+                    })
+            except ImportError:
+                pass  # memory_service no disponible
 
         return func.HttpResponse(
             json.dumps({
@@ -12009,15 +12013,19 @@ def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
         _save_pending_fixes(pending_fixes)
 
         # Registrar en el log semántico
-        _log_semantic_event({
-            "tipo": "correccion_registrada",
-            "fecha": datetime.now().isoformat(),
-            "origen": correccion["origen"],
-            "target": correccion["target"],
-            "accion": correccion["propuesta"],
-            "estado": "pendiente",
-            "id_correccion": correccion["id"]
-        })
+        try:
+            from services.memory_service import memory_service
+            if memory_service:
+                memory_service.log_event("correccion_registrada", {
+                    "fecha": datetime.now().isoformat(),
+                    "origen": correccion["origen"],
+                    "target": correccion["target"],
+                    "accion": correccion["propuesta"],
+                    "estado": "pendiente",
+                    "id_correccion": correccion["id"]
+                })
+        except ImportError:
+            pass  # memory_service no disponible
 
         # Evaluar si se puede auto-promover
         auto_promote = _evaluate_auto_promotion(correccion)
@@ -12161,24 +12169,7 @@ def _save_pending_fixes(fixes: list[dict]):
         json.dump(fixes, f, indent=2, ensure_ascii=False)
 
 
-def _log_semantic_event(event: dict):
-    """Registra evento en el log semántico"""
-    log_file = SEMANTIC_COMMITS_FILE
-    log_file.parent.mkdir(exist_ok=True)
-
-    commits = []
-    if log_file.exists():
-        with open(log_file, "r") as f:
-            commits = json.load(f)
-
-    commits.append(event)
-
-    # Mantener solo últimos 1000 commits
-    if len(commits) > 1000:
-        commits = commits[-1000:]
-
-    with open(log_file, "w") as f:
-        json.dump(commits, f, indent=2, ensure_ascii=False)
+# Función _log_semantic_event eliminada - ahora se usa memory_service.log_event()
 
 
 def _evaluate_auto_promotion(correccion: dict) -> dict:
@@ -12309,11 +12300,13 @@ def _execute_fix(correccion: dict) -> dict:
             correccion["id"], "aplicado" if resultado["validado"] else "fallido")
 
         # Log semántico
-        _log_semantic_event({
-            "tipo": "correccion_aplicada",
-            "fecha": datetime.now().isoformat(),
-            "origen": correccion["origen"],
-            "target": correccion["target"],
+        try:
+            from services.memory_service import memory_service
+            if memory_service:
+                memory_service.log_event("correccion_aplicada", {
+                    "fecha": datetime.now().isoformat(),
+                    "origen": correccion["origen"],
+                    "target": correccion["target"],
             "accion": correccion["accion"],
             "validado_por": correccion["validaciones_requeridas"],
             "resultado": "exitoso" if resultado["validado"] else "fallido"

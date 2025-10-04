@@ -1,0 +1,55 @@
+{
+  "timestamp": "2025-10-04T13:39:09.355532",
+  "results": {
+    "total": 6,
+    "success": 6,
+    "failed": 0,
+    "details": [
+      {
+        "endpoint": "/api/health",
+        "method": "GET",
+        "success": true,
+        "response": "{'status': 'healthy', 'timestamp': '2025-10-04T17:39:05.591302', 'version': '2.0-orchestrator', 'capabilities': {'semantic_processing': True, 'azure_cli_integration': True, 'blob_storage': False, 'orc"
+      },
+      {
+        "endpoint": "/api/status",
+        "method": "GET",
+        "success": true,
+        "response": "{'copiloto': 'activo', 'version': '2.0-semantic', 'timestamp': '2025-10-04T17:39:06.327639', 'ambiente': 'Azure', 'storage': 'conectado', 'is_azure': True, 'container': 'boat-rental-project', 'blob_re"
+      },
+      {
+        "endpoint": "/api/copiloto",
+        "method": "GET",
+        "success": true,
+        "response": "{'tipo': 'panel_inicial', 'titulo': '🤖 COPILOTO SEMÁNTICO - AZURE', 'version': '2.0-semantic', 'capacidades': {'leer': 'Lectura de archivos del proyecto', 'buscar': 'Búsqueda inteligente de archivos',"
+      },
+      {
+        "endpoint": "/api/leer-archivo?ruta=README.md",
+        "method": "GET",
+        "success": true,
+        "response": "{'exito': True, 'contenido': '# 🚤 BoatRental Venezuela - Plataforma Completa de Alquiler de Embarcaciones\\n\\nUna aplicación completa para el alquiler de embarcaciones en Venezuela, con app móvil, pane"
+      },
+      {
+        "endpoint": "/api/ejecutar",
+        "method": "POST",
+        "success": true,
+        "response": "{'error': 'maximum recursion depth exceeded while calling a Python object', 'tipo': 'RecursionError', 'intencion_recibida': 'dashboard', 'sugerencia': 'Verifica el formato de la petición', 'ejemplo_va"
+      },
+      {
+        "endpoint": "/api/hybrid",
+        "method": "POST",
+        "success": true,
+        "response": "{'success': True, 'parsed_command': {'endpoint': 'ping'}, 'execution_result': {'exito': True, 'message': 'pong', 'status': 'Function App funcionando correctamente', 'timestamp': '2025-10-04T17:39:09.1"
+      }
+    ]
+  },
+  "health_status": {
+    "azure": true,
+    "overall": true
+  },
+  "recommendations": {
+    "safe_to_modify": true,
+    "backup_recommended": true,
+    "diagnostics_needed": false
+  }
+}
