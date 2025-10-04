@@ -40,10 +40,23 @@ def _save_fixes(fixes: list[dict]):
 
 
 def _log_semantic_event(event: dict):
-    """Registra un evento semántico en un archivo de log JSONL."""
+    """Registra un evento semántico usando memory_service."""
     try:
-        with open('scripts/semantic_log.jsonl', 'a', encoding='utf-8') as f:
-            f.write(json.dumps(event) + '\n')
+        from services.memory_service import memory_service
+        if memory_service:
+            event_type = event.pop('tipo', 'semantic')
+            memory_service.log_event(event_type, event)
+        else:
+            # Fallback a archivo local si memory_service no está disponible
+            with open('scripts/semantic_log.jsonl', 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event) + '\n')
+    except ImportError:
+        # Fallback a archivo local si no se puede importar memory_service
+        try:
+            with open('scripts/semantic_log.jsonl', 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event) + '\n')
+        except Exception as e:
+            logging.error(f"Error al registrar evento semántico: {e}")
     except Exception as e:
         logging.error(f"Error al registrar evento semántico: {e}")
 

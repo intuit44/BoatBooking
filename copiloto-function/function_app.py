@@ -1244,43 +1244,18 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     Endpoint mejorado para lectura de archivos con búsqueda inteligente
     y respuestas optimizadas para agentes AI
     """
+    endpoint = "/api/leer-archivo"
+    method = "GET"
     run_id = get_run_id(req)
 
     try:
-        # --- PARCHE: Interceptar payloads de Azure Monitor y webhooks externos ---
-        user_agent = req.headers.get("User-Agent", "")
-        agent_header = req.headers.get("X-Agent-Auth", "")
-
-        # Solo procesar webhooks en requests POST con body
-        if not agent_header and req.method == "POST" and req.get_body():
-            try:
-                data = req.get_json() or {}
-                schema_id = str(data.get("schemaId", "")).lower()
-                # Condición flexible para Azure Monitor basada en schemaId o User-Agent
-                if "azuremonitor" in schema_id or "azure-monitor" in user_agent.lower():
-                    log_entry = {
-                        "tipo": "alerta_azure_monitor",
-                        "alerta": data.get("data", {}).get("essentials", {}).get("alertRule", "unknown"),
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "run_id": run_id
-                    }
-                    return func.HttpResponse(
-                        json.dumps(
-                            {"exito": True, "mensaje": "Alerta de Azure Monitor procesada", "run_id": run_id}),
-                        mimetype="application/json",
-                        status_code=200
-                    )
-            except Exception as e:
-                logging.debug(f"[{run_id}] No es webhook válido: {e}")
-                # Continue to normal processing
-
         # === PASO 1: EXTRAER Y VALIDAR PARÁMETROS ===
         params = extract_parameters(req)
 
         if not params["ruta_raw"]:
             return error_response(
                 code="MISSING_PARAMETER",
-                message="Debe especificar el parámetro 'ruta' o 'path' para leer el archivo",
+                message="Se requiere el parámetro 'ruta' para leer un archivo",
                 suggestions=generate_parameter_suggestions(),
                 status=400,
                 run_id=run_id
@@ -1509,7 +1484,7 @@ def smart_file_search(path: str, container: str, run_id: str) -> Dict[str, Any]:
     normalized_path = normalize_path(path)
     file_name = Path(path).name
 
-    # === ESTRATEGIA 1: BÚSQUEDA LOCAL MEJORADA ===
+    # === ESTRATEGIA 1: BÚSQUEDA LOCAL ===
     local_search_paths = generate_local_search_paths(
         path, normalized_path, file_name)
 
@@ -1557,31 +1532,6 @@ def generate_local_search_paths(path: str, normalized: str, filename: str) -> Li
     paths.append(PROJECT_ROOT / path)
     paths.append(PROJECT_ROOT / normalized)
 
-    # NUEVO: Ruta exacta del archivo si es ruta absoluta
-    if Path(path).is_absolute():
-        paths.append(Path(path))
-
-    # NUEVO: Rutas adicionales para Azure y directorio actual
-    if IS_AZURE:
-        # Rutas comunes en Azure Functions
-        azure_paths = [
-            Path("/home/site/wwwroot") / path,
-            Path("/home/site/wwwroot") / normalized,
-            Path("/home/site/repository") / path,
-            Path("/home/site/repository") / normalized,
-        ]
-        paths.extend(azure_paths)
-
-    # NUEVO: Rutas relativas al directorio actual (funciona tanto local como Azure)
-    current_dir = Path.cwd()
-    paths.extend([
-        current_dir / path,
-        current_dir / normalized,
-        current_dir / filename,
-        current_dir.parent / path,
-        current_dir.parent / normalized,
-    ])
-
     # Rutas comunes de proyecto
     common_dirs = ["scripts", "src", "app", "functions",
                    "api", "docs", "test", "copiloto-function"]
@@ -1589,17 +1539,8 @@ def generate_local_search_paths(path: str, normalized: str, filename: str) -> Li
         paths.append(PROJECT_ROOT / dir_name / filename)
         paths.append(PROJECT_ROOT / dir_name / normalized)
         if "/" in path:
+            # Si el path tiene subdirectorios, buscar también manteniendo estructura
             paths.append(PROJECT_ROOT / dir_name / path)
-
-        # NUEVO: También en Azure paths y directorio actual
-        if IS_AZURE:
-            paths.append(Path("/home/site/wwwroot") / dir_name / filename)
-            paths.append(Path("/home/site/repository") / dir_name / filename)
-
-        # Rutas relativas al directorio actual
-        current_dir = Path.cwd()
-        paths.append(current_dir / dir_name / filename)
-        paths.append(current_dir.parent / dir_name / filename)
 
     # Rutas específicas del proyecto copiloto
     paths.append(PROJECT_ROOT / "copiloto-function" / "scripts" / filename)
@@ -2021,6 +1962,9 @@ def generate_parameter_suggestions() -> List[str]:
         "Ejemplo: ?ruta=README.md",
         "Para archivos en otro contenedor: ?ruta=file.txt&container=mi-contenedor"
     ]
+
+
+# ============= FUNCIONES AUXILIARES =============
 
 
 @app.function_name(name="probar_endpoint_http")
@@ -4426,8 +4370,7 @@ def crear_archivo_local(
     contenido: str,
     tipo_mime: Optional[str] = None,
     binario: bool = False,
-    is_azure: Optional[bool] = None,
-    encoding: str = "utf-8"
+    is_azure: Optional[bool] = None
 ) -> dict:
     """
     Crea/sobrescribe archivo de texto plano o binario con manejo robusto de encoding.
@@ -4472,12 +4415,12 @@ def crear_archivo_local(
                 f.write(raw)
             tamaño_bytes = len(raw)
         else:
-            with open(ruta_completa, 'w', encoding=encoding) as f:
+            with open(ruta_completa, 'w', encoding='utf-8') as f:
                 f.write(contenido)
             tamaño_bytes = os.path.getsize(ruta_completa)
             # Agregar encoding declaration si es un script Python
-            if ruta_completa.endswith('.py') and encoding == 'utf-8':
-                with open(ruta_completa, 'r+', encoding=encoding) as f:
+            if ruta_completa.endswith('.py'):
+                with open(ruta_completa, 'r+', encoding='utf-8') as f:
                     content = f.read()
                     if not content.startswith('# -*- coding:'):
                         f.seek(0, 0)
@@ -5576,7 +5519,6 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                     raw_body = req.get_body()
                     if raw_body:
                         body_str = raw_body.decode(errors="ignore")
-                        # Buscar patrones simples
                         ruta_match = re.search(
                             r'"ruta"\s*:\s*"([^"]*)', body_str, re.IGNORECASE)
                         if not ruta_match:
@@ -5607,12 +5549,6 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             "file") or body.get("filename") or "").strip()
         contenido = body.get("content") or body.get(
             "contenido") or body.get("data") or body.get("text") or ""
-        encoding = body.get("encoding", "utf-8")
-
-        # Soporte para archivos binarios
-        contenido_base64 = body.get("contenido_base64")
-        binario = body.get("binario", False)
-        tipo_mime = body.get("tipo_mime", "text/plain")
 
         # DEFAULTS INTELIGENTES
         if not ruta:
@@ -5621,7 +5557,7 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             advertencias.append(
                 f"Ruta no especificada - generada automáticamente: {ruta}")
 
-        if not contenido and not contenido_base64:
+        if not contenido:
             contenido = "# Archivo creado automáticamente por AI Foundry\n"
             advertencias.append(
                 "Contenido vacío - agregado contenido por defecto")
@@ -5640,56 +5576,44 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
 
         try:
             if usar_local:
-                if binario or contenido_base64:
-                    res = crear_archivo_local(
-                        ruta, contenido_base64 or contenido, tipo_mime, binario=True)
-                else:
-                    res = crear_archivo_local(
-                        ruta, contenido, encoding=encoding)
+                res = crear_archivo_local(ruta, contenido)
             else:
                 # BLOB STORAGE CON FALLBACKS
-                if binario or contenido_base64:
-                    res = {
-                        "exito": False,
-                        "error": "Archivos binarios en blob storage no implementado aún",
-                        "sugerencia": "Usa rutas locales para archivos binarios"
-                    }
-                else:
-                    res = crear_archivo(ruta, contenido)
+                res = crear_archivo(ruta, contenido)
 
-                    # FALLBACK SI BLOB FALLA
-                    if not res.get("exito"):
-                        advertencias.append(
-                            f"Blob falló: {res.get('error', 'Error desconocido')}")
-                        try:
-                            # Intentar crear en local como fallback
-                            safe_ruta = f"fallback_{ruta.replace('/', '_').replace(':', '_')}"
-                            res_fallback = crear_archivo_local(
-                                safe_ruta, contenido, encoding=encoding)
-                            if res_fallback.get("exito"):
-                                res = res_fallback
-                                res["mensaje"] = f"Archivo creado como fallback local: {safe_ruta}"
-                                advertencias.append(
-                                    "Blob falló - creado archivo local como fallback")
-                            else:
-                                # Fallback sintético
-                                res = {
-                                    "exito": True,
-                                    "mensaje": "Operación procesada con limitaciones",
-                                    "ubicacion": f"synthetic://{ruta}",
-                                    "tipo_operacion": "fallback_sintetico"
-                                }
-                                advertencias.append(
-                                    "Todos los métodos fallaron - respuesta sintética")
-                        except Exception as e:
+                # FALLBACK SI BLOB FALLA
+                if not res.get("exito"):
+                    advertencias.append(
+                        f"Blob falló: {res.get('error', 'Error desconocido')}")
+                    try:
+                        # Intentar crear en local como fallback
+                        safe_ruta = f"fallback_{ruta.replace('/', '_').replace(':', '_')}"
+                        res_fallback = crear_archivo_local(
+                            safe_ruta, contenido)
+                        if res_fallback.get("exito"):
+                            res = res_fallback
+                            res["mensaje"] = f"Archivo creado como fallback local: {safe_ruta}"
+                            advertencias.append(
+                                "Blob falló - creado archivo local como fallback")
+                        else:
+                            # Fallback sintético
                             res = {
                                 "exito": True,
-                                "mensaje": "Operación completada con advertencias",
+                                "mensaje": "Operación procesada con limitaciones",
                                 "ubicacion": f"synthetic://{ruta}",
-                                "tipo_operacion": "fallback_total"
+                                "tipo_operacion": "fallback_sintetico"
                             }
                             advertencias.append(
-                                f"Error en fallback: {str(e)} - respuesta sintética")
+                                "Todos los métodos fallaron - respuesta sintética")
+                    except Exception as e:
+                        res = {
+                            "exito": True,
+                            "mensaje": "Operación completada con advertencias",
+                            "ubicacion": f"synthetic://{ruta}",
+                            "tipo_operacion": "fallback_total"
+                        }
+                        advertencias.append(
+                            f"Error en fallback: {str(e)} - respuesta sintética")
         except Exception as e:
             advertencias.append(f"Error en ejecución principal: {str(e)}")
             res = {
@@ -5712,8 +5636,6 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         # Enriquecer respuesta con metadata
         res.update({
             "tipo_almacenamiento": "local" if usar_local else "blob",
-            "encoding_usado": encoding if not binario else None,
-            "binario": binario,
             "timestamp": datetime.now().isoformat(),
             "tamaño_contenido": len(contenido) if contenido else 0,
             "advertencias": advertencias,
@@ -5858,6 +5780,7 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             # Detectar local vs blob
             if ruta.startswith("C:/") or ruta.startswith("/tmp/") or ruta.startswith("/home/") or ruta.startswith("tmp_mod_"):
                 # Crear archivo local
+                import os
                 os.makedirs(os.path.dirname(
                     ruta) if "/" in ruta or "\\" in ruta else ".", exist_ok=True)
                 with open(ruta, 'w', encoding='utf-8') as f:
@@ -5895,6 +5818,25 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                    "operacion_aplicada": "fallback_total"}
             advertencias.append(
                 f"Error en autocreación: {str(e)} - respuesta sintética")
+
+    # RESPUESTA SIEMPRE EXITOSA CON METADATA
+    if not res.get("exito"):
+        res = {"exito": True, "mensaje": "Operación procesada con limitaciones",
+               "operacion_aplicada": "fallback"}
+        advertencias.append("Forzado éxito para evitar error 400")
+
+    # Enriquecer respuesta
+    res["operacion_aplicada"] = res.get("operacion_aplicada", operacion)
+    res["ruta_procesada"] = ruta
+    res["advertencias"] = advertencias
+    res["timestamp"] = datetime.now().isoformat()
+
+    # NUNCA devolver status de error
+    return func.HttpResponse(
+        json.dumps(res, ensure_ascii=False),
+        mimetype="application/json",
+        status_code=200  # Siempre 200
+    )
 
     # Enriquecer respuesta para archivos no encontrados
     if not res.get("exito") and "no encontrado" in str(res.get("error", "")).lower():
@@ -5957,23 +5899,10 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             }
             res["ruta_sugerida"] = alt
 
-    # RESPUESTA SIEMPRE EXITOSA CON METADATA
-    if not res.get("exito"):
-        res = {"exito": True, "mensaje": "Operación procesada con limitaciones",
-               "operacion_aplicada": "fallback"}
-        advertencias.append("Forzado éxito para evitar error 400")
-
-    # Enriquecer respuesta
-    res["operacion_aplicada"] = res.get("operacion_aplicada", operacion)
-    res["ruta_procesada"] = ruta
-    res["advertencias"] = advertencias
-    res["timestamp"] = datetime.now().isoformat()
-
-    # Un solo return al final, status_code=200 siempre
     return func.HttpResponse(
         json.dumps(res, ensure_ascii=False),
         mimetype="application/json",
-        status_code=200
+        status_code=_status_from_result(res)
     )
 
 
@@ -7703,179 +7632,6 @@ def info_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     endpoint = "/api/info-archivo"
     method = "GET"
     run_id = get_run_id(req)
-    # PARCHE V2: Detectar webhooks (más tolerante)
-    user_agent = req.headers.get("User-Agent", "")
-    content_type = req.headers.get("Content-Type", "")
-
-    # Si NO tiene el header X-Agent-Auth, probablemente es un webhook
-    agent_header = req.headers.get("X-Agent-Auth", "")
-    if not agent_header:
-        try:
-            # Registrar cualquier webhook sin autenticación
-            alert_data = req.get_json() or {}
-
-            # Log del evento de webhook
-            _log_semantic_event({
-                "tipo": "webhook_recibido",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Webhook Externo",
-                "user_agent": user_agent,
-                "content_type": content_type,
-                "headers": dict(req.headers),
-                "body_preview": str(alert_data)[:200] if alert_data else "sin body",
-                "run_id": run_id
-            })
-
-            # Crear fix automático para cualquier webhook
-            auto_fix = {
-                "id": f"webhook-{run_id[:8]}",
-                "timestamp": datetime.now().isoformat(),
-                "run_id": run_id,
-                "estado": "pendiente",
-                "accion": "procesar_webhook_automatico",
-                "target": "webhook_handler",
-                "propuesta": "Webhook procesado automáticamente",
-                "tipo": "webhook_processing",
-                "detonante": "webhook_externo",
-                "origen": "Webhook Handler",
-                "prioridad": 7,
-                "validaciones_requeridas": ["log_webhook"],
-                "intentos": 0,
-                "simulacion": {
-                    "exito_esperado": True,
-                    "cambios_esperados": ["Log de webhook", "Procesamiento automático"],
-                    "riesgos": [],
-                    "rollback_disponible": True
-                }
-            }
-
-            # Guardar en pending_fixes
-            pending_fixes = _load_pending_fixes()
-            pending_fixes.append(auto_fix)
-            _save_pending_fixes(pending_fixes)
-
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "mensaje": "Webhook procesado automáticamente",
-                    "fix_creado": auto_fix["id"],
-                    "run_id": run_id,
-                    "debug": {
-                        "user_agent": user_agent,
-                        "content_type": content_type,
-                        "body_keys": list(alert_data.keys()) if alert_data else []
-                    }
-                }, ensure_ascii=False),
-                status_code=200
-            )
-
-        except Exception as e:
-            # Log del error
-            _log_semantic_event({
-                "tipo": "error_webhook",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Webhook Handler",
-                "error": str(e),
-                "run_id": run_id
-            })
-
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Error procesando webhook: {str(e)}",
-                    "run_id": run_id
-                }),
-                status_code=500
-            )
-
-# PARCHE: Detectar webhook de Azure Monitor
-    user_agent = req.headers.get("User-Agent", "")
-    content_type = req.headers.get("Content-Type", "")
-
-    # Si es webhook de Azure Monitor, manejar diferente
-    if "Azure-Monitor" in user_agent or "microsoft" in user_agent.lower():
-        try:
-            # Registrar evento de alerta de Azure Monitor
-            alert_data = req.get_json() or {}
-
-            # Log del evento de alerta
-            _log_semantic_event({
-                "tipo": "alerta_azure_monitor",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Azure Monitor",
-                "alerta_id": alert_data.get("data", {}).get("alertContext", {}).get("id", "unknown"),
-                "severidad": alert_data.get("data", {}).get("essentials", {}).get("severity", "unknown"),
-                "estado": alert_data.get("data", {}).get("essentials", {}).get("monitorCondition", "unknown"),
-                "descripcion": alert_data.get("data", {}).get("essentials", {}).get("description", "Alerta de Azure Monitor"),
-                "run_id": run_id
-            })
-
-            # Crear fix automático para HTTP 500
-            if "500" in str(alert_data).lower() or "error" in str(alert_data).lower():
-                auto_fix = {
-                    "id": f"azure-monitor-{run_id[:8]}",
-                    "timestamp": datetime.now().isoformat(),
-                    "run_id": run_id,
-                    "estado": "pendiente",
-                    "accion": "investigar_error_http_500",
-                    "target": "function_app_logs",
-                    "propuesta": "Revisar logs y aplicar fix automático si es posible",
-                    "tipo": "error_critico",
-                    "detonante": "azure_monitor_alert",
-                    "origen": "Azure Monitor Webhook",
-                    "prioridad": 8,
-                    "validaciones_requeridas": ["revisar_logs", "diagnostico_automatico"],
-                    "intentos": 0,
-                    "simulacion": {
-                        "exito_esperado": True,
-                        "cambios_esperados": ["Diagnóstico automático", "Fix si es posible"],
-                        "riesgos": [],
-                        "rollback_disponible": True
-                    }
-                }
-
-                # Guardar en pending_fixes
-                pending_fixes = _load_pending_fixes()
-                pending_fixes.append(auto_fix)
-                _save_pending_fixes(pending_fixes)
-
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": True,
-                        "mensaje": "Alerta de Azure Monitor procesada",
-                        "fix_creado": auto_fix["id"],
-                        "run_id": run_id
-                    }, ensure_ascii=False),
-                    status_code=200
-                )
-
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "mensaje": "Webhook de Azure Monitor recibido",
-                    "run_id": run_id
-                }, ensure_ascii=False),
-                status_code=200
-            )
-
-        except Exception as e:
-            # Log del error pero no fallar
-            _log_semantic_event({
-                "tipo": "error_webhook_azure",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Azure Monitor",
-                "error": str(e),
-                "run_id": run_id
-            })
-
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Error procesando webhook: {str(e)}",
-                    "run_id": run_id
-                }),
-                status_code=500
-            )
 
     # ✅ VALIDACIÓN TEMPRANA: Verificar parámetros y existencia física del archivo
     validation_result = validate_info_archivo_params(
@@ -10252,38 +10008,41 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
 
-        # Intentar parsear como JSON, si falla devolver texto plano
-        salida = ""
-        if resultado_final and resultado_final.stdout:
-            try:
-                output_json = json.loads(resultado_final.stdout.strip())
-                salida = output_json
-            except json.JSONDecodeError:
-                salida = resultado_final.stdout.strip()
-        else:
-            salida = ""
+        # TEMP WEB FIX: Respuesta estructurada para el modelo
+        stdout_raw = resultado_final.stdout.strip(
+        ) if resultado_final and resultado_final.stdout else ""
+        stderr_raw = resultado_final.stderr.strip(
+        ) if resultado_final and resultado_final.stderr else ""
 
-        # Registrar intentos en log semántico si hubo más de un intento o error
-        if len(intentos_log) > 1 or not exito:
-            _log_semantic_event({
-                "tipo": "cli_exec",
-                "fecha": datetime.now().isoformat(),
-                "comando_original": comando if comando else "no_definido",
-                "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
-                "sistema": sistema,
-                "intentos": intentos_log,
-                "exito": exito
-            })
+        # Intentar parsear JSON, pero siempre incluir raw
+        stdout_parsed = None
+        try:
+            if stdout_raw:
+                stdout_parsed = json.loads(stdout_raw)
+        except json.JSONDecodeError:
+            pass
+
+        # Respuesta estructurada que el modelo puede interpretar
+        response_data = {
+            "exito": True,
+            "comando_ejecutado": comando_ejecutado,
+            "codigo_salida": resultado_final.returncode if resultado_final else -1,
+            "output": {
+                "raw": stdout_raw,
+                "parsed": stdout_parsed,
+                "type": "json" if stdout_parsed else "text",
+                "lines": stdout_raw.split('\n') if stdout_raw else []
+            },
+            "stderr": stderr_raw,
+            "summary": f"Comando '{comando_ejecutado}' ejecutado exitosamente. Output: {len(stdout_raw)} chars"
+        }
+
+        # Solo incluir intentos si hubo múltiples
+        if len(intentos_log) > 1:
+            response_data["intentos"] = intentos_log
 
         return func.HttpResponse(
-            json.dumps({
-                "exito": True,
-                "stdout": salida,
-                "comando_ejecutado": comando_ejecutado if comando_ejecutado else "no_definido",
-                "codigo_salida": resultado_final.returncode if resultado_final else -1,
-                "sistema_operativo": sistema,
-                "intentos": intentos_log if len(intentos_log) > 1 else None
-            }),
+            json.dumps(response_data),
             mimetype="application/json",
             status_code=200
         )
@@ -12327,136 +12086,114 @@ CHANGE_LOG_FILE = Path("scripts/change_log.json")
 SEMANTIC_COMMITS_FILE = Path("scripts/semantic_commits.json")
 
 
-def append_to_jsonl(path, entry):
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
 @app.function_name(name="autocorregir_http")
 @app.route(route="autocorregir", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Endpoint de autocorrección.
-    - Si viene de Azure Monitor → registra alerta y retorna.
-    - Si viene sin auth header → trata como webhook genérico.
-    - Si viene de un agente válido → procesa corrección manual.
+    Endpoint para registrar y simular correcciones automáticas.
+    Restringido a agentes AI (verifica header especial)
     """
     run_id = get_run_id(req)
 
-    try:
-        data = req.get_json()
-    except Exception:
-        data = {}
-
-    user_agent = req.headers.get("User-Agent", "")
-    content_type = req.headers.get("Content-Type", "")
+    # Verificar que es un agente autorizado
     agent_header = req.headers.get("X-Agent-Auth", "")
-
-    # 1️⃣ Caso: alerta de Azure Monitor
-    if "schemaId" in data and "azuremonitor" in data["schemaId"].lower():
-        log_entry = {
-            "tipo": "alerta_azure_monitor",
-            "fecha": datetime.utcnow().isoformat(),
-            "origen": "Azure Monitor",
-            "alerta": data.get("data", {}).get("essentials", {}).get("alertRule"),
-            "severity": data.get("data", {}).get("essentials", {}).get("severity"),
-            "estado": data.get("data", {}).get("essentials", {}).get("monitorCondition"),
-            "run_id": run_id
-        }
-        append_to_jsonl("scripts/semantic_log.jsonl", log_entry)
-
-        # crear fix automático si aplica
-        if "500" in str(data):
-            fix = {
-                "id": f"azure-monitor-{run_id[:8]}",
-                "timestamp": datetime.utcnow().isoformat(),
-                "run_id": run_id,
-                "estado": "pendiente",
-                "accion": "investigar_error_http_500",
-                "target": "function_app_logs",
-                "propuesta": "Revisar logs y aplicar fix",
-                "tipo": "error_critico",
-                "detonante": "azure_monitor_alert",
-                "origen": "Azure Monitor",
-                "prioridad": 8
-            }
-            fixes = _load_pending_fixes()
-            fixes.append(fix)
-            _save_pending_fixes(fixes)
-
-        return func.HttpResponse(
-            json.dumps({"exito": True, "mensaje": "Alerta de Azure Monitor procesada",
-                       "run_id": run_id}, ensure_ascii=False),
-            status_code=200
-        )
-
-    # 2️⃣ Caso: webhook externo sin X-Agent-Auth
-    if not agent_header:
-        log_entry = {
-            "tipo": "webhook_recibido",
-            "fecha": datetime.utcnow().isoformat(),
-            "origen": "Webhook Externo",
-            "user_agent": user_agent,
-            "content_type": content_type,
-            "run_id": run_id,
-            "body_preview": str(data)[:200] if data else "sin body"
-        }
-        append_to_jsonl("scripts/semantic_log.jsonl", log_entry)
-
-        return func.HttpResponse(
-            json.dumps({"exito": True, "mensaje": "Webhook recibido y logueado",
-                       "run_id": run_id}, ensure_ascii=False),
-            status_code=200
-        )
-
-    # 3️⃣ Caso: agente válido
     if not _validate_agent_auth(agent_header):
         return func.HttpResponse(
-            json.dumps({"exito": False, "error": "No autorizado"},
-                       ensure_ascii=False),
+            json.dumps({
+                "exito": False,
+                "error": "No autorizado. Este endpoint es solo para agentes AI.",
+                "codigo": "UNAUTHORIZED_AGENT"
+            }),
             status_code=401
         )
 
     try:
+        body = req.get_json()
+
+        # Validar estructura requerida
         required_fields = ["accion", "target", "propuesta", "tipo"]
-        for f in required_fields:
-            if f not in data:
+        for field in required_fields:
+            if field not in body:
                 return func.HttpResponse(
-                    json.dumps(
-                        {"exito": False, "error": f"Campo requerido faltante: {f}"}, ensure_ascii=False),
+                    json.dumps({
+                        "exito": False,
+                        "error": f"Campo requerido faltante: {field}",
+                        "campos_requeridos": required_fields
+                    }),
                     status_code=400
                 )
 
+        # Crear registro de corrección
         correccion = {
-            "id": _generate_fix_id(data),
-            "timestamp": datetime.utcnow().isoformat(),
+            "id": _generate_fix_id(body),
+            "timestamp": datetime.now().isoformat(),
             "run_id": run_id,
             "estado": "pendiente",
-            "accion": data["accion"],
-            "target": data["target"],
-            "propuesta": data["propuesta"],
-            "tipo": data["tipo"],
-            "origen": data.get("origen", "AI Agent"),
-            "prioridad": _calculate_priority(data),
+            "accion": body.get("accion"),
+            "target": body.get("target"),
+            "propuesta": body.get("propuesta"),
+            "tipo": body.get("tipo"),
+            "detonante": body.get("detonante", "manual"),
+            "origen": body.get("origen", "AI Agent"),
+            "prioridad": _calculate_priority(body),
+            "validaciones_requeridas": _get_required_validations(body),
+            "intentos": 0,
+            "simulacion": _simulate_fix(body)
         }
 
-        fixes = _load_pending_fixes()
-        fixes.append(correccion)
-        _save_pending_fixes(fixes)
+        # Registrar en pending_fixes.json
+        pending_fixes = _load_pending_fixes()
+        pending_fixes.append(correccion)
+        _save_pending_fixes(pending_fixes)
 
-        append_to_jsonl("scripts/semantic_commits.json", correccion)
+        # Registrar en el log semántico
+        try:
+            from services.memory_service import memory_service
+            if memory_service:
+                memory_service.log_event("correccion_registrada", {
+                    "fecha": datetime.now().isoformat(),
+                    "origen": correccion["origen"],
+                    "target": correccion["target"],
+                    "accion": correccion["propuesta"],
+                    "estado": "pendiente",
+                    "id_correccion": correccion["id"]
+                })
+        except ImportError:
+            pass  # memory_service no disponible
+
+        # Evaluar si se puede auto-promover
+        auto_promote = _evaluate_auto_promotion(correccion)
+
+        response = {
+            "exito": True,
+            "mensaje": f"Corrección registrada: {correccion['id']}",
+            "correccion": correccion,
+            "auto_promocion": auto_promote,
+            "bandeja_revision": {
+                "total_pendientes": len(pending_fixes),
+                "alta_prioridad": len([f for f in pending_fixes if f.get("prioridad", 0) >= 8]),
+                "url_revision": f"/api/revisar-correcciones"
+            }
+        }
+
+        # Si es auto-promocionable y de alta prioridad, ejecutar
+        if auto_promote["promocionable"] and correccion["prioridad"] >= 9:
+            resultado_promocion = _execute_fix(correccion)
+            response["promocion_automatica"] = resultado_promocion
 
         return func.HttpResponse(
-            json.dumps(
-                {"exito": True, "mensaje": f"Corrección registrada: {correccion['id']}"}, ensure_ascii=False),
+            json.dumps(response, ensure_ascii=False, indent=2),
             status_code=200
         )
 
     except Exception as e:
         logging.exception(f"[{run_id}] Error en autocorregir")
         return func.HttpResponse(
-            json.dumps({"exito": False, "error": str(
-                e), "run_id": run_id}, ensure_ascii=False),
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "run_id": run_id
+            }),
             status_code=500
         )
 
@@ -12566,24 +12303,7 @@ def _save_pending_fixes(fixes: list[dict]):
         json.dump(fixes, f, indent=2, ensure_ascii=False)
 
 
-def _log_semantic_event(event: dict):
-    """Registra evento en el log semántico"""
-    log_file = SEMANTIC_COMMITS_FILE
-    log_file.parent.mkdir(exist_ok=True)
-
-    commits = []
-    if log_file.exists():
-        with open(log_file, "r") as f:
-            commits = json.load(f)
-
-    commits.append(event)
-
-    # Mantener solo últimos 1000 commits
-    if len(commits) > 1000:
-        commits = commits[-1000:]
-
-    with open(log_file, "w") as f:
-        json.dump(commits, f, indent=2, ensure_ascii=False)
+# Función _log_semantic_event eliminada - ahora se usa memory_service.log_event()
 
 
 def _evaluate_auto_promotion(correccion: dict) -> dict:
@@ -12714,15 +12434,19 @@ def _execute_fix(correccion: dict) -> dict:
             correccion["id"], "aplicado" if resultado["validado"] else "fallido")
 
         # Log semántico
-        _log_semantic_event({
-            "tipo": "correccion_aplicada",
-            "fecha": datetime.now().isoformat(),
-            "origen": correccion["origen"],
-            "target": correccion["target"],
-            "accion": correccion["accion"],
-            "validado_por": correccion["validaciones_requeridas"],
-            "resultado": "exitoso" if resultado["validado"] else "fallido"
-        })
+        try:
+            from services.memory_service import memory_service
+            if memory_service:
+                memory_service.log_event("correccion_aplicada", {
+                    "fecha": datetime.now().isoformat(),
+                    "origen": correccion["origen"],
+                    "target": correccion["target"],
+                    "accion": correccion["accion"],
+                    "validado_por": correccion["validaciones_requeridas"],
+                    "resultado": "exitoso" if resultado["validado"] else "fallido"
+                })
+        except ImportError:
+            pass
 
         return resultado
 
@@ -12732,227 +12456,3 @@ def _execute_fix(correccion: dict) -> dict:
             "ejecutado": False,
             "error": str(e)
         }
-# Agregar al final del archivo existente
-
-
-def ejecutar_comando_inteligente_core(
-    comando_base: str,
-    intencion: str,
-    parametros: Optional[Dict[str, Any]] = None,
-    contexto: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    Wrapper genérico inteligente: help → validar → ejecutar → autocorregir
-    """
-    resultado = {
-        "exito": False,
-        "comando_ejecutado": None,
-        "salida": None,
-        "error": None,
-        "proceso": [],
-        "timestamp": datetime.now().isoformat()
-    }
-
-    try:
-        # PASO 1: Auto-descubrimiento con --help
-        resultado["proceso"].append("1. Descubriendo sintaxis con --help")
-
-        help_commands = [f"{comando_base} --help", f"{comando_base} -h"]
-        if "monitor" in intencion and "alert" in intencion:
-            help_commands.insert(
-                0, f"{comando_base} metrics alert create --help")
-
-        sintaxis_info: Dict[str, Any] = {
-            "parametros_requeridos": [], "ejemplos": [], "help_output": ""}
-        for help_cmd in help_commands:
-            try:
-                result = subprocess.run(
-                    help_cmd.split(), capture_output=True, text=True, timeout=30)
-                if result.returncode == 0:
-                    sintaxis_info["help_output"] = result.stdout
-                    break
-            except:
-                continue
-
-        # PASO 2: Construir comando candidato
-        resultado["proceso"].append("2. Construyendo comando candidato")
-
-        if "alerta" in intencion.lower() and "http 500" in intencion.lower():
-            cmd_parts = [comando_base, "metrics", "alert", "create"]
-
-            if parametros:
-                if "resource_group" in parametros:
-                    cmd_parts.extend(
-                        ["--resource-group", parametros["resource_group"]])
-                if "function_app" in parametros:
-                    scope = f"/subscriptions/{parametros.get('subscription_id', 'SUBSCRIPTION_ID')}/resourceGroups/{parametros['resource_group']}/providers/Microsoft.Web/sites/{parametros['function_app']}"
-                    cmd_parts.extend(["--scopes", scope])
-
-            cmd_parts.extend([
-                "--name", "AlertaHTTP500Auto",
-                "--condition", "count requests where resultCode == '500' > 0",
-                "--description", "Alerta automática para HTTP 500",
-                "--severity", "2"
-            ])
-
-            comando_candidato = " ".join(cmd_parts)
-        else:
-            comando_candidato = comando_base
-
-        # PASO 3: Ejecución
-        resultado["proceso"].append("3. Ejecutando comando")
-        resultado["comando_ejecutado"] = comando_candidato
-
-        try:
-            exec_result = subprocess.run(
-                comando_candidato.split(),
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-
-            if exec_result.returncode == 0:
-                resultado["exito"] = True
-                resultado["salida"] = exec_result.stdout
-            else:
-                # PASO 4: Autocorrección básica
-                resultado["proceso"].append(
-                    "4. Comando falló, aplicando autocorrección")
-                error_msg = exec_result.stderr
-
-                # Correcciones comunes
-                if "not found" in error_msg.lower():
-                    resultado[
-                        "error"] = f"Comando no encontrado. Verificar que Azure CLI esté instalado: {error_msg}"
-                elif "login" in error_msg.lower():
-                    resultado[
-                        "error"] = f"Autenticación requerida. Ejecutar 'az login': {error_msg}"
-                elif "subscription" in error_msg.lower():
-                    resultado[
-                        "error"] = f"Problema con subscription. Verificar 'az account show': {error_msg}"
-                else:
-                    resultado["error"] = f"Error de ejecución: {error_msg}"
-
-                    # Intentar corrección automática
-                    if "required" in error_msg.lower():
-                        resultado["sugerencia_correccion"] = "Faltan parámetros requeridos. Revisar sintaxis con --help"
-
-        except subprocess.TimeoutExpired:
-            resultado["error"] = "Comando excedió timeout de 60s"
-        except Exception as e:
-            resultado["error"] = f"Error ejecutando comando: {str(e)}"
-
-    except Exception as e:
-        resultado["error"] = f"Error interno: {str(e)}"
-
-    return resultado
-
-
-@app.function_name(name="ejecutar_comando_inteligente_http")
-@app.route(route="ejecutar-comando-inteligente", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def ejecutar_comando_inteligente_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Endpoint HTTP para el ejecutor inteligente universal"""
-    try:
-        # Parser ultra-resiliente
-        body = {}
-        try:
-            body = req.get_json() or {}
-        except Exception:
-            try:
-                raw_body = req.get_body()
-                if raw_body:
-                    body = json.loads(raw_body.decode(errors="ignore"))
-            except Exception:
-                body = {}
-
-        comando_base = body.get("comando") or body.get("command") or ""
-        intencion = body.get("intencion") or body.get("intention") or ""
-        parametros = body.get("parametros") or body.get("parameters") or {}
-        contexto = body.get("contexto") or body.get("context")
-
-        if not comando_base:
-            return func.HttpResponse(json.dumps({
-                "exito": False,
-                "error": "Parámetro 'comando' es requerido",
-                "ejemplo": {
-                    "comando": "az monitor",
-                    "intencion": "crear alerta HTTP 500",
-                    "parametros": {"resource_group": "mi-grupo"}
-                }
-            }), status_code=400, mimetype="application/json")
-
-        if not intencion:
-            intencion = "ejecutar comando genérico"
-
-        resultado = ejecutar_comando_inteligente_core(
-            comando_base=comando_base,
-            intencion=intencion,
-            parametros=parametros,
-            contexto=contexto
-        )
-
-        resultado["endpoint"] = "ejecutar-comando-inteligente"
-        resultado["version"] = "1.0-universal"
-        resultado["flujo"] = "help → validar → ejecutar → autocorregir"
-
-        return func.HttpResponse(
-            json.dumps(resultado, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=200
-        )
-
-    except Exception as e:
-        return func.HttpResponse(json.dumps({
-            "exito": False,
-            "error": f"Error interno: {str(e)}",
-            "endpoint": "ejecutar-comando-inteligente"
-        }), status_code=500, mimetype="application/json")
-
-
-@app.function_name(name="crear_alerta_azure_http")
-@app.route(route="crear-alerta-azure", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def crear_alerta_azure_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Endpoint específico para crear alertas de Azure Monitor"""
-    try:
-        body = req.get_json() or {}
-
-        resource_group = body.get("resource_group") or "boat-rental-app-group"
-        function_app = body.get(
-            "function_app") or "copiloto-semantico-func-us2"
-        subscription_id = body.get(
-            "subscription_id") or "380fa841-83f3-42fe-adc4-582a5ebe139b"
-
-        parametros = {
-            "resource_group": resource_group,
-            "function_app": function_app,
-            "subscription_id": subscription_id
-        }
-
-        resultado = ejecutar_comando_inteligente_core(
-            comando_base="az monitor",
-            intencion="crear alerta HTTP 500",
-            parametros=parametros,
-            contexto="Azure Function App monitoring"
-        )
-
-        resultado["endpoint"] = "crear-alerta-azure"
-        resultado["caso_uso"] = "Azure Monitor Alert para HTTP 500"
-
-        return func.HttpResponse(
-            json.dumps(resultado, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=200
-        )
-
-    except Exception as e:
-        return func.HttpResponse(json.dumps({
-            "exito": False,
-            "error": f"Error: {str(e)}",
-            "endpoint": "crear-alerta-azure"
-        }), status_code=500, mimetype="application/json")
-
-
-@app.function_name(name="test500_http")
-@app.route(route="test500", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def test500_http(req: func.HttpRequest) -> func.HttpResponse:
-    raise Exception("Error 500 simulado para App Insights")

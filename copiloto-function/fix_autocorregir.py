@@ -23,16 +23,19 @@ def patch_autocorregir_function():
             alert_data = req.get_json() or {}
             
             # Log del evento de alerta
-            _log_semantic_event({
-                "tipo": "alerta_azure_monitor",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Azure Monitor",
-                "alerta_id": alert_data.get("data", {}).get("alertContext", {}).get("id", "unknown"),
-                "severidad": alert_data.get("data", {}).get("essentials", {}).get("severity", "unknown"),
-                "estado": alert_data.get("data", {}).get("essentials", {}).get("monitorCondition", "unknown"),
-                "descripcion": alert_data.get("data", {}).get("essentials", {}).get("description", "Alerta de Azure Monitor"),
-                "run_id": run_id
-            })
+            try:
+                from services.memory_service import memory_service
+                if memory_service:
+                    memory_service.log_event("alerta_azure_monitor", {
+                        "fecha": datetime.now().isoformat(),
+                        "origen": "Azure Monitor",
+                        "alerta_id": alert_data.get("data", {}).get("alertContext", {}).get("id", "unknown"),
+                        "severidad": alert_data.get("data", {}).get("essentials", {}).get("severity", "unknown"),
+                        "estado": alert_data.get("data", {}).get("essentials", {}).get("monitorCondition", "unknown"),
+                        "descripcion": alert_data.get("data", {}).get("essentials", {}).get("description", "Alerta de Azure Monitor")
+                    }, session_id=run_id)
+            except ImportError:
+                pass  # memory_service no disponible
             
             # Crear fix automático para HTTP 500
             if "500" in str(alert_data).lower() or "error" in str(alert_data).lower():
@@ -84,13 +87,16 @@ def patch_autocorregir_function():
             
         except Exception as e:
             # Log del error pero no fallar
-            _log_semantic_event({
-                "tipo": "error_webhook_azure",
-                "fecha": datetime.now().isoformat(),
-                "origen": "Azure Monitor",
-                "error": str(e),
-                "run_id": run_id
-            })
+            try:
+                from services.memory_service import memory_service
+                if memory_service:
+                    memory_service.log_event("error_webhook_azure", {
+                        "fecha": datetime.now().isoformat(),
+                        "origen": "Azure Monitor",
+                        "error": str(e)
+                    }, session_id=run_id)
+            except ImportError:
+                pass  # memory_service no disponible
             
             return func.HttpResponse(
                 json.dumps({
