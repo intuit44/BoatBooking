@@ -1,5 +1,6 @@
 # --- Imports mínimos requeridos ---
 from typing import Dict, List, Optional, Any
+from typing import cast
 from typing import Optional
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource.resources.models import (
@@ -9,16 +10,23 @@ from azure.mgmt.resource.resources.models import (
     TemplateLink,
     DeploymentMode
 )
+from azure.monitor.query import LogsQueryClient, LogsTable
+from azure.monitor.query._models import LogsQueryResult
+from azure.cosmos import CosmosClient
+from hybrid_processor import process_hybrid_request
 from azure.mgmt.resource import ResourceManagementClient
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
+from azure.monitor.query import LogsQueryClient
+from azure.cosmos import CosmosClient
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type
 from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
 from datetime import timedelta
 from collections.abc import Iterator
 import platform
+
 import subprocess
 import traceback
 import logging
@@ -253,8 +261,25 @@ except ImportError:
 # --- FunctionApp instance ---
 app = func.FunctionApp()
 
+# --- Cerebro Semántico Autónomo ---
+try:
+    from services.semantic_runtime import start_semantic_loop
+    # Iniciar cerebro semántico en segundo plano
+    start_semantic_loop()
+    logging.info("🧠 Cerebro semántico autónomo iniciado")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo iniciar cerebro semántico: {e}")
+
 # --- Configuración de Storage ---
 STORAGE_CONNECTION_STRING = os.getenv("AzureWebJobsStorage", "")
+
+# --- Configuración Semántica ---
+SEMANTIC_AUTOPILOT = os.getenv("SEMANTIC_AUTOPILOT", "off")
+SEMANTIC_PERIOD_SEC = os.getenv("SEMANTIC_PERIOD_SEC", "300")
+SEMANTIC_MAX_ACTIONS_PER_HOUR = os.getenv("SEMANTIC_MAX_ACTIONS_PER_HOUR", "6")
+
+logging.info(
+    f"🧠 Configuración semántica: AUTOPILOT={SEMANTIC_AUTOPILOT}, PERIOD={SEMANTIC_PERIOD_SEC}s, MAX_HOURLY={SEMANTIC_MAX_ACTIONS_PER_HOUR}")
 
 
 def _json_body(req):
@@ -6014,7 +6039,7 @@ def eliminar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 # TEMP WEB FIX: Usar ruta directa sin normalización restrictiva
                 from pathlib import Path
                 local_path = Path(ruta)
-                
+
                 if local_path.exists():
                     archivo_encontrado = True
                     local_path.unlink()
@@ -12501,111 +12526,167 @@ def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="verificar_app_insights")
 @app.route(route="verificar-app-insights", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
-    """Verifica telemetría de Application Insights"""
+    """Verifica telemetría de Application Insights sin depender de az CLI"""
+    app_name = os.environ.get(
+        "WEBSITE_SITE_NAME", "copiloto-semantico-func-us2")
+    workspace_id = os.environ.get("APPINSIGHTS_WORKSPACE_ID")
+
+    if not workspace_id:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "APPINSIGHTS_WORKSPACE_ID no configurado en las variables de entorno",
+                "app_name": app_name
+            }),
+            mimetype="application/json",
+            status_code=400
+        )
+
     try:
-        app_name = os.environ.get("WEBSITE_SITE_NAME", "copiloto-semantico-ai")
-        comando = (
-            f"az monitor app-insights query "
-            f"--app {app_name} "
-            f"--analytics-query \"customEvents | take 5\" -o json"
+        credential = DefaultAzureCredential()
+        client = LogsQueryClient(credential)
+        query = "Usage | take 5"
+        response = client.query_workspace(
+            workspace_id=workspace_id,
+            query=query,
+            timespan=timedelta(hours=1)
         )
 
-        result = subprocess.run(
-            comando,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        eventos_count = 0
+        has_data = False
+        metodo_parseo = "ninguno"
+        parse_error_msg = None
 
-        if result.returncode == 0:
-            try:
-                data = json.loads(result.stdout)
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": True,
-                        "telemetria_activa": len(data.get("tables", [])) > 0,
-                        "eventos_recientes": data,
-                        "app_name": app_name
-                    }),
-                    mimetype="application/json"
+        # Intentar parsear la respuesta con ambos métodos
+        try:
+            # Método 1: primary_table (recomendado por el SDK)
+            primary_table = getattr(response, "primary_table", None)
+            if primary_table is not None:
+                rows = getattr(primary_table, 'rows', None)
+                if rows:
+                    eventos_count = len(rows)
+                    has_data = True
+                    metodo_parseo = "primary_table"
+            
+            # Método 2: tables (fallback para compatibilidad)
+            if not has_data:
+                tables = getattr(response, 'tables', None)
+                if tables:
+                    for table in tables:
+                        rows = getattr(table, 'rows', None)
+                        if rows:
+                            eventos_count += len(rows)
+                    has_data = eventos_count > 0
+                    metodo_parseo = "tables_iteration" if has_data else "tables_vacias"
+                else:
+                    metodo_parseo = "sin_atributos_reconocidos"
+                
+        except Exception as parse_error:
+            parse_error_msg = f"{type(parse_error).__name__}: {str(parse_error)}"
+            eventos_count = -1  # Indica error en parsing
+            has_data = False
+            metodo_parseo = "error_parsing"
+
+        return func.HttpResponse(
+            json.dumps({
+                "exito": True,
+                "app_name": app_name,
+                "workspace_id": workspace_id,
+                "telemetria_activa": has_data,
+                "eventos_count": eventos_count,
+                "metodo_conexion": "sdk_managed_identity",
+                "metodo_parseo": metodo_parseo,
+                "parse_error": parse_error_msg,
+                "response_type": type(response).__name__,
+                "mensaje": (
+                    "SDK conectado exitosamente pero sin datos en última hora" 
+                    if not has_data and eventos_count == 0 
+                    else f"Encontrados {eventos_count} eventos usando {metodo_parseo}"
+                    if has_data
+                    else "Error procesando respuesta"
                 )
-            except json.JSONDecodeError:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": True,
-                        "raw_output": result.stdout,
-                        "app_name": app_name
-                    }),
-                    mimetype="application/json"
-                )
-        else:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": result.stderr,
-                    "sugerencia": "Verificar configuración de Application Insights"
-                }),
-                mimetype="application/json",
-                status_code=200
-            )
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
 
     except Exception as e:
         return func.HttpResponse(
             json.dumps({
+                "exito": False,
                 "error": str(e),
-                "tipo_error": type(e).__name__
+                "tipo_error": type(e).__name__,
+                "app_name": app_name,
+                "workspace_id": workspace_id or "no_configurado",
+                "metodo": "sdk_managed_identity_error"
             }),
             mimetype="application/json",
             status_code=500
         )
 
-
 @app.function_name(name="verificar_cosmos")
 @app.route(route="verificar-cosmos", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
-    """Verifica conectividad y escrituras en CosmosDB"""
+    """Verifica conectividad y escrituras en CosmosDB usando clave o MI"""
+    endpoint = os.environ.get("COSMOSDB_ENDPOINT")
+    key = os.environ.get("COSMOSDB_KEY")
+    database = os.environ.get("COSMOSDB_DATABASE", "copiloto-db")
+    container_name = os.environ.get("COSMOSDB_CONTAINER", "memory")
+
+    if not endpoint:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "Endpoint de CosmosDB no configurado",
+                "configuracion": {"endpoint": False}
+            }),
+            mimetype="application/json",
+            status_code=200
+        )
+
     try:
-        from azure.cosmos import CosmosClient
+        auth_method = "MI"
+        client = None
+        db = None
+        container = None
 
-        endpoint = os.environ.get("COSMOSDB_ENDPOINT")
-        key = os.environ.get("COSMOSDB_KEY")
-        database = os.environ.get("COSMOSDB_DATABASE", "copiloto-db")
-        container_name = os.environ.get("COSMOSDB_CONTAINER", "memory")
+        if key:
+            try:
+                client = CosmosClient(endpoint, key)
+                auth_method = "clave"
+                db = client.get_database_client(database)
+                container = db.get_container_client(container_name)
+                list(container.query_items("SELECT TOP 1 * FROM c",
+                     enable_cross_partition_query=True))
+            except Exception:
+                client = None
 
-        if not endpoint or not key:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Credenciales de CosmosDB no configuradas",
-                    "configuracion": {
-                        "endpoint": bool(endpoint),
-                        "key": bool(key)
-                    }
-                }),
-                mimetype="application/json",
-                status_code=200
-            )
+        if not client:
+            credential = DefaultAzureCredential()
+            client = CosmosClient(endpoint, credential)
+            auth_method = "MI"
+            db = client.get_database_client(database)
+            container = db.get_container_client(container_name)
 
-        client = CosmosClient(endpoint, key)
-        db = client.get_database_client(database)
-        container = db.get_container_client(container_name)
-
-        items = list(container.query_items(
-            "SELECT TOP 5 * FROM c ORDER BY c._ts DESC",
-            enable_cross_partition_query=True
-        ))
+        if container:
+            items = list(container.query_items(
+                "SELECT TOP 5 * FROM c ORDER BY c._ts DESC",
+                enable_cross_partition_query=True
+            ))
+        else:
+            items = []
 
         return func.HttpResponse(
             json.dumps({
                 "exito": True,
                 "cosmos_conectado": True,
+                "auth_method": auth_method,
                 "registros_encontrados": len(items),
                 "ultimo_registro": items[0] if items else None,
                 "estado": "funcionando" if items else "sin_escrituras",
                 "database": database,
                 "container": container_name
-            }),
+            }, indent=2, default=str),
             mimetype="application/json",
             status_code=200
         )
