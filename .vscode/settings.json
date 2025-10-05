@@ -16,5 +16,7 @@
   "debug.internalConsoleOptions": "neverOpen",
   "azureFunctions.projectLanguageModel": 4,
   "azureFunctions.preDeployTask": "npm prune (functions)",
-  "azureFunctions.projectSubpath": "copiloto-function"
+  "azureFunctions.projectSubpath": "copiloto-function",
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "typescript.format.insertSpaceBeforeFunctionParenthesis": false
 }
