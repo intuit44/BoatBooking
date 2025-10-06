@@ -6,13 +6,24 @@ import logging
 import json
 from functools import wraps
 from typing import Any, Callable
-import azure.functions as func
+import azure.functions as azfunc
+from services.memory_service import CosmosMemoryStore
 
 def registrar_memoria(source: str):
     """Decorador para registrar automáticamente interacciones en memoria"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(req: func.HttpRequest) -> func.HttpResponse:
+        def wrapper(req: azfunc.HttpRequest) -> azfunc.HttpResponse:
+            # 1️⃣ Consultar contexto previo antes de ejecutar
+            try:
+                cosmos = CosmosMemoryStore()
+                agent_id = req.headers.get("X-Agent-Auth", "System")
+                contexto_prev = cosmos.query(agent_id, limit=5)
+                setattr(req, "contexto_prev", contexto_prev)
+            except Exception as e:
+                logging.warning(f"[memoria] No se pudo consultar memoria previa: {e}")
+                setattr(req, "contexto_prev", [])
+            
             # Ejecutar función original
             response = func(req)
             

@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
-
+from services.cosmos_store import CosmosMemoryStore
 class MemoryService:
     def __init__(self):
         # Configurar Cosmos DB directamente
+        self.cosmos = CosmosMemoryStore()
         endpoint = os.environ.get('COSMOSDB_ENDPOINT') or ""
         key = os.environ.get('COSMOSDB_KEY')
         database_name = os.environ.get('COSMOSDB_DATABASE', 'agentMemory')

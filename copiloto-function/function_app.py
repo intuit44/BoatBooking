@@ -2892,14 +2892,31 @@ def ejecutar_comando_azure(comando: str, formato: str = "json") -> dict:
 
 
 def diagnosticar_function_app() -> dict:
-    """Diagnóstico completo de la Function App"""
+    """Diagnóstico completo de la Function App con memoria semántica"""
     diagnostico = {
         "timestamp": datetime.now().isoformat(),
         "function_app": os.environ.get("WEBSITE_SITE_NAME", "local"),
         "checks": {},
         "recomendaciones": [],
-        "metricas": {}
+        "metricas": {},
+        "memoria_semantica": {}
     }
+    
+    # Consultar memoria semántica
+    try:
+        from services.semantic_memory import obtener_estado_sistema
+        estado_resultado = obtener_estado_sistema()
+        if estado_resultado.get("exito"):
+            estado = estado_resultado["estado"]
+            diagnostico["memoria_semantica"] = {
+                "monitoreo_detectado": estado.get("monitoreo_activo", False),
+                "auditoria_detectada": estado.get("auditoria_activa", False),
+                "supervision_detectada": estado.get("supervision_activa", False),
+                "subsistemas_activos": estado.get("subsistemas_activos", []),
+                "total_interacciones_24h": estado.get("total_interacciones", 0)
+            }
+    except Exception as e:
+        diagnostico["memoria_semantica"] = {"error": str(e)}
 
     # 1. Verificar configuración
     diagnostico["checks"]["configuracion"] = {
@@ -2955,7 +2972,15 @@ def diagnosticar_function_app() -> dict:
         if cmd_result["exito"]:
             diagnostico["metricas"]["errores_http"] = cmd_result["data"]
 
-    # 5. Generar recomendaciones
+    # 5. Generar recomendaciones basadas en memoria semántica
+    memoria = diagnostico.get("memoria_semantica", {})
+    if memoria.get("monitoreo_detectado"):
+        diagnostico["recomendaciones"].append(
+            "Sistema de monitoreo YA ESTÁ ACTIVO según memoria semántica")
+    else:
+        diagnostico["recomendaciones"].append(
+            "Configurar monitoreo proactivo")
+    
     if not diagnostico["checks"].get("blob_storage_detalles", {}).get("conectado"):
         diagnostico["recomendaciones"].append(
             "Sincronizar archivos con Blob Storage: ./sync_to_blob.ps1")
@@ -2963,35 +2988,57 @@ def diagnosticar_function_app() -> dict:
     if diagnostico["metricas"]["cache"]["archivos_en_cache"] > 100:
         diagnostico["recomendaciones"].append(
             "Considerar limpiar caché para optimizar memoria")
+    
+    # 6. Agregar resumen inteligente
+    if memoria.get("total_interacciones_24h", 0) > 0:
+        diagnostico["resumen_inteligente"] = f"Sistema activo con {memoria['total_interacciones_24h']} interacciones en 24h. Subsistemas detectados: {', '.join(memoria.get('subsistemas_activos', [])[:3])}"
 
     return diagnostico
 
 
 def generar_dashboard_insights() -> dict:
     """
-    Dashboard ultra-ligero y súper rápido - sin operaciones costosas
+    Dashboard con memoria semántica integrada
     """
-    logging.info("⚡ Iniciando dashboard ultra-ligero")
+    logging.info("⚡ Iniciando dashboard con memoria semántica")
 
     try:
-        # Solo datos inmediatos, sin llamadas externas
+        # Consultar memoria semántica primero
+        memoria_info = {}
+        try:
+            from services.semantic_memory import obtener_estado_sistema
+            estado_resultado = obtener_estado_sistema(6)  # Últimas 6 horas
+            if estado_resultado.get("exito"):
+                estado = estado_resultado["estado"]
+                memoria_info = {
+                    "interacciones_6h": estado.get("total_interacciones", 0),
+                    "subsistemas_activos": len(estado.get("subsistemas_activos", [])),
+                    "monitoreo_activo": estado.get("monitoreo_activo", False),
+                    "agentes_activos": len(estado.get("agentes_activos", []))
+                }
+        except Exception as e:
+            memoria_info = {"error": str(e)}
+        
         dashboard = {
             "titulo": "Dashboard Copiloto Semántico",
             "generado": datetime.now().isoformat(),
-            "version": "ultra-ligero",
+            "version": "con-memoria-semantica",
             "secciones": {
                 "estado_sistema": {
                     "function_app": os.environ.get("WEBSITE_SITE_NAME", "local"),
                     "ambiente": "Azure" if IS_AZURE else "Local",
                     "version": "2.0-orchestrator",
                     "timestamp": datetime.now().isoformat(),
-                    "uptime": "Activo"
+                    "uptime": "Activo",
+                    "memoria_semantica": memoria_info
                 },
                 "metricas_basicas": {
                     "cache_activo": len(CACHE) if 'CACHE' in globals() else 0,
                     "storage_configurado": bool(STORAGE_CONNECTION_STRING),
                     "memoria_cache_kb": round(sum(len(str(v)) for v in CACHE.values()) / 1024, 2) if CACHE else 0,
-                    "endpoints_disponibles": 6
+                    "endpoints_disponibles": 6,
+                    "interacciones_recientes": memoria_info.get("interacciones_6h", 0),
+                    "subsistemas_detectados": memoria_info.get("subsistemas_activos", 0)
                 },
                 "estado_conexiones": {
                     "blob_storage": "Configurado" if STORAGE_CONNECTION_STRING else "No configurado",
@@ -3006,9 +3053,10 @@ def generar_dashboard_insights() -> dict:
                 "generar:resumen"
             ],
             "metadata": {
-                "tiempo_generacion": "< 10ms",
+                "tiempo_generacion": "< 50ms",
                 "optimizado": True,
-                "sin_operaciones_costosas": True
+                "memoria_semantica_integrada": True,
+                "estado_monitoreo": memoria_info.get("monitoreo_activo", "desconocido")
             }
         }
 
@@ -5214,8 +5262,37 @@ def invocar(req: func.HttpRequest) -> func.HttpResponse:
         return _error("InvokeError", 500, str(e), details={"endpoint": endpoint, "method": method, "data": data})
 
 
+@app.function_name(name="contexto_agente_http")
+@app.route(route="contexto-agente", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint que consulta memoria y devuelve contexto del agente"""
+    try:
+        from services.semantic_memory import obtener_estado_sistema, obtener_contexto_agente
+        
+        agent_id = req.params.get("agent_id")
+        
+        if agent_id:
+            # Contexto específico del agente
+            resultado = obtener_contexto_agente(agent_id)
+        else:
+            # Estado general del sistema
+            resultado = obtener_estado_sistema()
+        
+        return func.HttpResponse(
+            json.dumps(resultado, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            status_code=200 if resultado.get("exito") else 500
+        )
+        
+    except Exception as e:
+        logging.error(f"Error en contexto-agente: {e}")
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
 @app.function_name(name="health")
-# Cambiar a ANONYMOUS
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
 def health(req: func.HttpRequest) -> func.HttpResponse:
     """Health check con información detallada"""
