@@ -117,7 +117,7 @@ def test_appinsights_connection():
             client = LogsQueryClient(credential)
             
             # Query simple para verificar conectividad
-            query = "requests | take 1"
+            query = "union * | take 1"
             response = client.query_workspace(
                 workspace_id=workspace_id,
                 query=query,

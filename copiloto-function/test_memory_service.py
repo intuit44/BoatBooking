@@ -1,146 +1,60 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Script de prueba para verificar memory_service antes del despliegue
+Test del memory_service con Cosmos DB
 """
-import os
-import sys
-import json
-from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
-# Agregar el directorio actual al path para importar módulos
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from services.memory_service import memory_service
+import json
 
 def test_memory_service():
-    """Prueba básica del memory service"""
-    print("[TEST] Iniciando pruebas del memory_service...")
+    print("TESTING MEMORY SERVICE")
+    print("=" * 40)
     
-    try:
-        # Importar memory service
-        from services.memory_service import memory_service
-        print("[OK] memory_service importado correctamente")
-        
-        # Verificar que existe
-        if memory_service is None:
-            print("[ERROR] memory_service es None")
-            return False
-            
-        print(f"[OK] memory_service inicializado: {type(memory_service)}")
-        
-        # Verificar Cosmos Store
-        print(f"[INFO] Cosmos Store habilitado: {memory_service.cosmos_store.enabled}")
-        if memory_service.cosmos_store.enabled:
-            print(f"[INFO] Endpoint: {memory_service.cosmos_store.endpoint}")
-            print(f"[INFO] Database: {memory_service.cosmos_store.database_name}")
-            print(f"[INFO] Container: {memory_service.cosmos_store.container_name}")
-        
-        # Prueba de logging básico
-        test_session = f"test_{int(datetime.now().timestamp())}"
-        
-        print(f"[TEST] Probando log_event con session_id: {test_session}")
-        result = memory_service.log_event("test_event", {
-            "mensaje": "Prueba desde test_memory_service.py",
-            "timestamp": datetime.now().isoformat(),
-            "test_data": {"key": "value", "number": 42}
-        }, session_id=test_session)
-        
-        print(f"[OK] log_event resultado: {result}")
-        
-        # Prueba de consulta si Cosmos está habilitado
-        if memory_service.cosmos_store.enabled:
-            print("[TEST] Probando consulta de historial...")
-            history = memory_service.get_session_history(test_session, limit=5)
-            print(f"[INFO] Historial obtenido: {len(history)} elementos")
-            if history:
-                print(f"[INFO] Primer elemento: {json.dumps(history[0], indent=2)}")
-        
-        print("[OK] Todas las pruebas básicas completadas exitosamente")
-        return True
-        
-    except ImportError as e:
-        print(f"[ERROR] Error de importación: {e}")
-        return False
-    except Exception as e:
-        print(f"[ERROR] Error durante las pruebas: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_cosmos_connection():
-    """Prueba específica de conexión a Cosmos DB"""
-    print("\n[TEST] Probando conexión directa a Cosmos DB...")
+    # Test 1: Registrar interacción
+    print("\n1. Registrando interacción de agente...")
+    success = memory_service.record_interaction(
+        agent_id="AI-FOUNDATION",
+        source="test_script",
+        input_data={"action": "test", "data": "sample"},
+        output_data={"result": "success", "message": "Test completed"}
+    )
+    print(f"Resultado: {'✅ Guardado' if success else '❌ Error'}")
     
-    try:
-        from services.cosmos_store import CosmosMemoryStore
-        
-        # Crear instancia directa
-        cosmos = CosmosMemoryStore()
-        
-        print(f"[INFO] Cosmos habilitado: {cosmos.enabled}")
-        
-        if cosmos.enabled:
-            # Prueba de escritura directa
-            test_data = {
-                "session_id": "direct_test",
-                "event_type": "connection_test",
-                "message": "Prueba directa de Cosmos DB",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            print("[TEST] Probando upsert directo...")
-            result = cosmos.upsert(test_data)
-            print(f"[OK] Upsert resultado: {result}")
-            
-            if result:
-                print("[TEST] Probando query directo...")
-                items = cosmos.query("direct_test", limit=1)
-                print(f"[INFO] Query resultado: {len(items)} elementos")
-                if items:
-                    print(f"[INFO] Elemento: {json.dumps(items[0], indent=2)}")
-        else:
-            print("[WARN] Cosmos DB no está habilitado - verificar configuración")
-            
-    except Exception as e:
-        print(f"[ERROR] Error en prueba de Cosmos: {e}")
-        import traceback
-        traceback.print_exc()
-
-def check_environment():
-    """Verifica las variables de entorno necesarias"""
-    print("\n[CHECK] Verificando variables de entorno...")
+    # Test 2: Log evento semántico
+    print("\n2. Registrando evento semántico...")
+    success = memory_service.log_event("test_event", {
+        "description": "Test event from script",
+        "priority": "high"
+    })
+    print(f"Resultado: {'✅ Guardado' if success else '❌ Error'}")
     
-    required_vars = [
-        "COSMOSDB_ENDPOINT",
-        "COSMOSDB_DATABASE", 
-        "COSMOSDB_CONTAINER"
-    ]
-    
-    for var in required_vars:
-        value = os.environ.get(var)
-        if value:
-            print(f"[OK] {var}: {value}")
-        else:
-            print(f"[WARN] {var}: No configurado (usando default)")
-    
-    # Verificar Azure SDK
-    try:
-        from azure.cosmos import CosmosClient
-        from azure.identity import DefaultAzureCredential
-        print("[OK] Azure SDK disponible")
-    except ImportError as e:
-        print(f"[ERROR] Azure SDK no disponible: {e}")
+    print("\n3. Para verificar en Cosmos DB, ejecuta:")
+    print("python -c \"")
+    print("from services.memory_service import memory_service")
+    print("from azure.cosmos import CosmosClient")
+    print("from azure.identity import DefaultAzureCredential")
+    print("import os")
+    print("")
+    print("# Conectar a Cosmos")
+    print("endpoint = os.environ.get('COSMOSDB_ENDPOINT')")
+    print("key = os.environ.get('COSMOSDB_KEY')")
+    print("if key:")
+    print("    client = CosmosClient(endpoint, key)")
+    print("else:")
+    print("    client = CosmosClient(endpoint, DefaultAzureCredential())")
+    print("")
+    print("db = client.get_database_client('agentMemory')")
+    print("container = db.get_container_client('memory')")
+    print("")
+    print("# Consultar últimos registros")
+    print("for doc in container.query_items(")
+    print("    query='SELECT TOP 5 c.id, c.agent_id, c.source, c.timestamp FROM c ORDER BY c._ts DESC',")
+    print("    enable_cross_partition_query=True")
+    print("):")
+    print("    print(doc)")
+    print("\"")
 
 if __name__ == "__main__":
-    print("[START] Iniciando pruebas completas del memory_service\n")
-    
-    # Verificar entorno
-    check_environment()
-    
-    # Prueba básica del memory service
-    success = test_memory_service()
-    
-    # Prueba específica de Cosmos
-    test_cosmos_connection()
-    
-    print(f"\n[RESULT] Resultado final: {'EXITO' if success else 'FALLO'}")
-    print("[NOTE] Si las pruebas son exitosas, proceder con el despliegue")
+    test_memory_service()
