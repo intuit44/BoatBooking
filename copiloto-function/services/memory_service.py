@@ -1,20 +1,39 @@
 import os
 import json
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
-from .cosmos_store import CosmosMemoryStore
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 
 class MemoryService:
     def __init__(self):
-        self.cosmos_store = CosmosMemoryStore()
+        # Configurar Cosmos DB directamente
+        endpoint = os.environ.get('COSMOSDB_ENDPOINT') or ""
+        key = os.environ.get('COSMOSDB_KEY')
+        database_name = os.environ.get('COSMOSDB_DATABASE', 'agentMemory')
+        
+        try:
+            if key:
+                client = CosmosClient(endpoint, key)
+            else:
+                credential = DefaultAzureCredential()
+                client = CosmosClient(endpoint, credential)
+            
+            database = client.get_database_client(database_name)
+            self.memory_container = database.get_container_client('memory')
+            self.cosmos_available = True
+        except Exception as e:
+            logging.warning(f"Cosmos DB no disponible: {e}")
+            self.cosmos_available = False
+            self.memory_container = None
+        
+        # Fallback local
         self.local_enabled = True
         self.scripts_dir = Path(__file__).parent.parent / "scripts"
         self.scripts_dir.mkdir(exist_ok=True)
-        
-        # Archivos locales
-        self.pending_fixes_file = self.scripts_dir / "pending_fixes.json"
         self.semantic_log_file = self.scripts_dir / "semantic_log.jsonl"
     
     def log_event(self, event_type: str, data: Dict[str, Any], session_id: Optional[str] = None) -> bool:
@@ -50,8 +69,16 @@ class MemoryService:
             return False
     
     def _log_cosmos(self, event: Dict[str, Any]) -> bool:
-        """Escribe en Cosmos DB"""
-        return self.cosmos_store.upsert(event)
+        """Escribe en Cosmos DB contenedor memory"""
+        if not self.cosmos_available or not self.memory_container:
+            return False
+        
+        try:
+            self.memory_container.upsert_item(event)
+            return True
+        except Exception as e:
+            logging.error(f"Error escribiendo en Cosmos memory: {e}")
+            return False
     
     def save_pending_fix(self, fix_data: Dict[str, Any]) -> bool:
         """Guarda fix pendiente en local + Cosmos"""
@@ -67,7 +94,35 @@ class MemoryService:
     
     def get_session_history(self, session_id: str, limit: int = 100) -> list:
         """Obtiene historial de sesión desde Cosmos"""
-        return self.cosmos_store.query(session_id, limit)
+        if not self.cosmos_available or not self.memory_container:
+            return []
+        
+        try:
+            query = "SELECT * FROM c WHERE c.session_id = @session_id ORDER BY c._ts DESC"
+            items = list(self.memory_container.query_items(
+                query,
+                parameters=[{"name": "@session_id", "value": session_id}],
+                max_item_count=limit,
+                enable_cross_partition_query=True
+            ))
+            return items
+        except Exception as e:
+            logging.error(f"Error consultando historial: {e}")
+            return []
+    
+    def record_interaction(self, agent_id: str, source: str, input_data: Any, output_data: Any) -> bool:
+        """Registra interacción de agente"""
+        interaction = {
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.utcnow().isoformat(),
+            "agent_id": agent_id,
+            "source": source,
+            "input": input_data,
+            "output": output_data,
+            "session_id": f"agent_{agent_id}_{int(datetime.utcnow().timestamp())}"
+        }
+        
+        return self.log_event("agent_interaction", interaction)
 
 # Instancia global
 memory_service = MemoryService()

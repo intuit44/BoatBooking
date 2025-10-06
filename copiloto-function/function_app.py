@@ -261,6 +261,14 @@ except ImportError:
 # --- FunctionApp instance ---
 app = func.FunctionApp()
 
+# --- Wrapper automático de memoria ---
+from memory_route_wrapper import apply_memory_wrapper
+
+# Aplicar el wrapper de memoria que respeta la firma original de app.route
+apply_memory_wrapper(app)
+
+logging.info("🧠 Memory wrapper aplicado automáticamente a todos los endpoints")
+
 # --- Cerebro Semántico Autónomo ---
 try:
     from services.semantic_runtime import start_semantic_loop
@@ -12069,10 +12077,33 @@ def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="revisar-correcciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def revisar_correcciones(req: func.HttpRequest) -> func.HttpResponse:
     try:
+        # Intentar usar Cosmos DB primero
+        try:
+            from services.cosmos_fixes_service import cosmos_fixes_service
+            if cosmos_fixes_service:
+                pendientes = cosmos_fixes_service.get_pending_fixes()
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True, 
+                        "pendientes": pendientes,
+                        "fuente": "cosmos_db",
+                        "total": len(pendientes)
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+        except ImportError:
+            pass
+        
+        # Fallback a archivo JSON
         pendientes = _load_pending_fixes()
         return func.HttpResponse(
-            json.dumps({"exito": True, "pendientes": pendientes},
-                       ensure_ascii=False),
+            json.dumps({
+                "exito": True, 
+                "pendientes": pendientes,
+                "fuente": "json_file",
+                "total": len(pendientes)
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=200
         )
@@ -12118,6 +12149,7 @@ def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
     Restringido a agentes AI (verifica header especial)
     """
     run_id = get_run_id(req)
+    pending_fixes: List[dict] = []
 
     # Verificar que es un agente autorizado
     agent_header = req.headers.get("X-Agent-Auth", "")
@@ -12165,25 +12197,42 @@ def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
             "simulacion": _simulate_fix(body)
         }
 
-        # Registrar en pending_fixes.json
-        pending_fixes = _load_pending_fixes()
-        pending_fixes.append(correccion)
-        _save_pending_fixes(pending_fixes)
-
-        # Registrar en el log semántico
+        # Registrar en Cosmos DB
         try:
-            from services.memory_service import memory_service
-            if memory_service:
-                memory_service.log_event("correccion_registrada", {
-                    "fecha": datetime.now().isoformat(),
-                    "origen": correccion["origen"],
-                    "target": correccion["target"],
-                    "accion": correccion["propuesta"],
-                    "estado": "pendiente",
-                    "id_correccion": correccion["id"]
-                })
+            from services.cosmos_fixes_service import cosmos_fixes_service
+            from services.app_insights_logger import app_insights_logger
+            
+            if cosmos_fixes_service:
+                # Upsert en Cosmos
+                resultado_cosmos = cosmos_fixes_service.upsert_fix(correccion)
+                if not resultado_cosmos.get("exito"):
+                    return func.HttpResponse(
+                        json.dumps({
+                            "exito": False,
+                            "error": f"Error guardando en Cosmos: {resultado_cosmos.get('error')}"
+                        }),
+                        status_code=500
+                    )
+                
+                # Log estructurado a App Insights
+                app_insights_logger.log_fix_event(
+                    "correccion_registrada",
+                    correccion["id"],
+                    run_id,
+                    "pendiente",
+                    correccion["target"],
+                    correccion["prioridad"]
+                )
+            else:
+                # Fallback a archivo JSON
+                pending_fixes = _load_pending_fixes()
+                pending_fixes.append(correccion)
+                _save_pending_fixes(pending_fixes)
         except ImportError:
-            pass  # memory_service no disponible
+            # Fallback a archivo JSON
+            pending_fixes = _load_pending_fixes()
+            pending_fixes.append(correccion)
+            _save_pending_fixes(pending_fixes)
 
         # Evaluar si se puede auto-promover
         auto_promote = _evaluate_auto_promotion(correccion)
