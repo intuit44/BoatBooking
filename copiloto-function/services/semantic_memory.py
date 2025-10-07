@@ -64,16 +64,14 @@ def obtener_estado_sistema(horas_atras: int = 24) -> Dict[str, Any]:
                     "error": item.get("response_data", {}).get("error", "Error desconocido")
                 })
             
-            # Detectar capacidades activas
-            response_data = item.get("response_data", {})
-            if isinstance(response_data, dict):
-                content = str(response_data).lower()
-                if any(word in content for word in ["monitor", "diagnostico", "auditoria"]):
-                    estado["monitoreo_activo"] = True
-                if any(word in content for word in ["audit", "log", "trace"]):
-                    estado["auditoria_activa"] = True
-                if any(word in content for word in ["supervis", "alert", "watch"]):
-                    estado["supervision_activa"] = True
+            # Detectar capacidades activas basadas en tipo
+            tipo = item.get("tipo")
+            if tipo == "monitoring_event":
+                estado["monitoreo_activo"] = True
+            if tipo == "auditoria_event":
+                estado["auditoria_activa"] = True
+            if tipo == "cognitive_snapshot":
+                estado["supervision_activa"] = True
         
         # Convertir sets a listas para JSON
         estado["subsistemas_activos"] = list(estado["subsistemas_activos"])
