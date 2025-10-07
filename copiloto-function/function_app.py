@@ -10,6 +10,7 @@ from azure.mgmt.resource.resources.models import (
     TemplateLink,
     DeploymentMode
 )
+from services.memory_service import memory_service
 from azure.monitor.query import LogsQueryClient, LogsTable
 from azure.monitor.query._models import LogsQueryResult
 from azure.cosmos import CosmosClient
@@ -50,6 +51,12 @@ from datetime import datetime
 import os
 
 from azure.functions import HttpRequest, HttpResponse
+
+
+auto_state = os.environ.get("SEMANTIC_AUTOPILOT", "off")
+if auto_state == "on":
+    print("[*] Autopilot activado")
+
 
 # Validation helpers
 
@@ -2902,9 +2909,11 @@ def diagnosticar_function_app() -> dict:
         "memoria_semantica": {}
     }
     
-    # Consultar memoria semántica
+    # Consultar memoria semántica y conocimiento cognitivo
     try:
         from services.semantic_memory import obtener_estado_sistema
+        from services.cognitive_supervisor import CognitiveSupervisor
+        
         estado_resultado = obtener_estado_sistema()
         if estado_resultado.get("exito"):
             estado = estado_resultado["estado"]
@@ -2915,6 +2924,13 @@ def diagnosticar_function_app() -> dict:
                 "subsistemas_activos": estado.get("subsistemas_activos", []),
                 "total_interacciones_24h": estado.get("total_interacciones", 0)
             }
+        
+        # Agregar conocimiento cognitivo
+        supervisor = CognitiveSupervisor()
+        conocimiento_resultado = supervisor.get_latest_knowledge()
+        if conocimiento_resultado.get("exito"):
+            diagnostico["conocimiento_cognitivo"] = conocimiento_resultado["conocimiento"]
+            
     except Exception as e:
         diagnostico["memoria_semantica"] = {"error": str(e)}
 
@@ -2972,9 +2988,14 @@ def diagnosticar_function_app() -> dict:
         if cmd_result["exito"]:
             diagnostico["metricas"]["errores_http"] = cmd_result["data"]
 
-    # 5. Generar recomendaciones basadas en memoria semántica
+    # 5. Generar recomendaciones basadas en memoria semántica y conocimiento cognitivo
     memoria = diagnostico.get("memoria_semantica", {})
-    if memoria.get("monitoreo_detectado"):
+    conocimiento = diagnostico.get("conocimiento_cognitivo", {})
+    
+    # Usar conocimiento cognitivo si está disponible
+    if conocimiento.get("recomendaciones"):
+        diagnostico["recomendaciones"].extend(conocimiento["recomendaciones"])
+    elif memoria.get("monitoreo_detectado"):
         diagnostico["recomendaciones"].append(
             "Sistema de monitoreo YA ESTÁ ACTIVO según memoria semántica")
     else:
@@ -2989,8 +3010,10 @@ def diagnosticar_function_app() -> dict:
         diagnostico["recomendaciones"].append(
             "Considerar limpiar caché para optimizar memoria")
     
-    # 6. Agregar resumen inteligente
-    if memoria.get("total_interacciones_24h", 0) > 0:
+    # 6. Agregar resumen inteligente con conocimiento cognitivo
+    if conocimiento.get("evaluacion_sistema"):
+        diagnostico["resumen_inteligente"] = f"Evaluación cognitiva: {conocimiento['evaluacion_sistema']}. Tasa de éxito: {conocimiento.get('metricas_clave', {}).get('tasa_exito', 0):.1%}"
+    elif memoria.get("total_interacciones_24h", 0) > 0:
         diagnostico["resumen_inteligente"] = f"Sistema activo con {memoria['total_interacciones_24h']} interacciones en 24h. Subsistemas detectados: {', '.join(memoria.get('subsistemas_activos', [])[:3])}"
 
     return diagnostico
@@ -5262,6 +5285,30 @@ def invocar(req: func.HttpRequest) -> func.HttpResponse:
         return _error("InvokeError", 500, str(e), details={"endpoint": endpoint, "method": method, "data": data})
 
 
+@app.function_name(name="conocimiento_cognitivo_http")
+@app.route(route="conocimiento-cognitivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def conocimiento_cognitivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint para obtener el último conocimiento del supervisor cognitivo"""
+    try:
+        from services.cognitive_supervisor import CognitiveSupervisor
+        
+        supervisor = CognitiveSupervisor()
+        conocimiento = supervisor.get_latest_knowledge()
+        
+        return func.HttpResponse(
+            json.dumps(conocimiento, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            status_code=200 if conocimiento.get("exito") else 404
+        )
+        
+    except Exception as e:
+        logging.error(f"Error en conocimiento-cognitivo: {e}")
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
 @app.function_name(name="contexto_agente_http")
 @app.route(route="contexto-agente", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -5291,6 +5338,30 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
+@app.function_name(name="cognitive_supervisor_timer")
+@app.timer_trigger(schedule="0 */10 * * * *", arg_name="timer", run_on_startup=False)
+def cognitive_supervisor_timer(timer: func.TimerRequest) -> None:
+    """Supervisor cognitivo que analiza memoria cada 10 minutos"""
+    try:
+        from services.cognitive_supervisor import CognitiveSupervisor
+        from services.memory_service import memory_service  # ✅ import correcto
+
+        supervisor = CognitiveSupervisor()
+        resultado = supervisor.analyze_and_learn()
+
+        if resultado.get("exito"):
+            logging.info(f"✅ Supervisor cognitivo completado: {resultado['snapshot_id']}")
+            logging.info(f"📊 Evaluación: {resultado['conocimiento']['evaluacion_sistema']}")
+            memory_service.log_semantic_event({"tipo": "cognitive_snapshot"})
+        else:
+            logging.error(f"❌ Error en supervisor cognitivo: {resultado.get('error')}")
+
+    except Exception as e:
+        logging.error(f"💥 Error crítico en supervisor cognitivo: {e}")
+
+
+
 
 @app.function_name(name="health")
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
@@ -11159,6 +11230,15 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
                 "mensaje": "Diagnóstico general del sistema completado"
             }
 
+            # Registrar evento de auditoría en memoria
+            memory_service.log_semantic_event({
+                "tipo": "auditoria_event",
+                "fuente": "diagnostico_recursos_http",
+                "nivel": profundidad,
+                "mensaje": "Diagnóstico general completado correctamente",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
             return func.HttpResponse(
                 json.dumps(general_diagnostics, ensure_ascii=False),
                 mimetype="application/json",
@@ -11186,6 +11266,17 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
                     "tipo": "recurso_especifico"
                 }
             }
+
+            # Registrar auditoría del diagnóstico específico
+            memory_service.log_semantic_event({
+                "tipo": "auditoria_event",
+                "fuente": "diagnostico_recursos_http",
+                "recurso": rid,
+                "nivel": profundidad,
+                "resultado": "completado",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
             logging.info(
                 "diagnostico_recursos_http: Diagnostics completed successfully")
             return _json(result)
@@ -12616,6 +12707,7 @@ def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
     """Autodiagnóstico completo del sistema"""
     try:
         import psutil
+        from services.memory_service import memory_service
 
         estado = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -12632,11 +12724,15 @@ def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
             "ambiente": "Azure" if IS_AZURE else "Local"
         }
 
+        # 👉 Registrar evento de monitoreo solo si no hubo error
+        memory_service.log_semantic_event({"tipo": "monitoring_event"})
+
         return func.HttpResponse(
             json.dumps(estado, indent=2),
             mimetype="application/json",
             status_code=200
         )
+
     except Exception as e:
         return func.HttpResponse(
             json.dumps({
@@ -12658,6 +12754,7 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
     workspace_id = os.environ.get("APPINSIGHTS_WORKSPACE_ID")
 
     if not workspace_id:
+        memory_service.log_semantic_event({"tipo": "monitoring_event"})
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
@@ -12712,7 +12809,9 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
             eventos_count = -1  # Indica error en parsing
             has_data = False
             metodo_parseo = "error_parsing"
+            memory_service.log_semantic_event({"tipo": "monitoring_event"})
 
+        memory_service.log_semantic_event({"tipo": "monitoring_event"})
         return func.HttpResponse(
             json.dumps({
                 "exito": True,
@@ -12736,7 +12835,9 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
             status_code=200
         )
 
+
     except Exception as e:
+        memory_service.log_semantic_event({"tipo": "monitoring_event"})
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
@@ -12749,6 +12850,7 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
 
 @app.function_name(name="verificar_cosmos")
 @app.route(route="verificar-cosmos", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
