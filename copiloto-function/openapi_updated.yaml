@@ -1,0 +1,78 @@
+"/api/ejecutar-cli":
+  post:
+    summary: "Ejecutar comandos Azure CLI con autorreparación semántica"
+    description: "Ejecuta comandos 'az ...', detecta errores comunes, intenta reparar automáticamente usando memoria histórica y ofrece sugerencias contextuales si faltan parámetros."
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              comando:
+                type: string
+                example: "az group create --name mi-grupo"
+            required:
+              - comando
+    responses:
+      200:
+        description: "Comando ejecutado exitosamente"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
+                  type: boolean
+                  example: true
+                stdout:
+                  type: string
+                comando_ejecutado:
+                  type: string
+                autorreparado:
+                  type: boolean
+      422:
+        description: "Parámetro faltante o contexto incompleto. El agente puede actuar automáticamente."
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
+                  type: boolean
+                  example: false
+                tipo_error:
+                  type: string
+                  enum: ["MissingParameter"]
+                  example: "MissingParameter"
+                campo_faltante:
+                  type: string
+                  example: "resourceGroup"
+                endpoint_alternativo:
+                  type: string
+                  example: "/api/verificar-cosmos"
+                memoria_detectada:
+                  type: boolean
+                  example: false
+                sugerencia:
+                  type: string
+                  example: "Ejecutar /api/verificar-cosmos para obtener resourceGroup"
+                contexto:
+                  type: object
+                  properties:
+                    comando:
+                      type: string
+                    campo_faltante:
+                      type: string
+                    alternativas:
+                      type: array
+                      items:
+                        type: string
+                    payload_memoria:
+                      type: object
+              required:
+                - exito
+                - tipo_error
+                - campo_faltante
+                - endpoint_alternativo
+                - memoria_detectada

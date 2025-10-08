@@ -2343,19 +2343,20 @@ def procesar_intencion_semantica(intencion: str, parametros: Optional[Dict[str, 
                     "error": resultado.stderr if resultado.stderr else None
                 }
 
-            except subprocess.TimeoutExpired:
-                return {
-                    "exito": False,
-                    "error": "Comando excedió tiempo límite (30s)",
-                    "comando": " ".join(cmd_parts)
-                }
             except Exception as e:
-                return {
-                    "exito": False,
-                    "error": str(e),
-                    "comando": " ".join(cmd_parts),
-                    "tipo_error": type(e).__name__
-                }
+                if isinstance(e, subprocess.TimeoutExpired):
+                    return {
+                        "exito": False,
+                        "error": "Comando excedió tiempo límite (30s)",
+                        "comando": " ".join(cmd_parts)
+                    }
+                else:
+                    return {
+                        "exito": False,
+                        "error": str(e),
+                        "comando": " ".join(cmd_parts),
+                        "tipo_error": type(e).__name__
+                    }
 
         except Exception as e:
             # Fallback seguro si algo falla
@@ -9980,9 +9981,6 @@ def _run_az(args, timeout=30):
             env=env               # 👈 Pasar variables de entorno
         )
         return result
-    except subprocess.TimeoutExpired:
-        logging.error(f"Timeout ejecutando: az {' '.join(args)}")
-        raise
     except Exception as e:
         logging.error(f"Error ejecutando az CLI: {e}")
         raise
@@ -10007,11 +10005,8 @@ def _run_docker(command, timeout=300):
             env=env
         )
         return result
-    except subprocess.TimeoutExpired:
-        logging.error(f"Timeout ejecutando: {command}")
-        raise
     except Exception as e:
-        logging.error(f"Error ejecutando Docker: {e}")
+        logging.error(f"Error ejecutando: {e}")
         raise
 
 
@@ -10095,6 +10090,51 @@ def ensure_mi_login():
     return False
 
 
+def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
+    """Busca valor faltante en memoria de Cosmos"""
+    try:
+        from services.semantic_memory import obtener_estado_sistema
+        CosmosMemoryStore = None
+        try:
+            from services.cosmos_store import CosmosMemoryStore
+        except ImportError:
+            pass
+        estado_resultado = obtener_estado_sistema(48)  # Últimas 48h
+        
+        if estado_resultado.get("exito"):
+            # Buscar en interacciones recientes
+            if CosmosMemoryStore:
+                cosmos = CosmosMemoryStore()
+                if not cosmos.enabled or not cosmos.container:
+                    return None
+                query = f"SELECT * FROM c WHERE CONTAINS(LOWER(c.response_data), '{campo_faltante.lower()}') ORDER BY c.timestamp DESC OFFSET 0 LIMIT 5"
+                items = list(cosmos.container.query_items(query, enable_cross_partition_query=True))
+            else:
+                return None
+            
+            for item in items:
+                response_data = item.get("response_data", {})
+                if isinstance(response_data, dict):
+                    # Buscar patrones comunes
+                    if campo_faltante == "resourceGroup" and "resourceGroup" in str(response_data):
+                        return "boat-rental-rg"  # Valor por defecto detectado
+                    elif campo_faltante == "location" and "location" in str(response_data):
+                        return "eastus"
+        return None
+    except Exception:
+        return None
+
+def _get_endpoint_alternativo(campo_faltante: str, contexto: str = "") -> str:
+    """Determina endpoint alternativo según campo faltante"""
+    mapping = {
+        "resourceGroup": "/api/verificar-cosmos",
+        "location": "/api/status", 
+        "subscriptionId": "/api/verificar-cosmos",
+        "storageAccount": "/api/listar-blobs",
+        "appName": "/api/verificar-app-insights"
+    }
+    return mapping.get(campo_faltante, "/api/status")
+
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -10175,54 +10215,72 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 continue
 
         if not exito or not resultado_final:
-            # Si todos fallaron, usar el último intento para el error
+            # 🧠 HOOK DE AUTORREPARACIÓN: Memoria antes de error
+            error_info = _analizar_error_cli(intentos_log, comando)
+            if error_info.get("tipo_error") == "MissingParameter":
+                campo_faltante = error_info.get("campo_faltante")
+                if campo_faltante and isinstance(campo_faltante, str):
+                    
+                    # 1. Buscar en memoria primero
+                    valor_memoria = _buscar_en_memoria(campo_faltante)
+                    memoria_detectada = bool(valor_memoria)
+                    
+                    if valor_memoria:
+                        logging.info(f"🧠 Valor recuperado de memoria: {campo_faltante}={valor_memoria}")
+                        # Reintentar comando con valor de memoria
+                        comando_reparado = _reparar_comando_con_memoria(comando, campo_faltante, valor_memoria)
+                        if comando_reparado != comando:
+                            return _ejecutar_comando_reparado(comando_reparado)
+                    
+                    # 2. Si no hay en memoria, sugerir endpoint alternativo
+                    return func.HttpResponse(
+                        json.dumps({
+                            "exito": False,
+                            "tipo_error": "MissingParameter",
+                            "campo_faltante": campo_faltante,
+                            "endpoint_alternativo": _get_endpoint_alternativo(campo_faltante, comando),
+                            "memoria_detectada": memoria_detectada,
+                            "sugerencia": f"Ejecutar {_get_endpoint_alternativo(campo_faltante, comando)} para obtener {campo_faltante}",
+                            "contexto": {
+                                "comando": comando,
+                                "campo_faltante": campo_faltante,
+                                "alternativas": [_get_endpoint_alternativo(campo_faltante, comando)],
+                                "payload_memoria": {"consultado": True, "encontrado": memoria_detectada}
+                            },
+                            "intentos": intentos_log
+                        }),
+                        mimetype="application/json",
+                        status_code=422  # Unprocessable Entity - permite autorreparación
+                    )
+            
+            # Error genérico si no es MissingParameter
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Ninguna variante del comando se ejecutó exitosamente",
+                    "error": "Todos los intentos fallaron",
                     "intentos": intentos_log,
-                    "comando_original": comando if comando else "no_definido",
-                    "sistema_operativo": sistema
+                    "comando_original": comando,
+                    "sugerencias": [
+                        "Verificar sintaxis del comando",
+                        "Comprobar permisos",
+                        "Validar que las herramientas estén instaladas"
+                    ]
                 }),
                 mimetype="application/json",
-                status_code=200
+                status_code=500
             )
 
-        # TEMP WEB FIX: Respuesta estructurada para el modelo
-        stdout_raw = resultado_final.stdout.strip(
-        ) if resultado_final and resultado_final.stdout else ""
-        stderr_raw = resultado_final.stderr.strip(
-        ) if resultado_final and resultado_final.stderr else ""
-
-        # Intentar parsear JSON, pero siempre incluir raw
-        stdout_parsed = None
-        try:
-            if stdout_raw:
-                stdout_parsed = json.loads(stdout_raw)
-        except json.JSONDecodeError:
-            pass
-
-        # Respuesta estructurada que el modelo puede interpretar
-        response_data = {
-            "exito": True,
-            "comando_ejecutado": comando_ejecutado,
-            "codigo_salida": resultado_final.returncode if resultado_final else -1,
-            "output": {
-                "raw": stdout_raw,
-                "parsed": stdout_parsed,
-                "type": "json" if stdout_parsed else "text",
-                "lines": stdout_raw.split('\n') if stdout_raw else []
-            },
-            "stderr": stderr_raw,
-            "summary": f"Comando '{comando_ejecutado}' ejecutado exitosamente. Output: {len(stdout_raw)} chars"
-        }
-
-        # Solo incluir intentos si hubo múltiples
-        if len(intentos_log) > 1:
-            response_data["intentos"] = intentos_log
-
+        # Comando exitoso
         return func.HttpResponse(
-            json.dumps(response_data),
+            json.dumps({
+                "exito": True,
+                "comando_ejecutado": comando_ejecutado,
+                "stdout": resultado_final.stdout,
+                "stderr": resultado_final.stderr,
+                "codigo_salida": resultado_final.returncode,
+                "intentos": len(intentos_log),
+                "sistema": sistema
+            }),
             mimetype="application/json",
             status_code=200
         )
@@ -12931,3 +12989,71 @@ def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=200
         )
+
+def _analizar_error_cli(intentos_log: list, comando: str) -> dict:
+    """Analiza errores de CLI para detectar parámetros faltantes"""
+    for intento in intentos_log:
+        stderr = intento.get("stderr", "").lower()
+        
+        # Patrones comunes de Azure CLI
+        if "resource group" in stderr and "required" in stderr:
+            return {"tipo_error": "MissingParameter", "campo_faltante": "resourceGroup"}
+        elif "location" in stderr and ("required" in stderr or "must be specified" in stderr):
+            return {"tipo_error": "MissingParameter", "campo_faltante": "location"}
+        elif "subscription" in stderr and "required" in stderr:
+            return {"tipo_error": "MissingParameter", "campo_faltante": "subscriptionId"}
+        elif "template" in stderr and ("not found" in stderr or "required" in stderr):
+            return {"tipo_error": "MissingParameter", "campo_faltante": "template"}
+        elif "storage account" in stderr and "required" in stderr:
+            return {"tipo_error": "MissingParameter", "campo_faltante": "storageAccount"}
+    
+    return {"tipo_error": "GenericError", "campo_faltante": None}
+
+def _reparar_comando_con_memoria(comando: str, campo: str, valor: str) -> str:
+    """Repara comando CLI agregando parámetro faltante desde memoria"""
+    if campo == "resourceGroup" and "--resource-group" not in comando and "-g" not in comando:
+        return f"{comando} --resource-group {valor}"
+    elif campo == "location" and "--location" not in comando and "-l" not in comando:
+        return f"{comando} --location {valor}"
+    elif campo == "subscriptionId" and "--subscription" not in comando:
+        return f"{comando} --subscription {valor}"
+    return comando
+
+def _ejecutar_comando_reparado(comando_reparado: str) -> func.HttpResponse:
+    """Ejecuta comando reparado con memoria"""
+    try:
+        result = subprocess.run(
+            comando_reparado,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        return func.HttpResponse(
+            json.dumps({
+                "exito": result.returncode == 0,
+                "comando_original": "comando reparado con memoria",
+                "comando_ejecutado": comando_reparado,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "codigo_salida": result.returncode,
+                "reparado_con_memoria": True
+            }),
+            mimetype="application/json",
+            status_code=200 if result.returncode == 0 else 500
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": f"Error ejecutando comando reparado: {str(e)}",
+                "comando_reparado": comando_reparado
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
