@@ -10783,8 +10783,12 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             if command_type != "azure_cli":
                 logging.info(f"Redirigiendo comando {command_type} a ejecutor genérico")
                 
+                # 🔧 NORMALIZACIÓN ROBUSTA para comandos no-Azure CLI
+                comando_normalizado = _normalizar_comando_robusto(comando)
+                logging.info(f"Comando normalizado: {comando_normalizado}")
+                
                 # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(comando, command_type)
+                resultado = ejecutar_comando_sistema(comando_normalizado, command_type)
                 return func.HttpResponse(
                     json.dumps(resultado, ensure_ascii=False),
                     mimetype="application/json",
@@ -10799,8 +10803,11 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             # Fallback: si no parece Azure CLI, ejecutar como comando genérico
             if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
                 logging.info("Ejecutando comando no-Azure con fallback genérico")
+                # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
+                comando_normalizado = _normalizar_comando_robusto(comando)
+                logging.info(f"Comando fallback normalizado: {comando_normalizado}")
                 # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(comando, "generic")
+                resultado = ejecutar_comando_sistema(comando_normalizado, "generic")
                 return func.HttpResponse(
                     json.dumps(resultado, ensure_ascii=False),
                     mimetype="application/json",
@@ -10810,6 +10817,9 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             # Agregar prefijo az si no lo tiene
             if not comando.startswith("az "):
                 comando = f"az {comando}"
+        
+        # 🔧 NORMALIZACIÓN ROBUSTA: Manejar rutas con espacios y caracteres especiales
+        comando = _normalizar_comando_robusto(comando)
         
         # Manejar conflictos de output
         if "-o table" in comando and "--output json" not in comando:
@@ -10915,11 +10925,39 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
         else:
+            # 🔍 DETECCIÓN DE ARGUMENTOS FALTANTES
+            error_msg = result.stderr or "Comando falló sin mensaje de error"
+            
+            # Detectar argumentos faltantes comunes
+            missing_arg_info = _detectar_argumento_faltante(comando, error_msg)
+            
+            if missing_arg_info:
+                # Si detectamos argumento faltante, ofrecer solución inteligente
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "comando": comando,
+                        "error": error_msg,
+                        "codigo_salida": result.returncode,
+                        "diagnostico": {
+                            "argumento_faltante": missing_arg_info["argumento"],
+                            "descripcion": missing_arg_info["descripcion"],
+                            "sugerencia_automatica": missing_arg_info["sugerencia"],
+                            "comando_para_listar": missing_arg_info.get("comando_listar"),
+                            "valores_comunes": missing_arg_info.get("valores_comunes", [])
+                        },
+                        "accion_sugerida": f"Ejecutar: {missing_arg_info.get('comando_listar', 'az group list')} para obtener valores disponibles"
+                    }),
+                    mimetype="application/json",
+                    status_code=400  # 400 para argumentos faltantes, no 500
+                )
+            
+            # Error normal sin argumentos faltantes detectados
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
                     "comando": comando,
-                    "error": result.stderr or "Comando falló sin mensaje de error",
+                    "error": error_msg,
                     "codigo_salida": result.returncode
                 }),
                 mimetype="application/json",
@@ -10949,6 +10987,176 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         )
     except Exception as e:
         logging.error(f"Error en ejecutar_cli_http: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "comando": comando or "desconocido"
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
+
+def _normalizar_comando_robusto(comando: str) -> str:
+    """
+    Normaliza comandos de forma robusta para manejar rutas con espacios,
+    caracteres especiales y diferentes tipos de comandos.
+    """
+    try:
+        import re
+        
+        # Casos especiales para comandos comunes primero
+        if 'findstr' in comando.lower():
+            return _normalizar_findstr(comando)
+        elif 'type' in comando.lower():
+            return _normalizar_type(comando)
+        
+        # Para otros comandos, detectar rutas con espacios no entrecomilladas
+        # Patrón mejorado: buscar rutas que NO estén ya entre comillas
+        path_pattern = r'(?<!")((?:[A-Za-z]:\\|\./|/)[^"\s]*\s[^"\s]*(?:\.[a-zA-Z0-9]+)?)(?!")'
+        
+        def quote_path(match):
+            path = match.group(1)
+            return f'"{path}"'
+        
+        comando_normalizado = re.sub(path_pattern, quote_path, comando)
+        
+        return comando_normalizado
+        
+    except Exception as e:
+        logging.warning(f"Error normalizando comando: {e}")
+        return comando  # Devolver original si falla
+
+
+def _normalizar_findstr(comando: str) -> str:
+    """
+    Normaliza comandos findstr para manejar rutas con espacios correctamente.
+    """
+    try:
+        # Enfoque simple: buscar el último token que contenga espacios y no esté entrecomillado
+        parts = comando.split()
+        if len(parts) >= 3:  # findstr + opciones + archivo
+            # Reconstruir el comando buscando el último argumento
+            last_part = parts[-1]
+            # Si el último argumento contiene espacios y no está entrecomillado
+            if ' ' in ' '.join(parts[2:]) and not (last_part.startswith('"') and last_part.endswith('"')):
+                # Reconstruir: primeras partes + última parte entrecomillada
+                file_part = ' '.join(parts[2:])
+                if not (file_part.startswith('"') and file_part.endswith('"')):
+                    return f'{parts[0]} {parts[1]} "{file_part}"'
+        
+        return comando
+        
+    except Exception:
+        return comando
+
+
+def _normalizar_type(comando: str) -> str:
+    """
+    Normaliza comandos type para manejar rutas con espacios.
+    """
+    try:
+        # type "archivo con espacios"
+        parts = comando.split()
+        if len(parts) >= 2:
+            file_arg = ' '.join(parts[1:])  # Todo después de 'type'
+            if ' ' in file_arg and not (file_arg.startswith('"') and file_arg.endswith('"')):
+                return f'{parts[0]} "{file_arg}"'
+        
+        return comando
+        
+    except Exception:
+        return comando
+
+
+def _detectar_argumento_faltante(comando: str, error_msg: str) -> Optional[dict]:
+    """
+    Detecta argumentos faltantes en comandos Azure CLI y sugiere soluciones.
+    Usa la misma lógica de detección de intención para inferir valores faltantes.
+    """
+    try:
+        error_lower = error_msg.lower()
+        comando_lower = comando.lower()
+        
+        # Patrones de detección de argumentos faltantes
+        missing_patterns = {
+            "--resource-group": {
+                "patterns": ["resource group", "--resource-group", "-g", "resource-group is required"],
+                "argumento": "--resource-group",
+                "descripcion": "Este comando requiere especificar el grupo de recursos",
+                "comando_listar": "az group list --output table",
+                "sugerencia": "¿Quieres que liste los grupos de recursos disponibles?",
+                "valores_comunes": ["boat-rental-app-group", "boat-rental-rg", "DefaultResourceGroup-EUS2"]
+            },
+            "--account-name": {
+                "patterns": ["account name", "--account-name", "storage account", "account-name is required"],
+                "argumento": "--account-name",
+                "descripcion": "Este comando requiere el nombre de la cuenta de almacenamiento",
+                "comando_listar": "az storage account list --output table",
+                "sugerencia": "¿Quieres que liste las cuentas de almacenamiento disponibles?",
+                "valores_comunes": ["boatrentalstorage", "copilotostorage"]
+            },
+            "--name": {
+                "patterns": ["function app name", "--name", "app name", "name is required"],
+                "argumento": "--name",
+                "descripcion": "Este comando requiere el nombre de la aplicación",
+                "comando_listar": "az functionapp list --output table" if "functionapp" in comando_lower else "az webapp list --output table",
+                "sugerencia": "¿Quieres que liste las aplicaciones disponibles?",
+                "valores_comunes": ["copiloto-semantico-func-us2", "boat-rental-app"]
+            },
+            "--subscription": {
+                "patterns": ["subscription", "--subscription", "subscription id"],
+                "argumento": "--subscription",
+                "descripcion": "Este comando requiere especificar la suscripción",
+                "comando_listar": "az account list --output table",
+                "sugerencia": "¿Quieres que liste las suscripciones disponibles?",
+                "valores_comunes": []
+            },
+            "--location": {
+                "patterns": ["location", "--location", "region"],
+                "argumento": "--location",
+                "descripcion": "Este comando requiere especificar la ubicación/región",
+                "comando_listar": "az account list-locations --output table",
+                "sugerencia": "¿Quieres que liste las ubicaciones disponibles?",
+                "valores_comunes": ["eastus", "eastus2", "westus2", "centralus"]
+            }
+        }
+        
+        # Buscar patrones en el mensaje de error
+        for arg_name, info in missing_patterns.items():
+            for pattern in info["patterns"]:
+                if pattern in error_lower:
+                    # Verificar que el argumento no esté ya en el comando
+                    if arg_name not in comando_lower:
+                        logging.info(f"🔍 Argumento faltante detectado: {arg_name}")
+                        return info
+        
+        # Detección específica para Cosmos DB
+        if "cosmosdb" in comando_lower and any(pattern in error_lower for pattern in ["account-name", "account name"]):
+            return {
+                "argumento": "--account-name",
+                "descripcion": "Este comando de Cosmos DB requiere el nombre de la cuenta",
+                "comando_listar": "az cosmosdb list --output table",
+                "sugerencia": "¿Quieres que liste las cuentas de Cosmos DB disponibles?",
+                "valores_comunes": ["copiloto-cosmos", "boat-rental-cosmos"]
+            }
+        
+        # Detección para contenedores de storage
+        if "storage" in comando_lower and "container" in comando_lower and any(pattern in error_lower for pattern in ["container-name", "container name"]):
+            return {
+                "argumento": "--container-name",
+                "descripcion": "Este comando requiere el nombre del contenedor de almacenamiento",
+                "comando_listar": "az storage container list --account-name <account-name> --output table",
+                "sugerencia": "¿Quieres que liste los contenedores disponibles?",
+                "valores_comunes": ["boat-rental-project", "scripts", "backups"]
+            }
+        
+        return None
+        
+    except Exception as e:
+        logging.warning(f"Error detectando argumento faltante: {e}")
+        return None
         return func.HttpResponse(
             json.dumps({
                 "exito": False,

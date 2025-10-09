@@ -1,7 +1,7 @@
 "/api/ejecutar-cli":
   post:
-    summary: "Ejecutar cualquier comando con redirección automática"
-    description: "Ejecuta comandos Azure CLI, Python, PowerShell, Bash o cualquier otro. Detecta automáticamente el tipo y redirige a ejecutor apropiado. NUNCA rechaza comandos."
+    summary: "Ejecutar cualquier comando con redirección automática y detección inteligente"
+    description: "Ejecuta comandos Azure CLI, Python, PowerShell, Bash o cualquier otro. Detecta automáticamente el tipo y redirige a ejecutor apropiado. NUNCA rechaza comandos. Para comandos Azure CLI, detecta argumentos faltantes y sugiere soluciones inteligentes."
     requestBody:
       required: true
       content:
@@ -75,6 +75,62 @@
                 - comando
                 - error
       400:
+        description: "Argumentos faltantes detectados en comando Azure CLI"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
+                  type: boolean
+                  example: false
+                comando:
+                  type: string
+                  example: "az cosmosdb sql database list --account-name copiloto-cosmos"
+                error:
+                  type: string
+                  example: "argument --resource-group/-g: expected one argument"
+                codigo_salida:
+                  type: integer
+                  example: 2
+                diagnostico:
+                  type: object
+                  properties:
+                    argumento_faltante:
+                      type: string
+                      example: "--resource-group"
+                      description: "El argumento que falta en el comando"
+                    descripcion:
+                      type: string
+                      example: "Este comando requiere especificar el grupo de recursos"
+                    sugerencia_automatica:
+                      type: string
+                      example: "¿Quieres que liste los grupos de recursos disponibles?"
+                    comando_para_listar:
+                      type: string
+                      example: "az group list --output table"
+                      description: "Comando sugerido para obtener valores válidos"
+                    valores_comunes:
+                      type: array
+                      items:
+                        type: string
+                      example: ["boat-rental-app-group", "boat-rental-rg", "DefaultResourceGroup-EUS2"]
+                      description: "Valores comunes para este argumento"
+                  required:
+                    - argumento_faltante
+                    - descripcion
+                    - sugerencia_automatica
+                accion_sugerida:
+                  type: string
+                  example: "Ejecutar: az group list --output table para obtener valores disponibles"
+                  description: "Acción recomendada para resolver el problema"
+              required:
+                - exito
+                - comando
+                - error
+                - diagnostico
+                - accion_sugerida
+      422:
         description: "Solicitud inválida (falta parámetro comando)"
         content:
           application/json:

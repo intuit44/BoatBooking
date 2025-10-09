@@ -1,0 +1,18 @@
+{
+  "exito": false,
+  "comando": "az cosmosdb sql database list --account-name copiloto-cosmos --output json",
+  "error": "argument --resource-group/-g: expected one argument",
+  "codigo_salida": 2,
+  "diagnostico": {
+    "argumento_faltante": "--resource-group",
+    "descripcion": "Este comando requiere especificar el grupo de recursos",
+    "sugerencia_automatica": "¿Quieres que liste los grupos de recursos disponibles?",
+    "comando_para_listar": "az group list --output table",
+    "valores_comunes": [
+      "boat-rental-app-group",
+      "boat-rental-rg", 
+      "DefaultResourceGroup-EUS2"
+    ]
+  },
+  "accion_sugerida": "Ejecutar: az group list --output table para obtener valores disponibles"
+}
