@@ -288,3 +288,4 @@
 {"id": "session_1760005204_semantic_1760005204", "session_id": "session_1760005204", "timestamp": "2025-10-09T06:20:04.113604", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760005804_semantic_1760005804", "session_id": "session_1760005804", "timestamp": "2025-10-09T06:30:04.583859", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760006404_semantic_1760006404", "session_id": "session_1760006404", "timestamp": "2025-10-09T06:40:04.168826", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760007006_semantic_1760007006", "session_id": "session_1760007006", "timestamp": "2025-10-09T06:50:06.173221", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
