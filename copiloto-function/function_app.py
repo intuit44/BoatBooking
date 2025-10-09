@@ -1,8 +1,7 @@
 # --- Imports mínimos requeridos ---
-from typing import Dict, List, Optional, Any
+import os
 from typing import cast
 from typing import Optional
-from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource.resources.models import (
     ResourceGroup,
     Deployment,
@@ -16,6 +15,8 @@ from azure.monitor.query._models import LogsQueryResult
 from azure.cosmos import CosmosClient
 from hybrid_processor import process_hybrid_request
 from azure.mgmt.resource import ResourceManagementClient
+from bing_grounding_fallback import ejecutar_bing_grounding_fallback
+from utils_helpers import is_running_in_azure, get_run_id, api_ok, api_err
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
@@ -26,8 +27,8 @@ from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
 from datetime import timedelta
 from collections.abc import Iterator
-import platform
 
+import platform
 import subprocess
 import traceback
 import logging
@@ -45,11 +46,10 @@ import sys
 import difflib
 from urllib.parse import urljoin, unquote
 import requests
+from requests.exceptions import Timeout
 import azure.functions as func
 import json
 from datetime import datetime
-import os
-
 from azure.functions import HttpRequest, HttpResponse
 
 
@@ -1820,7 +1820,6 @@ def find_available_api_functions() -> List[str]:
         function_app = PROJECT_ROOT / "function_app.py"
         if function_app.exists():
             content = function_app.read_text()
-            import re
             # Buscar decoradores @app.route
             routes = re.findall(r'@app\.route\(route="([^"]+)"', content)
             functions.extend([route.replace('-', '_') for route in routes])
@@ -3732,293 +3731,146 @@ def generar_proximas_acciones(intencion: str, resultado: dict) -> list:
 # --- PARSER ROBUSTO PARA AGENT RESPONSE ---
 def clean_agent_response(agent_response: str) -> dict:
     """
-    Parser súper robusto y defensivo
+    Parser ultra-flexible que acepta cualquier formato de texto
     """
     try:
         logging.info(f"🔍 Parseando: {agent_response[:50]}...")
 
-        # Caso 0: Detectar JSON directo con campos de archivo
+        # Caso 1: JSON directo
         try:
             direct_json = json.loads(agent_response)
-            if isinstance(direct_json, dict) and ("ruta" in direct_json or "path" in direct_json):
-                logging.info("✅ JSON directo con campos de archivo detectado")
-                # Determinar endpoint basado en contenido
-                if "contenido" in direct_json or "content" in direct_json:
-                    # Usar escribir-archivo-local por defecto para archivos locales
-                    direct_json["endpoint"] = "escribir-archivo-local"
-                    direct_json["method"] = "POST"
-                    return direct_json
+            if isinstance(direct_json, dict):
+                logging.info("✅ JSON directo detectado")
+                # Asegurar campos mínimos
+                if "endpoint" not in direct_json and "intencion" not in direct_json:
+                    direct_json["endpoint"] = "copiloto"
+                return direct_json
         except json.JSONDecodeError:
-            pass  # No es JSON válido, continuar con otros casos
+            pass
 
-        # Caso 1: Comandos simples
-        simple_commands = {
-            "ping": {"endpoint": "ping"},
-            "status": {"endpoint": "status"},
-            "health": {"endpoint": "health"},
-            "estado": {"endpoint": "status"}
-        }
-
+        # Caso 2: Comandos simples
         clean_text = agent_response.strip().lower()
-        text_lower = clean_text
-
-        # REGLA NUEVA: Si el texto incluye "local" y "archivo", entonces endpoint = "escribir-archivo-local"
-        if "archivo" in text_lower and "local" in text_lower:
-            logging.info(
-                "✅ Detectado 'archivo' y 'local' en el texto, usando escribir-archivo-local")
-            # Intentar parsear JSON para preservar campos originales
-            try:
-                original_data = json.loads(agent_response)
-                if isinstance(original_data, dict):
-                    original_data["endpoint"] = "escribir-archivo-local"
-                    original_data["method"] = "POST"
-                    return original_data
-            except:
-                pass
-            return {"endpoint": "escribir-archivo-local", "method": "POST"}
-
-        # Regla reforzada para detectar "local" o rutas locales
-        if "local" in clean_text or clean_text.startswith("c:/") or clean_text.startswith("/tmp/"):
-            logging.info(
-                "✅ Detectado comando/ruta local, mapeando a escribir-archivo-local")
-            return {"endpoint": "escribir-archivo-local", "method": "POST"}
-
-        # Palabras clave directas para escribir archivo local
-        keywords_map = {
-            "escribir archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
-            "crear archivo local": {"endpoint": "escribir-archivo-local", "method": "POST"},
-            "guardar en local": {"endpoint": "escribir-archivo-local", "method": "POST"},
+        simple_commands = {
+            "ping": {"endpoint": "status"},
+            "status": {"endpoint": "status"},
+            "health": {"endpoint": "status"},
+            "estado": {"endpoint": "status"},
+            "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard"},
+            "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"}
         }
-        for keyword, command in keywords_map.items():
-            if keyword in clean_text:
-                logging.info(f"✅ Palabra clave directa detectada: {keyword}")
-                return command
 
         if clean_text in simple_commands:
-            logging.info(f"✅ Comando simple detectado: {clean_text}")
+            logging.info(f"✅ Comando simple: {clean_text}")
             return simple_commands[clean_text]
 
-        # Caso 2: Buscar JSON de forma más defensiva
-        try:
-            # Buscar múltiples patrones de JSON
-            patterns = [
-                r"```json\s*(\{.*?\})\s*```",  # ```json { } ```
-                r"```\s*(\{.*?\})\s*```",     # ``` { } ```
-                # Cualquier { } que contenga "endpoint"
-                r"(\{[^}]*\"endpoint\"[^}]*\})",
-            ]
+        # Caso 3: JSON embebido en markdown
+        patterns = [
+            r"```json\s*(\{.*?\})\s*```",
+            r"```\s*(\{.*?\})\s*```",
+            r"(\{[^}]*\"endpoint\"[^}]*\})"
+        ]
 
-            json_found = None
-            for pattern in patterns:
-                match = re.search(pattern, agent_response,
-                                  re.DOTALL | re.IGNORECASE)
-                if match:
-                    json_found = match.group(1).strip()
-                    logging.info(
-                        f"✅ JSON encontrado con patrón: {pattern[:20]}...")
-                    break
-
-            if json_found:
+        for pattern in patterns:
+            match = re.search(pattern, agent_response, re.DOTALL | re.IGNORECASE)
+            if match:
                 try:
-                    parsed_json = json.loads(json_found)
-                    logging.info(
-                        f"✅ JSON parseado exitosamente: {list(parsed_json.keys())}")
+                    parsed_json = json.loads(match.group(1).strip())
+                    if isinstance(parsed_json, dict):
+                        logging.info("✅ JSON embebido encontrado")
+                        return parsed_json
+                except json.JSONDecodeError:
+                    continue
 
-                    if not isinstance(parsed_json, dict):
-                        logging.warning("⚠️ JSON no es un objeto")
-                        return {"error": "JSON debe ser un objeto"}
-
-                    # Asegurar campos mínimos
-                    if "endpoint" not in parsed_json:
-                        parsed_json["endpoint"] = "ejecutar"
-                        logging.info(
-                            "➕ Agregado endpoint por defecto: ejecutar")
-
-                    if "method" not in parsed_json:
-                        parsed_json["method"] = "POST"
-                        logging.info("➕ Agregado method por defecto: POST")
-
-                    return parsed_json
-
-                except json.JSONDecodeError as e:
-                    logging.error(f"❌ Error parseando JSON: {str(e)}")
-                    logging.error(f"JSON problemático: {json_found[:100]}...")
-                    return {"error": f"JSON inválido: {str(e)}", "raw": json_found[:100]}
-
-        except Exception as e:
-            logging.error(f"❌ Error en búsqueda de JSON: {str(e)}")
-
-        # Caso 3: Palabras clave (más defensivo)
-        semantic_keywords_map = {
-            "dashboard": {"endpoint": "ejecutar", "intencion": "dashboard"},
-            "diagnostico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
-            "diagnóstico": {"endpoint": "ejecutar", "intencion": "diagnosticar:completo"},
-            "resumen": {"endpoint": "ejecutar", "intencion": "generar:resumen"}
-        }
-
-        for keyword, command in semantic_keywords_map.items():
-            if keyword in clean_text:
-                logging.info(f"✅ Palabra clave detectada: {keyword}")
-                return command
-
-        # Caso 4: Fallback seguro
-        logging.info("ℹ️ Usando fallback para texto libre")
+        # Caso 4: Fallback universal - cualquier texto se convierte en comando
+        logging.info("ℹ️ Usando fallback universal")
         return {
             "endpoint": "copiloto",
-            "mensaje": agent_response[:100],  # Limitar tamaño
+            "mensaje": agent_response[:200],
             "method": "GET"
         }
 
     except Exception as e:
-        logging.error(f"💥 Error crítico en parser: {str(e)}")
-        # Fallback ultra-seguro
+        logging.error(f"💥 Error en parser: {str(e)}")
         return {
-            "endpoint": "ping",  # Usar ping como fallback más seguro
-            "error_parser": str(e)
+            "endpoint": "status",
+            "method": "GET"
         }
 
 
-def hybrid_executor_fixed(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Endpoint hybrid con parser mejorado
-    """
-    logging.info('🤖 Endpoint hybrid activado (versión mejorada)')
-
-    try:
-        req_body = req.get_json()
-
-        if "agent_response" not in req_body:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Falta agent_response",
-                    "expected_format": {
-                        "agent_response": "string con comando o JSON embebido",
-                        "agent_name": "nombre del agente (opcional)"
-                    }
-                }, indent=2),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        agent_response = req_body["agent_response"]
-        agent_name = req_body.get("agent_name", "Architect_BoatRental")
-
-        logging.info(f'Raw agent_response: {agent_response[:200]}...')
-
-        # USAR EL PARSER MEJORADO
-        parsed_command = clean_agent_response(agent_response)
-
-        logging.info(f'Comando parseado: {parsed_command}')
-
-        # Manejar errores de parsing
-        if "error" in parsed_command:
-            return func.HttpResponse(
-                json.dumps({
-                    "success": False,
-                    "parsing_error": parsed_command["error"],
-                    "raw_response": parsed_command.get("raw", agent_response[:100]),
-                    "suggestion": "Verifica el formato del JSON embebido o usa comandos simples como 'ping'"
-                }, indent=2),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Ejecutar comando parseado
-        try:
-            result = execute_parsed_command(parsed_command)
-
-            # Generar respuesta amigable
-            user_response = generate_user_friendly_response_v2(
-                agent_response, result)
-
-            return func.HttpResponse(
-                json.dumps({
-                    "success": True,
-                    "parsed_command": parsed_command,
-                    "execution_result": result,
-                    "user_response": user_response,
-                    "metadata": {
-                        "timestamp": datetime.now().isoformat(),
-                        "agent": agent_name,
-                        "parser_version": "2.0"
-                    }
-                }, indent=2, ensure_ascii=False),
-                mimetype="application/json"
-            )
-
-        except Exception as e:
-            logging.error(f"Error ejecutando comando: {str(e)}")
-            return func.HttpResponse(
-                json.dumps({
-                    "success": False,
-                    "execution_error": str(e),
-                    "parsed_command": parsed_command,
-                    "suggestion": "Error interno ejecutando el comando"
-                }, indent=2),
-                mimetype="application/json",
-                status_code=500
-            )
-
-    except Exception as e:
-        logging.error(f"Error general en hybrid_executor: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({
-                "error": str(e),
-                "type": type(e).__name__,
-                "suggestion": "Error interno del servidor"
-            }, indent=2),
-            mimetype="application/json",
-            status_code=500
-        )
-
+def _get_endpoint_alternativo(campo_faltante: str, contexto: str = "") -> str:
+    """Determina endpoint alternativo según campo faltante"""
+    mapping = {
+        "resourceGroup": "/api/status",
+        "location": "/api/status", 
+        "subscriptionId": "/api/status",
+        "storageAccount": "/api/listar-blobs"
+    }
+    return mapping.get(campo_faltante, "/api/status")
 
 def execute_parsed_command(command: dict) -> dict:
     """
-    Ejecuta un comando ya parseado, detectando entorno (Azure/local) y usando la estrategia adecuada.
-    Adapta el router para aceptar el mismo formato que el agente ya envía, sin obligar a cambiar.
-    Si el agente manda directamente ruta y contenido en el JSON, se recoge igual y se pasa al endpoint.
+    Ejecuta un comando ya parseado con máxima flexibilidad.
+    Acepta cualquier formato de payload y lo adapta automáticamente.
     """
-    endpoint = command.get("endpoint")
+    if not command:
+        return {"exito": False, "error": "Comando vacío"}
+    
+    # Extraer endpoint con múltiples fallbacks
+    endpoint = (
+        command.get("endpoint") or 
+        command.get("intencion") or 
+        command.get("action") or 
+        "copiloto"  # fallback por defecto
+    )
+    
     method = command.get("method", "POST").upper()
-    # Recoge todos los campos excepto endpoint y method, sin obligar a usar "data" o "parametros"
-    data = {k: v for k, v in command.items() if k not in {
-        "endpoint", "method"}}
-    # Si el agente manda "data" o "parametros", los prioriza
+    
+    # Recoger datos de forma ultra-flexible
+    data = {}
+    
+    # Prioridad 1: campos explícitos de datos
     if "data" in command and isinstance(command["data"], dict):
         data = command["data"]
     elif "parametros" in command and isinstance(command["parametros"], dict):
         data = command["parametros"]
-
-    logging.debug(
-        f"[execute_parsed_command] endpoint={endpoint}, method={method}, data={data}")
+    elif "params" in command and isinstance(command["params"], dict):
+        data = command["params"]
+    else:
+        # Prioridad 2: todos los campos excepto metadatos
+        excluded_fields = {"endpoint", "method", "intencion", "action", "agent_response", "agent_name"}
+        data = {k: v for k, v in command.items() if k not in excluded_fields}
+    
+    # Si es una intención semántica, mapear al endpoint ejecutar
+    if endpoint in ["dashboard", "diagnosticar", "generar", "buscar", "leer"]:
+        data["intencion"] = endpoint
+        endpoint = "ejecutar"
+    
+    logging.info(f"[execute_parsed_command] endpoint={endpoint}, method={method}, data_keys={list(data.keys())}")
 
     IS_AZURE = is_running_in_azure()
 
     if IS_AZURE:
-        # 🔹 Invocar SIEMPRE vía HTTP en Azure
-        base_url = os.environ.get("FUNCTION_BASE_URL", "http://localhost:7071")
-        endpoint_str = endpoint or ""
-        ep = endpoint_str if endpoint_str.startswith(
-            "api/") or endpoint_str.startswith("/api/") else f"/api/{endpoint_str}"
+        # 🔹 Azure: HTTP request
+        base_url = os.environ.get("FUNCTION_BASE_URL", "https://copiloto-semantico-func-us2.azurewebsites.net")
+        endpoint_str = str(endpoint)
+        ep = endpoint_str if endpoint_str.startswith(("api/", "/api/")) else f"/api/{endpoint_str}"
         if not ep.startswith("/"):
             ep = "/" + ep
         url = f"{base_url}{ep}"
+        
         try:
             resp = requests.request(method, url, json=data, timeout=30)
             try:
                 return resp.json()
             except Exception:
-                return {"exito": False, "error": resp.text, "status": resp.status_code}
+                return {"exito": resp.ok, "raw_response": resp.text, "status": resp.status_code}
         except Exception as e:
             return {"exito": False, "error": str(e), "endpoint": endpoint, "status": 500}
     else:
-        # 🔹 Local: usar _resolve_handler
-        endpoint_str = endpoint if isinstance(
-            endpoint, str) and endpoint else ""
-        path, handler = _resolve_handler(endpoint_str)
+        # 🔹 Local: handler directo
+        path, handler = _resolve_handler(str(endpoint))
         if handler:
-            payload = json.dumps(data, ensure_ascii=False).encode(
-                "utf-8") if method in {"POST", "PUT", "PATCH"} and data else b""
+            payload = json.dumps(data, ensure_ascii=False).encode("utf-8") if method in {"POST", "PUT", "PATCH"} and data else b""
             req_mock = func.HttpRequest(
                 method=method,
                 url=f"http://localhost{path}",
@@ -4035,7 +3887,7 @@ def execute_parsed_command(command: dict) -> dict:
             except Exception as e:
                 return {"exito": False, "error": str(e), "endpoint": endpoint, "status": 500}
         else:
-            return {"exito": False, "error": f"Endpoint '{endpoint}' no implementado localmente"}
+            return {"exito": False, "error": f"Endpoint '{endpoint}' no encontrado", "endpoints_disponibles": ["status", "copiloto", "ejecutar", "listar-blobs"]}
 
 
 def generate_user_friendly_response_v2(original_response: str, result: dict) -> str:
@@ -4221,14 +4073,14 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
         logging.debug(f'Parametros: {parametros}')
         logging.debug(f'Contexto: {contexto}')
 
-        # Primero intentar con el procesador extendido
-        resultado = procesar_intencion_extendida(intencion, parametros)
-        procesador_usado = 'extendido'
+        # Usar el procesador semántico principal
+        resultado = procesar_intencion_semantica(intencion, parametros)
+        procesador_usado = 'semantico'
 
-        # Si falla, intentar con el procesador base
-        if not resultado.get("exito") and resultado.get("error") and "no soportado" in resultado.get("error", "").lower():
-            resultado = procesar_intencion_semantica(intencion, parametros)
-            procesador_usado = 'base'
+        # Si falla, intentar casos especiales
+        if not resultado.get("exito"):
+            logging.info(f"Procesador semántico falló, intentando casos especiales para: {intencion}")
+            procesador_usado = 'fallback'
 
         # Manejar casos especiales si ambos procesadores fallan
         if not resultado.get("exito"):
@@ -4607,63 +4459,103 @@ def _resolve_handler(endpoint: str):
 @app.function_name(name="hybrid")
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def hybrid(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('🚀 Hybrid (dinámico) activado')
+    logging.info('Hybrid (semantico inteligente) activado')
 
     try:
-        # Validación explícita del JSON
+        from semantic_intent_parser import enhance_hybrid_parser, should_trigger_bing_grounding
+        
+        # Validación flexible del JSON - acepta cualquier payload
         req_body = req.get_json()
         if req_body is None:
-            logging.error("Hybrid: JSON inválido o vacío recibido")
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Request body must be valid JSON",
-                    "error_code": "INVALID_JSON",
-                    "status": 400,
-                    "expected_format": {
-                        "agent_response": "string with command or embedded JSON"
-                    }
-                }),
-                mimetype="application/json",
-                status_code=400
-            )
+            req_body = {}
 
-        agent_response = req_body.get("agent_response", "").strip()
-        if not agent_response:
-            logging.error("Hybrid: agent_response faltante o vacío")
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "agent_response is required and cannot be empty",
-                    "error_code": "MISSING_AGENT_RESPONSE",
-                    "status": 400,
-                    "received_body": req_body
-                }),
-                mimetype="application/json",
-                status_code=400
-            )
+        logging.info(f"Hybrid recibió payload: {json.dumps(req_body, ensure_ascii=False)[:200]}...")
 
-        # Usar el parser robusto
-        parsed_command = clean_agent_response(agent_response)
-
-        if "error" not in parsed_command:
-            logging.info(f"Comando parseado: {parsed_command}")
-            resultado = execute_parsed_command(parsed_command)
+        # NUEVO: Parser semántico inteligente
+        user_input = None
+        parsed_command = None
+        
+        # Extraer input del usuario de diferentes formatos
+        if "agent_response" in req_body:
+            user_input = req_body["agent_response"]
+            logging.info("Formato legacy detectado: agent_response")
+        elif "query" in req_body:
+            user_input = req_body["query"]
+            logging.info("Formato query detectado")
+        elif "mensaje" in req_body:
+            user_input = req_body["mensaje"]
+            logging.info("Formato mensaje detectado")
+        elif "intencion" in req_body:
+            user_input = req_body["intencion"]
+            logging.info("Formato intencion detectado")
+        elif isinstance(req_body, dict) and len(req_body) == 1:
+            # Si solo hay un campo, usarlo como input
+            key, value = next(iter(req_body.items()))
+            user_input = str(value)
+            logging.info(f"Formato single-field detectado: {key}")
         else:
-            resultado = {"exito": False,
-                         "error": "No se identificó intención claramente"}
+            # Convertir todo el payload a string como último recurso
+            user_input = json.dumps(req_body, ensure_ascii=False)
+            logging.info("Formato libre - usando payload completo")
+        
+        # Usar parser semántico inteligente
+        if user_input:
+            parsed_command = enhance_hybrid_parser(user_input)
+            logging.info(f"Parser semántico result: {parsed_command.get('endpoint', 'unknown')}")
+        else:
+            # Fallback si no hay input
+            parsed_command = {"endpoint": "status", "method": "GET"}
 
-        # Asegurar formato consistente y metadata
+        # Ejecutar el comando parseado con manejo especial para Bing Grounding
+        if parsed_command and "error" not in parsed_command:
+            logging.info(f"Comando parseado: {parsed_command.get('endpoint', 'unknown')}")
+            
+            # Si requiere Bing Grounding, ejecutarlo con validación de tipos
+            if parsed_command.get("requires_grounding"):
+                logging.info(f"Activando Bing Grounding para: {user_input[:50]}...")
+                data = parsed_command.get("data")
+                if isinstance(data, dict):
+                    query = data.get("query", "")
+                    contexto = data.get("contexto", "general")
+                    resultado = ejecutar_bing_grounding_fallback(
+                        query,
+                        contexto,
+                        {"original_query": user_input}
+                    )
+                else:
+                    # Manejar caso donde data no es un dict (e.g., es un string)
+                    logging.warning(f"Data no es un dict: {type(data)}, usando fallback")
+                    resultado = ejecutar_bing_grounding_fallback(
+                        user_input or "help",
+                        "error_fallback",
+                        {"parse_error": "data no es dict", "payload": req_body}
+                    )
+            else:
+                resultado = execute_parsed_command(parsed_command)
+        else:
+            logging.warning(f"Error en parsing: {parsed_command}")
+            # Fallback - usar Bing Grounding incluso para errores
+            resultado = ejecutar_bing_grounding_fallback(
+                user_input or "help",
+                "error_fallback",
+                {"parse_error": parsed_command.get("error"), "payload": req_body}
+            )
+
+        # Respuesta consistente con información semántica
         response = {
             "resultado": resultado,
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "endpoint": "hybrid",
-                "version": "2.0-orchestrator",
-                "intencion_detectada": parsed_command.get("intencion", parsed_command.get("endpoint", "ninguna")),
+                "version": "2.0-semantic-intelligent",
+                "user_input": user_input[:100] if user_input else "none",
+                "parsed_endpoint": parsed_command.get("endpoint") if parsed_command else "none",
+                "used_grounding": parsed_command.get("requires_grounding", False) if parsed_command else False,
                 "ambiente": "Azure" if IS_AZURE else "Local"
             }
         }
 
-        return func.HttpResponse(json.dumps(response), mimetype="application/json", status_code=200)
+        return func.HttpResponse(json.dumps(response, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except ValueError as ve:
         # Error específico de parsing JSON
@@ -4694,6 +4586,7 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
             }
         }
         return func.HttpResponse(json.dumps(error_response), mimetype="application/json", status_code=500)
+
 
 
 # Helper claro para extraer JSON embebido dinámicamente
@@ -5340,6 +5233,531 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
             status_code=500
         )
 
+@app.function_name(name="interpretar_intencion_http")
+@app.route(route="interpretar-intencion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def interpretar_intencion_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint que interpreta lenguaje natural y genera comandos"""
+    try:
+        body = req.get_json() if req.get_body() else {}
+        
+        # Extraer consulta del usuario
+        consulta = (
+            body.get("consulta") or 
+            body.get("query") or 
+            body.get("mensaje") or 
+            body.get("texto") or 
+            ""
+        ).strip()
+        
+        if not consulta:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Se requiere una consulta para interpretar",
+                    "ejemplos": [
+                        "quiero actualizar requests",
+                        "cómo instalo matplotlib", 
+                        "dime el estado de mis recursos",
+                        "analizar logs de app insights"
+                    ]
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Parsear intención
+        from semantic_intent_parser import parse_natural_language
+        
+        resultado = parse_natural_language(consulta)
+        
+        # Si tiene comando directo
+        if "command" in resultado:
+            comando = resultado["command"]
+            tipo = resultado.get("type", "generic")
+            
+            # Si requiere confirmación, no ejecutar automáticamente
+            if resultado.get("requires_confirmation", False):
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "interpretacion": {
+                            "consulta_original": consulta,
+                            "comando_sugerido": comando,
+                            "tipo_comando": tipo,
+                            "explicacion": resultado.get("explanation", ""),
+                            "confianza": resultado.get("confidence", 0.8)
+                        },
+                        "requiere_confirmacion": True,
+                        "mensaje_confirmacion": resultado.get("confirmation_message", f"¿Confirmas ejecutar: {comando}?"),
+                        "acciones_disponibles": {
+                            "confirmar": f"POST /api/ejecutar-comando con {{\"comando\": \"{comando}\"}}",
+                            "cancelar": "No hacer nada"
+                        }
+                    }),
+                    mimetype="application/json",
+                    status_code=200
+                )
+            
+            # Ejecutar comando directamente
+            resultado_ejecucion = ejecutar_comando_sistema(comando, tipo)
+            
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": True,
+                    "interpretacion": {
+                        "consulta_original": consulta,
+                        "comando_ejecutado": comando,
+                        "tipo_comando": tipo,
+                        "explicacion": resultado.get("explanation", ""),
+                        "confianza": resultado.get("confidence", 0.8)
+                    },
+                    "ejecucion": {
+                        "exitoso": resultado_ejecucion.get("exito", False),
+                        "resultado": resultado_ejecucion.get("output", ""),
+                        "error": resultado_ejecucion.get("error"),
+                        "tiempo": resultado_ejecucion.get("duration", "unknown")
+                    }
+                }),
+                mimetype="application/json",
+                status_code=200
+            )
+        
+        # Si requiere grounding
+        elif resultado.get("requires_grounding", False):
+            try:
+                grounding_result = ejecutar_bing_grounding_fallback(
+                    resultado.get("grounding_query", consulta),
+                    resultado.get("context", "general"),
+                    {"original_query": consulta}
+                )
+                
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "interpretacion": {
+                            "consulta_original": consulta,
+                            "requiere_informacion_adicional": True,
+                            "explicacion": resultado.get("explanation", "Consulta requiere más contexto")
+                        },
+                        "grounding": grounding_result,
+                        "sugerencias": resultado.get("suggestions", [])
+                    }),
+                    mimetype="application/json",
+                    status_code=200
+                )
+            except Exception as e:
+                # Fallback si grounding falla
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "interpretacion": {
+                            "consulta_original": consulta,
+                            "mensaje": "Tu consulta necesita más información específica",
+                            "explicacion": resultado.get("explanation", "")
+                        },
+                        "sugerencias": resultado.get("suggestions", [
+                            "Sé más específico sobre qué quieres hacer",
+                            "Menciona nombres exactos de paquetes o recursos"
+                        ]),
+                        "error_grounding": str(e)
+                    }),
+                    mimetype="application/json",
+                    status_code=200
+                )
+        
+        # Respuesta general
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "interpretacion": {
+                    "consulta_original": consulta,
+                    "mensaje": "No se pudo interpretar la consulta"
+                },
+                "sugerencias": [
+                    "Reformula tu consulta",
+                    "Usa comandos más específicos",
+                    "Ejemplos: 'instalar numpy', 'actualizar requests', 'estado de recursos'"
+                ]
+            }),
+            mimetype="application/json",
+            status_code=422
+        )
+        
+    except Exception as e:
+        logging.error(f"Error en interpretar-intencion: {e}")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "mensaje": "Error procesando la consulta"
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
+@app.function_name(name="bing_grounding_http")
+@app.route(route="bing-grounding", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint robusto para Bing Grounding que resuelve consultas ambiguas"""
+    try:
+        # Validación flexible del body
+        body = req.get_json() if req.get_body() else {}
+        
+        # Extraer query de múltiples formatos posibles
+        query = (
+            body.get("query") or 
+            body.get("consulta") or 
+            body.get("pregunta") or 
+            body.get("texto") or 
+            body.get("message") or
+            body.get("agent_response") or
+            ""
+        ).strip()
+        
+        # Si no hay query, usar todo el body como query
+        if not query and body:
+            query = json.dumps(body, ensure_ascii=False)
+        
+        # Si aún no hay query, error
+        if not query:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Se requiere una consulta para procesar",
+                    "formatos_aceptados": [
+                        '{"query": "cómo listar cosmos db"}',
+                        '{"consulta": "ayuda con storage"}',
+                        '{"agent_response": "no sé cómo hacer esto"}'
+                    ]
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # Extraer contexto
+        contexto = body.get("contexto", "azure_cli_help")
+        prioridad = body.get("prioridad", "alta")
+        
+        logging.info(f"🔍 Bing Grounding procesando: {query[:50]}...")
+        
+        # Ejecutar Bing Grounding con manejo robusto
+        try:
+            resultado = ejecutar_bing_grounding_fallback(query, contexto, {
+                "prioridad": prioridad,
+                "timestamp": datetime.now().isoformat(),
+                "endpoint_origen": "bing-grounding"
+            })
+            
+            # Enriquecer respuesta
+            if resultado.get("exito"):
+                # Si hay comando sugerido, ofrecer ejecutarlo
+                if "comando_sugerido" in resultado:
+                    resultado["acciones_disponibles"] = [
+                        "ejecutar_comando_automaticamente",
+                        "mostrar_comando_solamente",
+                        "obtener_mas_informacion"
+                    ]
+                    resultado["endpoint_ejecucion"] = "/api/ejecutar-cli"
+            
+            return func.HttpResponse(
+                json.dumps(resultado, ensure_ascii=False, indent=2),
+                mimetype="application/json",
+                status_code=200
+            )
+            
+        except Exception as grounding_error:
+            logging.error(f"Error en Bing Grounding: {grounding_error}")
+            
+            # Fallback local robusto
+            fallback_result = {
+                "exito": True,
+                "fuente": "fallback_local",
+                "query_original": query,
+                "mensaje": f"No pude procesar '{query}' con Bing, pero aquí tienes sugerencias locales:",
+                "sugerencias": generar_sugerencias_locales(query),
+                "error_grounding": str(grounding_error),
+                "accion_sugerida": "revisar_sugerencias_locales"
+            }
+            
+            return func.HttpResponse(
+                json.dumps(fallback_result, ensure_ascii=False, indent=2),
+                mimetype="application/json",
+                status_code=200
+            )
+        
+    except Exception as e:
+        logging.error(f"Error crítico en bing-grounding: {e}")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "tipo_error": type(e).__name__,
+                "mensaje": "Error procesando consulta, pero el sistema sigue operativo",
+                "sugerencias_alternativas": [
+                    "Intenta reformular tu consulta",
+                    "Usa /api/ejecutar-cli directamente si conoces el comando",
+                    "Consulta /api/status para verificar el estado del sistema"
+                ]
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
+def generar_sugerencias_locales(query: str) -> list:
+    """Genera sugerencias locales cuando Bing Grounding falla"""
+    query_lower = query.lower()
+    sugerencias = []
+    
+    if "cosmos" in query_lower:
+        sugerencias.extend([
+            "az cosmosdb list --output json",
+            "az cosmosdb show --name <nombre> --resource-group <grupo>",
+            "az cosmosdb database list --account-name <cuenta>"
+        ])
+    
+    if "storage" in query_lower:
+        sugerencias.extend([
+            "az storage account list --output json",
+            "az storage account show --name <nombre>",
+            "az storage container list --account-name <cuenta>"
+        ])
+    
+    if "resource" in query_lower or "grupo" in query_lower:
+        sugerencias.extend([
+            "az group list --output json",
+            "az group show --name <nombre>",
+            "az resource list --resource-group <grupo>"
+        ])
+    
+    if not sugerencias:
+        sugerencias = [
+            "az --help",
+            "az account show",
+            "az group list",
+            "az storage account list"
+        ]
+    
+    return sugerencias[:5]  # Máximo 5 sugerencias
+
+# Endpoint /api/ejecutar-comando removido - funcionalidad integrada en /api/ejecutar-cli
+
+def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
+    """Ejecuta comando del sistema según su tipo de manera dinámica y adaptable"""
+    import subprocess
+    import time
+    import shutil
+    
+    start_time = time.time()
+    
+    try:
+        # Configurar entorno
+        env = os.environ.copy()
+        shell = False
+        cmd_args = []
+        
+        # Detección dinámica y configuración por tipo
+        if tipo == "python":
+            # Detectar si es pip, python script, o código inline
+            if comando.startswith("pip "):
+                # Comando pip directo
+                cmd_args = comando.split()
+                shell = True
+            elif comando.startswith("python "):
+                # Comando python con argumentos
+                cmd_args = comando.split()
+                shell = False
+            elif any(keyword in comando for keyword in ["import ", "print(", "def ", "class "]):
+                # Código Python inline
+                cmd_args = ["python", "-c", comando]
+                shell = False
+            else:
+                # Script Python o comando genérico
+                cmd_args = ["python"] + comando.split()
+                shell = False
+            
+            env['PYTHONIOENCODING'] = 'utf-8'
+            env['PYTHONUNBUFFERED'] = '1'
+            
+        elif tipo == "powershell":
+            # PowerShell con detección de cmdlets
+            if any(comando.startswith(prefix) for prefix in ["Get-", "Set-", "New-", "Remove-", "Invoke-"]):
+                # Cmdlet nativo
+                cmd_args = ["powershell", "-NoProfile", "-Command", comando]
+            else:
+                # Comando o script PowerShell
+                cmd_args = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", comando]
+            
+            env['POWERSHELL_TELEMETRY_OPTOUT'] = '1'
+            shell = False
+            
+        elif tipo == "bash":
+            # Bash con detección de comandos Unix
+            bash_path = shutil.which("bash") or "/bin/bash"
+            cmd_args = [bash_path, "-c", comando]
+            shell = False
+            
+        elif tipo == "npm":
+            # NPM con detección de subcomandos
+            if comando.startswith("npm "):
+                cmd_args = comando.split()
+            else:
+                cmd_args = ["npm"] + comando.split()
+            shell = True
+            
+        elif tipo == "docker":
+            # Docker con detección de subcomandos
+            if comando.startswith("docker "):
+                cmd_args = comando.split()
+            else:
+                cmd_args = ["docker"] + comando.split()
+            shell = False
+            
+        elif tipo == "azure_cli":
+            # Azure CLI
+            if comando.startswith("az "):
+                cmd_args = comando.split()
+            else:
+                cmd_args = ["az"] + comando.split()
+            shell = False
+            
+        else:
+            # Comando genérico - ejecutar tal como está
+            if " " in comando:
+                cmd_args = comando.split()
+            else:
+                cmd_args = [comando]
+            shell = True
+        
+        # EJECUCIÓN ROBUSTA: Detección dinámica de método óptimo
+        import shlex
+        
+        # Detectar si el comando tiene rutas con espacios o caracteres especiales
+        has_spaces_in_paths = ' ' in comando and ('\\' in comando or '/' in comando)
+        has_quotes = '"' in comando or "'" in comando
+        has_pipes = any(char in comando for char in ['|', '&&', '||', '>', '<'])
+        
+        # Normalizar rutas de Windows con espacios
+        if has_spaces_in_paths and not has_quotes and tipo == "python":
+            # Detectar rutas de Windows y agregar comillas si es necesario
+            import re
+            # Buscar patrones como "C:\path with spaces\file.py"
+            path_pattern = r'([A-Za-z]:\\[^"]*\s[^"]*\.[a-zA-Z]+)'
+            matches = re.findall(path_pattern, comando)
+            
+            for match in matches:
+                if '"' not in match:  # Solo si no tiene comillas ya
+                    comando = comando.replace(match, f'"{match}"')
+                    logging.info(f"Ruta normalizada: {match} -> \"{match}\"")
+        
+        # Decidir método de ejecución dinámicamente
+        if has_spaces_in_paths or has_quotes or has_pipes or shell:
+            # Usar shell para comandos complejos
+            execution_method = "shell"
+            logging.info(f"Ejecutando {tipo} con shell: {comando}")
+            
+            result = subprocess.run(
+                comando,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                encoding='utf-8',
+                errors='replace',
+                env=env
+            )
+        else:
+            # Intentar con lista de argumentos primero
+            execution_method = "args_list"
+            try:
+                if cmd_args:
+                    # Usar shlex para parsing inteligente
+                    if isinstance(cmd_args, list) and len(cmd_args) > 1:
+                        final_args = cmd_args
+                    else:
+                        try:
+                            final_args = shlex.split(comando) if isinstance(comando, str) else cmd_args
+                        except ValueError:
+                            # Si shlex falla, usar split simple como fallback
+                            final_args = comando.split() if isinstance(comando, str) else cmd_args
+                    
+                    logging.info(f"Ejecutando {tipo} con args: {final_args}")
+                    
+                    result = subprocess.run(
+                        final_args,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding='utf-8',
+                        errors='replace',
+                        env=env
+                    )
+                else:
+                    raise ValueError("No hay argumentos para ejecutar")
+                    
+            except (ValueError, FileNotFoundError) as e:
+                # Fallback a shell si falla el método de argumentos
+                execution_method = "shell_fallback"
+                logging.info(f"Fallback a shell para {tipo}: {e}")
+                
+                result = subprocess.run(
+                    comando,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    encoding='utf-8',
+                    errors='replace',
+                    env=env
+                )
+        
+        duration = time.time() - start_time
+        
+        return {
+            "exito": result.returncode == 0,
+            "output": result.stdout,
+            "error": result.stderr if result.stderr else None,
+            "return_code": result.returncode,
+            "duration": f"{duration:.2f}s",
+            "comando_ejecutado": comando,
+            "tipo_comando": tipo,
+            "metodo_ejecucion": execution_method,
+            "deteccion_automatica": {
+                "rutas_con_espacios": has_spaces_in_paths,
+                "tiene_comillas": has_quotes,
+                "tiene_pipes": has_pipes
+            }
+        }
+        
+    except subprocess.TimeoutExpired:
+        return {
+            "exito": False,
+            "error": "Comando excedió tiempo límite (60s)",
+            "return_code": -1,
+            "duration": "timeout",
+            "comando_ejecutado": comando,
+            "tipo_comando": tipo
+        }
+    except FileNotFoundError as e:
+        return {
+            "exito": False,
+            "error": f"Comando o programa no encontrado: {str(e)}",
+            "return_code": -1,
+            "duration": f"{time.time() - start_time:.2f}s",
+            "comando_ejecutado": comando,
+            "tipo_comando": tipo,
+            "sugerencia": "Verifica que el programa esté instalado y en el PATH"
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": f"Error ejecutando comando: {str(e)}",
+            "return_code": -1,
+            "duration": f"{time.time() - start_time:.2f}s",
+            "comando_ejecutado": comando,
+            "tipo_comando": tipo
+        }
+
+
 @app.function_name(name="cognitive_supervisor_timer")
 @app.timer_trigger(schedule="0 */10 * * * *", arg_name="timer", run_on_startup=False)
 def cognitive_supervisor_timer(timer: func.TimerRequest) -> None:
@@ -5697,7 +6115,6 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                     body = json.loads(body_str)
             except Exception:
                 try:
-                    import re
                     raw_body = req.get_body()
                     if raw_body:
                         body_str = raw_body.decode(errors="ignore")
@@ -5805,6 +6222,51 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 "tipo_operacion": "fallback_exception"
             }
 
+        # ACTIVAR BING FALLBACK GUARD SI FALLA LA CREACIÓN
+        if not ruta or not contenido or not res.get("exito"):
+            try:
+                from bing_fallback_guard import ejecutar_grounding_fallback
+                contexto_dict = {
+                    "operacion": "escritura de archivo",
+                    "ruta_original": ruta,
+                    "contenido_vacio": not contenido,
+                    "error_creacion": res.get("error", "Sin error específico"),
+                    "tipo_almacenamiento": "local" if usar_local else "blob"
+                }
+
+                fallback = ejecutar_grounding_fallback(
+                    prompt=f"Sugerir ruta válida y estrategia para escribir archivo: {ruta} con contenido: {contenido[:100]}...",
+                    contexto=json.dumps(contexto_dict, ensure_ascii=False),  # ← esto es lo importante
+                    error_info={"tipo_error": "escritura_archivo_fallida"}
+                )
+                if fallback.get("exito"):
+                    # Aplicar sugerencias del fallback
+                    ruta_sugerida = fallback.get("ruta_sugerida", ruta)
+                    estrategia = fallback.get("estrategia", "default")
+                    if ruta_sugerida != ruta:
+                        advertencias.append(f"Ruta corregida por Bing: {ruta} -> {ruta_sugerida}")
+                        ruta = str(ruta_sugerida)
+                        # Reintentar con la ruta sugerida
+                        if usar_local:
+                            res = crear_archivo_local(ruta, contenido)
+                        else:
+                            res = crear_archivo(ruta, contenido)
+                    if estrategia == "crear_directorios":
+                        # Implementar creación de directorios si es necesario
+                        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+                        advertencias.append("Directorios creados según sugerencia de Bing")
+                    elif estrategia == "verificar_existencia":
+                        # Verificar si el archivo existe y manejar
+                        if os.path.exists(ruta):
+                            advertencias.append("Archivo ya existe - sobrescribiendo según sugerencia")
+                        else:
+                            advertencias.append("Archivo no existe - creando nuevo según sugerencia")
+                    # Marcar que se aplicó el fallback
+                    res["bing_fallback_aplicado"] = True
+                    res["sugerencias_bing"] = fallback.get("sugerencias", [])
+            except Exception as bing_error:
+                advertencias.append(f"Error en Bing Fallback: {str(bing_error)}")
+
         # RESPUESTA SIEMPRE EXITOSA CON METADATA
         if not res.get("exito"):
             res = {
@@ -5890,7 +6352,6 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             try:
                 # Intento 3: Regex para extraer campos clave
-                import re
                 raw_body = req.get_body()
                 if raw_body:
                     body_str = raw_body.decode(errors="ignore")
@@ -5962,7 +6423,6 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             # Detectar local vs blob
             if ruta.startswith("C:/") or ruta.startswith("/tmp/") or ruta.startswith("/home/") or ruta.startswith("tmp_mod_"):
                 # Crear archivo local
-                import os
                 os.makedirs(os.path.dirname(
                     ruta) if "/" in ruta or "\\" in ruta else ".", exist_ok=True)
                 with open(ruta, 'w', encoding='utf-8') as f:
@@ -6001,6 +6461,29 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             advertencias.append(
                 f"Error en autocreación: {str(e)} - respuesta sintética")
 
+    # Enriquecer respuesta para archivos no encontrados
+    if not res.get("exito") and "no encontrado" in str(res.get("error", "")).lower():
+        res.update(_generar_respuesta_no_encontrado(ruta, contenido, operacion, body))
+
+    # ACTIVAR BING FALLBACK GUARD SI SIGUE SIN ÉXITO
+    if not res.get("exito"):
+        try:
+            from bing_fallback_guard import ejecutar_grounding_fallback
+
+            fallback = ejecutar_grounding_fallback(
+                prompt=f"Cómo realizar la operación '{operacion}' sobre el archivo '{ruta}'",
+                contexto=f"Intento de modificación fallido: {res.get('error')}",
+                error_info={"tipo_error": "modificacion_fallida"}
+            )
+
+            if fallback.get("exito"):
+                res["fallback_sugerido"] = True
+                res["sugerencias_bing"] = fallback.get("sugerencias", [])
+                res["accion_sugerida"] = fallback.get("accion_sugerida")
+                advertencias.append("Sugerencias de Bing aplicadas")
+        except Exception as e:
+            advertencias.append(f"Error en fallback Bing: {str(e)}")
+
     # RESPUESTA SIEMPRE EXITOSA CON METADATA
     if not res.get("exito"):
         res = {"exito": True, "mensaje": "Operación procesada con limitaciones",
@@ -6020,72 +6503,55 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200  # Siempre 200
     )
 
-    # Enriquecer respuesta para archivos no encontrados
-    if not res.get("exito") and "no encontrado" in str(res.get("error", "")).lower():
-        sugerencias = []
-        try:
-            if IS_AZURE:
-                client = get_blob_client()
-                container_client = None
-                if client and hasattr(client, "get_container_client"):
-                    container_client = client.get_container_client(
-                        CONTAINER_NAME)
-                if container_client:
-                    nombre_base = os.path.basename(ruta)
-                    for blob in container_client.list_blobs():
-                        name = getattr(blob, "name", "")
-                        if not name:
-                            continue
-                        if (nombre_base.lower() in name.lower()) or (ruta.lower() in name.lower()):
-                            sugerencias.append(name)
-        except Exception as e:
-            logging.warning(
-                "No se pudo listar blobs para sugerencias: %s", e)
 
-        # Respuesta “soft-error” estructurada para el agente
-        res = {
-            "exito": False,
-            "tipo": "no_encontrado",
-            "codigo": "RUTA_NO_EXISTE",
-            "error": f"El archivo '{ruta}' no existe",
-            "ruta_solicitada": ruta,
-            "alternativas": sugerencias[:5],
-            "sugerencias": sugerencias[:5],
-            "total_similares": len(sugerencias),
-            "tipo_operacion": "modificar_archivo",
-            "operacion_solicitada": operacion,
-            "siguiente_accion": (
-                "preguntar_confirmacion" if len(sugerencias) > 1 else
-                ("proponer_unica" if len(sugerencias) == 1 else "pedir_ruta")
-            ),
-            "mensaje_agente": _generar_mensaje_no_encontrado(ruta, sugerencias)
+def _generar_respuesta_no_encontrado(ruta, contenido, operacion, body):
+    sugerencias = []
+    try:
+        if IS_AZURE:
+            client = get_blob_client()
+            if client:
+                container_client = client.get_container_client(CONTAINER_NAME)
+                nombre_base = os.path.basename(ruta)
+                for blob in container_client.list_blobs():
+                    name = getattr(blob, "name", "")
+                    if nombre_base.lower() in name.lower():
+                        sugerencias.append(name)
+    except Exception as e:
+        logging.warning("No se pudo listar blobs: %s", e)
+
+    resultado = {
+        "exito": False,
+        "tipo": "no_encontrado",
+        "codigo": "RUTA_NO_EXISTE",
+        "ruta_solicitada": ruta,
+        "alternativas": sugerencias[:5],
+        "sugerencias": sugerencias[:5],
+        "total_similares": len(sugerencias),
+        "tipo_operacion": "modificar_archivo",
+        "operacion_solicitada": operacion,
+        "siguiente_accion": (
+            "preguntar_confirmacion" if len(sugerencias) > 1 else
+            ("proponer_unica" if len(sugerencias) == 1 else "pedir_ruta")
+        ),
+        "mensaje_agente": _generar_mensaje_no_encontrado(ruta, sugerencias)
+    }
+
+    if len(sugerencias) == 1:
+        alt = sugerencias[0]
+        resultado["accion_sugerida"] = {
+            "endpoint": "/api/modificar-archivo",
+            "http_method": "POST",
+            "payload": {
+                "ruta": alt,
+                "operacion": operacion,
+                "contenido": contenido
+            },
+            "autorizacion_requerida": True,
+            "confirm_prompt": f"¿Aplico la operación '{operacion}' en '{alt}'?"
         }
+        resultado["ruta_sugerida"] = alt
 
-        # Sugerencia accionable cuando hay 1 sola coincidencia
-        if len(sugerencias) == 1:
-            alt = sugerencias[0]
-            payload_contenido = (
-                contenido if contenido is not None
-                else (body.get("contenido") or body.get("content"))
-            )
-            res["accion_sugerida"] = {
-                "endpoint": "/api/modificar-archivo",
-                "http_method": "POST",
-                "payload": {
-                    "ruta": alt,
-                    "operacion": operacion,
-                    "contenido": payload_contenido
-                },
-                "autorizacion_requerida": True,
-                "confirm_prompt": f"¿Aplico la operación '{operacion}' en '{alt}'?"
-            }
-            res["ruta_sugerida"] = alt
-
-    return func.HttpResponse(
-        json.dumps(res, ensure_ascii=False),
-        mimetype="application/json",
-        status_code=_status_from_result(res)
-    )
+    return resultado
 
 
 def _generar_mensaje_no_encontrado(ruta: str, sugerencias: list) -> str:
@@ -6478,10 +6944,9 @@ def _normalize_script_spec(spec: str) -> Tuple[Optional[str], Optional[str], str
         return None, None, "empty"
 
     # hint: agente te manda un path local -> usamos el nombre y lo buscamos en blob/scripts/
-    import os
     for p in _TMP_HINT_PREFIXES:
         if s.startswith(p):
-            name = os.path.basename(s)
+            name = Path(s).name
             return CONTAINER_NAME, f"scripts/{name}", "mapped_from_tmp"
 
     # ya viene como blob relativo (scripts/foo.py)
@@ -8746,6 +9211,26 @@ def preparar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         # ✅ EJECUTAR LÓGICA: Procesar la preparación del script
         res = preparar_script_desde_blob(ruta.strip())
 
+        # 🔍 FALLBACK GUARD: Si falla, intentar Bing Grounding
+        if not res.get("exito"):
+            try:
+                from bing_fallback_guard import ejecutar_grounding_fallback
+                
+                contexto = f"script preparation failed: {res.get('error', '')}"
+                fallback_result = ejecutar_grounding_fallback(
+                    prompt=f"prepare script: {ruta}",
+                    contexto=contexto,
+                    error_info={"tipo_error": "script_generation_failed"}
+                )
+                
+                if fallback_result.get("exito"):
+                    from bing_fallback_guard import aplicar_fallback_a_respuesta
+                    res = aplicar_fallback_a_respuesta(res, fallback_result)
+                    logging.info(f"🔍 Fallback aplicado para script: {ruta}")
+                    
+            except Exception as e:
+                logging.warning(f"Fallback guard no disponible: {e}")
+
         # ✅ DETERMINAR STATUS CODE: Basado en el resultado
         if res.get("exito"):
             status_code = 201 if "preparado" in str(
@@ -8928,107 +9413,189 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="crear_contenedor_http")
 @app.route(route="crear-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Crea un nuevo contenedor en Azure Blob Storage"""
+    """Crea una nueva cuenta de almacenamiento en Azure usando CLI con Bing Fallback para parámetros faltantes"""
     try:
         body = req.get_json()
         nombre = (body.get("nombre") or "").strip()
-        publico = body.get("publico", False)
-        metadata = body.get("metadata")
-        if isinstance(metadata, str):
+        location = (body.get("location") or body.get("ubicacion") or "eastus").strip()
+        sku = (body.get("sku") or "Standard_LRS").strip()
+        kind = (body.get("kind") or "StorageV2").strip()
+        public_access = body.get("public_access") or body.get("publico", False)
+        resource_group = (body.get("resource_group") or body.get("resourceGroup") or os.environ.get("RESOURCE_GROUP", "boat-rental-app-group")).strip()
+
+        # Validar parámetros requeridos
+        parametros_validos = bool(nombre and location and sku and kind and resource_group)
+        if not parametros_validos:
+            # Activar Bing Fallback por parámetros faltantes
             try:
-                metadata = json.loads(metadata)
-            except:
-                metadata = {}
-        if not isinstance(metadata, dict):
-            metadata = {}
+                from bing_fallback_guard import ejecutar_grounding_fallback
+                fallback = ejecutar_grounding_fallback(
+                    prompt=f"Crear cuenta de almacenamiento Azure con nombre '{nombre or 'desconocido'}', location '{location}', sku '{sku}', kind '{kind}', resource_group '{resource_group}'. Proporciona el comando az completo con todos los parámetros requeridos.",
+                    contexto="creación de cuenta de almacenamiento",
+                    error_info={"tipo_error": "MissingParameter", "parametros_faltantes": [p for p in ["nombre", "location", "sku", "kind", "resource_group"] if not locals().get(p)]}
+                )
+                if fallback.get("exito") and fallback.get("comando_sugerido"):
+                    # Ejecutar el comando sugerido por Bing
+                    result = subprocess.run(fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
+                    if result.returncode == 0:
+                        return func.HttpResponse(
+                            json.dumps({
+                                "exito": True,
+                                "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing",
+                                "comando_ejecutado": fallback["comando_sugerido"],
+                                "stdout": result.stdout,
+                                "cuenta": nombre,
+                                "location": location,
+                                "sku": sku,
+                                "kind": kind,
+                                "resource_group": resource_group
+                            }, ensure_ascii=False),
+                            mimetype="application/json",
+                            status_code=201
+                        )
+            except Exception as bing_error:
+                logging.warning(f"Bing Fallback falló: {bing_error}")
 
-        if not nombre:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Parámetro 'nombre' es requerido",
-                    "ejemplo": {"nombre": "nuevo-contenedor", "publico": False}
+                    "error": "Parámetros insuficientes para crear cuenta de almacenamiento",
+                    "parametros_requeridos": ["nombre", "location", "sku", "kind", "resource_group"],
+                    "parametros_recibidos": {
+                        "nombre": nombre,
+                        "location": location,
+                        "sku": sku,
+                        "kind": kind,
+                        "resource_group": resource_group
+                    },
+                    "ejemplo": {
+                        "nombre": "mi-storage-account",
+                        "location": "eastus",
+                        "sku": "Standard_LRS",
+                        "kind": "StorageV2",
+                        "resource_group": "mi-resource-group",
+                        "public_access": False
+                    }
                 }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
 
-        # Validar nombre del contenedor (Azure rules)
-        import re
-        if not re.match(r'^[a-z0-9]([a-z0-9\-]{1,61}[a-z0-9])?$', nombre):
+        # Construir comando CLI
+        cmd = [
+            "az", "storage", "account", "create",
+            "--name", nombre,
+            "--resource-group", resource_group,
+            "--location", location,
+            "--sku", sku,
+            "--kind", kind,
+            "--output", "json"
+        ]
+
+        if public_access:
+            cmd.extend(["--allow-blob-public-access", "true"])
+
+        # Ejecutar comando
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        if result.returncode == 0:
+            try:
+                account_info = json.loads(result.stdout)
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "mensaje": f"Cuenta de almacenamiento '{nombre}' creada exitosamente",
+                        "cuenta": account_info.get("name"),
+                        "location": account_info.get("location"),
+                        "sku": account_info.get("sku", {}).get("name"),
+                        "kind": account_info.get("kind"),
+                        "resource_group": account_info.get("resourceGroup"),
+                        "id": account_info.get("id")
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=201
+                )
+            except json.JSONDecodeError:
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": True,
+                        "mensaje": "Cuenta de almacenamiento creada (respuesta no parseable)",
+                        "stdout": result.stdout
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=201
+                )
+        else:
+            # Comando falló - activar Bing Fallback
+            try:
+                from bing_fallback_guard import ejecutar_grounding_fallback
+                fallback = ejecutar_grounding_fallback(
+                    prompt=f"El comando az storage account create falló. Error: {result.stderr}. Sugiere el comando correcto para crear cuenta '{nombre}' en '{resource_group}' con sku '{sku}'.",
+                    contexto="creación de cuenta de almacenamiento fallida",
+                    error_info={"tipo_error": "CommandFailed", "stderr": result.stderr, "returncode": result.returncode}
+                )
+                if fallback.get("exito") and fallback.get("comando_sugerido"):
+                    # Reintentar con comando sugerido
+                    retry_result = subprocess.run(fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
+                    if retry_result.returncode == 0:
+                        return func.HttpResponse(
+                            json.dumps({
+                                "exito": True,
+                                "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing (reintento)",
+                                "comando_ejecutado": fallback["comando_sugerido"],
+                                "cuenta": nombre
+                            }, ensure_ascii=False),
+                            mimetype="application/json",
+                            status_code=201
+                        )
+            except Exception as bing_error:
+                logging.warning(f"Bing Fallback en reintento falló: {bing_error}")
+
+            # Error final
+            mensaje = result.stderr.lower()
+            if "already exists" in mensaje or "name already taken" in mensaje:
+                status_code = 409
+                error_msg = f"La cuenta de almacenamiento '{nombre}' ya existe"
+            elif "invalid" in mensaje and "location" in mensaje:
+                status_code = 400
+                error_msg = f"Location '{location}' inválida"
+            elif "authorization" in mensaje or "forbidden" in mensaje:
+                status_code = 403
+                error_msg = "Permisos insuficientes para crear cuenta de almacenamiento"
+            else:
+                status_code = 500
+                error_msg = f"Error creando cuenta de almacenamiento: {result.stderr}"
+
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Nombre inválido. Debe ser minúsculas, números y guiones (3-63 caracteres)",
-                    "nombre_proporcionado": nombre
+                    "error": error_msg,
+                    "stderr": result.stderr,
+                    "returncode": result.returncode,
+                    "comando_intentado": " ".join(cmd)
                 }, ensure_ascii=False),
                 mimetype="application/json",
-                status_code=400
+                status_code=status_code
             )
 
-        client = get_blob_client()
-        if not client:
-            return func.HttpResponse(
-                json.dumps(
-                    {"exito": False, "error": "Blob Storage no configurado"}),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        try:
-            # Configurar nivel de acceso
-            from azure.storage.blob import PublicAccess
-            public_access = PublicAccess.Container.value if publico else None
-
-            # Crear contenedor
-            container_client = client.create_container(
-                name=nombre,
-                public_access=public_access,
-                metadata=metadata
-            )
-
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "mensaje": f"Contenedor '{nombre}' creado exitosamente",
-                    "contenedor": nombre,
-                    "publico": publico,
-                    "metadata": metadata,
-                    "url": f"https://{client.account_name}.blob.core.windows.net/{nombre}"
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=201
-            )
-
-        except Exception as e:
-            mensaje = str(e).lower()
-            if "already exists" in mensaje:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "error": f"El contenedor '{nombre}' ya existe",
-                        "sugerencia": "Usa un nombre diferente o elimina el contenedor existente"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=409
-                )
-            if "publicaccessnotpermitted" in mensaje:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "error": "No se permite el acceso público en esta cuenta de almacenamiento",
-                        "sugerencia": "Habilita 'allowBlobPublicAccess = true' en la configuración del Storage Account"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=403
-                )
-            raise
-
+    except subprocess.TimeoutExpired:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "Timeout creando cuenta de almacenamiento (2 minutos)",
+                "sugerencia": "Verificar conectividad de red o reducir parámetros"
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=408
+        )
     except Exception as e:
         logging.exception("crear_contenedor_http failed")
         return func.HttpResponse(
-            json.dumps({"exito": False, "error": str(
-                e), "tipo_error": type(e).__name__}),
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "tipo_error": type(e).__name__
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
         )
@@ -10090,8 +10657,11 @@ def ensure_mi_login():
     return False
 
 
+# Usar la función is_running_in_azure ya definida más abajo
+
 def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
     """Busca valor faltante en memoria de Cosmos"""
+    
     try:
         from services.semantic_memory import obtener_estado_sistema
         CosmosMemoryStore = None
@@ -10124,199 +10694,267 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
     except Exception:
         return None
 
-def _get_endpoint_alternativo(campo_faltante: str, contexto: str = "") -> str:
-    """Determina endpoint alternativo según campo faltante"""
-    mapping = {
-        "resourceGroup": "/api/verificar-cosmos",
-        "location": "/api/status", 
-        "subscriptionId": "/api/verificar-cosmos",
-        "storageAccount": "/api/listar-blobs",
-        "appName": "/api/verificar-app-insights"
-    }
-    return mapping.get(campo_faltante, "/api/status")
 
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Ejecuta cualquier comando recibido en el body, con inteligencia adaptativa:
-    - Si el comando es un archivo .sh y el sistema es Windows, antepone 'bash', 'wsl bash' o 'sh' según disponibilidad.
-    - Auto-reintenta variantes si el primero falla.
-    - Registra intentos en un log semántico si el agente no tiene visibilidad de errores.
-    """
-    comando = None  # Inicializar para evitar unbound variable
+    """Endpoint robusto para ejecutar comandos Azure CLI"""
+    comando = None
     try:
-        ensure_mi_login()
-        setup_git_credentials()
-
         body = req.get_json()
-        comando = body.get("comando") if body else None
-
-        if not comando or not isinstance(comando, str) or not comando.strip():
+        logging.warning(f"[DEBUG] Payload recibido: {body}")
+        
+        if not body:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Parámetro 'comando' requerido",
-                    "ejemplo": {"comando": "group list"}
+                    "error": "Request body must be valid JSON",
+                    "ejemplo": {"comando": "storage account list"}
                 }),
-                mimetype="application/json",
-                status_code=400
+                status_code=400,
+                mimetype="application/json"
             )
-
-        comando = comando.strip()
-        intentos_log = []
-        sistema = platform.system()
-        is_windows = sistema.lower().startswith("win")
-        es_sh = comando.endswith(".sh")
-        variantes = [comando]
-
-        # --- INTELIGENCIA ADAPTATIVA ---
-        if es_sh:
-            if is_windows:
-                variantes = [
-                    f"bash {comando}",
-                    f"wsl bash {comando}",
-                    f"sh {comando}"
-                ]
+        
+        comando = body.get("comando")
+        if not comando:
+            if body.get("intencion"):
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": "Este endpoint no maneja intenciones, solo comandos CLI.",
+                        "sugerencia": "Usa /api/hybrid para intenciones semánticas."
+                    }),
+                    status_code=422,
+                    mimetype="application/json"
+                )
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Falta el parámetro 'comando'.",
+                    "ejemplo": {"comando": "storage account list"}
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # DETECCIÓN ROBUSTA DE AZURE CLI
+        az_paths = [
+            shutil.which("az"),
+            shutil.which("az.cmd"),
+            shutil.which("az.exe"),
+            "/usr/bin/az",
+            "/usr/local/bin/az",
+            "C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd",
+            "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd"
+        ]
+        
+        az_binary = None
+        for path in az_paths:
+            if path and os.path.exists(path):
+                az_binary = path
+                break
+        
+        if not az_binary:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Azure CLI no está instalado o no está disponible en el PATH",
+                    "diagnostico": {
+                        "paths_verificados": [p for p in az_paths if p],
+                        "sugerencia": "Instalar Azure CLI o verificar PATH",
+                        "ambiente": "Azure" if IS_AZURE else "Local"
+                    }
+                }),
+                status_code=503,
+                mimetype="application/json"
+            )
+        
+        # REDIRECCIÓN AUTOMÁTICA: Si no es comando Azure CLI, redirigir a ejecutor genérico
+        try:
+            from command_type_detector import detect_and_normalize_command
+            
+            # Detectar tipo de comando dinámicamente
+            detection = detect_and_normalize_command(comando)
+            command_type = detection.get("type", "generic")
+            
+            logging.info(f"Comando detectado como: {command_type}")
+            
+            # Si NO es comando Azure CLI, redirigir automáticamente
+            if command_type != "azure_cli":
+                logging.info(f"Redirigiendo comando {command_type} a ejecutor genérico")
+                
+                # Usar la función ejecutar_comando_sistema directamente
+                resultado = ejecutar_comando_sistema(comando, command_type)
+                return func.HttpResponse(
+                    json.dumps(resultado, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200 if resultado.get("exito") else 500
+                )
+            
+            # Normalizar comando Azure CLI
+            comando = detection.get("normalized_command", comando)
+            
+        except ImportError as e:
+            logging.warning(f"No se pudo importar command_type_detector: {e}")
+            # Fallback: si no parece Azure CLI, ejecutar como comando genérico
+            if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
+                logging.info("Ejecutando comando no-Azure con fallback genérico")
+                # Usar la función ejecutar_comando_sistema directamente
+                resultado = ejecutar_comando_sistema(comando, "generic")
+                return func.HttpResponse(
+                    json.dumps(resultado, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200 if resultado.get("exito") else 500
+                )
+            
+            # Agregar prefijo az si no lo tiene
+            if not comando.startswith("az "):
+                comando = f"az {comando}"
+        
+        # Manejar conflictos de output
+        if "-o table" in comando and "--output json" not in comando:
+            # Si ya tiene -o table, no agregar --output json
+            pass
+        elif "--output" not in comando and "-o" not in comando:
+            comando += " --output json"
+        
+        logging.info(f"Ejecutando: {comando} con binary: {az_binary}")
+        
+        # EJECUCIÓN ROBUSTA: Manejar rutas con espacios y comandos complejos
+        import shlex
+        
+        try:
+            # Método 1: Usar shlex para parsing inteligente
+            if az_binary != "az":
+                # Reemplazar 'az' con ruta completa manteniendo estructura
+                if comando.startswith("az "):
+                    comando_final = comando.replace("az ", f'"{az_binary}" ', 1)
+                else:
+                    comando_final = f'"{az_binary}" {comando}'
             else:
-                variantes = [f"bash {comando}", comando, f"sh {comando}"]
-
-        exito = False
-        resultado_final = None
-        comando_ejecutado = None
-
-        for intento in variantes:
-            try:
-                logging.info(f"Intentando ejecutar: {intento}")
+                comando_final = comando
+            
+            # Detectar si necesita shell=True (rutas con espacios, pipes, etc.)
+            needs_shell = any(char in comando_final for char in [' && ', ' || ', '|', '>', '<', '"', "'"])
+            
+            if needs_shell:
+                # Usar shell para comandos complejos
                 result = subprocess.run(
-                    intento,
+                    comando_final,
                     shell=True,
                     capture_output=True,
                     text=True,
-                    timeout=60
+                    timeout=60,
+                    encoding="utf-8",
+                    errors="replace"
                 )
-                intentos_log.append({
-                    "comando": intento,
-                    "codigo_salida": result.returncode,
-                    "stdout": result.stdout[:200] if result.stdout else "",
-                    "stderr": result.stderr[:200] if result.stderr else ""
-                })
-                if result.returncode == 0:
-                    exito = True
-                    resultado_final = result
-                    comando_ejecutado = intento
-                    break
-            except Exception as e:
-                intentos_log.append({
-                    "comando": intento,
-                    "error": str(e),
-                    "tipo_error": type(e).__name__
-                })
-                continue
-
-        if not exito or not resultado_final:
-            # 🧠 HOOK DE AUTORREPARACIÓN: Memoria antes de error
-            error_info = _analizar_error_cli(intentos_log, comando)
-            if error_info.get("tipo_error") == "MissingParameter":
-                campo_faltante = error_info.get("campo_faltante")
-                if campo_faltante and isinstance(campo_faltante, str):
-                    
-                    # 1. Buscar en memoria primero
-                    valor_memoria = _buscar_en_memoria(campo_faltante)
-                    memoria_detectada = bool(valor_memoria)
-                    
-                    if valor_memoria:
-                        logging.info(f"🧠 Valor recuperado de memoria: {campo_faltante}={valor_memoria}")
-                        # Reintentar comando con valor de memoria
-                        comando_reparado = _reparar_comando_con_memoria(comando, campo_faltante, valor_memoria)
-                        if comando_reparado != comando:
-                            return _ejecutar_comando_reparado(comando_reparado)
-                    
-                    # 2. Si no hay en memoria, sugerir endpoint alternativo
+            else:
+                # Usar lista de argumentos para comandos simples
+                try:
+                    cmd_parts = shlex.split(comando_final)
+                    result = subprocess.run(
+                        cmd_parts,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding="utf-8",
+                        errors="replace"
+                    )
+                except ValueError:
+                    # Fallback a shell si shlex falla
+                    result = subprocess.run(
+                        comando_final,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding="utf-8",
+                        errors="replace"
+                    )
+        except Exception as exec_error:
+            # Último fallback: shell simple
+            logging.warning(f"Fallback a shell simple: {exec_error}")
+            result = subprocess.run(
+                comando,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                encoding="utf-8",
+                errors="replace"
+            )
+        
+        if result.returncode == 0:
+            # Intentar parsear JSON solo si no es tabla
+            if "-o table" not in comando:
+                try:
+                    output_json = json.loads(result.stdout) if result.stdout else []
                     return func.HttpResponse(
                         json.dumps({
-                            "exito": False,
-                            "tipo_error": "MissingParameter",
-                            "campo_faltante": campo_faltante,
-                            "endpoint_alternativo": _get_endpoint_alternativo(campo_faltante, comando),
-                            "memoria_detectada": memoria_detectada,
-                            "sugerencia": f"Ejecutar {_get_endpoint_alternativo(campo_faltante, comando)} para obtener {campo_faltante}",
-                            "contexto": {
-                                "comando": comando,
-                                "campo_faltante": campo_faltante,
-                                "alternativas": [_get_endpoint_alternativo(campo_faltante, comando)],
-                                "payload_memoria": {"consultado": True, "encontrado": memoria_detectada}
-                            },
-                            "intentos": intentos_log
+                            "exito": True,
+                            "comando": comando,
+                            "resultado": output_json,
+                            "codigo_salida": result.returncode
                         }),
                         mimetype="application/json",
-                        status_code=422  # Unprocessable Entity - permite autorreparación
+                        status_code=200
                     )
+                except json.JSONDecodeError:
+                    pass
             
-            # Error genérico si no es MissingParameter
+            # Devolver como texto si no es JSON válido
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": True,
+                    "comando": comando,
+                    "resultado": result.stdout,
+                    "codigo_salida": result.returncode,
+                    "formato": "texto"
+                }),
+                mimetype="application/json",
+                status_code=200
+            )
+        else:
             return func.HttpResponse(
                 json.dumps({
                     "exito": False,
-                    "error": "Todos los intentos fallaron",
-                    "intentos": intentos_log,
-                    "comando_original": comando,
-                    "sugerencias": [
-                        "Verificar sintaxis del comando",
-                        "Comprobar permisos",
-                        "Validar que las herramientas estén instaladas"
-                    ]
+                    "comando": comando,
+                    "error": result.stderr or "Comando falló sin mensaje de error",
+                    "codigo_salida": result.returncode
                 }),
                 mimetype="application/json",
                 status_code=500
             )
-
-        # Comando exitoso
-        return func.HttpResponse(
-            json.dumps({
-                "exito": True,
-                "comando_ejecutado": comando_ejecutado,
-                "stdout": resultado_final.stdout,
-                "stderr": resultado_final.stderr,
-                "codigo_salida": resultado_final.returncode,
-                "intentos": len(intentos_log),
-                "sistema": sistema
-            }),
-            mimetype="application/json",
-            status_code=200
-        )
-
+    
     except subprocess.TimeoutExpired:
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
                 "error": "Comando excedió tiempo límite (60s)",
-                "comando_ejecutado": comando if comando else "no_definido",
-                "sistema_operativo": platform.system()
+                "comando": comando or "desconocido"
             }),
             mimetype="application/json",
-            status_code=200
+            status_code=500
         )
     except FileNotFoundError:
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
-                "error": f"Comando no encontrado o no disponible en {platform.system()}",
-                "comando_ejecutado": comando if comando else "no_definido",
-                "sugerencia": f"Verifica que el comando esté instalado correctamente en {platform.system()}",
-                "sistema_operativo": platform.system()
+                "error": "Azure CLI no encontrado en el sistema",
+                "comando": comando or "desconocido",
+                "sugerencia": "Verificar instalación de Azure CLI"
             }),
             mimetype="application/json",
-            status_code=200
+            status_code=503
         )
     except Exception as e:
-        logging.exception("ejecutar_cli_http failed")
+        logging.error(f"Error en ejecutar_cli_http: {str(e)}")
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
                 "error": str(e),
                 "tipo_error": type(e).__name__,
-                "comando_ejecutado": comando if comando else "no_definido",
-                "sistema_operativo": platform.system()
+                "comando": comando or "desconocido"
             }),
             mimetype="application/json",
             status_code=500
@@ -10420,9 +11058,8 @@ def generar_mensaje_natural_sdk(servicio: str, operacion: str, resultado):
                 return f"✅ Información del recurso '{nombre}' obtenida correctamente."
         else:
             return "✅ Operación show completada."
-
-    else:
-        return f"✅ Operación '{operacion}' en servicio '{servicio}' completada exitosamente."
+    
+    return f"✅ Operación {operacion} completada para {servicio}."
 
 
 def obtener_credenciales_azure():
@@ -11580,7 +12217,6 @@ def update_app_service_plan(plan_name: str, resource_group: str, sku: str) -> di
 @app.route(route="deploy", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     import json
-    import os
     import time
     import traceback
     try:
@@ -13055,5 +13691,8 @@ def _ejecutar_comando_reparado(comando_reparado: str) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
+
+
 
 

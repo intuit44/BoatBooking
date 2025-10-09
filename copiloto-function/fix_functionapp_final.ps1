@@ -141,6 +141,9 @@ $settings = @{
   # App Insights
   "APPINSIGHTS_WORKSPACE_ID"                    = "3e355ae8-3dd7-44ad-be64-fa332dc93c96"
   "APPLICATIONINSIGHTS_CONNECTION_STRING"       = "InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53"
+  # Bing Search
+  "BING_SEARCH_KEY"                             = "7242cc4c0c9449f6989f14e21af9ff44"
+  "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"

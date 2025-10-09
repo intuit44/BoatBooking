@@ -1,0 +1,40 @@
+{
+  "endpoints": {
+    "/api/ejecutar-cli": {
+      "formato_esperado": {
+        "comando": "az storage account list"
+      },
+      "campos_requeridos": [
+        "comando"
+      ],
+      "campos_prohibidos": [
+        "intencion"
+      ],
+      "descripcion": "Solo acepta comandos Azure CLI directos"
+    },
+    "/api/hybrid": {
+      "formato_esperado": {
+        "agent_response": "comando o JSON embebido"
+      },
+      "campos_requeridos": [
+        "agent_response"
+      ],
+      "descripcion": "Procesa respuestas de agentes con parsing inteligente"
+    },
+    "/api/ejecutar": {
+      "formato_esperado": {
+        "intencion": "dashboard",
+        "parametros": {}
+      },
+      "campos_requeridos": [
+        "intencion"
+      ],
+      "descripcion": "Procesa intenciones semánticas"
+    }
+  },
+  "reglas_fallback": {
+    "si_comando_cli": "usar /api/ejecutar-cli con {comando: 'az ...'}",
+    "si_intencion_semantica": "usar /api/ejecutar con {intencion: '...'}",
+    "si_respuesta_agente": "usar /api/hybrid con {agent_response: '...'}"
+  }
+}

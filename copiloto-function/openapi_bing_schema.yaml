@@ -1,0 +1,98 @@
+"/api/bing-grounding":
+  post:
+    summary: "Búsqueda inteligente externa con Bing"
+    description: "Fuente de conocimiento externo que se activa automáticamente cuando el sistema interno no puede resolver algo. Aprende y registra para futuras consultas."
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              query:
+                type: string
+                example: "cómo armar comando para crear contenedor en Azure CLI"
+                description: "Consulta específica a buscar"
+              contexto:
+                type: string
+                example: "comando fallido en ejecutar-cli"
+                description: "Contexto del error o situación"
+              intencion_original:
+                type: string
+                example: "crear recurso cosmos"
+                description: "Intención original del usuario"
+              prioridad:
+                type: string
+                enum: ["baja", "normal", "alta", "critica"]
+                example: "alta"
+                description: "Prioridad de la consulta"
+            required:
+              - query
+    responses:
+      200:
+        description: "Búsqueda exitosa con conocimiento externo"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
+                  type: boolean
+                  example: true
+                resultado:
+                  type: object
+                  properties:
+                    resumen:
+                      type: string
+                      example: "Para crear un contenedor en Azure CLI usa `az cosmosdb sql container create ...`"
+                    fuentes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          titulo:
+                            type: string
+                          url:
+                            type: string
+                    tipo:
+                      type: string
+                      example: "snippet"
+                    comando_sugerido:
+                      type: string
+                      example: "az cosmosdb sql container create --name mi-container"
+                accion_sugerida:
+                  type: string
+                  example: "Reintentar con comando sugerido"
+                reutilizable:
+                  type: boolean
+                  example: true
+                metadata:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                    contexto:
+                      type: string
+                    trigger:
+                      type: string
+                      example: "sistema_interno_insuficiente"
+              required:
+                - exito
+                - resultado
+                - accion_sugerida
+                - reutilizable
+      500:
+        description: "Error en búsqueda externa"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
+                  type: boolean
+                  example: false
+                error:
+                  type: string
+                  example: "No se pudo obtener información de Bing"
+                detalles:
+                  type: string

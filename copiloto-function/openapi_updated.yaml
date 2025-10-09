@@ -1,7 +1,7 @@
 "/api/ejecutar-cli":
   post:
-    summary: "Ejecutar comandos Azure CLI con autorreparación semántica"
-    description: "Ejecuta comandos 'az ...', detecta errores comunes, intenta reparar automáticamente usando memoria histórica y ofrece sugerencias contextuales si faltan parámetros."
+    summary: "Ejecutar cualquier comando con redirección automática"
+    description: "Ejecuta comandos Azure CLI, Python, PowerShell, Bash o cualquier otro. Detecta automáticamente el tipo y redirige a ejecutor apropiado. NUNCA rechaza comandos."
     requestBody:
       required: true
       content:
@@ -11,12 +11,13 @@
             properties:
               comando:
                 type: string
-                example: "az group create --name mi-grupo"
+                example: "python script.py"
+                description: "Cualquier comando válido del sistema"
             required:
               - comando
     responses:
       200:
-        description: "Comando ejecutado exitosamente"
+        description: "Comando ejecutado exitosamente (Azure CLI o genérico)"
         content:
           application/json:
             schema:
@@ -25,14 +26,32 @@
                 exito:
                   type: boolean
                   example: true
-                stdout:
+                comando:
                   type: string
-                comando_ejecutado:
+                  example: "python script.py"
+                tipo_comando:
                   type: string
-                autorreparado:
-                  type: boolean
-      422:
-        description: "Parámetro faltante o contexto incompleto. El agente puede actuar automáticamente."
+                  enum: ["azure_cli", "python", "powershell", "bash", "generic"]
+                  example: "python"
+                resultado:
+                  type: string
+                  example: "Script ejecutado correctamente"
+                codigo_salida:
+                  type: integer
+                  example: 0
+                tiempo_ejecucion:
+                  type: string
+                  example: "<60s"
+                ejecutor:
+                  type: string
+                  enum: ["azure_cli", "subprocess_fallback", "fallback_generico"]
+                  example: "subprocess_fallback"
+              required:
+                - exito
+                - comando
+                - tipo_comando
+      500:
+        description: "Error en ejecución del comando"
         content:
           application/json:
             schema:
@@ -41,38 +60,37 @@
                 exito:
                   type: boolean
                   example: false
+                comando:
+                  type: string
+                error:
+                  type: string
+                  example: "Comando falló con código de salida 1"
+                codigo_salida:
+                  type: integer
+                  example: 1
                 tipo_error:
                   type: string
-                  enum: ["MissingParameter"]
-                  example: "MissingParameter"
-                campo_faltante:
-                  type: string
-                  example: "resourceGroup"
-                endpoint_alternativo:
-                  type: string
-                  example: "/api/verificar-cosmos"
-                memoria_detectada:
+              required:
+                - exito
+                - comando
+                - error
+      400:
+        description: "Solicitud inválida (falta parámetro comando)"
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exito:
                   type: boolean
                   example: false
-                sugerencia:
+                error:
                   type: string
-                  example: "Ejecutar /api/verificar-cosmos para obtener resourceGroup"
-                contexto:
+                  example: "Falta el parámetro 'comando'"
+                ejemplo:
                   type: object
                   properties:
                     comando:
                       type: string
-                    campo_faltante:
-                      type: string
-                    alternativas:
-                      type: array
-                      items:
-                        type: string
-                    payload_memoria:
-                      type: object
-              required:
-                - exito
-                - tipo_error
-                - campo_faltante
-                - endpoint_alternativo
-                - memoria_detectada
+                      example: "storage account list"
+
