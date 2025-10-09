@@ -4,14 +4,13 @@ Una aplicación completa para el alquiler de embarcaciones en Venezuela, con app
 
 ## 🏗️ Arquitectura del Proyecto
 
-
 boat-rental-app/ ├── mobile-app/ # React Native + Expo (iOS/Android) ├── backend/ # Serverless Framework + AWS Lambda
 ├── admin-panel/ # Next.js + Material-UI ├── .codegpt/ # Configuración de agentes CodeGPT └── README.md # Este archivo
-
 
 ## 🔐 POLÍTICA OFICIAL DE GESTIÓN DE SECRETOS
 
 ### Configuración Actual de Seguridad
+
 - ✅ **Gestión Centralizada**: Claves almacenadas en **Azure Key Vault** (`boatRentalVault`)
 - 🔐 Secreto principal: `ENV-FILE`, contiene el `.env` completo
 - ⚠️ El archivo `.env` ya no se gestiona localmente en producción
@@ -23,6 +22,7 @@ boat-rental-app/ ├── mobile-app/ # React Native + Expo (iOS/Android) ├�
   - `AWS Credentials`: Configuración local AWS CLI
 
 ### **Scripts de Seguridad Disponibles**
+
 ```bash
 # Generar secretos seguros
 node backend/generate-secret.js
@@ -139,22 +139,25 @@ npm run run-agent975
 Scripts de Corrección Disponibles
 bash
 
+### Scripts de Seguridad Disponibles
 
-# Corrección de dependencias
-node fix-all-dependencies.js
-node smart-dependency-fixer.js
+    # Corrección de dependencias
+    node fix-all-dependencies.js
+    node smart-dependency-fixer.js
+    
+    # Corrección de TypeScript
+    node final-typescript-fixes.js
+    node fix-remaining-ts-errors.js
+    
+    # Corrección de Amplify
+    node amplify-v5-complete-fix.js
+    node amplify-diagnostic-fix.js
+    
+    # Corrección de versiones Expo
+    node expo-version-fixer-pro.js
+    node force-expo-versions.js
 
-# Corrección de TypeScript
-node final-typescript-fixes.js
-node fix-remaining-ts-errors.js
-
-# Corrección de Amplify
-node amplify-v5-complete-fix.js
-node amplify-diagnostic-fix.js
-
-# Corrección de versiones Expo
-node expo-version-fixer-pro.js
-node force-expo-versions.js
+```
 
 🌿 Ramas y Desarrollo
 Rama Principal
@@ -164,8 +167,8 @@ Deploy: Automático a AWS en push a main
 CI/CD Pipeline
 yaml
 
-
 # .github/workflows/deploy.yml
+
 name: Deploy to AWS
 on:
   push:
@@ -203,22 +206,25 @@ Git configurado
 Setup Completo
 bash
 
-
 # 1. Clonar repositorio
-git clone https://github.com/intuit44/BoatBooking.git
+
+git clone <https://github.com/intuit44/BoatBooking.git>
 cd BoatBooking
 
 # 2. Mobile App
+
 cd mobile-app
 npm install
 npm start
 
 # 3. Backend (nueva terminal)
+
 cd ../backend
 npm install
 npm run dev
 
 # 4. Admin Panel (nueva terminal)
+
 cd ../admin-panel
 npm install
 npm run dev
@@ -226,8 +232,8 @@ npm run dev
 Variables de Entorno Requeridas
 bash
 
-
 # Backend (.env)
+
 JWT_SECRET=your-jwt-secret-key
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=*
@@ -237,19 +243,22 @@ DYNAMODB_TABLE_BOOKINGS=boat-rental-bookings-dev
 DYNAMODB_TABLE_PAYMENTS=boat-rental-payments-dev
 
 # AWS Credentials
+
 aws configure
 
 Verificación de Setup
 bash
 
-
 # Verificar Amplify
+
 ./mobile-app/scripts/verify-amplify.ps1
 
 # Verificar Phase 2
+
 ./mobile-app/scripts/verify-phase2-complete.ps1
 
 # Verificar Phase 3
+
 ./mobile-app/scripts/verify-phase3-complete.ps1
 
 🏗️ Arquitectura de Datos
@@ -283,14 +292,16 @@ Supertest: Testing de APIs
 Comandos de Testing
 bash
 
-
 # Mobile App
+
 cd mobile-app && npm test
 
 # Backend
+
 cd backend && npm test
 
 # Admin Panel
+
 cd admin-panel && npm test
 
 🔍 Debugging y Troubleshooting
@@ -325,23 +336,22 @@ Wiki: Documentación técnica detallada
 📄 Licencia
 Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para detalles.
 
-Repositorio: https://github.com/intuit44/BoatBooking
+Repositorio: <https://github.com/intuit44/BoatBooking>
 Hash: 6f6cb8e67440918b1f79fe9fd0270f1d36cd8d06
 Última actualización: Enero 2025
 Versión: 1.0.0
 
 📊 Métricas del Proyecto
-Componente	Archivos	Dependencias	Estado
-Mobile App	500+	1,855+	✅ Funcional
-Backend	200+	974	✅ Funcional
-Admin Panel	150+	453	✅ Funcional
-Total	850+	3,282+	✅ Completamente Funcional
+Componente Archivos Dependencias Estado
+Mobile App 500+ 1,855+ ✅ Funcional
+Backend 200+ 974 ✅ Funcional
+Admin Panel 150+ 453 ✅ Funcional
+Total 850+ 3,282+ ✅ Completamente Funcional
 ¡Bienvenido al proyecto BoatRental Venezuela! 🚤
-
 
 Este README.md actualizado incluye:
 
-1. ✅ **Política oficial de gestión de secretos** 
+1. ✅ **Política oficial de gestión de secretos**
 2. ✅ **Tecnologías activas** con versiones específicas
 3. ✅ **Estado completo del grafo** con estadísticas reales
 4. ✅ **Agentes CodeGPT** documentados

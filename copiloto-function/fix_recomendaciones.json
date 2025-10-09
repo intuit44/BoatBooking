@@ -1,0 +1,17 @@
+[
+  {
+    "problema": "Payload con 'intencion' enviado a /api/ejecutar-cli",
+    "solucion": "Cambiar a {\"comando\": \"az storage account list\"}",
+    "codigo_ejemplo": "\n# ❌ INCORRECTO\npayload = {\"intencion\": \"buscar en bing\"}\nrequests.post(\"/api/ejecutar-cli\", json=payload)\n\n# ✅ CORRECTO\npayload = {\"comando\": \"az storage account list\"}\nrequests.post(\"/api/ejecutar-cli\", json=payload)\n"
+  },
+  {
+    "problema": "bing_fallback_guard.py genera payloads incorrectos",
+    "solucion": "Actualizar la lógica de generación de payloads",
+    "codigo_ejemplo": "\n# En bing_fallback_guard.py\ndef generar_payload_cli(comando_azure):\n    return {\n        \"comando\": comando_azure,  # ✅ Usar 'comando'\n        # \"intencion\": \"...\"       # ❌ NO usar 'intencion'\n    }\n"
+  },
+  {
+    "problema": "Routing incorrecto de intenciones",
+    "solucion": "Usar el endpoint correcto según el tipo de payload",
+    "codigo_ejemplo": "\n# Routing correcto\nif es_comando_cli(payload):\n    endpoint = \"/api/ejecutar-cli\"\n    payload = {\"comando\": comando}\nelif es_intencion_semantica(payload):\n    endpoint = \"/api/ejecutar\"\n    payload = {\"intencion\": intencion}\nelif es_respuesta_agente(payload):\n    endpoint = \"/api/hybrid\"\n    payload = {\"agent_response\": respuesta}\n"
+  }
+]
