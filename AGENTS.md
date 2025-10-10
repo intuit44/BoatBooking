@@ -241,6 +241,7 @@ graph TD
 * **✅ Respuesta consistente** - Siempre devuelve resultado, nunca falla por tipo de comando
 
 **Ejemplo de uso universal**:
+
 ```json
 // Azure CLI
 {"comando": "az storage account list"}
@@ -276,6 +277,7 @@ graph TD
    * **Marca** la solución como reutilizable
 
 4. **Flujo simplificado**:
+
    ```
    Comando → /api/ejecutar-cli → Si falla → /api/bing-grounding → Reintentar
    ```

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "2.1",
+    "version": "2.7",
     "description": "Herramienta directa a la Function App (sin Logic App / SAS)",
     "license": {
       "name": "MIT",
@@ -11,10 +11,10 @@
   },
   "servers": [
     {
-      "url": "https://copiloto-semantico-func-us2.azurewebsites.net"
+      "url": "https://copiloto-func.ngrok.app"
     },
     {
-      "url": "https://copiloto-func.ngrok.app"
+      "url": "https://copiloto-semantico-func-us2.azurewebsites.net"
     }
   ],
   "paths": {
@@ -338,7 +338,7 @@
       "post": {
         "summary": "Registrar corrección propuesta por un agente AI",
         "description": "Permite registrar una corrección sugerida por un agente de inteligencia artificial para revisión o aplicación posterior.",
-        "operationId": "autocorregir",
+        "operationId": "autocorregirHttp",
         "tags": [
           "Autocorrección"
         ],
@@ -520,7 +520,7 @@
       "post": {
         "summary": "Generar reporte de promoción de correcciones",
         "description": "Genera un reporte detallado sobre las correcciones promovidas, con filtros opcionales y formatos de salida personalizables.",
-        "operationId": "generarReporte",
+        "operationId": "promocionReporteHttp",
         "tags": [
           "Autocorrección"
         ],
@@ -2132,7 +2132,7 @@
     "/api/copiloto": {
       "get": {
         "summary": "Endpoint principal del copiloto",
-        "operationId": "getCopiloto",
+        "operationId": "copiloto",
         "tags": [
           "Internal"
         ],
@@ -2184,7 +2184,7 @@
     "/api/ejecutar": {
       "post": {
         "summary": "Orquestador de intenciones",
-        "operationId": "ejecutarIntencion",
+        "operationId": "ejecutar",
         "tags": [
           "Internal"
         ],
@@ -2676,82 +2676,147 @@
           "ambiente"
         ]
       },
-      "RespuestaStatus": {
-        "type": "object",
-        "properties": {
-          "exito": {"type": "boolean"},
-          "estado": {"type": "string"},
-          "timestamp": {"type": "string"}
-        }
-      },
-      "RespuestaDetectar": {
-        "type": "object",
-        "properties": {
-          "exito": {"type": "boolean"},
-          "detectado": {"type": "object"}
-        }
-      },
-      "RespuestaPreparar": {
-        "type": "object",
-        "properties": {
-          "exito": {"type": "boolean"},
-          "preparado": {"type": "boolean"}
-        }
-      },
-      "RespuestaDesplegar": {
-        "type": "object",
-        "properties": {
-          "exito": {"type": "boolean"},
-          "desplegado": {"type": "boolean"}
-        }
-      },
-      "RespuestaRollback": {
-        "type": "object",
-        "properties": {
-          "exito": {"type": "boolean"},
-          "revertido": {"type": "boolean"}
-        }
-      },
       "AccionDesplegar": {
         "type": "object",
         "properties": {
-          "accion": {"type": "string", "enum": ["deploy"]},
-          "tag": {"type": "string"}
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "deploy"
+            ]
+          }
         }
       },
       "AccionRollback": {
         "type": "object",
         "properties": {
-          "accion": {"type": "string", "enum": ["rollback"]},
-          "tag_anterior": {"type": "string"}
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "rollback"
+            ]
+          }
         }
       },
       "AccionStatus": {
         "type": "object",
         "properties": {
-          "accion": {"type": "string", "enum": ["status"]}
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "status"
+            ]
+          }
         }
       },
       "AccionDetectar": {
         "type": "object",
         "properties": {
-          "accion": {"type": "string", "enum": ["detectar"]},
-          "tag": {"type": "string"}
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "detectar"
+            ]
+          }
         }
       },
       "AccionPreparar": {
         "type": "object",
         "properties": {
-          "accion": {"type": "string", "enum": ["validate"]},
-          "ambiente": {"type": "string"}
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "preparar"
+            ]
+          }
+        }
+      },
+      "RespuestaStatus": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        }
+      },
+      "RespuestaDetectar": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean"
+          },
+          "detectado": {
+            "type": "boolean"
+          },
+          "detalles": {
+            "type": "object"
+          }
+        }
+      },
+      "RespuestaPreparar": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean"
+          },
+          "preparado": {
+            "type": "boolean"
+          },
+          "ruta": {
+            "type": "string"
+          }
+        }
+      },
+      "RespuestaDesplegar": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean"
+          },
+          "desplegado": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "RespuestaRollback": {
+        "type": "object",
+        "properties": {
+          "exito": {
+            "type": "boolean"
+          },
+          "rollback_exitoso": {
+            "type": "boolean"
+          },
+          "version_anterior": {
+            "type": "string"
+          }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "error": {"type": "string"},
-          "code": {"type": "string"}
-        }
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "error"
+        ]
       }
     }
   }
