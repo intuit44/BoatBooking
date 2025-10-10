@@ -484,3 +484,5 @@
 {"id": "session_1760137805_semantic_1760137805", "session_id": "session_1760137805", "timestamp": "2025-10-10T19:10:05.024637", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760138404_semantic_1760138404", "session_id": "session_1760138404", "timestamp": "2025-10-10T19:20:04.458684", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760138404_semantic_1760138404", "session_id": "session_1760138404", "timestamp": "2025-10-10T19:20:04.614197", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760139004_semantic_1760139004", "session_id": "session_1760139004", "timestamp": "2025-10-10T19:30:04.839431", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760139005_semantic_1760139005", "session_id": "session_1760139005", "timestamp": "2025-10-10T19:30:05.621229", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
