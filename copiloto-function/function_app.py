@@ -101,20 +101,20 @@ if not os.path.exists(os.path.expanduser("~/.git-credentials")):
 
 # --- Built-ins y estándar ---
 
-# --- Azure Core ---
+# --- Azure Core ---P
 
 # --- Azure SDK de gestión ---
 
 # --- Configuración de AI Projects y Agents ---
 # Proyecto principal (yellowstone)
 AI_PROJECT_ID_MAIN = os.environ.get(
-    "AI_PROJECT_ID_MAIN", "yellowstone413g-9987")
-AI_AGENT_ID_MAIN = os.environ.get("AI_AGENT_ID", "Agent914")
+    "AI_PROJECT_ID_MAIN", "yellowstone413g-9987-re-projectP")
+AI_AGENT_ID_MAIN = os.environ.get("AI_AGENT_ID", "Agent898")
 
 # Proyecto de booking
 AI_PROJECT_ID_BOOKING = os.environ.get(
     "AI_PROJECT_ID_BOOKING", "booking-agents")
-AI_AGENT_ID_EXECUTOR = os.environ.get("AI_AGENT_ID_EXECUTOR", "Agent975")
+AI_AGENT_ID_EXECUTOR = os.environ.get("AI_AGENT_ID_EXECUTOR", "Agent898")
 
 # Variables adicionales para otros posibles proyectos
 AI_PROJECT_ID_ANALYTICS = os.environ.get("AI_PROJECT_ID_ANALYTICS")
@@ -3948,6 +3948,172 @@ def status(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200
     )
 
+
+
+
+
+def _serve_openapi_schema() -> func.HttpResponse:
+    """Función helper mejorada para servir el schema OpenAPI"""
+    try:
+        # Buscar el archivo en múltiples ubicaciones
+        schema_paths = [
+            Path(__file__).parent / "openapi.yaml",
+            Path(__file__).parent / "openapi_copiloto_local.yaml", 
+            Path("/home/site/wwwroot/openapi.yaml"),  # Azure path
+            Path("/home/site/wwwroot/openapi_copiloto_local.yaml")
+        ]
+        
+        schema_content = None
+        used_path = None
+        
+        for schema_path in schema_paths:
+            logging.info(f"Buscando schema en: {schema_path}")
+            if schema_path.exists():
+                try:
+                    schema_content = schema_path.read_text(encoding='utf-8')
+                    used_path = str(schema_path)
+                    logging.info(f"Schema encontrado en: {used_path}, tamaño: {len(schema_content)}")
+                    
+                    # Verificar que tiene la versión correcta
+                    if 'openapi: 3.1.' in schema_content or '"openapi": "3.1.' in schema_content:
+                        logging.info("✅ Versión OpenAPI 3.1.x confirmada")
+                        break
+                    else:
+                        logging.warning(f"⚠️ Archivo encontrado pero versión incorrecta en: {used_path}")
+                        # Continuar buscando
+                        schema_content = None
+                        
+                except Exception as e:
+                    logging.error(f"Error leyendo {schema_path}: {e}")
+                    continue
+        
+        if schema_content:
+            # Filtrar las claves con None para asegurar que headers solo contiene str:str
+            headers: dict[str, str] = {
+                k: v for k, v in {
+                    "Content-Type": "application/x-yaml",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-cache",
+                    "X-Schema-Source": used_path
+                }.items() if v is not None
+            }
+            return func.HttpResponse(
+                schema_content,
+                mimetype="application/x-yaml",
+                status_code=200,
+                headers=headers
+            )
+        else:
+            # Listar archivos disponibles para debug
+            available_files = []
+            try:
+                base_dir = Path(__file__).parent
+                for file in base_dir.glob("*.yaml"):
+                    available_files.append(str(file.name))
+                for file in base_dir.glob("*.yml"):
+                    available_files.append(str(file.name))
+            except Exception:
+                available_files = ["error_listing_files"]
+                
+            return func.HttpResponse(
+                json.dumps({
+                    "error": "OpenAPI schema not found or incorrect version",
+                    "searched_paths": [str(p) for p in schema_paths],
+                    "available_yaml_files": available_files,
+                    "requirement": "OpenAPI 3.1.x required for Agent898"
+                }),
+                mimetype="application/json",
+                status_code=404
+            )
+    except Exception as e:
+        logging.error(f"Error sirviendo OpenAPI schema: {e}")
+        return func.HttpResponse(
+            json.dumps({
+                "error": "Error loading OpenAPI schema",
+                "details": str(e)
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
+@app.function_name(name="openapi_schema")
+@app.route(route="openapi.yaml", auth_level=func.AuthLevel.ANONYMOUS)
+def openapi_schema(req: func.HttpRequest) -> func.HttpResponse:
+    """Sirve el schema OpenAPI completo para Agent898 - ruta estándar"""
+    return _serve_openapi_schema()
+
+@app.function_name(name="openapi_schema_api")
+@app.route(route="api/openapi.yaml", auth_level=func.AuthLevel.ANONYMOUS)
+def openapi_schema_api(req: func.HttpRequest) -> func.HttpResponse:
+    """Sirve el schema OpenAPI completo para Agent898 - ruta con /api/"""
+    return _serve_openapi_schema()
+
+
+# Agregar este endpoint temporal para verificar qué archivo se está sirviendo
+@app.function_name(name="debug_openapi")
+@app.route(route="debug-openapi", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
+    """Debug temporal para verificar archivos OpenAPI"""
+    try:
+        import os
+        from pathlib import Path
+        
+        base_path = Path(__file__).parent
+        
+        # Buscar todos los archivos YAML
+        yaml_files = []
+        for pattern in ["*.yaml", "*.yml"]:
+            yaml_files.extend(list(base_path.glob(pattern)))
+        
+        # Verificar contenido de archivos OpenAPI
+        files_info = []
+        for file_path in yaml_files:
+            if file_path.exists():
+                try:
+                    content = file_path.read_text(encoding='utf-8')
+                    # Buscar la línea de versión
+                    version_line = None
+                    for line in content.split('\n'):
+                        if 'openapi:' in line.lower():
+                            version_line = line.strip()
+                            break
+                    
+                    files_info.append({
+                        "file": str(file_path.name),
+                        "full_path": str(file_path),
+                        "exists": True,
+                        "size": len(content),
+                        "version_line": version_line,
+                        "content_preview": content[:200]
+                    })
+                except Exception as e:
+                    files_info.append({
+                        "file": str(file_path.name),
+                        "full_path": str(file_path),
+                        "exists": True,
+                        "error": str(e)
+                    })
+        
+        return func.HttpResponse(
+            json.dumps({
+                "working_directory": str(Path.cwd()),
+                "function_file_dir": str(base_path),
+                "yaml_files_found": files_info,
+                "expected_files": [
+                    "openapi.yaml",
+                    "openapi_copiloto_local.yaml"
+                ]
+            }, ensure_ascii=False, indent=2),
+            mimetype="application/json",
+            status_code=200
+        )
+        
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
 
 @app.function_name(name="listar_blobs")
 @app.route(route="listar-blobs", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
