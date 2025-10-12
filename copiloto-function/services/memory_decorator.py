@@ -70,7 +70,8 @@ class MockMemoryService:
 
 def registrar_memoria(source_name: str):
     """
-    Decorador que registra automáticamente las llamadas en el sistema de memoria.
+    Decorador que registra automáticamente las llamadas en el sistema de memoria
+    y consulta memoria previa para continuidad de sesión.
     
     Args:
         source_name: Nombre identificador del endpoint/función
@@ -104,6 +105,55 @@ def registrar_memoria(source_name: str):
             except Exception as e:
                 logging.warning(f"⚠️ Error extrayendo parámetros: {e}")
                 params = {}
+            
+            # 🧠 CONSULTAR MEMORIA PREVIA AUTOMÁTICAMENTE
+            memoria_contexto = None
+            try:
+                # DETECCIÓN AUTOMÁTICA de session_id y agent_id
+                session_id = (
+                    params.get("session_id") or 
+                    params.get("body", {}).get("session_id") or
+                    req.headers.get("X-Session-ID") or
+                    req.headers.get("Session-ID") or
+                    req.headers.get("x-session-id") or
+                    # Generar session_id automático basado en User-Agent + IP
+                    f"auto_{hash(req.headers.get('User-Agent', '') + req.headers.get('X-Forwarded-For', ''))}"
+                )
+                
+                agent_id = (
+                    params.get("agent_id") or 
+                    params.get("body", {}).get("agent_id") or
+                    req.headers.get("X-Agent-ID") or
+                    req.headers.get("Agent-ID") or
+                    req.headers.get("x-agent-id") or
+                    req.headers.get("User-Agent", "UnknownAgent")[:50]  # Usar User-Agent como fallback
+                )
+                
+                # SIEMPRE consultar memoria si tenemos identificadores
+                if session_id and agent_id:
+                    from services.session_memory import consultar_memoria_sesion, generar_contexto_prompt
+                    
+                    resultado_memoria = consultar_memoria_sesion(session_id, agent_id)
+                    if resultado_memoria.get("exito"):
+                        memoria_contexto = resultado_memoria["memoria"]
+                        
+                        # Agregar contexto al request para que la función lo use
+                        if hasattr(req, '__dict__'):
+                            req.__dict__["_memoria_contexto"] = memoria_contexto
+                            req.__dict__["_memoria_prompt"] = generar_contexto_prompt(memoria_contexto)
+                            req.__dict__["_session_id"] = session_id
+                            req.__dict__["_agent_id"] = agent_id
+                        
+                        logging.info(f"🧠 Memoria auto-consultada: {session_id[:8]}.../{agent_id[:10]}... -> {memoria_contexto.get('total_interacciones_sesion', 0)} interacciones")
+                    else:
+                        # Primera vez - crear contexto vacío pero válido
+                        if hasattr(req, '__dict__'):
+                            req.__dict__["_session_id"] = session_id
+                            req.__dict__["_agent_id"] = agent_id
+                        logging.info(f"🆕 Nueva sesión detectada: {session_id[:8]}.../{agent_id[:10]}...")
+                
+            except Exception as e:
+                logging.warning(f"⚠️ Error consultando memoria previa: {e}")
             
             # Ejecutar función original
             response = None
@@ -148,11 +198,19 @@ def registrar_memoria(source_name: str):
             try:
                 duration_ms = (datetime.now() - start_time).total_seconds() * 1000
                 
+                # Agregar session_id y agent_id al registro
+                enhanced_params = params.copy()
+                if hasattr(req, '__dict__'):
+                    if "_session_id" in req.__dict__:
+                        enhanced_params["session_id"] = req.__dict__["_session_id"]
+                    if "_agent_id" in req.__dict__:
+                        enhanced_params["agent_id"] = req.__dict__["_agent_id"]
+                
                 memory_service.registrar_llamada(
                     source=source_name,
                     endpoint=endpoint,
                     method=method,
-                    params=params,
+                    params=enhanced_params,
                     response_data=response_data,
                     success=success
                 )

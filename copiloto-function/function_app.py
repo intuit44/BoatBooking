@@ -268,13 +268,100 @@ except ImportError:
 # --- FunctionApp instance ---
 app = func.FunctionApp()
 
-# --- Wrapper automático de memoria ---
-from memory_route_wrapper import apply_memory_wrapper
+# --- FORZAR WRAPPER DE MEMORIA EN TIEMPO DE CARGA ---
+# 🧠 SISTEMA DE MEMORIA FORZADO PARA AZURE RUNTIME
+try:
+    from memory_route_wrapper import apply_memory_wrapper
+    
+    # FORZAR aplicación inmediata del wrapper
+    logging.info("🧠 [INIT] Forzando aplicación de memoria wrapper...")
+    
+    # Aplicar wrapper básico
+    apply_memory_wrapper(app)
+    
+    # Wrapper mejorado que se aplica INMEDIATAMENTE
+    def force_memory_wrapper_immediate():
+        """Fuerza la aplicación del wrapper en tiempo de carga del módulo"""
+        try:
+            original_route = app.route
+            
+            def memory_enhanced_route(*args, **kwargs):
+                def decorator(func_ref):
+                    def wrapper(req):
+                        # 1. DETECTAR session_id y agent_id AUTOMÁTICAMENTE
+                        session_id = (
+                            req.params.get("session_id") or
+                            (req.get_json() or {}).get("session_id") or
+                            req.headers.get("X-Session-ID") or
+                            f"auto_{hash(str(req.headers.get('User-Agent', '')) + str(req.url))}"
+                        )
+                        
+                        agent_id = (
+                            req.params.get("agent_id") or
+                            (req.get_json() or {}).get("agent_id") or
+                            req.headers.get("X-Agent-ID") or
+                            "AutoAgent"
+                        )
+                        
+                        # 2. EJECUTAR función original
+                        response = func_ref(req)
+                        
+                        # 3. AGREGAR memoria a respuesta JSON
+                        try:
+                            if (isinstance(response, func.HttpResponse) and 
+                                response.mimetype == "application/json"):
+                                
+                                body_bytes = response.get_body()
+                                if body_bytes:
+                                    data = json.loads(body_bytes.decode('utf-8'))
+                                    
+                                    # Agregar metadata de memoria
+                                    if "metadata" not in data:
+                                        data["metadata"] = {}
+                                    
+                                    data["metadata"]["session_info"] = {
+                                        "session_id": session_id,
+                                        "agent_id": agent_id
+                                    }
+                                    data["metadata"]["memoria_disponible"] = True
+                                    data["metadata"]["wrapper_aplicado"] = True
+                                    
+                                    # Crear nueva respuesta
+                                    return func.HttpResponse(
+                                        json.dumps(data, ensure_ascii=False),
+                                        mimetype="application/json",
+                                        status_code=response.status_code
+                                    )
+                        except Exception as e:
+                            logging.warning(f"🧠 Error aplicando memoria: {e}")
+                        
+                        return response
+                    
+                    return original_route(*args, **kwargs)(wrapper)
+                return decorator
+            
+            # APLICAR INMEDIATAMENTE
+            app.route = memory_enhanced_route
+            logging.info("🧠 [INIT] ✅ Memory wrapper aplicado FORZADAMENTE")
+            return True
+            
+        except Exception as e:
+            logging.error(f"🧠 [INIT] ❌ Error aplicando wrapper: {e}")
+            return False
+    
+    # EJECUTAR INMEDIATAMENTE EN TIEMPO DE CARGA
+    wrapper_success = force_memory_wrapper_immediate()
+    
+    if wrapper_success:
+        logging.info("🧠 [INIT] Sistema de memoria ACTIVADO en tiempo de carga")
+    else:
+        logging.warning("🧠 [INIT] Sistema de memoria FALLÓ - continuando sin memoria")
+        
+except Exception as e:
+    logging.error(f"🧠 [INIT] Error crítico cargando sistema de memoria: {e}")
+    logging.info("🧠 [INIT] Continuando sin sistema de memoria automática")
 
-# Aplicar el wrapper de memoria que respeta la firma original de app.route
-apply_memory_wrapper(app)
-
-logging.info("🧠 Memory wrapper aplicado automáticamente a todos los endpoints")
+# Logging ya incluido en el bloque try/except anterior
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -3569,6 +3656,7 @@ def generar_sugerencias_comando_azure(comando: str) -> list:
 @app.function_name(name="copiloto")
 @app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     logging.info('🤖 Copiloto Semántico activado')
 
     mensaje = req.params.get('mensaje', '')
@@ -3614,6 +3702,9 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             }
         }
 
+        # Aplicar memoria manual
+        panel = aplicar_memoria_manual(req, panel)
+        
         return func.HttpResponse(
             json.dumps(panel, indent=2, ensure_ascii=False),
             mimetype="application/json"
@@ -3740,6 +3831,9 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 "proximas_acciones": ["sugerir", "buscar:*"]
             })
 
+        # Aplicar memoria manual
+        respuesta_base = aplicar_memoria_manual(req, respuesta_base)
+        
         return func.HttpResponse(
             json.dumps(respuesta_base, indent=2, ensure_ascii=False),
             mimetype="application/json"
@@ -4006,7 +4100,13 @@ def build_status() -> dict:
 @app.route(route="status", auth_level=func.AuthLevel.ANONYMOUS)
 def status(req: func.HttpRequest) -> func.HttpResponse:
     """Status endpoint muy ligero, solo confirma estado"""
+    from memory_manual import aplicar_memoria_manual
+    
     estado = build_status()
+    
+    # Aplicar memoria manualmente
+    estado = aplicar_memoria_manual(req, estado)
+    
     return func.HttpResponse(
         json.dumps(estado, indent=2, ensure_ascii=False),
         mimetype="application/json",
@@ -4016,6 +4116,73 @@ def status(req: func.HttpRequest) -> func.HttpResponse:
 
 
 
+
+@app.function_name(name="test_wrapper_memoria")
+@app.route(route="test-wrapper-memoria", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def test_wrapper_memoria(req: func.HttpRequest) -> func.HttpResponse:
+    """Endpoint específico para probar el wrapper de memoria"""
+    try:
+        # Detectar parámetros de memoria
+        session_id = (
+            req.params.get("session_id") or
+            (req.get_json() or {}).get("session_id") or
+            req.headers.get("X-Session-ID") or
+            f"auto_{hash(str(req.headers.get('User-Agent', '')) + str(req.url))}"
+        )
+        
+        agent_id = (
+            req.params.get("agent_id") or
+            (req.get_json() or {}).get("agent_id") or
+            req.headers.get("X-Agent-ID") or
+            "AutoAgent"
+        )
+        
+        # Intentar consultar memoria
+        memoria_resultado = {}
+        try:
+            from memory_helpers import obtener_memoria_request
+            memoria_contexto = obtener_memoria_request(req)
+            memoria_resultado = memoria_contexto or {}
+        except Exception as e:
+            memoria_resultado = {"error_memoria": str(e)}
+        
+        resultado = {
+            "test_wrapper": True,
+            "timestamp": datetime.now().isoformat(),
+            "session_detectado": {
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "origen_session": "params" if req.params.get("session_id") else "auto",
+                "origen_agent": "params" if req.params.get("agent_id") else "auto"
+            },
+            "memoria_sistema": memoria_resultado,
+            "metadata": {
+                "wrapper_test": True,
+                "memoria_disponible": True,
+                "session_info": {
+                    "session_id": session_id,
+                    "agent_id": agent_id
+                },
+                "wrapper_aplicado": True
+            }
+        }
+        
+        return func.HttpResponse(
+            json.dumps(resultado, indent=2, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+        
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({
+                "error": str(e),
+                "test_wrapper": False,
+                "timestamp": datetime.now().isoformat()
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
 
 def _serve_openapi_schema() -> func.HttpResponse:
     """Función helper mejorada para servir el schema OpenAPI"""
@@ -4184,6 +4351,7 @@ def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="listar-blobs", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
     """Lista blobs con conteo total y muestra consistente usando api_ok/api_err."""
+    from memory_manual import aplicar_memoria_manual
     endpoint = "/api/listar-blobs"
     method = "GET"
 
@@ -4250,6 +4418,9 @@ def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
                 "timestamp": datetime.now().isoformat()
             }
         )
+        # Aplicar memoria manual
+        payload = aplicar_memoria_manual(req, payload)
+        
         return func.HttpResponse(json.dumps(payload, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except Exception as e:
@@ -4262,7 +4433,18 @@ def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="ejecutar", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
     """Versión mejorada del endpoint ejecutar con intenciones extendidas"""
+    from memory_manual import aplicar_memoria_manual
     logging.info('🚀 Endpoint ejecutar (orquestador mejorado) activado')
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE
+    from memory_helpers import obtener_memoria_request, obtener_prompt_memoria, extraer_session_info
+    
+    memoria_contexto = obtener_memoria_request(req)
+    memoria_prompt = obtener_prompt_memoria(req)
+    session_info = extraer_session_info(req)
+    
+    if memoria_contexto and memoria_contexto.get("tiene_historial"):
+        logging.info(f"🧠 Continuando sesión con {memoria_contexto['total_interacciones_sesion']} interacciones previas")
 
     # Initialize req_body to handle potential exceptions
     req_body = {}
@@ -4360,8 +4542,17 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
                 'intencion_procesada': intencion,
                 'procesador': procesador_usado,
                 'ambiente': 'Azure' if IS_AZURE else 'Local',
-                'copiloto_version': '2.0-orchestrator-extendido'
+                'copiloto_version': '2.0-orchestrator-extendido',
+                'session_info': session_info,
+                'memoria_disponible': bool(memoria_contexto and memoria_contexto.get("tiene_historial"))
             }
+            
+            # 🧠 AGREGAR CONTEXTO DE MEMORIA
+            if memoria_prompt:
+                nuevo_resultado['contexto_memoria'] = memoria_prompt
+            
+            from memory_helpers import agregar_memoria_a_respuesta
+            nuevo_resultado = agregar_memoria_a_respuesta(nuevo_resultado, req)
 
             # Si hay error de urgencia alta, agregar diagnóstico
             if not nuevo_resultado.get('exito', True) and contexto.get('urgencia') == 'alta':
@@ -4414,6 +4605,9 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
 
+        # Aplicar memoria manual
+        resultado = aplicar_memoria_manual(req, resultado)
+        
         return func.HttpResponse(
             json.dumps(resultado, indent=2, ensure_ascii=False),
             mimetype="application/json",
@@ -4690,7 +4884,20 @@ def _resolve_handler(endpoint: str):
 @app.function_name(name="hybrid")
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def hybrid(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     logging.info('Hybrid (semantico inteligente) activado')
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE
+    from memory_helpers import obtener_memoria_request, obtener_prompt_memoria, extraer_session_info
+    
+    memoria_contexto = obtener_memoria_request(req)
+    memoria_prompt = obtener_prompt_memoria(req)
+    session_info = extraer_session_info(req)
+    
+    if memoria_contexto and memoria_contexto.get("tiene_historial"):
+        logging.info(f"🧠 Memoria de sesión disponible: {memoria_contexto['total_interacciones_sesion']} interacciones previas")
+    elif session_info.get("session_id"):
+        logging.info(f"🆕 Nueva sesión detectada: {session_info['session_id']}")
 
     try:
         from semantic_intent_parser import enhance_hybrid_parser, should_trigger_bing_grounding
@@ -4782,10 +4989,22 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
                 "user_input": user_input[:100] if user_input else "none",
                 "parsed_endpoint": parsed_command.get("endpoint") if parsed_command else "none",
                 "used_grounding": parsed_command.get("requires_grounding", False) if parsed_command else False,
-                "ambiente": "Azure" if IS_AZURE else "Local"
+                "ambiente": "Azure" if IS_AZURE else "Local",
+                "session_info": session_info,
+                "memoria_disponible": bool(memoria_contexto and memoria_contexto.get("tiene_historial"))
             }
         }
+        
+        # 🧠 AGREGAR CONTEXTO DE MEMORIA A LA RESPUESTA
+        if memoria_prompt:
+            response["contexto_memoria"] = memoria_prompt
+        
+        from memory_helpers import agregar_memoria_a_respuesta
+        response = agregar_memoria_a_respuesta(response, req)
 
+        # Aplicar memoria manual
+        response = aplicar_memoria_manual(req, response)
+        
         return func.HttpResponse(json.dumps(response, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except ValueError as ve:
@@ -5316,6 +5535,7 @@ def bridge_cli(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="invocar")
 @app.route(route="invocar", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def invocar(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """
     Resuelve y ejecuta endpoints dinámicamente con tolerancia mejorada para agentes
     """
@@ -5410,9 +5630,78 @@ def invocar(req: func.HttpRequest) -> func.HttpResponse:
         return _error("InvokeError", 500, str(e), details={"endpoint": endpoint, "method": method, "data": data})
 
 
+@app.function_name(name="consultar_memoria_http")
+@app.route(route="consultar-memoria", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def consultar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
+    """Endpoint para consultar memoria de sesión manualmente"""
+    try:
+        # Extraer parámetros
+        if req.method == "GET":
+            session_id = req.params.get("session_id")
+            agent_id = req.params.get("agent_id")
+        else:
+            body = req.get_json() or {}
+            session_id = body.get("session_id")
+            agent_id = body.get("agent_id")
+        
+        if not session_id:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "session_id es requerido",
+                    "ejemplo": {
+                        "session_id": "mi_session_123",
+                        "agent_id": "AzureSupervisor"
+                    }
+                }),
+                mimetype="application/json",
+                status_code=400
+            )
+        
+        # Consultar memoria
+        from services.session_memory import consultar_memoria_sesion, generar_contexto_prompt
+        
+        resultado = consultar_memoria_sesion(session_id, agent_id)
+        
+        if resultado.get("exito"):
+            memoria = resultado["memoria"]
+            contexto_prompt = generar_contexto_prompt(memoria)
+            
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": True,
+                    "session_id": session_id,
+                    "agent_id": agent_id,
+                    "memoria": memoria,
+                    "contexto_prompt": contexto_prompt,
+                    "timestamp": datetime.now().isoformat()
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+        else:
+            return func.HttpResponse(
+                json.dumps(resultado),
+                mimetype="application/json",
+                status_code=500
+            )
+            
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "tipo_error": type(e).__name__
+            }),
+            mimetype="application/json",
+            status_code=500
+        )
+
 @app.function_name(name="conocimiento_cognitivo_http")
 @app.route(route="conocimiento-cognitivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def conocimiento_cognitivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint para obtener el último conocimiento del supervisor cognitivo"""
     try:
         from services.cognitive_supervisor import CognitiveSupervisor
@@ -5437,6 +5726,7 @@ def conocimiento_cognitivo_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="contexto_agente_http")
 @app.route(route="contexto-agente", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint que consulta memoria y devuelve contexto del agente"""
     try:
         from services.semantic_memory import obtener_estado_sistema, obtener_contexto_agente
@@ -5467,6 +5757,7 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="interpretar_intencion_http")
 @app.route(route="interpretar-intencion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def interpretar_intencion_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint que interpreta lenguaje natural y genera comandos"""
     try:
         body = req.get_json() if req.get_body() else {}
@@ -5629,6 +5920,7 @@ def interpretar_intencion_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="bing_grounding_http")
 @app.route(route="bing-grounding", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint robusto para Bing Grounding que resuelve consultas ambiguas"""
     try:
         # Validación flexible del body
@@ -5690,6 +5982,7 @@ def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
                     ]
                     resultado["endpoint_ejecucion"] = "/api/ejecutar-cli"
             
+            resultado = aplicar_memoria_manual(req, resultado)
             return func.HttpResponse(
                 json.dumps(resultado, ensure_ascii=False, indent=2),
                 mimetype="application/json",
@@ -5710,6 +6003,7 @@ def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
                 "accion_sugerida": "revisar_sugerencias_locales"
             }
             
+            fallback_result = aplicar_memoria_manual(req, fallback_result)
             return func.HttpResponse(
                 json.dumps(fallback_result, ensure_ascii=False, indent=2),
                 mimetype="application/json",
@@ -6404,6 +6698,7 @@ def modificar_archivo(
 @app.function_name(name="escribir_archivo_http")
 @app.route(route="escribir-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint ULTRA-ROBUSTO para crear/escribir archivos - nunca falla por formato"""
     advertencias = []
 
@@ -6639,6 +6934,7 @@ def is_running_in_azure() -> bool:
 @app.function_name(name="modificar_archivo_http")
 @app.route(route="modificar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint ultra-resiliente para modificar archivos - nunca falla por formato"""
     advertencias = []
 
@@ -6874,6 +7170,7 @@ def _generar_mensaje_no_encontrado(ruta: str, sugerencias: list) -> str:
 @app.function_name(name="eliminar_archivo_http")
 @app.route(route="eliminar-archivo", methods=["POST", "DELETE"], auth_level=func.AuthLevel.ANONYMOUS)
 def eliminar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Elimina un archivo del Blob (preferente) o del filesystem local."""
     try:
         # Body opcional + querystring
@@ -7342,6 +7639,7 @@ _FALSE_SET = {"0", "false", "no", "n", "off"}
 @app.function_name(name="ejecutar_script_local_http")
 @app.route(route="ejecutar-script-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Ejecuta scripts desde cualquier ruta local del contenedor con búsqueda automática y robusta"""
 
     try:
@@ -7467,6 +7765,7 @@ def normalizar_blob_path(script_path: str) -> str:
 @app.function_name(name="ejecutar_script_http")
 @app.route(route="ejecutar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """
     Ejecuta scripts desde Blob Storage o local, soportando múltiples tipos (.py, .sh, .ps1)
     Dinámico y abierto: no restringe a scripts/ ni rutas fijas.
@@ -7630,6 +7929,7 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="verificar_script_http")
 @app.route(route="verificar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_script_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """
     Verifica propiedades de un script en Blob Storage: tamaño, permisos, ejecutabilidad, shebang, bash -n
     """
@@ -8285,6 +8585,7 @@ def mover_archivo(origen: str, destino: str, overwrite: bool = False, eliminar_o
 @app.function_name(name="mover_archivo_http")
 @app.route(route="mover-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def mover_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         # ✅ VALIDACIÓN DEFENSIVA INMEDIATA: Verificar que hay contenido en el body antes de procesar
         request_body = req.get_body()
@@ -8580,6 +8881,7 @@ def _format_file_size(size_bytes: int) -> str:
 @app.function_name(name="info_archivo_http")
 @app.route(route="info-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def info_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     endpoint = "/api/info-archivo"
     method = "GET"
     run_id = get_run_id(req)
@@ -9120,6 +9422,7 @@ def validate_info_archivo_params(req, run_id, CONTAINER_NAME, IS_AZURE, get_blob
 @app.function_name(name="descargar_archivo_http")
 @app.route(route="descargar-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def descargar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         ruta = (req.params.get("ruta") or "").strip()
         modo = (req.params.get("modo")
@@ -9167,6 +9470,7 @@ def copiar_archivo(origen: str, destino: str, overwrite: bool = False) -> dict:
 @app.function_name(name="copiar_archivo_http")
 @app.route(route="copiar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def copiar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         # ✅ VALIDACIÓN DEFENSIVA: Verificar que body no sea None/vacío
         body = None
@@ -9470,6 +9774,7 @@ def preparar_script_desde_blob(ruta_blob: str) -> dict:
 @app.function_name(name="preparar_script_http")
 @app.route(route="preparar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def preparar_script_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         # ✅ LECTURA SIMPLIFICADA Y ROBUSTA: Usar patrón estándar
         try:
@@ -9594,6 +9899,7 @@ def render_tool_response(status_code: int, payload: dict) -> str:
 @app.function_name(name="render_error_http")
 @app.route(route="render-error", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint dedicado para renderizar errores de forma semántica"""
     try:
         # ✅ VALIDACIÓN DEFENSIVA: Verificar que request_body no sea None
@@ -9718,6 +10024,7 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="crear_contenedor_http")
 @app.route(route="crear-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Crea una nueva cuenta de almacenamiento en Azure usando CLI con Bing Fallback para parámetros faltantes"""
     try:
         body = req.get_json()
@@ -9909,6 +10216,7 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="proxy_local_http")
 @app.route(route="proxy-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Proxy hacia tu servidor local via ngrok"""
     import requests
     import traceback
@@ -10093,6 +10401,7 @@ def debug_auth_environment():
 @app.function_name(name="gestionar_despliegue_http")
 @app.route(route="gestionar-despliegue", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """🚀 ENDPOINT ROBUSTO Y SEMÁNTICO PARA GESTIÓN DE DESPLIEGUES
     
     Sistema completamente adaptativo que acepta cualquier formato de payload y se adapta
@@ -10505,6 +10814,7 @@ def ejecutar_reiniciar_simple(parametros: dict) -> dict:
 @app.function_name(name="desplegar_funcion_http")
 @app.route(route="desplegar-funcion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Automatiza el despliegue de una nueva versión del contenedor"""
 
     try:
@@ -10609,6 +10919,7 @@ def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="actualizar-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
     """Actualiza el contenedor de la Function App a una versión específica"""
+    from memory_manual import aplicar_memoria_manual
 
     try:
         body = req.get_json() if req.get_body() else {}
@@ -10700,13 +11011,16 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
         logging.info(f"Ejecutando restart: {' '.join(restart_cmd)}")
         subprocess.run(restart_cmd, capture_output=True, text=True, timeout=30)
 
+        resultado = {
+            "exito": True,
+            "mensaje": f"Contenedor actualizado a {tag}",
+            "imagen": imagen,
+            "timestamp": datetime.now().isoformat()
+        }
+        resultado = aplicar_memoria_manual(req, resultado)
+        
         return func.HttpResponse(
-            json.dumps({
-                "exito": True,
-                "mensaje": f"Contenedor actualizado a {tag}",
-                "imagen": imagen,
-                "timestamp": datetime.now().isoformat()
-            }),
+            json.dumps(resultado),
             mimetype="application/json",
             status_code=200
         )
@@ -10893,6 +11207,7 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint robusto para ejecutar comandos Azure CLI"""
     comando = None
     az_paths = []
@@ -11104,13 +11419,15 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             if "-o table" not in comando:
                 try:
                     output_json = json.loads(result.stdout) if result.stdout else []
+                    resultado_temp = {
+                        "exito": True,
+                        "comando": comando,
+                        "resultado": output_json,
+                        "codigo_salida": result.returncode
+                    }
+                    resultado_temp = aplicar_memoria_manual(req, resultado_temp)
                     return func.HttpResponse(
-                        json.dumps({
-                            "exito": True,
-                            "comando": comando,
-                            "resultado": output_json,
-                            "codigo_salida": result.returncode
-                        }),
+                        json.dumps(resultado_temp),
                         mimetype="application/json",
                         status_code=200
                     )
@@ -11118,14 +11435,16 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     pass
             
             # Devolver como texto si no es JSON válido
+            resultado_temp = {
+                "exito": True,
+                "comando": comando,
+                "resultado": result.stdout,
+                "codigo_salida": result.returncode,
+                "formato": "texto"
+            }
+            resultado_temp = aplicar_memoria_manual(req, resultado_temp)
             return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "comando": comando,
-                    "resultado": result.stdout,
-                    "codigo_salida": result.returncode,
-                    "formato": "texto"
-                }),
+                json.dumps(resultado_temp),
                 mimetype="application/json",
                 status_code=200
             )
@@ -11158,28 +11477,30 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 )
             
             # Error normal sin argumentos faltantes detectados - MEJORADO
+            error_result = {
+                "exito": False,
+                "comando": comando,
+                "error": error_msg,
+                "codigo_salida": result.returncode,
+                "stderr": result.stderr,
+                "stdout": result.stdout,
+                "diagnostico": {
+                    "tipo_error": "ejecucion_fallida",
+                    "comando_completo": comando,
+                    "az_binary_usado": az_binary,
+                    "ambiente": "Azure" if IS_AZURE else "Local"
+                },
+                "sugerencias_debug": [
+                    "Verificar sintaxis del comando",
+                    "Comprobar permisos de Azure CLI",
+                    "Revisar si el recurso existe",
+                    "Ejecutar 'az login' si hay problemas de autenticación"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+            error_result = aplicar_memoria_manual(req, error_result)
             return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "comando": comando,
-                    "error": error_msg,
-                    "codigo_salida": result.returncode,
-                    "stderr": result.stderr,
-                    "stdout": result.stdout,
-                    "diagnostico": {
-                        "tipo_error": "ejecucion_fallida",
-                        "comando_completo": comando,
-                        "az_binary_usado": az_binary,
-                        "ambiente": "Azure" if IS_AZURE else "Local"
-                    },
-                    "sugerencias_debug": [
-                        "Verificar sintaxis del comando",
-                        "Comprobar permisos de Azure CLI",
-                        "Revisar si el recurso existe",
-                        "Ejecutar 'az login' si hay problemas de autenticación"
-                    ],
-                    "timestamp": datetime.now().isoformat()
-                }),
+                json.dumps(error_result),
                 mimetype="application/json",
                 status_code=200  # ✅ CAMBIO: Siempre 200 para que Foundry pueda procesar
             )
@@ -11927,6 +12248,7 @@ def diagnosticar_function_app_con_sdk() -> dict:
 @app.function_name(name="diagnostico_recursos_completo_http")
 @app.route(route="diagnostico-recursos-completo", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """
     Diagnóstico completo de recursos Azure usando SDK en lugar de CLI
     """
@@ -12126,6 +12448,7 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     No usa Kudu ni credenciales estáticas.
     ✅ Verifica existencia en ARM antes de consultar /deployments.
     """
+    from memory_manual import aplicar_memoria_manual
     # Initialize variables at function start to ensure they're always bound
     sub = None
     rg = None
@@ -12265,6 +12588,7 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
             "total_deployments": len(deployments_data.get("value", [])) if isinstance(deployments_data.get("value"), list) else 0,
             "endpoints_consultados": [resource_api, deployments_api]
         }
+        body = aplicar_memoria_manual(req, body)
         return func.HttpResponse(json.dumps(body, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except requests.exceptions.Timeout:
@@ -12295,6 +12619,7 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="bateria_endpoints_http")
 @app.route(route="bateria-endpoints", methods=["POST", "GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def bateria_endpoints_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     endpoint, method = "/api/bateria-endpoints", req.method
     try:
         # ✅ ROBUSTO: Acepta cualquier body o sin body, GET o POST
@@ -12369,16 +12694,19 @@ def bateria_endpoints_http(req: func.HttpRequest) -> func.HttpResponse:
 
         payload = {"summary": summary, "results": results}
         ok = api_ok(endpoint, method, 200, "Batería ejecutada", payload)
+        ok = aplicar_memoria_manual(req, ok)
         return func.HttpResponse(json.dumps(ok, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except Exception as e:
         err = api_err(endpoint, method, 500, "BatteryError", str(e))
+        err = aplicar_memoria_manual(req, err)
         return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
 
 
 @app.function_name(name="diagnostico_recursos_http")
 @app.route(route="diagnostico-recursos", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Endpoint para configurar diagnósticos de recursos Azure"""
     try:
         if req.method == "GET":
@@ -12667,6 +12995,7 @@ def procesar_intencion_cli(parametros: dict) -> dict:
 @app.function_name(name="diagnostico_configurar_http")
 @app.route(route="diagnostico-configurar", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def diagnostico_configurar_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     body = _json_body(req)
     rid = _s(body.get("resourceId"))
     ws = _s(body.get("workspaceId"))
@@ -12710,7 +13039,8 @@ def _get_monitor_client_from_rid(resource_id: str):  # type: ignore
 
 @app.function_name(name="diagnostico_listar_http")
 @app.route(route="diagnostico-listar", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def diagnostico_listar_http(req: func.HttpRequest) -> func.HttpResponse:  # type: ignore
+def diagnostico_listar_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual  # type: ignore
     rid = req.params.get("resourceId", "")
     if not rid:
         return func.HttpResponse(json.dumps({"ok": False, "error": "resourceId requerido"}), mimetype="application/json", status_code=400)
@@ -12768,6 +13098,7 @@ def update_app_service_plan(plan_name: str, resource_group: str, sku: str) -> di
 @app.function_name(name="deploy_http")
 @app.route(route="deploy", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     import json
     import time
     import traceback
@@ -12922,6 +13253,7 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="configurar_cors_http")
 @app.route(route="configurar-cors", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def configurar_cors_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Configura CORS usando SDK"""
     try:
         body = req.get_json() if req.get_body() else {}
@@ -13023,6 +13355,7 @@ def configurar_cors_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="configurar_app_settings_http")
 @app.route(route="configurar-app-settings", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def configurar_app_settings_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Configura app settings usando REST API con validación robusta"""
     try:
         body = req.get_json() if req.get_body() else {}
@@ -13198,6 +13531,7 @@ def configurar_app_settings_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="escalar_plan_http")
 @app.route(route="escalar-plan", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escalar_plan_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Escala el plan de App Service usando SDK"""
     try:
         body = req.get_json() if req.get_body() else {}
@@ -13451,6 +13785,7 @@ def _rollback_fix(fix_id: str) -> dict:
 @app.function_name(name="rollback_correccion")
 @app.route(route="rollback", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def rollback_correccion(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         body = req.get_json()
         fix_id = body.get("id")
@@ -13484,6 +13819,7 @@ def rollback_correccion(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="promover_http")
 @app.route(route="promover", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def promover_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         from scripts.auto_promoter import main as run_promotor
         run_promotor()
@@ -13504,6 +13840,7 @@ def promover_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="promocion_reporte_http")
 @app.route(route="promocion-reporte", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         with open("scripts/semantic_log.jsonl", "r") as f:
             lines = f.readlines()
@@ -13527,6 +13864,7 @@ def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="revisar_correcciones")
 @app.route(route="revisar-correcciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def revisar_correcciones(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     try:
         # Intentar usar Cosmos DB primero
         try:
@@ -13595,6 +13933,7 @@ SEMANTIC_COMMITS_FILE = Path("scripts/semantic_commits.json")
 @app.function_name(name="autocorregir_http")
 @app.route(route="autocorregir", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def autocorregir_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """
     Endpoint para registrar y simular correcciones automáticas.
     Restringido a agentes AI (verifica header especial)
@@ -13987,6 +14326,7 @@ def _execute_fix(correccion: dict) -> dict:
 @app.function_name(name="verificar_estado_sistema")
 @app.route(route="verificar-sistema", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Autodiagnóstico completo del sistema"""
     try:
         import psutil
@@ -14031,6 +14371,7 @@ def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="verificar_app_insights")
 @app.route(route="verificar-app-insights", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Verifica telemetría de Application Insights sin depender de az CLI"""
     app_name = os.environ.get(
         "WEBSITE_SITE_NAME", "copiloto-semantico-func-us2")
@@ -14138,6 +14479,7 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="verificar_cosmos")
 @app.route(route="verificar-cosmos", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Verifica conectividad y escrituras en CosmosDB usando clave o MI"""
     endpoint = os.environ.get("COSMOSDB_ENDPOINT")
     key = os.environ.get("COSMOSDB_KEY")
@@ -14289,6 +14631,7 @@ def aplicar_correccion_manual_http(req: func.HttpRequest) -> func.HttpResponse:
     Endpoint universal para aplicar correcciones manuales de forma dinámica y robusta.
     Adaptable como /api/ejecutar-cli - acepta cualquier tipo de corrección sin predefiniciones.
     """
+    from memory_manual import aplicar_memoria_manual
     endpoint = "/api/aplicar-correccion-manual"
     method = "POST"
     run_id = get_run_id(req)
@@ -14347,6 +14690,7 @@ def aplicar_correccion_manual_http(req: func.HttpRequest) -> func.HttpResponse:
             }
         }
         
+        response_data = aplicar_memoria_manual(req, response_data)
         status_code = 200 if resultado.get("exito", True) else 400
         
         return func.HttpResponse(
