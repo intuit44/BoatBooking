@@ -1,0 +1,9 @@
+{
+  "detectar": ["detect", "check", "verificar", "status", "info"],
+  "preparar": ["prepare", "setup", "preconfig", "build"],
+  "desplegar": ["deploy", "launch", "start", "push"],
+  "rollback": ["revert", "undo", "restore", "back"],
+  "validar": ["validate", "verify", "test", "confirm"],
+  "actualizar": ["update", "patch", "hotfix", "upgrade"],
+  "reiniciar": ["restart", "reload", "reboot", "refresh"]
+}
