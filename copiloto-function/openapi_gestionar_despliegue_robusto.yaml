@@ -1,0 +1,562 @@
+openapi: 3.1.0
+info:
+  title: "Gestionar Despliegue - Sistema Robusto"
+  version: "2.0.0"
+  description: |
+    🚀 **ENDPOINT ROBUSTO Y SEMÁNTICO PARA GESTIÓN DE DESPLIEGUES**
+    
+    Sistema completamente adaptativo que acepta cualquier formato de payload y se adapta
+    dinámicamente sin rechazar requests por condiciones predefinidas.
+    
+    ## Características Principales
+    - ✅ **Validador dinámico** que acepta múltiples formatos
+    - ✅ **Detección automática** de acción, entorno, target
+    - ✅ **Respuestas estructuradas** con sugerencias adaptativas
+    - ✅ **Compatible** con Foundry, CodeGPT, CLI sin conflictos
+    - ✅ **Tolerante** al desorden de parámetros
+    - ✅ **Manejo de errores** que guía a agentes para autocorrección
+
+paths:
+  /api/gestionar-despliegue:
+    post:
+      summary: "Gestión robusta de despliegues"
+      description: |
+        Endpoint ultra-flexible que acepta cualquier formato de payload para gestionar despliegues.
+        
+        **Formatos de payload soportados:**
+        - JSON estándar en body
+        - JSON en raw body
+        - Query parameters
+        - Payload vacío (usa defaults)
+        
+        **Acciones soportadas:**
+        - `detectar` / `detect` / `check` - Detecta cambios y estado
+        - `preparar` / `prepare` / `build` / `validate` - Prepara script de despliegue
+        - `desplegar` / `deploy` - Ejecuta despliegue completo
+        - `rollback` / `revert` - Rollback a versión anterior
+        - `estado` / `status` / `info` - Obtiene estado actual
+        - `actualizar` / `update` / `upgrade` - Actualiza configuración
+        - `reiniciar` / `restart` / `reboot` - Reinicia servicios
+        
+      requestBody:
+        required: false
+        description: |
+          **Payload ultra-flexible** - El sistema acepta cualquier combinación de campos:
+          
+          ### Formatos Mínimos Válidos:
+          ```json
+          {}
+          {"accion": "detectar"}
+          {"action": "deploy", "tag": "v1.2.3"}
+          {"comando": "rollback", "tag_anterior": "v1.2.2"}
+          ```
+          
+          ### Formato Completo:
+          ```json
+          {
+            "accion": "desplegar",
+            "tag": "v1.2.3",
+            "plataforma": "foundry",
+            "agente": "Deploy_Agent",
+            "configuracion": {...},
+            "forzar": false,
+            "timeout": 300
+          }
+          ```
+          
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # Campos de acción (múltiples sinónimos)
+                accion:
+                  type: string
+                  enum: ["detectar", "preparar", "desplegar", "rollback", "estado", "actualizar", "reiniciar"]
+                  description: "Acción principal a ejecutar"
+                action:
+                  type: string
+                  description: "Sinónimo de 'accion' (inglés)"
+                comando:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                command:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                operacion:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                operation:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                tipo:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                type:
+                  type: string
+                  description: "Sinónimo de 'accion'"
+                
+                # Campos de versión (múltiples sinónimos)
+                tag:
+                  type: string
+                  description: "Versión/tag a desplegar"
+                  example: "v1.2.3"
+                version:
+                  type: string
+                  description: "Sinónimo de 'tag'"
+                v:
+                  type: string
+                  description: "Sinónimo corto de 'tag'"
+                
+                # Campos de rollback
+                tag_anterior:
+                  type: string
+                  description: "Versión anterior para rollback"
+                  example: "v1.2.2"
+                previous_version:
+                  type: string
+                  description: "Sinónimo de 'tag_anterior'"
+                prev:
+                  type: string
+                  description: "Sinónimo corto de 'tag_anterior'"
+                
+                # Campos de contexto
+                plataforma:
+                  type: string
+                  enum: ["foundry", "codegpt", "cli", "general"]
+                  description: "Plataforma que invoca el endpoint"
+                platform:
+                  type: string
+                  description: "Sinónimo de 'plataforma'"
+                target:
+                  type: string
+                  description: "Sinónimo de 'plataforma'"
+                
+                agente:
+                  type: string
+                  description: "Nombre del agente que invoca"
+                  example: "Deploy_Agent"
+                agent:
+                  type: string
+                  description: "Sinónimo de 'agente'"
+                client:
+                  type: string
+                  description: "Sinónimo de 'agente'"
+                
+                # Configuración
+                configuracion:
+                  type: object
+                  description: "Configuración específica del agente"
+                  additionalProperties: true
+                config:
+                  type: object
+                  description: "Sinónimo de 'configuracion'"
+                settings:
+                  type: object
+                  description: "Sinónimo de 'configuracion'"
+                
+                # Opciones de ejecución
+                forzar:
+                  type: boolean
+                  default: false
+                  description: "Forzar ejecución sin validaciones"
+                force:
+                  type: boolean
+                  description: "Sinónimo de 'forzar'"
+                f:
+                  type: boolean
+                  description: "Sinónimo corto de 'forzar'"
+                
+                timeout:
+                  type: integer
+                  default: 300
+                  description: "Timeout en segundos"
+                timeout_s:
+                  type: integer
+                  description: "Sinónimo de 'timeout'"
+                
+              additionalProperties: true
+              description: |
+                **IMPORTANTE:** Este schema es indicativo. El endpoint acepta cualquier combinación
+                de campos y se adapta dinámicamente. No hay campos obligatorios.
+                
+            examples:
+              payload_minimo:
+                summary: "Payload mínimo (detección automática)"
+                value: {}
+              
+              detectar_cambios:
+                summary: "Detectar cambios"
+                value:
+                  accion: "detectar"
+              
+              preparar_despliegue:
+                summary: "Preparar script de despliegue"
+                value:
+                  action: "prepare"
+                  tag: "v1.2.3"
+              
+              desplegar_version:
+                summary: "Desplegar versión específica"
+                value:
+                  accion: "desplegar"
+                  tag: "v1.2.3"
+                  plataforma: "foundry"
+                  agente: "Deploy_Agent"
+              
+              rollback_version:
+                summary: "Rollback a versión anterior"
+                value:
+                  comando: "rollback"
+                  tag_anterior: "v1.2.2"
+              
+              actualizar_agente:
+                summary: "Actualizar configuración de agente"
+                value:
+                  operacion: "actualizar"
+                  agente: "Deploy_Agent"
+                  configuracion:
+                    modelo: "gpt-4o-mini"
+                    temperatura: 0.2
+                    herramientas: ["leer-archivo", "ejecutar-cli"]
+              
+              foundry_format:
+                summary: "Formato típico de Foundry"
+                value:
+                  action: "deploy"
+                  version: "v1.2.3"
+                  platform: "foundry"
+                  agent: "AzureSupervisor"
+              
+              codegpt_format:
+                summary: "Formato típico de CodeGPT"
+                value:
+                  accion: "desplegar"
+                  tag: "v1.2.3"
+                  plataforma: "codegpt"
+                  agente: "Deploy_Agent"
+                  configuracion:
+                    modelo: "gpt-4o-mini"
+                    descripcion: "Agente para tareas DevOps"
+
+      responses:
+        '200':
+          description: "Operación exitosa"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exito:
+                    type: boolean
+                    example: true
+                  accion_ejecutada:
+                    type: string
+                    example: "desplegar"
+                  alias_usado:
+                    type: string
+                    nullable: true
+                    example: "deploy"
+                  resultado:
+                    type: object
+                    description: "Resultado específico de la acción ejecutada"
+                    additionalProperties: true
+                  metadata:
+                    type: object
+                    properties:
+                      run_id:
+                        type: string
+                        example: "abc12345"
+                      endpoint:
+                        type: string
+                        example: "/api/gestionar-despliegue"
+                      formato_payload:
+                        type: string
+                        example: "json_estandar"
+                      timestamp:
+                        type: string
+                        format: date-time
+                      version_sistema:
+                        type: string
+                        example: "robusto_v1.0"
+                  proximas_acciones:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Verificar estado con 'estado'", "Monitorear logs de la aplicación"]
+              
+              examples:
+                detectar_exitoso:
+                  summary: "Detección exitosa"
+                  value:
+                    exito: true
+                    accion_ejecutada: "detectar"
+                    alias_usado: null
+                    resultado:
+                      accion: "detectar"
+                      archivo_verificado: "/home/site/wwwroot/function_app.py"
+                      hash_funcion: "a1b2c3d4"
+                      herramientas_disponibles:
+                        az_cli: true
+                        docker: true
+                        git: true
+                      mensaje: "Detección completada. Hash: a1b2c3d4"
+                    metadata:
+                      run_id: "abc12345"
+                      endpoint: "/api/gestionar-despliegue"
+                      formato_payload: "json_estandar"
+                      timestamp: "2024-01-15T10:30:00Z"
+                      version_sistema: "robusto_v1.0"
+                    proximas_acciones:
+                      - "preparar - para generar script de despliegue"
+                      - "estado - para verificar estado actual"
+                
+                desplegar_exitoso:
+                  summary: "Despliegue exitoso"
+                  value:
+                    exito: true
+                    accion_ejecutada: "desplegar"
+                    alias_usado: "deploy"
+                    resultado:
+                      accion: "desplegar"
+                      tag: "v1.2.3"
+                      comandos_planificados:
+                        - "docker build -t copiloto-func-azcli:v1.2.3 ."
+                        - "docker tag copiloto-func-azcli:v1.2.3 boatrentalacr.azurecr.io/copiloto-func-azcli:v1.2.3"
+                        - "az acr login -n boatrentalacr"
+                        - "docker push boatrentalacr.azurecr.io/copiloto-func-azcli:v1.2.3"
+                      mensaje: "Despliegue de v1.2.3 planificado exitosamente"
+                    metadata:
+                      run_id: "def67890"
+                      endpoint: "/api/gestionar-despliegue"
+                      formato_payload: "json_estandar"
+                      timestamp: "2024-01-15T10:35:00Z"
+                      version_sistema: "robusto_v1.0"
+
+        '400':
+          description: "Error de validación (con sugerencias para corrección)"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exito:
+                    type: boolean
+                    example: false
+                  error_code:
+                    type: string
+                    example: "VALIDATION_ERROR"
+                  error:
+                    type: string
+                    example: "Validación fallida: Rollback requiere especificar tag_anterior"
+                  sugerencias:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Agregar parámetro 'tag_anterior' para rollback"
+                      - "Ejemplo: {'accion': 'rollback', 'tag_anterior': 'v1.2.2'}"
+                  detalles:
+                    type: object
+                    additionalProperties: true
+                  metadata:
+                    type: object
+                    properties:
+                      run_id:
+                        type: string
+                      endpoint:
+                        type: string
+                      timestamp:
+                        type: string
+                        format: date-time
+                      status_code:
+                        type: integer
+                        example: 400
+                  agent_guidance:
+                    type: object
+                    properties:
+                      next_action:
+                        type: string
+                        example: "retry_with_corrections"
+                      retry_suggestions:
+                        type: array
+                        items:
+                          type: string
+                      format_example:
+                        type: object
+                        additionalProperties: true
+              
+              examples:
+                rollback_sin_tag:
+                  summary: "Error: Rollback sin tag anterior"
+                  value:
+                    exito: false
+                    error_code: "VALIDATION_ERROR"
+                    error: "Validación fallida: Rollback requiere especificar tag_anterior"
+                    sugerencias:
+                      - "Agregar parámetro 'tag_anterior' para rollback"
+                      - "Ejemplo: {'accion': 'rollback', 'tag_anterior': 'v1.2.2'}"
+                    detalles:
+                      accion: "rollback"
+                      parametros_recibidos: []
+                      acciones_validas: ["detectar", "preparar", "desplegar", "rollback", "estado", "actualizar", "reiniciar"]
+                    metadata:
+                      run_id: "ghi12345"
+                      endpoint: "/api/gestionar-despliegue"
+                      timestamp: "2024-01-15T10:40:00Z"
+                      status_code: 400
+                    agent_guidance:
+                      next_action: "retry_with_corrections"
+                      retry_suggestions:
+                        - "Agregar parámetro 'tag_anterior' para rollback"
+                        - "Ejemplo: {'accion': 'rollback', 'tag_anterior': 'v1.2.2'}"
+                      format_example:
+                        accion: "rollback"
+                        tag_anterior: "v1.2.2"
+
+        '401':
+          description: "Error de autenticación"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exito:
+                    type: boolean
+                    example: false
+                  error_code:
+                    type: string
+                    example: "AUTHENTICATION_ERROR"
+                  error:
+                    type: string
+                    example: "No se pudo autenticar con Azure"
+                  sugerencias:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "En Azure: habilitar Managed Identity"
+                      - "En local: ejecutar 'az login'"
+                      - "Verificar Service Principal si está configurado"
+
+        '500':
+          description: "Error crítico del sistema"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exito:
+                    type: boolean
+                    example: false
+                  error_code:
+                    type: string
+                    example: "CRITICAL_SYSTEM_ERROR"
+                  error:
+                    type: string
+                    example: "Error crítico del sistema: Connection timeout"
+                  sugerencias:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Verificar logs del sistema"
+                      - "Reintentar con payload simplificado"
+                      - "Contactar soporte si el error persiste"
+
+components:
+  schemas:
+    AccionDespliegue:
+      type: string
+      enum:
+        - "detectar"
+        - "preparar" 
+        - "desplegar"
+        - "rollback"
+        - "estado"
+        - "actualizar"
+        - "reiniciar"
+      description: "Acciones principales soportadas"
+    
+    AliasAccion:
+      type: string
+      enum:
+        - "detect"
+        - "check"
+        - "prepare"
+        - "build"
+        - "validate"
+        - "deploy"
+        - "revert"
+        - "status"
+        - "info"
+        - "update"
+        - "upgrade"
+        - "restart"
+        - "reboot"
+      description: "Alias y sinónimos de acciones"
+    
+    PlataformaAgente:
+      type: string
+      enum:
+        - "foundry"
+        - "codegpt"
+        - "cli"
+        - "general"
+      description: "Plataformas de agentes soportadas"
+
+  examples:
+    PayloadVacio:
+      summary: "Payload vacío (usa detección automática)"
+      value: {}
+    
+    DetectarCambios:
+      summary: "Detectar cambios en el sistema"
+      value:
+        accion: "detectar"
+    
+    PrepararDespliegue:
+      summary: "Preparar script de despliegue"
+      value:
+        action: "prepare"
+        version: "v1.2.3"
+    
+    DesplegarFoundry:
+      summary: "Desplegar desde Foundry"
+      value:
+        action: "deploy"
+        version: "v1.2.3"
+        platform: "foundry"
+        agent: "AzureSupervisor"
+    
+    DesplegarCodeGPT:
+      summary: "Desplegar desde CodeGPT"
+      value:
+        accion: "desplegar"
+        tag: "v1.2.3"
+        plataforma: "codegpt"
+        agente: "Deploy_Agent"
+        configuracion:
+          modelo: "gpt-4o-mini"
+          temperatura: 0.2
+    
+    RollbackVersion:
+      summary: "Rollback a versión anterior"
+      value:
+        comando: "rollback"
+        tag_anterior: "v1.2.2"
+    
+    ActualizarAgente:
+      summary: "Actualizar configuración de agente"
+      value:
+        operacion: "actualizar"
+        agente: "Deploy_Agent"
+        configuracion:
+          modelo: "gpt-4o-mini"
+          temperatura: 0.35
+          agregar_herramientas: ["diagnostico-recursos"]
+          remover_herramientas: ["bateria-endpoints"]
+
+tags:
+  - name: "Despliegue Robusto"
+    description: "Sistema robusto y semántico para gestión de despliegues"

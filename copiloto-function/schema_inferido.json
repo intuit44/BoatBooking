@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "accion": {
+      "type": "string",
+      "description": "Acción principal"
+    },
+    "action": {
+      "type": "string",
+      "description": "Alias en inglés"
+    },
+    "comando": {
+      "type": "string",
+      "description": "Sinónimo de acción"
+    },
+    "tag": {
+      "type": "string",
+      "description": "Versión a desplegar"
+    },
+    "tag_anterior": {
+      "type": "string",
+      "description": "Versión para rollback"
+    },
+    "guardar_como": {
+      "type": "string",
+      "description": "Nombre del script generado"
+    },
+    "parametros": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "timeout": {
+          "type": "integer"
+        },
+        "forzar": {
+          "type": "boolean"
+        },
+        "verbose": {
+          "type": "boolean"
+        },
+        "dry_run": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "action": "launch",
+      "tag": "v20"
+    },
+    {
+      "accion": "desplegar",
+      "tag": "v20",
+      "parametros": {
+        "timeout": 120,
+        "forzar": true
+      }
+    },
+    {
+      "accion": "preparar",
+      "tag": "v15",
+      "guardar_como": "deploy_v15.sh"
+    },
+    {
+      "accion": "validar",
+      "tag": "v216"
+    },
+    {
+      "comando": "verify",
+      "tag": "v216"
+    },
+    {
+      "accion": "rollback",
+      "tag_anterior": "v215",
+      "parametros": {
+        "timeout": 60,
+        "verbose": true
+      }
+    },
+    {
+      "action": "hotfix",
+      "tag": "v20.1"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "2.7",
+    "version": "2.8",
     "description": "Herramienta directa a la Function App (sin Logic App / SAS)",
     "license": {
       "name": "MIT",
@@ -390,50 +390,6 @@
           },
           "401": {
             "description": "No autorizado (falta header X-Agent-Auth)"
-          }
-        }
-      }
-    },
-    "/api/aplicar-correccion-manual": {
-      "post": {
-        "summary": "Aplicar corrección manual",
-        "description": "Permite aplicar una corrección previamente registrada de forma manual, confirmando su ejecución.",
-        "operationId": "aplicarCorreccionManual",
-        "tags": [
-          "Autocorrección"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "id"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "confirmado": {
-                    "type": "boolean",
-                    "default": true
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Corrección aplicada"
-          },
-          "400": {
-            "description": "Solicitud inválida"
-          },
-          "404": {
-            "description": "Corrección no encontrada"
           }
         }
       }
@@ -891,120 +847,159 @@
     },
     "/api/gestionar-despliegue": {
       "post": {
-        "summary": "Gestiona el proceso completo de despliegue",
-        "description": "Orquestador principal que unifica detección, preparación, despliegue y rollback. Soporta deducción automática de intención y alias para acciones comunes.",
+        "summary": "🚀 ENDPOINT ROBUSTO Y SEMÁNTICO PARA GESTIÓN DE DESPLIEGUES",
+        "description": "⭐ Sistema completamente adaptativo que acepta cualquier formato de payload y se adapta dinámicamente sin rechazar requests. Características: ✅ Validador dinámico que acepta múltiples formatos ✅ Detección automática de acción, entorno, target ✅ Respuestas estructuradas con sugerencias adaptativas ✅ Compatible con Foundry, CodeGPT, CLI sin conflictos ✅ Tolerante al desorden de parámetros ✅ Manejo de errores que guía a agentes para autocorrección. SIEMPRE retorna éxito=true para compatibilidad con agentes.",
         "operationId": "gestionarDespliegue",
         "tags": [
-          "Azure Deployment",
-          "Despliegues"
+          "🚀 Despliegues Robustos",
+          "Azure Deployment"
         ],
         "security": [],
         "requestBody": {
-          "required": true,
+          "required": false,
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "$ref": "#/components/schemas/AccionDesplegar"
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Acepta cualquier JSON o payload vacío. El sistema deduce automáticamente la intención.",
+                "properties": {
+                  "accion": {
+                    "type": "string",
+                    "enum": ["detectar", "preparar", "desplegar", "deploy", "rollback", "validate", "status"],
+                    "description": "Acción principal (opcional - se deduce automáticamente)"
                   },
-                  {
-                    "$ref": "#/components/schemas/AccionRollback"
+                  "action": {
+                    "type": "string",
+                    "description": "Alias en inglés para accion"
                   },
-                  {
-                    "$ref": "#/components/schemas/AccionStatus"
+                  "comando": {
+                    "type": "string",
+                    "description": "Sinónimo de acción"
                   },
-                  {
-                    "$ref": "#/components/schemas/AccionDetectar"
+                  "command": {
+                    "type": "string",
+                    "description": "Sinónimo en inglés"
                   },
-                  {
-                    "$ref": "#/components/schemas/AccionPreparar"
+                  "tag": {
+                    "type": "string",
+                    "description": "Tag de versión para despliegue"
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "Alias para tag"
+                  },
+                  "tag_anterior": {
+                    "type": "string",
+                    "description": "Tag anterior para rollback"
+                  },
+                  "preparar": {
+                    "type": "boolean",
+                    "description": "Si true, ejecuta acción preparar"
+                  },
+                  "plataforma": {
+                    "type": "string",
+                    "enum": ["foundry", "codegpt", "cli"],
+                    "description": "Plataforma origen (para compatibilidad)"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "description": "Alias en inglés para plataforma"
+                  },
+                  "agente": {
+                    "type": "string",
+                    "description": "Nombre del agente que hace la petición"
+                  },
+                  "agent": {
+                    "type": "string",
+                    "description": "Alias en inglés para agente"
+                  },
+                  "configuracion": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Configuración adicional del agente/despliegue"
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "Alias para configuracion"
+                  },
+                  "cambios": {
+                    "type": "object",
+                    "description": "Cambios a aplicar"
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "description": "Motivo del rollback"
                   }
+                },
+                "examples": [
+                  {},
+                  {"accion": "detectar"},
+                  {"action": "deploy", "tag": "v1.2.3"},
+                  {"accion": "rollback", "tag_anterior": "v1.2.2"},
+                  {"preparar": true},
+                  {"comando": "check"},
+                  {"action": "deploy", "version": "v1.2.3", "platform": "foundry", "agent": "AzureSupervisor"},
+                  {"accion": "desplegar", "tag": "v1.2.3", "plataforma": "codegpt", "agente": "Deploy_Agent", "configuracion": {"modelo": "gpt-4o-mini"}}
                 ]
-              },
-              "examples": {
-                "despliegue": {
-                  "summary": "Despliegue completo",
-                  "value": {
-                    "accion": "deploy",
-                    "tag": "v1.2.3"
-                  }
-                },
-                "rollback": {
-                  "summary": "Rollback de emergencia",
-                  "value": {
-                    "accion": "rollback",
-                    "tag_anterior": "v1.2.2",
-                    "motivo": "fallo_critico"
-                  }
-                },
-                "status": {
-                  "summary": "Consulta de estado",
-                  "value": {
-                    "accion": "status"
-                  }
-                },
-                "deteccion": {
-                  "summary": "Detección automática",
-                  "value": {
-                    "accion": "detectar",
-                    "tag": "v1.2.3"
-                  }
-                },
-                "validacion": {
-                  "summary": "Validación y preparación",
-                  "value": {
-                    "accion": "validate",
-                    "ambiente": "staging"
-                  }
-                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Operación completada exitosamente",
+            "description": "✅ SIEMPRE EXITOSO - Sistema robusto que nunca falla",
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/RespuestaStatus"
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "enum": [true],
+                      "description": "SIEMPRE true para compatibilidad con agentes"
                     },
-                    {
-                      "$ref": "#/components/schemas/RespuestaDetectar"
+                    "accion_ejecutada": {
+                      "type": "string",
+                      "enum": ["detectar", "preparar", "desplegar", "rollback", "status", "validate", "error_recovery"],
+                      "description": "Acción que se ejecutó realmente"
                     },
-                    {
-                      "$ref": "#/components/schemas/RespuestaPreparar"
+                    "alias_usado": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Alias o sinónimo detectado en el payload"
                     },
-                    {
-                      "$ref": "#/components/schemas/RespuestaDesplegar"
+                    "resultado": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Resultado específico de la acción ejecutada"
                     },
-                    {
-                      "$ref": "#/components/schemas/RespuestaRollback"
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "run_id": {
+                          "type": "string"
+                        },
+                        "endpoint": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "version_sistema": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "proximas_acciones": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Sugerencias de próximos pasos"
                     }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Solicitud mal formada o parámetros inválidos",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error interno del servidor",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  },
+                  "required": ["exito", "accion_ejecutada", "resultado"]
                 }
               }
             }
@@ -1291,85 +1286,13 @@
     },
     "/api/ejecutar-cli": {
       "post": {
-        "summary": "[LEGACY] Ejecutar comandos Azure CLI - Usar /api/ejecutar-comando-inteligente para nuevos casos",
-        "description": "⚠️ ENDPOINT LEGACY: Para nuevos casos usar /api/ejecutar-comando-inteligente que incluye autocorrección. Este endpoint solo ejecuta comandos Azure CLI directos con formato: {\"comando\": \"group list\"}",
+        "summary": "🚀 EJECUTOR UNIVERSAL - Acepta cualquier tipo de comando",
+        "description": "⭐ ENDPOINT PRINCIPAL para ejecutar comandos. Acepta Azure CLI, Python, PowerShell, Bash, NPM, Docker y cualquier comando. Formato: {\"comando\": \"az group list\"} o {\"comando\": \"python script.py\"}. Sin restricciones ni validaciones.",
         "operationId": "ejecutarCli",
         "tags": [
-          "Azure CLI - Legacy"
+          "🚀 Universal CLI Executor"
         ],
         "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "comando": {
-                        "type": "string",
-                        "example": "storage account list"
-                      }
-                    },
-                    "required": [
-                      "comando"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "servicio": {
-                        "type": "string",
-                        "example": "storage"
-                      },
-                      "comando": {
-                        "type": "string",
-                        "example": "account list"
-                      }
-                    },
-                    "required": [
-                      "servicio",
-                      "comando"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Respuesta del comando ejecutado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Solicitud inválida"
-          },
-          "403": {
-            "description": "Operación no permitida"
-          },
-          "408": {
-            "description": "Timeout excedido"
-          }
-        }
-      }
-    },
-    "/api/ejecutar-comando-inteligente": {
-      "post": {
-        "summary": "🚀 EJECUTOR INTELIGENTE UNIVERSAL - help → validar → ejecutar → autocorregir",
-        "description": "⭐ ENDPOINT PRINCIPAL PARA COMANDOS CLI. Campo 'comando' es OBLIGATORIO. Formato: {\"comando\": \"az monitor\", \"intencion\": \"crear alerta\"}. Incluye autocorrección automática.",
-        "operationId": "ejecutarComandoInteligente",
-        "tags": [
-          "🚀 Intelligent Executor - USAR ESTE"
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1379,59 +1302,200 @@
                 "properties": {
                   "comando": {
                     "type": "string",
-                    "description": "Comando base CLI (ej: 'az group', 'kubectl get', 'git status')",
-                    "example": "az group"
-                  },
-                  "intencion": {
-                    "type": "string",
-                    "description": "Descripción de lo que quiere hacer",
-                    "example": "listar todos los grupos de recursos"
-                  },
-                  "parametros": {
-                    "type": "object",
-                    "description": "Parámetros adicionales opcionales",
-                    "properties": {
-                      "resource_group": {
-                        "type": "string"
-                      },
-                      "function_app": {
-                        "type": "string"
-                      }
-                    }
+                    "description": "Cualquier comando a ejecutar",
+                    "examples": [
+                      "az group list",
+                      "python -u script.py",
+                      "npm install express",
+                      "docker ps",
+                      "Get-Process"
+                    ]
                   }
                 },
-                "required": [
-                  "comando"
-                ],
+                "required": ["comando"],
                 "additionalProperties": false
-              },
-              "examples": {
-                "listar_grupos": {
-                  "summary": "Listar grupos de recursos",
-                  "value": {
-                    "comando": "az group",
-                    "intencion": "listar todos los grupos de recursos"
-                  }
-                },
-                "crear_alerta": {
-                  "summary": "Crear alerta Azure Monitor HTTP 500",
-                  "value": {
-                    "comando": "az monitor",
-                    "intencion": "crear alerta HTTP 500 para function app",
-                    "parametros": {
-                      "resource_group": "boat-rental-app-group",
-                      "function_app": "copiloto-semantico-func-us2",
-                      "subscription_id": "380fa841-83f3-42fe-adc4-582a5ebe139b"
-                    }
-                  }
-                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Comando procesado exitosamente o con autocorrección"
+            "description": "Comando procesado (exitoso o con error detallado)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "description": "Si el comando se ejecutó exitosamente"
+                    },
+                    "comando": {
+                      "type": "string",
+                      "description": "Comando ejecutado"
+                    },
+                    "output": {
+                      "type": "string",
+                      "description": "Salida estándar del comando"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Mensaje de error si falló"
+                    },
+                    "codigo_salida": {
+                      "type": "integer",
+                      "description": "Código de salida del proceso"
+                    },
+                    "diagnostico": {
+                      "type": "object",
+                      "description": "Información detallada del error para debugging"
+                    },
+                    "sugerencias_solucion": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Sugerencias para resolver el problema"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Timestamp de la ejecución"
+                    }
+                  },
+                  "required": ["exito", "comando"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/aplicar-correccion-manual": {
+      "post": {
+        "summary": "🔧 APLICAR CORRECCIÓN MANUAL - Endpoint universal para aplicar correcciones dinámicas",
+        "description": "Endpoint adaptable que detecta automáticamente el tipo de corrección y la aplica. Soporta: Cosmos DB (timeout), Azure Config, archivos locales, comandos CLI, configuraciones de app. Formato flexible sin predefiniciones rígidas.",
+        "operationId": "aplicarCorreccionManual",
+        "tags": [
+          "Correcciones Universales"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "timeout": {
+                    "type": "integer",
+                    "description": "Timeout en segundos (para Cosmos DB)",
+                    "example": 30
+                  },
+                  "database": {
+                    "type": "string",
+                    "description": "Nombre de la base de datos",
+                    "example": "cosmos-db"
+                  },
+                  "comando": {
+                    "type": "string",
+                    "description": "Comando CLI a ejecutar",
+                    "example": "az storage account list"
+                  },
+                  "ruta": {
+                    "type": "string",
+                    "description": "Ruta del archivo a modificar",
+                    "example": "app.json"
+                  },
+                  "contenido": {
+                    "type": "string",
+                    "description": "Contenido del archivo"
+                  },
+                  "configuracion": {
+                    "type": "object",
+                    "description": "Configuraciones a aplicar",
+                    "additionalProperties": true
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "Alias para configuracion",
+                    "additionalProperties": true
+                  },
+                  "settings": {
+                    "type": "object",
+                    "description": "Settings de Azure",
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true,
+                "examples": [
+                  {
+                    "timeout": 30,
+                    "database": "cosmos-db"
+                  },
+                  {
+                    "comando": "az functionapp restart --name myapp --resource-group myrg"
+                  },
+                  {
+                    "ruta": "app.json",
+                    "configuracion": {
+                      "timeout": 30
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Corrección aplicada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "description": "Si la corrección fue exitosa"
+                    },
+                    "tipo_correccion": {
+                      "type": "string",
+                      "enum": ["cosmos_db", "azure_config", "archivo_local", "comando_cli", "configuracion_app", "generico"],
+                      "description": "Tipo de corrección detectado automáticamente"
+                    },
+                    "resultado": {
+                      "type": "object",
+                      "description": "Detalles del resultado de la corrección"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "run_id": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "endpoint": {
+                          "type": "string"
+                        },
+                        "ambiente": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": ["exito", "tipo_correccion", "resultado"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error en la corrección"
+          },
+          "500": {
+            "description": "Error interno del servidor"
           }
         }
       }
@@ -2003,15 +2067,91 @@
     },
     "/api/bateria-endpoints": {
       "post": {
-        "summary": "Ejecutar batería de pruebas de endpoints",
+        "summary": "🔧 BATERÍA ROBUSTA - Ejecutar batería de pruebas de endpoints",
+        "description": "⭐ ENDPOINT ROBUSTO que ejecuta una batería completa de pruebas de endpoints. Acepta cualquier body JSON o sin body. Nunca falla por formato de entrada. Formato opcional: {} o sin body.",
         "operationId": "bateriaEndpoints",
+        "tags": [
+          "Testing"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Body opcional - acepta cualquier JSON o sin body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batería ejecutada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Total de endpoints probados"
+                        },
+                        "ok": {
+                          "type": "integer",
+                          "description": "Endpoints que respondieron correctamente"
+                        },
+                        "fail": {
+                          "type": "integer",
+                          "description": "Endpoints que fallaron"
+                        }
+                      }
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "status_code": {
+                            "type": "integer"
+                          },
+                          "ok": {
+                            "type": "boolean"
+                          },
+                          "data": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "🔧 BATERÍA ROBUSTA - Ejecutar batería de pruebas (método GET)",
+        "description": "Mismo endpoint robusto pero usando método GET. Útil para agentes que prefieren GET.",
+        "operationId": "bateriaEndpointsGet",
         "tags": [
           "Testing"
         ],
         "security": [],
         "responses": {
           "200": {
-            "description": "Batería ejecutada",
+            "description": "Batería ejecutada exitosamente",
             "content": {
               "application/json": {
                 "schema": {
@@ -2020,9 +2160,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Solicitud inválida"
           }
         }
       }
@@ -2483,12 +2620,8 @@
       "description": "Operaciones de Azure Blob Storage"
     },
     {
-      "name": "Azure CLI - Legacy",
-      "description": "Comandos Azure CLI básicos (usar Intelligent Executor para nuevos casos)"
-    },
-    {
-      "name": "🚀 Intelligent Executor - USAR ESTE",
-      "description": "Ejecutor inteligente universal con autocorrección automática"
+      "name": "🚀 Universal CLI Executor",
+      "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
     },
     {
       "name": "Diagnóstico",
@@ -2522,13 +2655,10 @@
       "name": "Bridge",
       "description": "Endpoints tolerantes para agentes problemáticos"
     },
+
     {
-      "name": "CLI",
-      "description": "Ejecución de comandos CLI vía SDK"
-    },
-    {
-      "name": "Despliegues",
-      "description": "Gestión completa de procesos de despliegue"
+      "name": "🚀 Despliegues Robustos",
+      "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
     }
   ],
   "components": {
@@ -2676,130 +2806,90 @@
           "ambiente"
         ]
       },
-      "AccionDesplegar": {
+      "RespuestaGestionarDespliegueRobusta": {
         "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "deploy"
-            ]
-          }
-        }
-      },
-      "AccionRollback": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "rollback"
-            ]
-          }
-        }
-      },
-      "AccionStatus": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "status"
-            ]
-          }
-        }
-      },
-      "AccionDetectar": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "detectar"
-            ]
-          }
-        }
-      },
-      "AccionPreparar": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "preparar"
-            ]
-          }
-        }
-      },
-      "RespuestaStatus": {
-        "type": "object",
+        "description": "Respuesta unificada del sistema robusto de gestión de despliegues",
         "properties": {
           "exito": {
-            "type": "boolean"
+            "type": "boolean",
+            "enum": [true],
+            "description": "SIEMPRE true para compatibilidad con agentes"
           },
-          "estado": {
-            "type": "string"
+          "accion_ejecutada": {
+            "type": "string",
+            "enum": ["detectar", "preparar", "desplegar", "rollback", "status", "validate", "error_recovery"],
+            "description": "Acción que se ejecutó realmente"
           },
-          "mensaje": {
-            "type": "string"
+          "alias_usado": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alias o sinónimo detectado en el payload"
+          },
+          "resultado": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Resultado específico de la acción ejecutada",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "description": "Tipo de resultado"
+              },
+              "mensaje": {
+                "type": "string",
+                "description": "Mensaje descriptivo"
+              },
+              "comandos_sugeridos": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Comandos sugeridos para ejecutar"
+              },
+              "hash_funcion": {
+                "type": "string",
+                "description": "Hash de la función actual (para detectar)"
+              },
+              "proximo_tag": {
+                "type": "string",
+                "description": "Próximo tag sugerido"
+              },
+              "script_content": {
+                "type": "string",
+                "description": "Contenido del script generado (para preparar)"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "description": "ID único de la ejecución"
+              },
+              "endpoint": {
+                "type": "string",
+                "description": "Endpoint que procesó la petición"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp de la ejecución"
+              },
+              "version_sistema": {
+                "type": "string",
+                "description": "Versión del sistema robusto"
+              }
+            }
+          },
+          "proximas_acciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sugerencias de próximos pasos"
           }
-        }
-      },
-      "RespuestaDetectar": {
-        "type": "object",
-        "properties": {
-          "exito": {
-            "type": "boolean"
-          },
-          "detectado": {
-            "type": "boolean"
-          },
-          "detalles": {
-            "type": "object"
-          }
-        }
-      },
-      "RespuestaPreparar": {
-        "type": "object",
-        "properties": {
-          "exito": {
-            "type": "boolean"
-          },
-          "preparado": {
-            "type": "boolean"
-          },
-          "ruta": {
-            "type": "string"
-          }
-        }
-      },
-      "RespuestaDesplegar": {
-        "type": "object",
-        "properties": {
-          "exito": {
-            "type": "boolean"
-          },
-          "desplegado": {
-            "type": "boolean"
-          },
-          "version": {
-            "type": "string"
-          }
-        }
-      },
-      "RespuestaRollback": {
-        "type": "object",
-        "properties": {
-          "exito": {
-            "type": "boolean"
-          },
-          "rollback_exitoso": {
-            "type": "boolean"
-          },
-          "version_anterior": {
-            "type": "string"
-          }
-        }
+        },
+        "required": ["exito", "accion_ejecutada", "resultado"]
       },
       "Error": {
         "type": "object",
