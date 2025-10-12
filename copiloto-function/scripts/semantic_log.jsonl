@@ -645,3 +645,11 @@
 {"id": "session_1760295004_semantic_1760295004", "session_id": "session_1760295004", "timestamp": "2025-10-12T14:50:04.113270", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760295603_semantic_1760295603", "session_id": "session_1760295603", "timestamp": "2025-10-12T15:00:03.977669", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760296203_semantic_1760296203", "session_id": "session_1760296203", "timestamp": "2025-10-12T15:10:03.877877", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760296805_semantic_1760296805", "session_id": "session_1760296805", "timestamp": "2025-10-12T15:20:05.550980", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760297404_semantic_1760297404", "session_id": "session_1760297404", "timestamp": "2025-10-12T15:30:04.036674", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760298003_semantic_1760298003", "session_id": "session_1760298003", "timestamp": "2025-10-12T15:40:03.906945", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760298603_semantic_1760298603", "session_id": "session_1760298603", "timestamp": "2025-10-12T15:50:03.980734", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760299204_semantic_1760299204", "session_id": "session_1760299204", "timestamp": "2025-10-12T16:00:04.403814", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760299803_semantic_1760299803", "session_id": "session_1760299803", "timestamp": "2025-10-12T16:10:03.817199", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760300403_semantic_1760300403", "session_id": "session_1760300403", "timestamp": "2025-10-12T16:20:03.658259", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760301003_semantic_1760301003", "session_id": "session_1760301003", "timestamp": "2025-10-12T16:30:03.390552", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
