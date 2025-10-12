@@ -7776,17 +7776,57 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     except Exception:
         req_body = {}
 
-    # Unificación semántica de parámetros
-    script_blob_path = req_body.get("script") or req_body.get("script_path")
+    # VALIDACIÓN ROBUSTA Y SEMÁNTICA - Acepta múltiples formatos
+    script_blob_path = (
+        req_body.get("script") or 
+        req_body.get("script_path") or
+        req_body.get("parametros", {}).get("ruta") or
+        req_body.get("parametros", {}).get("script") or
+        req_body.get("ruta") or
+        req_body.get("archivo")
+    )
+    
+    # Si hay intención semántica, interpretarla
+    if not script_blob_path and req_body.get("intencion"):
+        intencion = req_body.get("intencion", "")
+        parametros = req_body.get("parametros", {})
+        
+        if "leer" in intencion and parametros.get("ruta"):
+            ruta = parametros.get("ruta")
+            if ruta.endswith(('.py', '.sh', '.ps1', '.bat')):
+                script_blob_path = ruta
+            else:
+                return func.HttpResponse(json.dumps({
+                    "success": False,
+                    "error": "La ruta especificada no es un script ejecutable",
+                    "sugerencia": "Use /api/leer-archivo para archivos de texto"
+                }), status_code=400, mimetype="application/json")
+    
     timeout_s = int(req_body.get("timeout_s") or req_body.get("timeout") or 60)
     args = req_body.get("args", [])
     interpreter = req_body.get("interpreter")
 
     if not script_blob_path or not isinstance(script_blob_path, str) or not script_blob_path.strip():
+        try:
+            blob_service_client = get_blob_client()
+            scripts_disponibles = []
+            if blob_service_client:
+                container_client = blob_service_client.get_container_client(CONTAINER_NAME)
+                scripts_disponibles = [
+                    blob.name for blob in container_client.list_blobs() 
+                    if blob.name.endswith(('.py', '.sh', '.ps1', '.bat'))
+                ][:10]
+        except:
+            scripts_disponibles = []
+            
         return func.HttpResponse(json.dumps({
             "success": False,
-            "error": "Parámetro 'script' o 'script_path' es requerido y debe ser un string no vacío",
-            "example": {"script": "scripts/mi_script.py"}
+            "error": "No se pudo determinar qué script ejecutar",
+            "formatos_aceptados": {
+                "directo": {"script": "scripts/mi_script.py"},
+                "semantico": {"intencion": "ejecutar", "parametros": {"ruta": "scripts/mi_script.py"}}
+            },
+            "scripts_disponibles": scripts_disponibles
         }), status_code=400, mimetype="application/json")
 
     # 4. Normalizar ruta del script en blob
@@ -7887,7 +7927,7 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             pass
 
-        return func.HttpResponse(json.dumps({
+        resultado = {
             "success": codigo == 0,
             "stdout": salida,
             "stderr": error,
@@ -7896,7 +7936,9 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             "interpreter": interpreter_final,
             "args": args,
             "run_id": run_id
-        }, ensure_ascii=False), status_code=200, mimetype="application/json")
+        }
+        resultado = aplicar_memoria_manual(req, resultado)
+        return func.HttpResponse(json.dumps(resultado, ensure_ascii=False), status_code=200, mimetype="application/json")
     except subprocess.TimeoutExpired:
         try:
             os.unlink(temp_path)
