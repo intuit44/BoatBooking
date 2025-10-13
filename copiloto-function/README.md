@@ -181,7 +181,7 @@ Verificar Phase 2
 Verificar Phase 3
 ./mobile-app/scripts/verify-phase3-complete.ps1
 
-🏗️ Arquitectura de Datos Tablas DynamoDB Users: Gestión de usuarios y autenticación Boats: Catálogo de embarcaciones Bookings: Sistema de reservas Payments: Procesamiento de pagos GraphQL Schema Queries: Consultas para obtener datos Mutations: Operaciones de escritura Subscriptions: Actualizaciones en tiempo real 📈 Roadmap y Próximas Funcionalidades En Desarrollo ✅ Integración completa con servicios de pago ✅ Sistema de notificaciones push 🔄 Geolocalización y mapas 🔄 Sistema de reviews y ratings 🔄 Dashboard en tiempo real Próximas Versiones Chat en tiempo real Sistema de promociones Integración con redes sociales App para capitanes Sistema de mantenimiento 🧪 Testing Frameworks de Testing Jest: Testing unitario React Native Testing Library: Testing de componentes Supertest: Testing de APIs Comandos de Testing bash
+🏗️ Arquitectura de Datos Tablas DynamoDB Users: Gestión de usuarios y autenticación Boats: Catálogo de embarcaciones Bookings: Sistema de reservas Payments: Procesamiento de pagos GraphQL Schema Queries: Consultas para obtener datos Mutations: Operaciones de escritura Subscriptions: Actualizaciones en tiempo real 📈 Roadmap y Próximas Funcionalidades En Desarrollo ✅ Integración completa con servicios de pago ✅ Sistema de notificaciones push 🔄 Geolocalización y mapas 🔄 Sistema de reviews and ratings 🔄 Dashboard en tiempo real Próximas Versiones Chat en tiempo real Sistema de promociones Integración con redes sociales App para capitanes Sistema de mantenimiento 🧪 Testing Frameworks de Testing Jest: Testing unitario React Native Testing Library: Testing de componentes Supertest: Testing de APIs Comandos de Testing bash
 
 Mobile App
 cd mobile-app && npm test
@@ -192,7 +192,7 @@ cd backend && npm test
 Admin Panel
 cd admin-panel && npm test
 
-🔍 Debugging y Troubleshooting Problemas Comunes Errores de TypeScript: Ejecutar node final-typescript-fixes.js Problemas de Amplify: Ejecutar node amplify-v5-complete-fix.js Dependencias: Ejecutar node fix-all-dependencies.js Logs y Monitoreo CloudWatch: Logs de Lambda functions Expo DevTools: Debugging de React Native Redux DevTools: Estado de la aplicación 🤝 Contribución Proceso de Contribución Fork el proyecto Crea una rama para tu feature (git checkout -b feature/AmazingFeature) Commit tus cambios (git commit -m 'Add some AmazingFeature') Push a la rama (git push origin feature/AmazingFeature) Abre un Pull Request Estándares de Código ESLint: Configurado para JavaScript/TypeScript Prettier: Formateo automático de código Husky: Git hooks para pre-commit 📞 Soporte y Contacto Documentación Adicional API Documentation: Disponible en /docs Component Library: Storybook configurado Architecture Decision Records: En /docs/adr Canales de Comunicación Issues: GitHub Issues para bugs y features Discussions: GitHub Discussions para preguntas Wiki: Documentación técnica detallada 📄 Licencia Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para detalles.
+🔍 Debugging y Troubleshooting Problemas Comunes Errores de TypeScript: Ejecutar node final-typescript-fixes.js Problemas de Amplify: Ejecutar node amplify-v5-complete-fix.js Dependencias: Ejecutar node fix-all-dependencies.js Logs y Monitoreo CloudWatch: Logs de Lambda functions Expo DevTools: Debugging de React Native Redux DevTools: Estado de la aplicación 🤝 Contribución Proceso de Contribución Fork el proyecto Crea una rama para tu feature (git checkout -b feature/AmazingFeature) Commit tus cambios (git commit -m 'Add some AmazingFeature') Push a la rama (git push origin feature/AmazingFeature) Abre un Pull Request Estándares de Código ESLint: Configurado para JavaScript/TypeScript Prettier: Formateo automático de código Husky: Git hooks para pre-commit 📞 Soporte y Contacto Documentación Adicional API Documentation: Disponible en /docs Component Library: Storybook configurado Architecture Decision Records: En /docs/adr Canales de Comunicación Issues: GitHub Issues para bugs and features Discussions: GitHub Discussions para preguntas Wiki: Documentación técnica detallada 📄 Licencia Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para detalles.
 
 Repositorio: https://github.com/intuit44/BoatBooking Hash: 6f6cb8e67440918b1f79fe9fd0270f1d36cd8d06 Última actualización: Enero 2025 Versión: 1.0.0
 
@@ -409,6 +409,46 @@ Tests Cognitivos ✅ 100% PASSED Validación completa del sistema
 OpenAPI ✅ ACTUALIZADA Documentación alineada con implementación
 ✨ Resultado: Sistema completamente funcional sin callejones sin salida.
 
+🧠 Detector Inteligente (bing_intent_detector.py)
+Detecta automáticamente cuándo usar Bing Grounding basado en:
+
+Información dinámica: "versión más reciente", "qué hay de nuevo"
+
+Documentación oficial: "qué dice la documentación", "guía oficial"
+
+Problemas reportados: "errores comunes", "GitHub issues"
+
+Comparaciones: "vs", "alternativas a", "mejor que"
+
+Tecnologías dinámicas: DeepSpeed, ChatGPT, Azure OpenAI, etc.
+
+NO usa Bing para:
+
+Comandos básicos conocidos: "cómo usar sed", "ejemplo de script"
+
+Archivos locales: "mi README.md", "archivo local"
+
+🔄 Integración con Validador Semántico
+En el endpoint /api/copiloto:
+
+Extrae consulta del request automáticamente
+
+Detecta intención con el nuevo detector
+
+Si requiere Bing: Ejecuta automáticamente y devuelve respuesta enriquecida
+
+Si no requiere: Continúa con flujo normal
+
+Si Bing falla: Continúa normal pero registra el intento
+
+📊 Ejemplos de Funcionamiento
+Consulta Acción Razón
+"¿Cuál es la versión más reciente de Azure Functions?" ✅ Bing automático Información dinámica
+"¿Qué es DeepSpeed-Chat?" ✅ Bing automático Tecnología dinámica
+"Explica cómo funciona sed" ❌ Flujo normal Comando básico conocido
+"Resume mi README.md" ❌ Flujo normal Archivo local
+El sistema ahora es completamente automático - el usuario no necesita pedir explícitamente Bing Grounding, se activa por detección de intención inteligente.
+
 ## ✅ Mejora al Endpoint `/api/leer-archivo` - Respuesta JSON Estructurada
 
 ### Descripción de la Mejora
@@ -429,3 +469,4 @@ Todas las respuestas ahora siguen este formato estandarizado:
   },
   "errores": []
 }
+```
