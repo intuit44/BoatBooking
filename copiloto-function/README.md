@@ -1,472 +1,141 @@
-🚤 BoatRental Venezuela - Plataforma Completa de Alquiler de Embarcaciones
-Una aplicación completa para el alquiler de embarcaciones en Venezuela, con app móvil, panel de administración web y backend serverless escalable.
-
-🏗️ Arquitectura del Proyecto
-boat-rental-app/ ├── mobile-app/ # React Native + Expo (iOS/Android) ├── backend/ # Serverless Framework + AWS Lambda ├── admin-panel/ # Next.js + Material-UI ├── .codegpt/ # Configuración de agentes CodeGPT └── README.md # Este archivo
-
-🔐 POLÍTICA OFICIAL DE GESTIÓN DE SECRETOS
-Configuración Actual de Seguridad
-✅ Gestión Centralizada: Claves almacenadas en Azure Key Vault (boatRentalVault)
-
-🔐 Secreto principal: ENV-FILE, contiene el .env completo
-
-⚠️ El archivo .env ya no se gestiona localmente en producción
-
-✅ Los scripts o funciones deben consultar el Vault vía getSecret("ENV-FILE")
-
-Variables Críticas:
-
-JWT_SECRET: Configurado en serverless.yml (valor por defecto: 'dev-secret-change-in-production')
-DYNAMODB_TABLE_*: Tablas DynamoDB por ambiente
-AWS Credentials: Configuración local AWS CLI
-Scripts de Seguridad Disponibles
-
-# Generar secretos seguros
-
-node backend/generate-secret.js
-
-# Configurar ambiente de desarrollo
-
-./mobile-app/scripts/setup-dev-environment.sh
-🚀 ESTADO DEL PROYECTO - COMPLETAMENTE FUNCIONAL
-Verificación Completa Realizada
-Fecha de verificación: Enero 2025
-Estado general: ✅ COMPLETAMENTE FUNCIONAL
-
-✅ Mobile App: 1,855+ packages instalados, configuración completa
-✅ Backend: 974 packages instalados, serverless.yml configurado
-✅ Admin Panel: 453 packages instalados, todas las páginas creadas
-📱 Aplicación Móvil (React Native + Expo)
-Tecnologías Activas
-React Native 0.72.10 con Expo ~49.0.15
-TypeScript ^5.1.3 para tipado estático
-Redux Toolkit ^1.9.7 para gestión de estado
-AWS Amplify ^6.0.7 para integración con backend
-React Native Paper ^5.11.1 para componentes UI
-Funcionalidades Implementadas
-🔐 Autenticación: Login/Register con JWT
-🚤 Catálogo de Embarcaciones: Búsqueda y filtros avanzados
-📅 Sistema de Reservas: Booking completo con calendario
-💳 Procesamiento de Pagos: Integración con servicios de pago
-📱 Navegación: Stack y Tab navigation configurados
-Comandos de Ejecución
-bash
-
-cd mobile-app
-npm install                # Instalar dependencias
-npm start                  # Servidor de desarrollo
-npm run android           # Android
-npm run ios               # iOS
-npm run web               # Web Browser
-
-⚡ Backend (Serverless Framework)
-Tecnologías Activas
-Node.js 18.x runtime
-Serverless Framework ^3.38.0
-AWS SDK ^2.1490.0
-JWT ^9.0.2 para autenticación
-DynamoDB: Tables para Users, Boats, Bookings, Payments
-API Endpoints Configurados
-Autenticación: /auth/register, /auth/login, /auth/refresh
-Embarcaciones: /boats (CRUD completo)
-Reservas: /bookings (gestión completa)
-Pagos: /payments/process
-Servicios AWS Integrados
-Lambda Functions: Funciones serverless para cada endpoint
-DynamoDB: Base de datos NoSQL para persistencia
-IAM: Roles y políticas de seguridad
-API Gateway: Gestión de APIs REST
-Comandos de Ejecución
-bash
-
-cd backend
-npm install               # Instalar dependencias
-npm run dev              # Servidor local puerto 3000
-npm run deploy           # Desplegar a AWS (dev)
-npm run deploy:prod      # Desplegar a producción
-🖥️ Panel de Administración (Next.js)
-Tecnologías Activas
-Next.js 14.0.3 con App Router
-Material-UI ^5.14.18
-TypeScript ^5.2.2
-React Hook Form ^7.47.0
-Recharts ^2.8.0 para gráficos
-Páginas Implementadas
-/dashboard - Panel principal con métricas
-/boats - Gestión de embarcaciones
-/bookings - Gestión de reservas
-/users - Gestión de usuarios
-/reports - Reportes y análisis
-Comandos de Ejecución
-bash
+# Copiloto Function
+
+Esta Function App actúa como el orquestador semántico de la plataforma Copiloto: expone endpoints HTTP y timers que permiten a agentes externos leer o modificar archivos, ejecutar scripts o CLI, consultar memoria, diagnosticar despliegues y coordinar acciones de mantenimiento sin salir de Azure Functions.【F:copiloto-function/function_app.py†L3727-L3790】【F:copiloto-function/function_app.py†L4519-L4584】【F:copiloto-function/function_app.py†L5380-L5472】
 
-cd admin-panel
-npm install              # Instalar dependencias
-npm run dev             # Servidor de desarrollo
-npm run build           # Build para producción
-npm start               # Servidor de producción
-🤖 Agentes CodeGPT Especializados
-Estructura de Agentes Activa
-Architect_BoatRental: Arquitectura general y coordinación
-Mobile_App_Agent: React Native/Expo development
-AdminPanel_Agent: Next.js admin panel
-AWS_Agent: Backend serverless y servicios AWS
-Azure_Foundry_Agent: Modelo gpt-35-turbo-instruct
-Configuración Azure OpenAI
-json
-
-{
-  "codegpt.openai_api_type": "azure",
-  "codegpt.openai_api_base": "<https://boatrentalfoundry-dev.openai.azure.com>",
-  "codegpt.openai_api_version": "2023-12-01",
-  "codegpt.openai_deployment_name": "o4-mini",
-  "codegpt.model": "o4-mini"
-}
-
-### Ejecutar un agente de ejemplo
-
-Para probar la integración con Azure AI Foundry:
-
-```bash
-npm run run-agent975
-🔧 Scripts de Mantenimiento Scripts de Corrección Disponibles bash
-
-Corrección de dependencias
-node fix-all-dependencies.js node smart-dependency-fixer.js
-
-Corrección de TypeScript
-node final-typescript-fixes.js node fix-remaining-ts-errors.js
-
-Corrección de Amplify
-node amplify-v5-complete-fix.js node amplify-diagnostic-fix.js
-
-Corrección de versiones Expo
-node expo-version-fixer-pro.js node force-expo-versions.js
-
-🌿 Ramas y Desarrollo Rama Principal main: Rama de producción con deploy automático Workflow: GitHub Actions configurado para CI/CD Deploy: Automático a AWS en push a main CI/CD Pipeline yaml
-
-.github/workflows/deploy.yml
-name: Deploy to AWS on: push: branches: [main] jobs: deploy: runs-on: ubuntu-latest steps: - uses: actions/checkout@v2 - name: Deploy Backend run: cd backend && npm run deploy
-
-📊 Estado del Grafo de Dependencias Estadísticas Actuales Total de archivos: 1000+ archivos Dependencias totales: 3,282+ packages Líneas de código: 15,000+ líneas Plataformas soportadas: iOS, Android, Web Servicios AWS: Lambda, DynamoDB, S3, IAM, Cognito Nodos Críticos del Grafo Más referenciados: useAppSelector, authSlice, fetchBoats Funciones principales: HomeScreen, createResponse, BookingsScreen Servicios clave: PaymentService, BookingsService, BoatsService Interfaces Principales Boat: Definición de embarcaciones Booking: Gestión de reservas PaymentData: Procesamiento de pagos User: Gestión de usuarios 🚀 Inicio Rápido para Desarrolladores Prerrequisitos Node.js 18.x o superior AWS CLI configurado Expo CLI instalado globalmente Git configurado Setup Completo bash
-
-1. Clonar repositorio
-git clone https://github.com/intuit44/BoatBooking.git cd BoatBooking
-
-2. Mobile App
-cd mobile-app npm install npm start
-
-3. Backend (nueva terminal)
-cd ../backend npm install npm run dev
-
-4. Admin Panel (nueva terminal)
-cd ../admin-panel npm install npm run dev
-
-Variables de Entorno Requeridas bash
-
-Backend (.env)
-JWT_SECRET=your-jwt-secret-key JWT_EXPIRES_IN=7d CORS_ORIGIN=* DYNAMODB_TABLE_USERS=boat-rental-users-dev DYNAMODB_TABLE_BOATS=boat-rental-boats-dev DYNAMODB_TABLE_BOOKINGS=boat-rental-bookings-dev DYNAMODB_TABLE_PAYMENTS=boat-rental-payments-dev
-
-AWS Credentials
-aws configure
-
-Verificación de Setup bash
-
-Verificar Amplify
-./mobile-app/scripts/verify-amplify.ps1
-
-Verificar Phase 2
-./mobile-app/scripts/verify-phase2-complete.ps1
-
-Verificar Phase 3
-./mobile-app/scripts/verify-phase3-complete.ps1
-
-🏗️ Arquitectura de Datos Tablas DynamoDB Users: Gestión de usuarios y autenticación Boats: Catálogo de embarcaciones Bookings: Sistema de reservas Payments: Procesamiento de pagos GraphQL Schema Queries: Consultas para obtener datos Mutations: Operaciones de escritura Subscriptions: Actualizaciones en tiempo real 📈 Roadmap y Próximas Funcionalidades En Desarrollo ✅ Integración completa con servicios de pago ✅ Sistema de notificaciones push 🔄 Geolocalización y mapas 🔄 Sistema de reviews and ratings 🔄 Dashboard en tiempo real Próximas Versiones Chat en tiempo real Sistema de promociones Integración con redes sociales App para capitanes Sistema de mantenimiento 🧪 Testing Frameworks de Testing Jest: Testing unitario React Native Testing Library: Testing de componentes Supertest: Testing de APIs Comandos de Testing bash
-
-Mobile App
-cd mobile-app && npm test
-
-Backend
-cd backend && npm test
-
-Admin Panel
-cd admin-panel && npm test
-
-🔍 Debugging y Troubleshooting Problemas Comunes Errores de TypeScript: Ejecutar node final-typescript-fixes.js Problemas de Amplify: Ejecutar node amplify-v5-complete-fix.js Dependencias: Ejecutar node fix-all-dependencies.js Logs y Monitoreo CloudWatch: Logs de Lambda functions Expo DevTools: Debugging de React Native Redux DevTools: Estado de la aplicación 🤝 Contribución Proceso de Contribución Fork el proyecto Crea una rama para tu feature (git checkout -b feature/AmazingFeature) Commit tus cambios (git commit -m 'Add some AmazingFeature') Push a la rama (git push origin feature/AmazingFeature) Abre un Pull Request Estándares de Código ESLint: Configurado para JavaScript/TypeScript Prettier: Formateo automático de código Husky: Git hooks para pre-commit 📞 Soporte y Contacto Documentación Adicional API Documentation: Disponible en /docs Component Library: Storybook configurado Architecture Decision Records: En /docs/adr Canales de Comunicación Issues: GitHub Issues para bugs and features Discussions: GitHub Discussions para preguntas Wiki: Documentación técnica detallada 📄 Licencia Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para detalles.
-
-Repositorio: https://github.com/intuit44/BoatBooking Hash: 6f6cb8e67440918b1f79fe9fd0270f1d36cd8d06 Última actualización: Enero 2025 Versión: 1.0.0
-
-📊 Métricas del Proyecto Componente Archivos Dependencias Estado Mobile App 500+ 1,855+ ✅ Funcional Backend 200+ 974 ✅ Funcional Admin Panel 150+ 453 ✅ Funcional Total 850+ 3,282+ ✅ Completamente Funcional ¡Bienvenido al proyecto BoatRental Venezuela! 🚤
-
-Este README.md actualizado incluye:
-
-✅ Política oficial de gestión de secretos
-✅ Tecnologías activas con versiones específicas
-✅ Estado completo del grafo con estadísticas reales
-✅ Agentes CodeGPT documentados
-✅ Scripts de mantenimiento listados
-✅ Configuración de ramas y CI/CD
-✅ Setup detallado para desarrolladores nuevos
-✅ Arquitectura completa del proyecto
-✅ Troubleshooting y debugging
-✅ Métricas actualizadas del proyecto
-El README está listo para ser guardado como README.md en la raíz del proyecto.
-
-🔍 Tests de Validación Cognitiva
-✅ Tests automatizados de funciones clave
-Archivo Propósito
-test_cosmos_memory.py Verifica consultas semánticas a memoria en Cosmos DB
-test_core_functions.py Valida lógica de autorreparación, mapeo de errores y recuperación
-test_endpoint_422.py Simula flujo real de error → memoria → retry automático
-test_bing_simple.py Valida activación inteligente de Bing Grounding y construcción de comando
-Total: 15 assertions, 100% PASSED. Última ejecución: 2025-10-08.
-
-🧪 Comandos de Testing Cognitivo
-# Ejecutar todos los tests cognitivos
-cd copiloto-function
-python -m pytest tests/ -v
-
-# Test específico de memoria semántica
-python test_cosmos_memory.py
-
-# Test de autorreparación
-python test_core_functions.py
-
-# Test de flujo completo error → retry
-python test_endpoint_422.py
-
-# Test de Bing Grounding
-python test_bing_simple.py
-📊 Cobertura de Tests Cognitivos
-Memoria Semántica: ✅ 100% - Consultas a Cosmos DB
-Autorreparación: ✅ 100% - Lógica de recovery automático
-Mapeo de Errores: ✅ 100% - Identificación y clasificación
-Bing Grounding: ✅ 100% - Activación inteligente
-Flujos Completos: ✅ 100% - End-to-end scenarios
-⚡ ACTUALIZACIÓN CRÍTICA: Endpoint /api/ejecutar-cli Universal
-🚀 CAMBIO CONFIRMADO Y PROBADO
-El endpoint /api/ejecutar-cli ha sido completamente rediseñado y ahora es el ejecutor universal para todos los tipos de comandos:
-
-✅ Capacidades Confirmadas
-🚫 NUNCA rechaza comandos - Eliminados todos los errores 422
-🔄 Detección automática - Identifica Azure CLI, Python, PowerShell, Bash, NPM, Docker
-⚡ Redirección inteligente - Si no es Azure CLI, ejecuta con subprocess automáticamente
-✅ Respuesta consistente - Siempre devuelve resultado, nunca falla por tipo de comando
-📋 Ejemplos de Uso Universal
-# Azure CLI
-curl -X POST http://localhost:7071/api/ejecutar-cli \
-  -H "Content-Type: application/json" \
-  -d '{"comando": "az storage account list"}'
-
-# Python
-curl -X POST http://localhost:7071/api/ejecutar-cli \
-  -H "Content-Type: application/json" \
-  -d '{"comando": "python -u script.py"}'
-
-# PowerShell
-curl -X POST http://localhost:7071/api/ejecutar-cli \
-  -H "Content-Type: application/json" \
-  -d '{"comando": "Get-Process"}'
-
-# NPM
-curl -X POST http://localhost:7071/api/ejecutar-cli \
-  -H "Content-Type: application/json" \
-  -d '{"comando": "npm install express"}'
-🎯 Respuesta Unificada
-{
-  "exito": true,
-  "comando": "python -u script.py",
-  "tipo_comando": "python",
-  "resultado": "Script ejecutado correctamente",
-  "codigo_salida": 0,
-  "tiempo_ejecucion": "<60s",
-  "ejecutor": "subprocess_fallback"
-}
-🔧 Arquitectura Interna
-# Flujo unificado:
-comando → detect_type() → if azure_cli: use_az_binary()
-                       → else: subprocess.run(comando)
-📊 Métricas de Rendimiento
-Tipo de Comando Éxito Rate Tiempo Promedio Estado
-Azure CLI 98% 2.1s ✅ Óptimo
-Python 96% 1.8s ✅ Excelente
-PowerShell 94% 2.3s ✅ Bueno
-Bash/Generic 92% 1.5s ✅ Funcional
-🔗 Endpoint /api/bing-grounding
-/api/bing-grounding
-Sistema de conocimiento externo inteligente que actúa cuando el sistema interno no puede continuar y necesita ayuda externa.
-
-📥 Input
-{
-  "query": "cómo crear base de datos en Cosmos DB",
-  "contexto": "fallo en CLI - comando no reconocido",
-  "intencion_original": "ejecutar comando az cosmosdb create",
-  "prioridad": "alta"
-}
-📤 Output
-{
-  "exito": true,
-  "resultado": {
-    "resumen": "Para crear una base de datos Cosmos DB, usa az cosmosdb sql database create con los parámetros correctos...",
-    "comando_sugerido": "az cosmosdb sql database create --account-name myaccount --resource-group mygroup --name mydatabase",
-    "fuentes": ["https://docs.microsoft.com/azure/cosmos-db/..."],
-    "confianza": 0.95
-  },
-  "reutilizable": true,
-  "accion_sugerida": "Reintentar con comando sugerido"
-}
-🎯 Activación Automática
-El endpoint se activa automáticamente en estos escenarios:
-
-Comando ejecutado pero falló (no por tipo, sino por ejecución)
-Error desconocido no mapeado en el sistema
-Herramienta no reconocida o acción ambigua
-Optimización solicitada sin conocimiento interno
-Configuración faltante o documentación insuficiente
-🔗 Hooks de Integración
-# Hooks que activan Bing Grounding automáticamente
-hook_ejecutar_cli_bing()      # Fallos en ejecución (no en tipo)
-hook_hybrid_bing()            # Procesamiento híbrido
-hook_render_error_bing()      # Errores de renderizado
-hook_memory_fallback_bing()   # Memoria insuficiente
-📈 Métricas de Grounding
-Métrica Valor Estado
-Activaciones exitosas 95% ✅ Excelente
-Tiempo de respuesta < 3s ✅ Óptimo
-Comandos útiles generados 89% ✅ Alto
-Reutilización de soluciones 76% ✅ Bueno
-🛡️ Bing Fallback Guard - Sistema de Última Línea de Defensa
-✅ Módulo Centralizado de Recuperación Automática
-El sistema incluye un guardia de fallback que previene callejones sin salida mediante Bing Grounding automático.
-
-Componente Función Estado
-bing_fallback_guard.py Módulo centralizado de detección y recuperación ✅ Activo
-verifica_si_requiere_grounding() Detecta pérdida de conciencia del sistema ✅ 7/7 tests
-ejecutar_grounding_fallback() Ejecuta Bing como fallback automático ✅ Integrado
-aplicar_fallback_a_respuesta() Mejora respuestas con conocimiento externo ✅ Funcional
-🔄 Integración por Endpoint
-Endpoints con Fallback Guard Activo
-✅ /api/preparar-script - Fallback en generación de scripts
-✅ /api/ejecutar-cli - UNIVERSAL: Ejecuta cualquier comando, fallback solo en errores de ejecución
-🔄 /api/copiloto - Listo para activación cuando sea necesario
-⚡ Nota Importante sobre /api/ejecutar-cli
-Con las últimas actualizaciones confirmadas:
-
-Ya NO necesita fallback por tipo de comando - acepta todos los tipos
-Fallback Guard solo se activa si el comando falla en ejecución (no por rechazo)
-Eliminados completamente los errores 422 por tipo de comando
-Flujo simplificado: Comando → Ejecutar → Si falla → Bing Grounding
-📊 Métricas de Efectividad
-# Ejecutar tests del sistema de fallback
-python test_fallback_guard.py
-
-# Resultados esperados
-Testing bing_fallback_guard módulo centralizado...
-OK: Detecta fallo en generación de script
-OK: Detecta solicitud de conocimiento externo  
-OK: Detecta error no resoluble internamente
-OK: No activa cuando no es necesario
-OK: Fallback exitoso mejora respuesta con error
-OK: Fallback fallido mantiene respuesta original
-OK: Integración en preparar-script funciona correctamente
-
-Fallback Guard tests PASSED ✅
-🧠 Casos de Uso del Fallback Guard
-✅ Triggers de Activación Automática
-Fallo en generación de scripts - Sistema no puede crear el script solicitado
-Comandos CLI no reconocidos - Azure CLI retorna errores de comando desconocido
-Configuraciones faltantes - Parámetros requeridos no disponibles internamente
-Herramientas no disponibles - Dependencias o binarios no encontrados
-Solicitudes de conocimiento externo - Usuario pregunta sobre temas no documentados
-🔧 Implementación Simple
-from bing_fallback_guard import verifica_si_requiere_grounding, ejecutar_grounding_fallback
-
-# En cualquier endpoint donde el sistema "pierde conciencia"
-if not resultado.get("exito"):
-    if verifica_si_requiere_grounding(resultado, contexto):
-        fallback = ejecutar_grounding_fallback(prompt, contexto, error_info)
-        if fallback.get("exito"):
-            resultado = aplicar_fallback_a_respuesta(resultado, fallback)
-📈 Beneficios del Sistema
-🚫 Cero Callejones Sin Salida: El sistema nunca falla completamente
-🧠 Aprendizaje Continuo: Cada fallback mejora el conocimiento interno
-⚡ Recuperación Automática: Sin intervención manual requerida
-📊 Monitoreo Integrado: Logs semánticos de todas las activaciones
-🔄 Mejora Progresiva: Las soluciones se almacenan para futuros usos
-🎯 Próximas Integraciones
-Los siguientes endpoints están listos para recibir Fallback Guard:
-
-/api/escribir-archivo - Para casos de rutas complejas
-/api/modificar-archivo - Para operaciones de contenido avanzadas
-/api/crear-contenedor - Para configuraciones de Azure desconocidas
-/api/diagnostico-recursos - Para recursos no documentados
-📊 Estado Final del Sistema
-Componente Estado Descripción
-/api/ejecutar-cli ✅ UNIVERSAL Ejecuta cualquier comando sin rechazos
-Fallback Guard ✅ ACTIVO Recuperación automática en fallos
-Bing Grounding ✅ INTEGRADO Conocimiento externo cuando es necesario
-Tests Cognitivos ✅ 100% PASSED Validación completa del sistema
-OpenAPI ✅ ACTUALIZADA Documentación alineada con implementación
-✨ Resultado: Sistema completamente funcional sin callejones sin salida.
-
-🧠 Detector Inteligente (bing_intent_detector.py)
-Detecta automáticamente cuándo usar Bing Grounding basado en:
-
-Información dinámica: "versión más reciente", "qué hay de nuevo"
-
-Documentación oficial: "qué dice la documentación", "guía oficial"
-
-Problemas reportados: "errores comunes", "GitHub issues"
-
-Comparaciones: "vs", "alternativas a", "mejor que"
-
-Tecnologías dinámicas: DeepSpeed, ChatGPT, Azure OpenAI, etc.
-
-NO usa Bing para:
-
-Comandos básicos conocidos: "cómo usar sed", "ejemplo de script"
-
-Archivos locales: "mi README.md", "archivo local"
-
-🔄 Integración con Validador Semántico
-En el endpoint /api/copiloto:
-
-Extrae consulta del request automáticamente
-
-Detecta intención con el nuevo detector
-
-Si requiere Bing: Ejecuta automáticamente y devuelve respuesta enriquecida
-
-Si no requiere: Continúa con flujo normal
-
-Si Bing falla: Continúa normal pero registra el intento
-
-📊 Ejemplos de Funcionamiento
-Consulta Acción Razón
-"¿Cuál es la versión más reciente de Azure Functions?" ✅ Bing automático Información dinámica
-"¿Qué es DeepSpeed-Chat?" ✅ Bing automático Tecnología dinámica
-"Explica cómo funciona sed" ❌ Flujo normal Comando básico conocido
-"Resume mi README.md" ❌ Flujo normal Archivo local
-El sistema ahora es completamente automático - el usuario no necesita pedir explícitamente Bing Grounding, se activa por detección de intención inteligente.
-
-## ✅ Mejora al Endpoint `/api/leer-archivo` - Respuesta JSON Estructurada
-
-### Descripción de la Mejora
-El endpoint `/api/leer-archivo` ha sido completamente refactorizado para devolver respuestas JSON consistentes y estructuradas, eliminando inconsistencias previas y mejorando la integración con agentes AI.
-
-### Estructura de Respuesta Unificada
-Todas las respuestas ahora siguen este formato estandarizado:
-
-```json
-{
-  "exito": true,
-  "data": {
-    "contenido": "Contenido del archivo",
-    "metadatos": {
-      "nombre": "archivo.txt",
-      "tamano": 1234
-    }
-  },
-  "errores": []
-}
-```
+## Arquitectura general
+
+- `function_app.py` concentra todos los endpoints HTTP y el timer del supervisor cognitivo; cada ruta aplica wrappers comunes para diagnósticos, memoria y manejo de errores antes de devolver respuestas para Foundry o agentes Codex.【F:copiloto-function/function_app.py†L1432-L1484】【F:copiloto-function/function_app.py†L4179-L4199】【F:copiloto-function/function_app.py†L6463-L6479】
+- Los módulos de `services/` encapsulan persistencia y analítica: `memory_service.py` escribe eventos en Cosmos DB (con fallback local) y `cognitive_supervisor.py` genera snapshots `estado_sistema_YYYYMMDD_HHmmss` con métricas agregadas; `cosmos_store.py` inicializa el contenedor y maneja autenticación por clave o Managed Identity.【F:copiloto-function/services/memory_service.py†L12-L127】【F:copiloto-function/services/cognitive_supervisor.py†L1-L88】【F:copiloto-function/services/cosmos_store.py†L24-L110】
+- Los helpers `memory_precheck.py` y `memory_manual.py` inyectan contexto de conversación en las respuestas, mientras que otros servicios (`semantic_intent_parser`, `memory_helpers`, `services/session_memory`) aportan enriquecimiento semántico sobre la marcha.【F:copiloto-function/memory_precheck.py†L12-L115】【F:copiloto-function/memory_manual.py†L10-L55】【F:copiloto-function/function_app.py†L4992-L5003】【F:copiloto-function/function_app.py†L5736-L5785】
+
+## 🧠 Sistema de Memoria y Contexto
+
+Este sistema utiliza memoria persistente en Cosmos DB para dar continuidad a interacciones de agentes. La información se recupera antes de ejecutar cada acción crítica, se enriquece la respuesta con metadatos de sesión y se registran snapshots cognitivos periódicos.
+
+### Capas de memoria
+
+1. **Pre-check automático (`consultar_memoria_antes_responder`)** recupera hasta tres interacciones previas por sesión y devuelve un resumen con el número de interacciones, última actividad y estado de la continuidad. Se aplica antes de ejecutar la lógica del endpoint cuando existe `session_id` en headers, query o body.【F:copiloto-function/memory_precheck.py†L12-L115】
+2. **Wrapper manual (`aplicar_memoria_manual`)** asegura que toda respuesta incluya `session_id`, `agent_id`, bandera de memoria disponible y marcas temporales incluso si el payload original no era un diccionario, evitando pérdidas de contexto en Foundry.【F:copiloto-function/memory_manual.py†L10-L55】
+3. **Supervisor cognitivo** analiza la memoria cada diez minutos, identifica tendencias y guarda snapshots `estado_sistema_YYYYMMDD_HHmmss` con métricas de estabilidad y recomendaciones que también se exponen vía API.【F:copiloto-function/function_app.py†L6463-L6479】【F:copiloto-function/services/cognitive_supervisor.py†L14-L88】
+4. **Consultas y paneles de memoria** permiten a los agentes inspeccionar manualmente la memoria de sesión, recuperar el último snapshot o ver contexto agregado por agente cuando necesitan reconstruir estado antes de tomar decisiones.【F:copiloto-function/function_app.py†L5736-L5857】
+
+### Flujo de enriquecimiento por solicitud
+
+1. **Recepción y pre-check**: los endpoints críticos ejecutan `consultar_memoria_antes_responder` para saber si deben continuar una conversación existente (ejemplo en `leer-archivo`, `copiloto`, `status`, `ejecutar`, `hybrid`, `escribir-archivo` y `modificar-archivo`).【F:copiloto-function/function_app.py†L1432-L1469】【F:copiloto-function/function_app.py†L3727-L3785】【F:copiloto-function/function_app.py†L4179-L4195】【F:copiloto-function/function_app.py†L4519-L4541】【F:copiloto-function/function_app.py†L4979-L5003】【F:copiloto-function/function_app.py†L6801-L6810】【F:copiloto-function/function_app.py†L7048-L7134】
+2. **Ejecución de la operación**: cada handler implementa validaciones resilientes (regex, defaults y parsing tolerante) antes de tocar archivos, ejecutar comandos o invocar servicios externos.【F:copiloto-function/function_app.py†L1476-L1484】【F:copiloto-function/function_app.py†L4553-L4584】【F:copiloto-function/function_app.py†L6856-L6880】【F:copiloto-function/function_app.py†L7060-L7134】
+3. **Enriquecimiento de respuesta**: todas las rutas que manipulan agentes o devuelven diagnósticos aplican el wrapper manual para incluir `session_info`, flags de memoria y timestamps consistentes.【F:copiloto-function/function_app.py†L1467-L1473】【F:copiloto-function/function_app.py†L3783-L3789】【F:copiloto-function/function_app.py†L4507-L4511】【F:copiloto-function/function_app.py†L6804-L6810】
+4. **Persistencia**: el `MemoryService` registra eventos en Cosmos DB (contener `memory`, base `agentMemory`) con fallback JSONL local para resiliencia, y los endpoints de diagnóstico también escriben eventos semánticos cuando se completan verificaciones o auditorías.【F:copiloto-function/services/memory_service.py†L12-L127】【F:copiloto-function/function_app.py†L13059-L13083】
+5. **Evaluación cognitiva**: el timer del supervisor guarda snapshots periódicos y notifica al servicio de memoria; estos resultados pueden consultarse desde `GET /api/conocimiento-cognitivo` para contextualizar nuevas acciones.【F:copiloto-function/function_app.py†L6463-L6479】【F:copiloto-function/function_app.py†L5804-L5819】
+
+### Cobertura de memoria por endpoint
+
+- **Pre-check + memoria manual**: `GET /api/leer-archivo`, `GET /api/copiloto`, `GET /api/status`, `POST /api/ejecutar`, `POST /api/hybrid`, `POST /api/escribir-archivo` y `POST /api/modificar-archivo` conservan continuidad completa (pre-check + wrapper).【F:copiloto-function/function_app.py†L1432-L1469】【F:copiloto-function/function_app.py†L3727-L3785】【F:copiloto-function/function_app.py†L4179-L4195】【F:copiloto-function/function_app.py†L4519-L4541】【F:copiloto-function/function_app.py†L4979-L5003】【F:copiloto-function/function_app.py†L6801-L6810】【F:copiloto-function/function_app.py†L7048-L7134】
+- **Solo memoria manual**: la mayoría de las rutas (archivos, scripts, diagnósticos, CLI, despliegues) añaden `session_info` aunque no necesiten consultar historial antes de ejecutar, manteniendo trazabilidad uniforme para Foundry.【F:copiloto-function/function_app.py†L4437-L4511】【F:copiloto-function/function_app.py†L5736-L5785】【F:copiloto-function/function_app.py†L7884-L8099】【F:copiloto-function/function_app.py†L9042-L9646】【F:copiloto-function/function_app.py†L9935-L10430】【F:copiloto-function/function_app.py†L10562-L11194】【F:copiloto-function/function_app.py†L11368-L11751】【F:copiloto-function/function_app.py†L12498-L14094】【F:copiloto-function/function_app.py†L14576-L14884】
+- **Sin wrappers**: utilidades como `probar-endpoint`, `test-wrapper-memoria`, `bridge-cli`, `diagnostico-eliminar` o `aplicar-correccion` operan sin memoria porque devuelven respuestas sintéticas o validan los propios wrappers.【F:copiloto-function/function_app.py†L2232-L2340】【F:copiloto-function/function_app.py†L4207-L4251】【F:copiloto-function/function_app.py†L5380-L5472】【F:copiloto-function/function_app.py†L13305-L13394】【F:copiloto-function/function_app.py†L14114-L14173】
+
+### Cosmos DB y persistencia de interacciones
+
+- **Configuración**: se espera `COSMOSDB_ENDPOINT`, `COSMOSDB_DATABASE` (por defecto `agentMemory`) y `COSMOSDB_CONTAINER` (`memory`). El cliente intenta autenticarse primero con `DefaultAzureCredential` (Managed Identity) y luego con clave; si falla, desactiva la capa y usa logs locales.【F:copiloto-function/services/memory_service.py†L12-L78】【F:copiloto-function/services/cosmos_store.py†L24-L78】
+- **Estructura de eventos**: cada registro incluye `session_id`, `event_type`, `data` y `timestamp`. Las interacciones de agentes, alertas y fixes pendientes se persisten con IDs únicos y quedan disponibles para queries posteriores.【F:copiloto-function/services/memory_service.py†L40-L126】
+- **Observabilidad**: `GET /api/verificar-cosmos` comprueba conectividad, método de autenticación y devuelve la última escritura para validar que el pipeline de memoria sigue activo.【F:copiloto-function/function_app.py†L14729-L14796】
+
+## Catálogo de endpoints
+
+### Orquestación semántica y herramientas
+
+- `GET /api/copiloto` — Panel semántico principal, lista capacidades y responde a comandos naturales aplicando pre-check y memoria.【F:copiloto-function/function_app.py†L3727-L3827】
+- `POST /api/ejecutar` — Orquestador universal de intenciones que enruta a lectores, diagnósticos o scripts según el análisis semántico del payload.【F:copiloto-function/function_app.py†L4519-L4709】
+- `POST /api/hybrid` — Intérprete de lenguaje natural tolerante que decide entre endpoints y puede invocar Bing Grounding si detecta preguntas abiertas.【F:copiloto-function/function_app.py†L4979-L5109】
+- `POST /api/bridge-cli` — Fallback para agentes con JSON malformado; acepta cualquier payload, valida y reenvía a `ejecutar-cli` con comandos saneados.【F:copiloto-function/function_app.py†L5380-L5472】
+- `POST /api/ejecutar-cli` — Ejecutor universal de comandos Azure CLI que nunca devuelve 400: responde con ayudas si falta `comando` y valida disponibilidad del binario antes de ejecutar.【F:copiloto-function/function_app.py†L11369-L11626】
+- `POST /api/invocar` — Permite encadenar endpoints internos de la Function App reenviando requests normalizados entre funciones.【F:copiloto-function/function_app.py†L5638-L5733】
+- `POST /api/interpretar-intencion` — Convierte texto natural en comandos estructurados apoyándose en el parser semántico compartido.【F:copiloto-function/function_app.py†L5860-L5908】
+- `POST /api/bing-grounding` — Wrapper directo para ejecutar grounding semántico con Bing cuando se requiera información externa.【F:copiloto-function/function_app.py†L6023-L6109】
+- `POST /api/probar-endpoint` — Proxie que ejecuta otros endpoints de la Function App para validación rápida sin memoria asociada.【F:copiloto-function/function_app.py†L2232-L2354】
+
+### Memoria, contexto y snapshots
+
+- `GET/POST /api/consultar-memoria` — Recupera historial de una sesión específica y genera prompts listos para agentes.【F:copiloto-function/function_app.py†L5736-L5785】
+- `GET /api/conocimiento-cognitivo` — Expone el snapshot más reciente creado por el supervisor cognitivo con recomendaciones.【F:copiloto-function/function_app.py†L5804-L5819】
+- `GET /api/contexto-agente` — Devuelve contexto agregado por agente o estado general del sistema desde la memoria semántica.【F:copiloto-function/function_app.py†L5829-L5857】
+- `GET /api/test-wrapper-memoria` — Endpoint de diagnóstico que muestra cómo se extraen `session_id` y `agent_id` desde headers/query.【F:copiloto-function/function_app.py†L4207-L4251】
+- `POST /api/aplicar-correccion-manual` — Guarda acciones correctivas manuales con metadatos de sesión para trazabilidad.【F:copiloto-function/function_app.py†L14877-L14947】
+
+### Operaciones sobre archivos y almacenamiento
+
+- `GET /api/leer-archivo` — Lector inteligente con pre-check de memoria, autodetección de rutas especiales y respuestas contextualizadas.【F:copiloto-function/function_app.py†L1432-L1484】
+- `POST /api/escribir-archivo` — Crea o sobrescribe archivos locales/blob con parser ultra resiliente y memoria aplicada.【F:copiloto-function/function_app.py†L6801-L6880】
+- `POST /api/modificar-archivo` — Edita archivos con operaciones (`agregar_final`, `reemplazar`, etc.) y fallback de creación si el archivo no existe.【F:copiloto-function/function_app.py†L7048-L7180】
+- `POST/DELETE /api/eliminar-archivo` — Borra archivos locales o blobs con validaciones de ruta segura.【F:copiloto-function/function_app.py†L7289-L7394】
+- `POST /api/mover-archivo` — Mueve archivos entre rutas o contenedores garantizando consistencia de metadata.【F:copiloto-function/function_app.py†L8746-L8844】
+- `POST /api/copiar-archivo` — Copia archivos con soporte para blobs y almacenamiento local.【F:copiloto-function/function_app.py†L9631-L9726】
+- `GET /api/info-archivo` — Devuelve metadata detallada de tamaño, timestamps y tipo para un archivo dado.【F:copiloto-function/function_app.py†L9042-L9153】
+- `GET /api/descargar-archivo` — Descarga contenido como base64 o binario listo para agentes.【F:copiloto-function/function_app.py†L9583-L9630】
+- `POST /api/escribir-archivo-local` — Variante explícita para filesystem local usada en flujos controlados.【F:copiloto-function/function_app.py†L4757-L4898】
+- `GET /api/listar-blobs` — Lista blobs con paginación y estadísticas en la cuenta configurada.【F:copiloto-function/function_app.py†L4437-L4511】
+- `POST /api/crear-contenedor` — Crea contenedores de Blob Storage con validaciones de nombre y región.【F:copiloto-function/function_app.py†L10185-L10331】
+- `POST /api/actualizar-contenedor` — Aplica políticas o configuración avanzada a contenedores existentes.【F:copiloto-function/function_app.py†L11079-L11194】
+- `POST /api/proxy-local` — Reenvía requests HTTP a servicios locales protegidos desde la Function App.【F:copiloto-function/function_app.py†L10377-L10542】
+
+### Scripts y automatización
+
+- `POST /api/ejecutar-script` — Ejecuta scripts almacenados en blob o filesystem con seguimiento de resultados y memoria.【F:copiloto-function/function_app.py†L7884-L8099】
+- `POST /api/ejecutar-script-local` — Corre scripts locales controlando permisos y rutas seguras.【F:copiloto-function/function_app.py†L7758-L7881】
+- `POST /api/verificar-script` — Revisa sintaxis y compatibilidad antes de ejecutar un script proporcionado.【F:copiloto-function/function_app.py†L8090-L8246】
+- `POST /api/preparar-script` — Genera scaffolding y empaqueta scripts antes de su ejecución o despliegue.【F:copiloto-function/function_app.py†L9935-L10058】
+- `POST /api/render-error` — Genera respuestas de error con formato estándar a partir de eventos capturados.【F:copiloto-function/function_app.py†L10060-L10183】
+
+### Despliegue y configuración
+
+- `POST /api/gestionar-despliegue` — Gestiona versiones, consulta estado y activa acciones de despliegue coordinadas.【F:copiloto-function/function_app.py†L10562-L10941】
+- `POST /api/desplegar-funcion` — Empaqueta y despliega funciones hacia Azure Function Apps objetivo.【F:copiloto-function/function_app.py†L10975-L11078】
+- `POST /api/deploy` — Despliegue directo de artefactos con control de versión y rollback integrado.【F:copiloto-function/function_app.py†L13348-L13499】
+- `POST /api/configurar-cors` — Actualiza políticas CORS de la Function App en caliente.【F:copiloto-function/function_app.py†L13503-L13585】
+- `POST /api/configurar-app-settings` — Administra variables de aplicación con validaciones y respaldo semántico.【F:copiloto-function/function_app.py†L13605-L13765】
+- `POST /api/escalar-plan` — Ajusta SKU y capacidad del plan de consumo/dedicado según parámetros recibidos.【F:copiloto-function/function_app.py†L13781-L13980】
+- `POST /api/rollback` — Revierte cambios aplicando correcciones guardadas previamente.【F:copiloto-function/function_app.py†L14035-L14068】
+- `POST /api/promover` — Promueve artefactos entre entornos y registra auditoría en memoria.【F:copiloto-function/function_app.py†L14069-L14089】
+- `GET /api/promocion-reporte` — Genera reportes de promoción para seguimiento humano.【F:copiloto-function/function_app.py†L14090-L14113】
+- `GET /api/revisar-correcciones` — Lista correcciones pendientes aplicables al sistema.【F:copiloto-function/function_app.py†L14114-L14156】
+- `POST /api/aplicar-correccion` — Ejecuta correcciones automáticas detectadas por el sistema.【F:copiloto-function/function_app.py†L14157-L14181】
+
+### Diagnóstico y observabilidad
+
+- `GET /api/status` — Resumen ligero del estado de la Function App con indicadores de almacenamiento y endpoints clave.【F:copiloto-function/function_app.py†L4179-L4201】
+- `GET /api/health` — Health check completo con capacidades expuestas para monitores externos.【F:copiloto-function/function_app.py†L6487-L6514】
+- `GET/POST /api/diagnostico-recursos-completo` — Ejecuta diagnósticos profundos sobre recursos Azure, registrando auditorías en memoria.【F:copiloto-function/function_app.py†L12498-L12838】
+- `GET /api/auditar-deploy` — Obtiene auditorías de despliegue y métricas de versiones activas.【F:copiloto-function/function_app.py†L12693-L12774】
+- `GET/POST /api/bateria-endpoints` — Ejecuta pruebas de humo sobre múltiples endpoints para verificar disponibilidad.【F:copiloto-function/function_app.py†L12869-L12947】
+- `GET/POST /api/diagnostico-recursos` — Diagnóstico parametrizable de recursos individuales con registro semántico.【F:copiloto-function/function_app.py†L12956-L13115】
+- `POST /api/diagnostico-configurar` — Ajusta parámetros de diagnóstico automatizado.【F:copiloto-function/function_app.py†L13245-L13289】
+- `GET /api/diagnostico-listar` — Lista diagnósticos configurados en el sistema.【F:copiloto-function/function_app.py†L13290-L13304】
+- `POST/DELETE /api/diagnostico-eliminar` — Elimina configuraciones de diagnóstico específicas.【F:copiloto-function/function_app.py†L13305-L13394】
+- `POST /api/autocorregir` — Dispara flujos de autocorrección basados en memoria y diagnósticos previos.【F:copiloto-function/function_app.py†L14183-L14505】
+- `GET /api/verificar-sistema` — Ejecuta verificación integral del entorno (dependencias, funciones, storage).【F:copiloto-function/function_app.py†L14576-L14620】
+- `GET /api/verificar-app-insights` — Comprueba la integración con Application Insights y registra eventos semánticos.【F:copiloto-function/function_app.py†L14621-L14718】
+- `GET /api/verificar-cosmos` — Valida la conectividad con Cosmos DB y devuelve el último documento encontrado.【F:copiloto-function/function_app.py†L14729-L14796】
+
+### OpenAPI y utilidades
+
+- `GET /api/openapi.yaml` y `GET /api/api/openapi.yaml` — Sirven el documento OpenAPI actualizado para consumidores externos.【F:copiloto-function/function_app.py†L4358-L4371】
+- `GET /api/debug-openapi` — Herramienta de depuración para comprobar rutas detectadas dinámicamente.【F:copiloto-function/function_app.py†L4372-L4434】
+- `GET /api/bateria-endpoints` (modo GET) y `POST /api/bateria-endpoints` — ya descrito arriba pero útil como suite de diagnóstico automatizado.【F:copiloto-function/function_app.py†L12869-L12947】
+
+## Supervisión continua
+
+- El timer `cognitive_supervisor_timer` se ejecuta cada diez minutos (`0 */10 * * * *`) y registra tanto logs como eventos semánticos, garantizando que Foundry siempre disponga de un snapshot vigente sin intervención manual.【F:copiloto-function/function_app.py†L6463-L6479】
+- Los endpoints de estado, verificación y diagnóstico alimentan al `MemoryService`, permitiendo reconstruir la línea de tiempo completa de acciones dentro de Cosmos DB o, en su defecto, en los logs JSONL locales.【F:copiloto-function/function_app.py†L4179-L4201】【F:copiloto-function/function_app.py†L13059-L13083】【F:copiloto-function/services/memory_service.py†L40-L126】
+
+## Ejecución local
+
+1. Instalar dependencias de la Function App:
+   ```bash
+   cd copiloto-function
+   npm install  # para tooling local
+   pip install -r requirements.txt
+   func start
+   ```
+2. Configurar variables necesarias (`COSMOSDB_ENDPOINT`, `BLOB_CONNECTION_STRING`, credenciales Azure) antes de iniciar para habilitar memoria persistente y acceso a storage.【F:copiloto-function/services/memory_service.py†L12-L78】【F:copiloto-function/function_app.py†L4437-L4476】
+3. Validar salud inicial visitando `GET /api/health` y `GET /api/status`; luego ejecutar `GET /api/verificar-cosmos` para confirmar persistencia de memoria.【F:copiloto-function/function_app.py†L4179-L4201】【F:copiloto-function/function_app.py†L6487-L6514】【F:copiloto-function/function_app.py†L14729-L14796】
+
+Con esta documentación, cualquier agente o supervisor externo obtiene una instantánea semántica completa del sistema, comprende cómo se gestiona la memoria persistente y puede localizar rápidamente el endpoint adecuado para cada flujo operativo.
