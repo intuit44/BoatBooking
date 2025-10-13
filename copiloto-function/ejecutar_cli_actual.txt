@@ -1,0 +1,367 @@
+@app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
+    """Endpoint robusto para ejecutar comandos Azure CLI"""
+    comando = None
+    az_paths = []
+    try:
+        body = req.get_json()
+        logging.warning(f"[DEBUG] Payload recibido: {body}")
+        
+        if not body:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Request body must be valid JSON",
+                    "ejemplo": {"comando": "storage account list"}
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        comando = body.get("comando")
+        if not comando:
+            if body.get("intencion"):
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": "Este endpoint no maneja intenciones, solo comandos CLI.",
+                        "sugerencia": "Usa /api/hybrid para intenciones semánticas."
+                    }),
+                    status_code=422,
+                    mimetype="application/json"
+                )
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Falta el parámetro 'comando'.",
+                    "ejemplo": {"comando": "storage account list"}
+                }),
+                status_code=400,
+                mimetype="application/json"
+            )
+        
+        # DETECCIÓN ROBUSTA DE AZURE CLI
+        az_paths = [
+            shutil.which("az"),
+            shutil.which("az.cmd"),
+            shutil.which("az.exe"),
+            "/usr/bin/az",
+            "/usr/local/bin/az",
+            "C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd",
+            "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd"
+        ]
+        
+        az_binary = None
+        for path in az_paths:
+            if path and os.path.exists(path):
+                az_binary = path
+                break
+        
+        if not az_binary:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": "Azure CLI no está instalado o no está disponible en el PATH",
+                    "diagnostico": {
+                        "paths_verificados": [p for p in az_paths if p],
+                        "sugerencia": "Instalar Azure CLI o verificar PATH",
+                        "ambiente": "Azure" if IS_AZURE else "Local"
+                    }
+                }),
+                status_code=503,
+                mimetype="application/json"
+            )
+        
+        # ✅ VERIFICACIÓN PREVIA: Comprobar existencia de archivos si el comando los referencia
+        archivo_verificado = _verificar_archivos_en_comando(comando)
+        if not archivo_verificado["exito"]:
+            return func.HttpResponse(
+                json.dumps(archivo_verificado, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200  # 200 para que Foundry pueda procesar el error
+            )
+        
+        # REDIRECCIÓN AUTOMÁTICA: Si no es comando Azure CLI, redirigir a ejecutor genérico
+        try:
+            from command_type_detector import detect_and_normalize_command
+            
+            # Detectar tipo de comando dinámicamente
+            detection = detect_and_normalize_command(comando)
+            command_type = detection.get("type", "generic")
+            
+            logging.info(f"Comando detectado como: {command_type}")
+            
+            # Si NO es comando Azure CLI, redirigir automáticamente
+            if command_type != "azure_cli":
+                logging.info(f"Redirigiendo comando {command_type} a ejecutor genérico")
+                
+                # 🔧 NORMALIZACIÓN ROBUSTA para comandos no-Azure CLI
+                comando_normalizado = _normalizar_comando_robusto(comando)
+                logging.info(f"Comando normalizado: {comando_normalizado}")
+                
+                # Usar la función ejecutar_comando_sistema directamente
+                resultado = ejecutar_comando_sistema(comando_normalizado, command_type)
+                return func.HttpResponse(
+                    json.dumps(resultado, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200  # ✅ CAMBIO: Siempre 200
+                )
+            
+            # Normalizar comando Azure CLI
+            comando = detection.get("normalized_command", comando)
+            
+        except ImportError as e:
+            logging.warning(f"No se pudo importar command_type_detector: {e}")
+            # Fallback: si no parece Azure CLI, ejecutar como comando genérico
+            if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
+                logging.info("Ejecutando comando no-Azure con fallback genérico")
+                # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
+                comando_normalizado = _normalizar_comando_robusto(comando)
+                logging.info(f"Comando fallback normalizado: {comando_normalizado}")
+                # Usar la función ejecutar_comando_sistema directamente
+                resultado = ejecutar_comando_sistema(comando_normalizado, "generic")
+                return func.HttpResponse(
+                    json.dumps(resultado, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200 if resultado.get("exito") else 500
+                )
+            
+            # Agregar prefijo az si no lo tiene
+            if not comando.startswith("az "):
+                comando = f"az {comando}"
+        
+        # 🔧 NORMALIZACIÓN ROBUSTA: Manejar rutas con espacios y caracteres especiales
+        comando = _normalizar_comando_robusto(comando)
+        
+        # Manejar conflictos de output
+        if "-o table" in comando and "--output json" not in comando:
+            # Si ya tiene -o table, no agregar --output json
+            pass
+        elif "--output" not in comando and "-o" not in comando:
+            comando += " --output json"
+        
+        logging.info(f"Ejecutando: {comando} con binary: {az_binary}")
+        
+        # EJECUCIÓN ROBUSTA: Manejar rutas con espacios y comandos complejos
+        import shlex
+        
+        try:
+            # Método 1: Usar shlex para parsing inteligente
+            if az_binary != "az":
+                # Reemplazar 'az' con ruta completa manteniendo estructura
+                if comando.startswith("az "):
+                    comando_final = comando.replace("az ", f'"{az_binary}" ', 1)
+                else:
+                    comando_final = f'"{az_binary}" {comando}'
+            else:
+                comando_final = comando
+            
+            # Detectar si necesita shell=True (rutas con espacios, pipes, etc.)
+            needs_shell = any(char in comando_final for char in [' && ', ' || ', '|', '>', '<', '"', "'"])
+            
+            if needs_shell:
+                # Usar shell para comandos complejos
+                result = subprocess.run(
+                    comando_final,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    encoding="utf-8",
+                    errors="replace"
+                )
+            else:
+                # Usar lista de argumentos para comandos simples
+                try:
+                    cmd_parts = shlex.split(comando_final)
+                    result = subprocess.run(
+                        cmd_parts,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding="utf-8",
+                        errors="replace"
+                    )
+                except ValueError:
+                    # Fallback a shell si shlex falla
+                    result = subprocess.run(
+                        comando_final,
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding="utf-8",
+                        errors="replace"
+                    )
+        except Exception as exec_error:
+            # Último fallback: shell simple
+            logging.warning(f"Fallback a shell simple: {exec_error}")
+            result = subprocess.run(
+                comando,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                encoding="utf-8",
+                errors="replace"
+            )
+        
+        if result.returncode == 0:
+            # Intentar parsear JSON solo si no es tabla
+            if "-o table" not in comando:
+                try:
+                    output_json = json.loads(result.stdout) if result.stdout else []
+                    resultado_temp = {
+                        "exito": True,
+                        "comando": comando,
+                        "resultado": output_json,
+                        "codigo_salida": result.returncode
+                    }
+                    resultado_temp = aplicar_memoria_manual(req, resultado_temp)
+                    return func.HttpResponse(
+                        json.dumps(resultado_temp),
+                        mimetype="application/json",
+                        status_code=200
+                    )
+                except json.JSONDecodeError:
+                    pass
+            
+            # Devolver como texto si no es JSON válido
+            resultado_temp = {
+                "exito": True,
+                "comando": comando,
+                "resultado": result.stdout,
+                "codigo_salida": result.returncode,
+                "formato": "texto"
+            }
+            resultado_temp = aplicar_memoria_manual(req, resultado_temp)
+            return func.HttpResponse(
+                json.dumps(resultado_temp),
+                mimetype="application/json",
+                status_code=200
+            )
+        else:
+            # 🔍 DETECCIÓN DE ARGUMENTOS FALTANTES
+            error_msg = result.stderr or "Comando falló sin mensaje de error"
+            
+            # Detectar argumentos faltantes comunes
+            missing_arg_info = _detectar_argumento_faltante(comando, error_msg)
+            
+            if missing_arg_info:
+                # Si detectamos argumento faltante, ofrecer solución inteligente
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "comando": comando,
+                        "error": error_msg,
+                        "codigo_salida": result.returncode,
+                        "diagnostico": {
+                            "argumento_faltante": missing_arg_info["argumento"],
+                            "descripcion": missing_arg_info["descripcion"],
+                            "sugerencia_automatica": missing_arg_info["sugerencia"],
+                            "comando_para_listar": missing_arg_info.get("comando_listar"),
+                            "valores_comunes": missing_arg_info.get("valores_comunes", [])
+                        },
+                        "accion_sugerida": f"Ejecutar: {missing_arg_info.get('comando_listar', 'az group list')} para obtener valores disponibles"
+                    }),
+                    mimetype="application/json",
+                    status_code=400  # 400 para argumentos faltantes, no 500
+                )
+            
+            # Error normal sin argumentos faltantes detectados - MEJORADO
+            error_result = {
+                "exito": False,
+                "comando": comando,
+                "error": error_msg,
+                "codigo_salida": result.returncode,
+                "stderr": result.stderr,
+                "stdout": result.stdout,
+                "diagnostico": {
+                    "tipo_error": "ejecucion_fallida",
+                    "comando_completo": comando,
+                    "az_binary_usado": az_binary,
+                    "ambiente": "Azure" if IS_AZURE else "Local"
+                },
+                "sugerencias_debug": [
+                    "Verificar sintaxis del comando",
+                    "Comprobar permisos de Azure CLI",
+                    "Revisar si el recurso existe",
+                    "Ejecutar 'az login' si hay problemas de autenticación"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+            error_result = aplicar_memoria_manual(req, error_result)
+            return func.HttpResponse(
+                json.dumps(error_result),
+                mimetype="application/json",
+                status_code=200  # ✅ CAMBIO: Siempre 200 para que Foundry pueda procesar
+            )
+    
+    except subprocess.TimeoutExpired:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "Comando excedió tiempo límite (60s)",
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "timeout",
+                    "timeout_segundos": 60,
+                    "sugerencia": "El comando tardó más de 60 segundos en ejecutarse"
+                },
+                "sugerencias_solucion": [
+                    "Verificar conectividad de red",
+                    "Simplificar el comando si es muy complejo",
+                    "Verificar que Azure CLI esté respondiendo"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }),
+            mimetype="application/json",
+            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
+        )
+    except FileNotFoundError as e:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": "Azure CLI no encontrado en el sistema",
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "programa_no_encontrado",
+                    "programa_buscado": "az (Azure CLI)",
+                    "paths_verificados": [p for p in az_paths if p] if 'az_paths' in locals() else [],
+                    "error_detallado": str(e)
+                },
+                "sugerencias_solucion": [
+                    "Instalar Azure CLI desde https://docs.microsoft.com/cli/azure/install-azure-cli",
+                    "Verificar que Azure CLI esté en el PATH del sistema",
+                    "Reiniciar terminal después de la instalación"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }),
+            mimetype="application/json",
+            status_code=200  # ✅ CAMBIO: 200 en lugar de 503
+        )
+    except Exception as e:
+        logging.error(f"Error en ejecutar_cli_http: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "excepcion_inesperada",
+                    "tipo_excepcion": type(e).__name__,
+                    "mensaje_completo": str(e)
+                },
+                "sugerencias_debug": [
+                    "Verificar formato del comando",
+                    "Comprobar logs del sistema",
+                    "Reportar este error si persiste"
+                ],
+                "timestamp": datetime.now().isoformat(),
+                "ambiente": "Azure" if IS_AZURE else "Local"
+            }),
+            mimetype="application/json",
+            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
+        )
+
