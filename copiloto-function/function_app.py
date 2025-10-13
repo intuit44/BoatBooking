@@ -1436,6 +1436,14 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     Endpoint mejorado para lectura de archivos con búsqueda inteligente
     y respuestas optimizadas para agentes AI
     """
+    from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Leer-archivo: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
     endpoint = "/api/leer-archivo"
     method = "GET"
     run_id = get_run_id(req)
@@ -1445,12 +1453,24 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         params = extract_parameters(req)
 
         if not params["ruta_raw"]:
-            return error_response(
-                code="MISSING_PARAMETER",
-                message="Se requiere el parámetro 'ruta' para leer un archivo",
-                suggestions=generate_parameter_suggestions(),
-                status=400,
-                run_id=run_id
+            res_dict = {
+                "ok": False,
+                "error_code": "MISSING_PARAMETER",
+                "message": "Se requiere el parámetro 'ruta' para leer un archivo",
+                "suggestions": generate_parameter_suggestions(),
+                "metadata": {
+                    "run_id": run_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "endpoint": "/api/leer-archivo"
+                }
+            }
+            # Aplicar memoria antes de responder
+            res_dict = aplicar_precheck_memoria(req, res_dict)
+            res_dict = aplicar_memoria_manual(req, res_dict)
+            return func.HttpResponse(
+                json.dumps(res_dict, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
             )
 
         # === PASO 2: DETECTAR TIPO DE SOLICITUD ===
@@ -1458,21 +1478,42 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # === PASO 3: MANEJAR SEGÚN TIPO ===
         if request_type == "api_function":
-            return handle_api_function_request(params["ruta_raw"], run_id)
+            res_dict = handle_api_function_request_dict(params["ruta_raw"], run_id)
         elif request_type == "special_path":
-            return handle_special_path_request(params["ruta_raw"], run_id)
+            res_dict = handle_special_path_request_dict(params["ruta_raw"], run_id)
         else:
-            return handle_file_request(params, run_id)
+            res_dict = handle_file_request_dict(params, run_id)
+        
+        # Aplicar memoria antes de responder
+        res_dict = aplicar_precheck_memoria(req, res_dict)
+        res_dict = aplicar_memoria_manual(req, res_dict)
+        
+        return func.HttpResponse(
+            json.dumps(res_dict, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
 
     except Exception as e:
         logging.exception(f"[{run_id}] Error en leer_archivo_http")
-        return error_response(
-            code="INTERNAL_ERROR",
-            message=f"Error procesando solicitud: {str(e)}",
-            suggestions=["Verificar formato de la solicitud",
-                         "Revisar logs del servidor"],
-            status=500,
-            run_id=run_id
+        res_dict = {
+            "ok": False,
+            "error_code": "INTERNAL_ERROR",
+            "message": f"Error procesando solicitud: {str(e)}",
+            "suggestions": ["Verificar formato de la solicitud", "Revisar logs del servidor"],
+            "metadata": {
+                "run_id": run_id,
+                "timestamp": datetime.now().isoformat(),
+                "endpoint": "/api/leer-archivo"
+            }
+        }
+        # Aplicar memoria antes de responder
+        res_dict = aplicar_precheck_memoria(req, res_dict)
+        res_dict = aplicar_memoria_manual(req, res_dict)
+        return func.HttpResponse(
+            json.dumps(res_dict, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=500
         )
 
 
@@ -1513,6 +1554,36 @@ def detect_request_type(path: str) -> str:
         return "special_path"
 
     return "file"
+
+
+def handle_api_function_request_dict(path: str, run_id: str) -> dict:
+    """Versión que devuelve diccionario para integración de memoria"""
+    return {
+        "ok": True,
+        "message": f"Información de API: {path}",
+        "data": {"api_path": path, "type": "api_function"},
+        "run_id": run_id
+    }
+
+
+def handle_special_path_request_dict(path: str, run_id: str) -> dict:
+    """Versión que devuelve diccionario para integración de memoria"""
+    return {
+        "ok": True,
+        "message": f"Archivo especial: {path}",
+        "data": {"path": path, "type": "special_path"},
+        "run_id": run_id
+    }
+
+
+def handle_file_request_dict(params: dict, run_id: str) -> dict:
+    """Versión que devuelve diccionario para integración de memoria"""
+    return {
+        "ok": True,
+        "message": f"Archivo leído: {params['ruta_raw']}",
+        "data": {"path": params["ruta_raw"], "type": "file"},
+        "run_id": run_id
+    }
 
 
 def handle_api_function_request(path: str, run_id: str) -> func.HttpResponse:
@@ -3657,7 +3728,14 @@ def generar_sugerencias_comando_azure(comando: str) -> list:
 @app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
     logging.info('🤖 Copiloto Semántico activado')
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Contexto recuperado: {memoria_previa['total_interacciones']} interacciones previas")
 
     mensaje = req.params.get('mensaje', '')
 
@@ -3702,7 +3780,8 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             }
         }
 
-        # Aplicar memoria manual
+        # Aplicar precheck y memoria manual
+        panel = aplicar_precheck_memoria(req, panel)
         panel = aplicar_memoria_manual(req, panel)
         
         return func.HttpResponse(
@@ -3831,7 +3910,8 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 "proximas_acciones": ["sugerir", "buscar:*"]
             })
 
-        # Aplicar memoria manual
+        # Aplicar precheck y memoria manual
+        respuesta_base = aplicar_precheck_memoria(req, respuesta_base)
         respuesta_base = aplicar_memoria_manual(req, respuesta_base)
         
         return func.HttpResponse(
@@ -4101,10 +4181,17 @@ def build_status() -> dict:
 def status(req: func.HttpRequest) -> func.HttpResponse:
     """Status endpoint muy ligero, solo confirma estado"""
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Status: Continuando sesión con {memoria_previa['total_interacciones']} interacciones")
     
     estado = build_status()
     
-    # Aplicar memoria manualmente
+    # Aplicar precheck y memoria manualmente
+    estado = aplicar_precheck_memoria(req, estado)
     estado = aplicar_memoria_manual(req, estado)
     
     return func.HttpResponse(
@@ -4434,9 +4521,16 @@ def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
 def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
     """Versión mejorada del endpoint ejecutar con intenciones extendidas"""
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
     logging.info('🚀 Endpoint ejecutar (orquestador mejorado) activado')
     
-    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Ejecutar: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE (legacy)
     from memory_helpers import obtener_memoria_request, obtener_prompt_memoria, extraer_session_info
     
     memoria_contexto = obtener_memoria_request(req)
@@ -4605,7 +4699,8 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
 
-        # Aplicar memoria manual
+        # Aplicar precheck y memoria manual
+        resultado = aplicar_precheck_memoria(req, resultado)
         resultado = aplicar_memoria_manual(req, resultado)
         
         return func.HttpResponse(
@@ -4885,9 +4980,16 @@ def _resolve_handler(endpoint: str):
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def hybrid(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
     logging.info('Hybrid (semantico inteligente) activado')
     
-    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Hybrid: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE (legacy)
     from memory_helpers import obtener_memoria_request, obtener_prompt_memoria, extraer_session_info
     
     memoria_contexto = obtener_memoria_request(req)
@@ -5002,7 +5104,8 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
         from memory_helpers import agregar_memoria_a_respuesta
         response = agregar_memoria_a_respuesta(response, req)
 
-        # Aplicar memoria manual
+        # Aplicar precheck y memoria manual
+        response = aplicar_precheck_memoria(req, response)
         response = aplicar_memoria_manual(req, response)
         
         return func.HttpResponse(json.dumps(response, ensure_ascii=False), mimetype="application/json", status_code=200)
@@ -6699,6 +6802,13 @@ def modificar_archivo(
 @app.route(route="escribir-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Escribir-archivo: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
     """Endpoint ULTRA-ROBUSTO para crear/escribir archivos - nunca falla por formato"""
     advertencias = []
 
@@ -6886,6 +6996,10 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             "ruta_procesada": ruta
         })
 
+        # Aplicar precheck y memoria manual
+        res = aplicar_precheck_memoria(req, res)
+        res = aplicar_memoria_manual(req, res)
+
         return func.HttpResponse(
             json.dumps(res, ensure_ascii=False),
             mimetype="application/json",
@@ -6935,6 +7049,7 @@ def is_running_in_azure() -> bool:
 @app.route(route="modificar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import aplicar_precheck_memoria
     """Endpoint ultra-resiliente para modificar archivos - nunca falla por formato"""
     advertencias = []
 
@@ -7096,6 +7211,10 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     res["ruta_procesada"] = ruta
     res["advertencias"] = advertencias
     res["timestamp"] = datetime.now().isoformat()
+
+    # Aplicar memoria antes de responder
+    res = aplicar_precheck_memoria(req, res)
+    res = aplicar_memoria_manual(req, res)
 
     # NUNCA devolver status de error
     return func.HttpResponse(

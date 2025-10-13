@@ -1,6 +1,13 @@
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Ejecutar-CLI: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
     """Endpoint robusto para ejecutar comandos Azure CLI"""
     comando = None
     az_paths = []
@@ -218,6 +225,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                         "resultado": output_json,
                         "codigo_salida": result.returncode
                     }
+                    resultado_temp = aplicar_precheck_memoria(req, resultado_temp)
                     resultado_temp = aplicar_memoria_manual(req, resultado_temp)
                     return func.HttpResponse(
                         json.dumps(resultado_temp),
