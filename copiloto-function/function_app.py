@@ -3770,6 +3770,7 @@ def generar_sugerencias_comando_azure(comando: str) -> list:
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
     
     logging.info('🤖 Copiloto Semántico activado')
     
@@ -3777,6 +3778,35 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     memoria_previa = consultar_memoria_antes_responder(req)
     if memoria_previa and memoria_previa.get("contexto_recuperado"):
         logging.info(f"🧠 Contexto recuperado: {memoria_previa['total_interacciones']} interacciones previas")
+    
+    # Extraer consulta del request
+    try:
+        body = req.get_json() or {}
+        consulta = body.get("consulta") or body.get("query") or body.get("mensaje") or body.get("prompt") or ""
+        
+        if consulta:
+            # 🔍 DETECCIÓN INTELIGENTE DE BING GROUNDING
+            bing_result = integrar_con_validador_semantico_inteligente(req, consulta, memoria_previa)
+            
+            # Si Bing ya resolvió la consulta completamente
+            if bing_result.get("respuesta_final"):
+                respuesta = bing_result["respuesta_final"]
+                respuesta = aplicar_precheck_memoria(req, respuesta)
+                respuesta = aplicar_memoria_manual(req, respuesta)
+                
+                return func.HttpResponse(
+                    json.dumps(respuesta, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+            
+            # Si se detectó necesidad de Bing pero falló, continuar con nota
+            if bing_result.get("bing_fallido"):
+                logging.info(f"🔍 Bing Grounding detectado pero falló, continuando con flujo normal")
+        
+    except Exception as e:
+        logging.error(f"Error en detección Bing: {e}")
+        # Continuar con flujo normal si hay error
 
     mensaje = req.params.get('mensaje', '')
 
