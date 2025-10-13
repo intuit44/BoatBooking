@@ -5992,7 +5992,7 @@ def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception as grounding_error:
             logging.error(f"Error en Bing Grounding: {grounding_error}")
             
-            # Fallback local robusto
+            # Fallback local robustoP
             fallback_result = {
                 "exito": True,
                 "fuente": "fallback_local",
@@ -11250,7 +11250,7 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    """Endpoint robusto para ejecutar comandos Azure CLI"""
+    """Endpoint UNIVERSAL para ejecutar comandos - NUNCA falla con HTTP 400"""
     comando = None
     az_paths = []
     try:
@@ -11258,35 +11258,55 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         logging.warning(f"[DEBUG] Payload recibido: {body}")
         
         if not body:
+            # ✅ CAMBIO: HTTP 200 con mensaje explicativo
+            resultado = {
+                "exito": False,
+                "error": "Request body must be valid JSON",
+                "ejemplo": {"comando": "storage account list"},
+                "accion_requerida": "Proporciona un comando válido en el campo 'comando'"
+            }
+            resultado = aplicar_memoria_manual(req, resultado)
             return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Request body must be valid JSON",
-                    "ejemplo": {"comando": "storage account list"}
-                }),
-                status_code=400,
+                json.dumps(resultado),
+                status_code=200,  # ✅ SIEMPRE 200
                 mimetype="application/json"
             )
         
         comando = body.get("comando")
         if not comando:
             if body.get("intencion"):
+                # ✅ CAMBIO: HTTP 200 con redirección sugerida
+                resultado = {
+                    "exito": False,
+                    "error": "Este endpoint ejecuta comandos CLI, no intenciones semánticas",
+                    "sugerencia": "Usa /api/hybrid para intenciones semánticas",
+                    "alternativa": "O proporciona un comando CLI directo",
+                    "ejemplo": {"comando": "storage account list"}
+                }
+                resultado = aplicar_memoria_manual(req, resultado)
                 return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "error": "Este endpoint no maneja intenciones, solo comandos CLI.",
-                        "sugerencia": "Usa /api/hybrid para intenciones semánticas."
-                    }),
-                    status_code=422,
+                    json.dumps(resultado),
+                    status_code=200,  # ✅ SIEMPRE 200
                     mimetype="application/json"
                 )
+            
+            # ✅ CAMBIO: HTTP 200 con solicitud de comando
+            resultado = {
+                "exito": False,
+                "error": "Falta el parámetro 'comando'",
+                "accion_requerida": "¿Qué comando CLI quieres ejecutar?",
+                "ejemplo": {"comando": "storage account list"},
+                "comandos_comunes": [
+                    "storage account list",
+                    "group list", 
+                    "functionapp list",
+                    "storage container list --account-name <nombre>"
+                ]
+            }
+            resultado = aplicar_memoria_manual(req, resultado)
             return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Falta el parámetro 'comando'.",
-                    "ejemplo": {"comando": "storage account list"}
-                }),
-                status_code=400,
+                json.dumps(resultado),
+                status_code=200,  # ✅ SIEMPRE 200
                 mimetype="application/json"
             )
         
@@ -11498,24 +11518,93 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             missing_arg_info = _detectar_argumento_faltante(comando, error_msg)
             
             if missing_arg_info:
-                # Si detectamos argumento faltante, ofrecer solución inteligente
+                # 🧠 AUTOCORRECCIÓN CON MEMORIA
+                logging.info(f"🔍 Argumento faltante detectado: --{missing_arg_info['argumento']}")
+                
+                # Intentar autocorrección con memoria
+                try:
+                    from memory_helpers_autocorrection import buscar_parametro_en_memoria, obtener_memoria_request
+                    
+                    memoria_contexto = obtener_memoria_request(req)
+                    if memoria_contexto and memoria_contexto.get("tiene_historial"):
+                        valor_memoria = buscar_parametro_en_memoria(
+                            memoria_contexto, 
+                            missing_arg_info["argumento"], 
+                            comando
+                        )
+                        
+                        if valor_memoria:
+                            # ✅ REEJECUTAR COMANDO AUTOCORREGIDO
+                            comando_corregido = f"{comando} --{missing_arg_info['argumento']} {valor_memoria}"
+                            logging.info(f"🧠 Reejecutando con memoria: {comando_corregido}")
+                            
+                            # Ejecutar comando corregido
+                            result_corregido = subprocess.run(
+                                comando_corregido,
+                                shell=True,
+                                capture_output=True,
+                                text=True,
+                                timeout=60,
+                                encoding="utf-8",
+                                errors="replace"
+                            )
+                            
+                            if result_corregido.returncode == 0:
+                                try:
+                                    output_json = json.loads(result_corregido.stdout) if result_corregido.stdout else []
+                                except json.JSONDecodeError:
+                                    output_json = result_corregido.stdout
+                                
+                                resultado_temp = {
+                                    "exito": True,
+                                    "comando_original": comando,
+                                    "comando_ejecutado": comando_corregido,
+                                    "resultado": output_json,
+                                    "codigo_salida": result_corregido.returncode,
+                                    "autocorreccion": {
+                                        "aplicada": True,
+                                        "argumento_corregido": missing_arg_info["argumento"],
+                                        "valor_usado": valor_memoria,
+                                        "fuente": "memoria_sesion"
+                                    },
+                                    "mensaje": f"✅ Comando autocorregido usando memoria: --{missing_arg_info['argumento']} {valor_memoria}"
+                                }
+                                resultado_temp = aplicar_memoria_manual(req, resultado_temp)
+                                return func.HttpResponse(
+                                    json.dumps(resultado_temp),
+                                    mimetype="application/json",
+                                    status_code=200
+                                )
+                except Exception as e:
+                    logging.warning(f"Error en autocorrección: {e}")
+                
+                # ✅ NO SE PUDO AUTOCORREGIR - SOLICITAR AL USUARIO (HTTP 200)
+                resultado_temp = {
+                    "exito": False,
+                    "comando": comando,
+                    "error": f"Falta el argumento --{missing_arg_info['argumento']}",
+                    "accion_requerida": f"¿Puedes indicarme el valor para --{missing_arg_info['argumento']}?",
+                    "diagnostico": {
+                        "argumento_faltante": missing_arg_info["argumento"],
+                        "descripcion": missing_arg_info["descripcion"],
+                        "sugerencia_automatica": missing_arg_info["sugerencia"],
+                        "comando_para_listar": missing_arg_info.get("comando_listar"),
+                        "valores_comunes": missing_arg_info.get("valores_comunes", []),
+                        "memoria_consultada": True,
+                        "valor_encontrado_en_memoria": False
+                    },
+                    "sugerencias": [
+                        f"Ejecutar: {missing_arg_info.get('comando_listar', 'az --help')} para ver valores disponibles",
+                        f"Proporcionar --{missing_arg_info['argumento']} <valor> en el comando",
+                        "El sistema recordará el valor para futuros comandos"
+                    ],
+                    "ejemplo_corregido": f"{comando} --{missing_arg_info['argumento']} <valor>"
+                }
+                resultado_temp = aplicar_memoria_manual(req, resultado_temp)
                 return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "comando": comando,
-                        "error": error_msg,
-                        "codigo_salida": result.returncode,
-                        "diagnostico": {
-                            "argumento_faltante": missing_arg_info["argumento"],
-                            "descripcion": missing_arg_info["descripcion"],
-                            "sugerencia_automatica": missing_arg_info["sugerencia"],
-                            "comando_para_listar": missing_arg_info.get("comando_listar"),
-                            "valores_comunes": missing_arg_info.get("valores_comunes", [])
-                        },
-                        "accion_sugerida": f"Ejecutar: {missing_arg_info.get('comando_listar', 'az group list')} para obtener valores disponibles"
-                    }),
+                    json.dumps(resultado_temp),
                     mimetype="application/json",
-                    status_code=400  # 400 para argumentos faltantes, no 500
+                    status_code=200  # ✅ SIEMPRE 200, NUNCA 400
                 )
             
             # Error normal sin argumentos faltantes detectados - MEJORADO

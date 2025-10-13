@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "2.12",
-    "description": "Herramienta directa a la Function App (sin Logic App / SAS)",
+    "version": "2.13",
+    "description": "Herramienta directa a la Function App con autocorrección inteligente y memoria integrada",
     "license": {
       "name": "MIT",
       "url": "https://opensource.org/licenses/MIT"
@@ -1337,13 +1337,19 @@
     },
     "/api/ejecutar-cli": {
       "post": {
-        "summary": "🚀 EJECUTOR UNIVERSAL - Acepta cualquier tipo de comando",
-        "description": "⭐ ENDPOINT PRINCIPAL para ejecutar comandos. Acepta Azure CLI, Python, PowerShell, Bash, NPM, Docker y cualquier comando. Formato: {\"comando\": \"az group list\"} o {\"comando\": \"python script.py\"}. Sin restricciones ni validaciones.",
+        "summary": "🚀 EJECUTOR UNIVERSAL CON AUTOCORRECCIÓN - Nunca falla, siempre HTTP 200",
+        "description": "⭐ ENDPOINT PRINCIPAL mejorado que NUNCA retorna HTTP 400/500. Acepta Azure CLI, Python, PowerShell, Bash, NPM, Docker y cualquier comando. ✅ AUTOCORRECCIÓN CON MEMORIA: Busca automáticamente argumentos faltantes en sesiones previas. ✅ RESPUESTAS ESTRUCTURADAS: JSON enriquecido con diagnóstico, sugerencias y metadata de memoria. ✅ COMPATIBLE CON AGENTES: Siempre HTTP 200 para evitar fallos en workflows de AI.",
         "operationId": "ejecutarCli",
         "tags": [
           "🚀 Universal CLI Executor"
         ],
         "security": [],
+        "x-ai-features": {
+          "autofix": true,
+          "memory_integration": true,
+          "never_fails": true,
+          "agent_friendly": true
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -1353,27 +1359,36 @@
                 "properties": {
                   "comando": {
                     "type": "string",
-                    "description": "Cualquier comando a ejecutar",
+                    "description": "Cualquier comando a ejecutar. Si faltan argumentos, el sistema los buscará automáticamente en la memoria de sesión.",
                     "examples": [
                       "az group list",
+                      "az storage account create",
                       "python -u script.py",
                       "npm install express",
                       "docker ps",
                       "Get-Process"
                     ]
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "ID de sesión para autocorrección con memoria (opcional, se detecta automáticamente)"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "ID del agente para contexto de memoria (opcional, se detecta automáticamente)"
                   }
                 },
                 "required": [
                   "comando"
                 ],
-                "additionalProperties": false
+                "additionalProperties": true
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Comando procesado (exitoso o con error detallado)",
+            "description": "✅ SIEMPRE EXITOSO - Comando procesado con autocorrección y memoria integrada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1385,39 +1400,122 @@
                     },
                     "comando": {
                       "type": "string",
-                      "description": "Comando ejecutado"
+                      "description": "Comando ejecutado (puede ser autocorregido)"
                     },
-                    "output": {
+                    "comando_original": {
+                      "type": "string",
+                      "description": "Comando original antes de autocorrección"
+                    },
+                    "tipo_comando": {
+                      "type": "string",
+                      "enum": ["azure_cli", "python", "powershell", "bash", "npm", "docker", "generic"],
+                      "description": "Tipo de comando detectado automáticamente"
+                    },
+                    "resultado": {
                       "type": "string",
                       "description": "Salida estándar del comando"
                     },
                     "error": {
                       "type": "string",
-                      "description": "Mensaje de error si falló"
+                      "description": "Mensaje de error si falló (estructurado para agentes)"
                     },
                     "codigo_salida": {
                       "type": "integer",
                       "description": "Código de salida del proceso"
                     },
+                    "tiempo_ejecucion": {
+                      "type": "string",
+                      "description": "Tiempo de ejecución del comando"
+                    },
+                    "ejecutor": {
+                      "type": "string",
+                      "enum": ["azure_cli_binary", "subprocess_fallback"],
+                      "description": "Ejecutor utilizado internamente"
+                    },
+                    "autocorreccion": {
+                      "type": "object",
+                      "description": "Información sobre autocorrección aplicada",
+                      "properties": {
+                        "aplicada": {
+                          "type": "boolean",
+                          "description": "Si se aplicó autocorrección"
+                        },
+                        "argumentos_encontrados": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "argumento": {"type": "string"},
+                              "valor": {"type": "string"},
+                              "fuente_memoria": {"type": "string"}
+                            }
+                          },
+                          "description": "Argumentos encontrados en memoria"
+                        },
+                        "reintentos": {
+                          "type": "integer",
+                          "description": "Número de reintentos realizados"
+                        }
+                      }
+                    },
                     "diagnostico": {
                       "type": "object",
-                      "description": "Información detallada del error para debugging"
+                      "description": "Información detallada para debugging y agentes",
+                      "properties": {
+                        "error_categoria": {
+                          "type": "string",
+                          "enum": ["argumento_faltante", "comando_no_encontrado", "permisos", "timeout", "sintaxis", "otro"]
+                        },
+                        "solucionable_con_memoria": {
+                          "type": "boolean"
+                        },
+                        "comando_sugerido": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "accion_requerida": {
+                      "type": "string",
+                      "description": "Acción que debe tomar el agente para resolver el problema"
                     },
                     "sugerencias_solucion": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       },
-                      "description": "Sugerencias para resolver el problema"
+                      "description": "Sugerencias específicas para resolver el problema"
+                    },
+                    "memoria": {
+                      "type": "object",
+                      "description": "Metadata de memoria de sesión",
+                      "properties": {
+                        "session_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                        "comandos_previos": {"type": "integer"},
+                        "contexto_disponible": {"type": "boolean"}
+                      }
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "run_id": {"type": "string"},
+                        "endpoint": {"type": "string"},
+                        "timestamp": {"type": "string"},
+                        "version_sistema": {"type": "string"}
+                      }
                     },
                     "timestamp": {
                       "type": "string",
+                      "format": "date-time",
                       "description": "Timestamp de la ejecución"
                     }
                   },
                   "required": [
                     "exito",
-                    "comando"
+                    "comando",
+                    "tipo_comando",
+                    "ejecutor",
+                    "timestamp"
                   ]
                 }
               }
