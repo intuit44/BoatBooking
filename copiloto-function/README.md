@@ -363,3 +363,9 @@ Este README.md actualizado incluye:
 10. ✅ **Métricas actualizadas** del proyecto
 
 El README está listo para ser guardado como `README.md` en la raíz del proyecto.
+
+docs/memory_integration.md
++150
+-0
+
+Undo
