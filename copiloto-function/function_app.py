@@ -1558,32 +1558,73 @@ def detect_request_type(path: str) -> str:
 
 def handle_api_function_request_dict(path: str, run_id: str) -> dict:
     """Versión que devuelve diccionario para integración de memoria"""
-    return {
-        "ok": True,
-        "message": f"Información de API: {path}",
-        "data": {"api_path": path, "type": "api_function"},
-        "run_id": run_id
-    }
+    try:
+        with open("function_app.py", "r", encoding="utf-8") as f:
+            contenido = f.read()
+        return {
+            "exito": True,
+            "contenido": contenido,
+            "tipo": "python",
+            "ruta": "function_app.py",
+            "mensaje": f"Código de función API: {path}",
+            "run_id": run_id
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": str(e),
+            "mensaje": f"No se pudo leer función API: {path}",
+            "run_id": run_id
+        }
 
 
 def handle_special_path_request_dict(path: str, run_id: str) -> dict:
     """Versión que devuelve diccionario para integración de memoria"""
-    return {
-        "ok": True,
-        "message": f"Archivo especial: {path}",
-        "data": {"path": path, "type": "special_path"},
-        "run_id": run_id
-    }
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            contenido = f.read()
+        return {
+            "exito": True,
+            "contenido": contenido,
+            "tipo": "text",
+            "ruta": path,
+            "mensaje": f"Archivo especial leído: {path}",
+            "run_id": run_id
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": str(e),
+            "mensaje": f"No se pudo leer archivo especial: {path}",
+            "run_id": run_id
+        }
 
 
 def handle_file_request_dict(params: dict, run_id: str) -> dict:
     """Versión que devuelve diccionario para integración de memoria"""
-    return {
-        "ok": True,
-        "message": f"Archivo leído: {params['ruta_raw']}",
-        "data": {"path": params["ruta_raw"], "type": "file"},
-        "run_id": run_id
-    }
+    ruta = params["ruta_raw"]
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            contenido = f.read()
+        
+        tipo = "markdown" if ruta.endswith(".md") else "text"
+            
+        return {
+            "exito": True,
+            "contenido": contenido,
+            "tipo": tipo,
+            "ruta": ruta,
+            "tamaño": len(contenido),
+            "mensaje": f"Archivo leído exitosamente: {ruta}",
+            "run_id": run_id
+        }
+    except Exception as e:
+        return {
+            "exito": False,
+            "error": str(e),
+            "mensaje": f"No se pudo leer archivo: {ruta}",
+            "run_id": run_id
+        }
 
 
 def handle_api_function_request(path: str, run_id: str) -> func.HttpResponse:
