@@ -1437,12 +1437,13 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     y respuestas optimizadas para agentes AI
     """
     from memory_manual import aplicar_memoria_manual
-    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     
-    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
-    memoria_previa = consultar_memoria_antes_responder(req)
-    if memoria_previa and memoria_previa.get("contexto_recuperado"):
-        logging.info(f"🧠 Leer-archivo: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Leer-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
+        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     
     endpoint = "/api/leer-archivo"
     method = "GET"
@@ -1465,7 +1466,7 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 }
             }
             # Aplicar memoria antes de responder
-            res_dict = aplicar_precheck_memoria(req, res_dict)
+            res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
             res_dict = aplicar_memoria_manual(req, res_dict)
             return func.HttpResponse(
                 json.dumps(res_dict, ensure_ascii=False),
@@ -1485,7 +1486,7 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             res_dict = handle_file_request_dict(params, run_id)
         
         # Aplicar memoria antes de responder
-        res_dict = aplicar_precheck_memoria(req, res_dict)
+        res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
         res_dict = aplicar_memoria_manual(req, res_dict)
         
         return func.HttpResponse(
@@ -1508,7 +1509,7 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             }
         }
         # Aplicar memoria antes de responder
-        res_dict = aplicar_precheck_memoria(req, res_dict)
+        res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
         res_dict = aplicar_memoria_manual(req, res_dict)
         return func.HttpResponse(
             json.dumps(res_dict, ensure_ascii=False),
@@ -3769,15 +3770,16 @@ def generar_sugerencias_comando_azure(comando: str) -> list:
 @app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
     
     logging.info('🤖 Copiloto Semántico activado')
     
-    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
-    memoria_previa = consultar_memoria_antes_responder(req)
-    if memoria_previa and memoria_previa.get("contexto_recuperado"):
-        logging.info(f"🧠 Contexto recuperado: {memoria_previa['total_interacciones']} interacciones previas")
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Memoria Cosmos: {memoria_previa['total_interacciones']} interacciones encontradas")
+        logging.info(f"📝 Resumen: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     
     # Extraer consulta del request
     try:
@@ -3791,7 +3793,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             # Si Bing ya resolvió la consulta completamente
             if bing_result.get("respuesta_final"):
                 respuesta = bing_result["respuesta_final"]
-                respuesta = aplicar_precheck_memoria(req, respuesta)
+                respuesta = aplicar_memoria_cosmos_directo(req, respuesta)
                 respuesta = aplicar_memoria_manual(req, respuesta)
                 
                 return func.HttpResponse(
@@ -3852,7 +3854,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
         }
 
         # Aplicar precheck y memoria manual
-        panel = aplicar_precheck_memoria(req, panel)
+        panel = aplicar_memoria_cosmos_directo(req, panel)
         panel = aplicar_memoria_manual(req, panel)
         
         return func.HttpResponse(
@@ -3982,7 +3984,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             })
 
         # Aplicar precheck y memoria manual
-        respuesta_base = aplicar_precheck_memoria(req, respuesta_base)
+        respuesta_base = aplicar_memoria_cosmos_directo(req, respuesta_base)
         respuesta_base = aplicar_memoria_manual(req, respuesta_base)
         
         return func.HttpResponse(
@@ -6873,12 +6875,13 @@ def modificar_archivo(
 @app.route(route="escribir-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     
-    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
-    memoria_previa = consultar_memoria_antes_responder(req)
-    if memoria_previa and memoria_previa.get("contexto_recuperado"):
-        logging.info(f"🧠 Escribir-archivo: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Escribir-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
+        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     
     """Endpoint ULTRA-ROBUSTO para crear/escribir archivos - nunca falla por formato"""
     advertencias = []
@@ -7067,8 +7070,8 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             "ruta_procesada": ruta
         })
 
-        # Aplicar precheck y memoria manual
-        res = aplicar_precheck_memoria(req, res)
+        # Aplicar memoria Cosmos y memoria manual
+        res = aplicar_memoria_cosmos_directo(req, res)
         res = aplicar_memoria_manual(req, res)
 
         return func.HttpResponse(
@@ -7120,8 +7123,14 @@ def is_running_in_azure() -> bool:
 @app.route(route="modificar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from memory_precheck import aplicar_precheck_memoria
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     """Endpoint ultra-resiliente para modificar archivos - nunca falla por formato"""
+    
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
+        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     advertencias = []
 
     # PARSER ULTRA-RESILIENTE - nunca explota
@@ -7284,7 +7293,7 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     res["timestamp"] = datetime.now().isoformat()
 
     # Aplicar memoria antes de responder
-    res = aplicar_precheck_memoria(req, res)
+    res = aplicar_memoria_cosmos_directo(req, res)
     res = aplicar_memoria_manual(req, res)
 
     # NUNCA devolver status de error

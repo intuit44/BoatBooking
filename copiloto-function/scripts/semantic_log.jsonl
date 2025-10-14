@@ -754,3 +754,13 @@
 {"id": "session_1760406005_semantic_1760406005", "session_id": "session_1760406005", "timestamp": "2025-10-13T21:40:05.370187", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760406604_semantic_1760406604", "session_id": "session_1760406604", "timestamp": "2025-10-13T21:50:04.342323", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
 {"id": "session_1760408403_semantic_1760408403", "session_id": "session_1760408403", "timestamp": "2025-10-13T22:20:03.786212", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760409004_semantic_1760409004", "session_id": "session_1760409004", "timestamp": "2025-10-13T22:30:04.236853", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760409603_semantic_1760409603", "session_id": "session_1760409603", "timestamp": "2025-10-13T22:40:03.867609", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760410203_semantic_1760410203", "session_id": "session_1760410203", "timestamp": "2025-10-13T22:50:03.784392", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760410803_semantic_1760410803", "session_id": "session_1760410803", "timestamp": "2025-10-13T23:00:03.931868", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760411404_semantic_1760411404", "session_id": "session_1760411404", "timestamp": "2025-10-13T23:10:04.903560", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760412003_semantic_1760412003", "session_id": "session_1760412003", "timestamp": "2025-10-13T23:20:03.832961", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760412603_semantic_1760412603", "session_id": "session_1760412603", "timestamp": "2025-10-13T23:30:03.808568", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760413204_semantic_1760413204", "session_id": "session_1760413204", "timestamp": "2025-10-13T23:40:04.648595", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760413807_semantic_1760413807", "session_id": "session_1760413807", "timestamp": "2025-10-13T23:50:07.411058", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
+{"id": "session_1760414404_semantic_1760414404", "session_id": "session_1760414404", "timestamp": "2025-10-14T00:00:04.967727", "event_type": "semantic", "data": {"tipo": "cognitive_snapshot"}}
