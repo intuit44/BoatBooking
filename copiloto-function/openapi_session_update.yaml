@@ -1,0 +1,117 @@
+# Actualización OpenAPI para session_id y agent_id
+# Componentes comunes para parámetros de sesión
+
+components:
+  parameters:
+    SessionID:
+      name: session_id
+      in: query
+      description: "ID de sesión para continuidad de conversación y memoria automática"
+      required: false
+      schema:
+        type: string
+        example: "test_deduplicado_001"
+    
+    SessionIDHeader:
+      name: Session-ID
+      in: header
+      description: "ID de sesión en header (prioridad alta)"
+      required: false
+      schema:
+        type: string
+        example: "test_deduplicado_001"
+    
+    AgentID:
+      name: agent_id
+      in: query
+      description: "ID del agente para contexto de memoria"
+      required: false
+      schema:
+        type: string
+        example: "TestAgent"
+    
+    AgentIDHeader:
+      name: Agent-ID
+      in: header
+      description: "ID del agente en header (prioridad alta)"
+      required: false
+      schema:
+        type: string
+        example: "TestAgent"
+
+  schemas:
+    SessionParameters:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: "ID de sesión para continuidad de conversación"
+          example: "test_deduplicado_001"
+        agent_id:
+          type: string
+          description: "ID del agente para contexto de memoria"
+          example: "TestAgent"
+
+# Endpoints que necesitan actualización:
+
+paths:
+  /api/copiloto:
+    post:
+      summary: "🧠 COPILOTO CON MEMORIA INTEGRADA - Endpoint principal con historial automático"
+      parameters:
+        - $ref: '#/components/parameters/SessionIDHeader'
+        - $ref: '#/components/parameters/AgentIDHeader'
+        - $ref: '#/components/parameters/SessionID'
+        - $ref: '#/components/parameters/AgentID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SessionParameters'
+                - type: object
+                  properties:
+                    comando:
+                      type: string
+                      description: "Comando o consulta al copiloto"
+
+  /api/ejecutar-cli:
+    post:
+      parameters:
+        - $ref: '#/components/parameters/SessionIDHeader'
+        - $ref: '#/components/parameters/AgentIDHeader'
+        - $ref: '#/components/parameters/SessionID'
+        - $ref: '#/components/parameters/AgentID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SessionParameters'
+                - type: object
+                  properties:
+                    comando:
+                      type: string
+
+  /api/hybrid:
+    post:
+      parameters:
+        - $ref: '#/components/parameters/SessionIDHeader'
+        - $ref: '#/components/parameters/AgentIDHeader'
+        - $ref: '#/components/parameters/SessionID'
+        - $ref: '#/components/parameters/AgentID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SessionParameters'
+                - type: object
+
+  /api/revisar-correcciones:
+    get:
+      parameters:
+        - $ref: '#/components/parameters/SessionIDHeader'
+        - $ref: '#/components/parameters/AgentIDHeader'
+        - $ref: '#/components/parameters/SessionID'
+        - $ref: '#/components/parameters/AgentID'

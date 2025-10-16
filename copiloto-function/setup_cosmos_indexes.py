@@ -3,13 +3,16 @@
 Script para configurar índices optimizados en Cosmos DB
 """
 import os
-from azure.cosmos import CosmosClient
+from azure.cosmos import CosmosClient, PartitionKey
 from azure.identity import DefaultAzureCredential
 
 def setup_optimized_indexes():
     # Cliente Cosmos
     endpoint = os.environ.get('COSMOSDB_ENDPOINT')
     key = os.environ.get('COSMOSDB_KEY')
+    
+    if not endpoint:
+        raise ValueError("COSMOSDB_ENDPOINT environment variable is required")
     
     if key:
         client = CosmosClient(endpoint, key)
@@ -54,17 +57,17 @@ def setup_optimized_indexes():
     
     try:
         # Actualizar fixes container
-        fixes_container = database.get_container_client('fixes')
-        fixes_container.replace_container(
-            partition_key='/estado',
+        database.replace_container(
+            container='fixes',
+            partition_key=PartitionKey(path='/estado'),
             indexing_policy=fixes_indexing_policy
         )
         print("✅ Índices optimizados para 'fixes'")
         
         # Actualizar semantic_events container  
-        events_container = database.get_container_client('semantic_events')
-        events_container.replace_container(
-            partition_key='/tipo',
+        database.replace_container(
+            container='semantic_events',
+            partition_key=PartitionKey(path='/tipo'),
             indexing_policy=events_indexing_policy
         )
         print("✅ Índices optimizados para 'semantic_events'")

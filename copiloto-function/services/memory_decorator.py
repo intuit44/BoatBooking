@@ -66,28 +66,108 @@ class MockMemoryService:
     def obtener_historial(self, source: str, limit: int = 10) -> list:
         """Mock que retorna lista vacía"""
         return []
+    
+    def obtener_estadisticas(self, source_name: Optional[str] = None) -> Dict[str, Any]:
+        """Mock que retorna estadísticas vacías"""
+        return {
+            "total_llamadas": 0,
+            "llamadas_exitosas": 0,
+            "llamadas_fallidas": 0,
+            "fuentes_activas": [],
+            "ultimo_registro": None,
+            "servicio": "mock"
+        }
+    
+    def limpiar_registros(self, source_name: Optional[str] = None) -> bool:
+        """Mock que simula limpiar registros"""
+        logging.info("🧠 [MOCK] Memoria limpiada")
+        return True
 
 
 def registrar_memoria(source_name: str):
     """
-    Decorador que registra automáticamente las llamadas en el sistema de memoria
-    y consulta memoria previa para continuidad de sesión.
+    Decorador que registra automáticamente las llamadas en el sistema de memoria,
+    consulta memoria previa Y SEMÁNTICA para continuidad de sesión Y detecta intención para redirección automática.
+    
+    FUNCIONALIDADES AUTOMÁTICAS:
+    - Consulta memoria cronológica y semántica
+    - Inyecta contexto enriquecido en el request
+    - Registra snapshots semánticos automáticamente
+    - Mantiene coherencia conversacional
     
     Args:
         source_name: Nombre identificador del endpoint/función
         
     Returns:
-        Decorador que envuelve la función con registro de memoria
+        Decorador que envuelve la función con registro de memoria semántica completa
     """
     def decorator(func_ref: Callable) -> Callable:
         @wraps(func_ref)
         def wrapper(req) -> Any:  # Usar Any para evitar problemas de tipo
+            logging.info(f"🧠 WRAPPER MEMORIA EJECUTÁNDOSE: {source_name} - {req.method} {req.url}")
             start_time = datetime.now()
             memory_service = get_memory_service()
             
             # Extraer información de la request
             method = req.method
             endpoint = req.url
+            
+            # 🧠 DETECCIÓN DE INTENCIÓN Y REDIRECCIÓN AUTOMÁTICA
+
+            try:
+                from services.semantic_intent_parser import aplicar_deteccion_intencion
+                
+                fue_redirigido, respuesta_redirigida = aplicar_deteccion_intencion(req, endpoint)
+                
+                if fue_redirigido and respuesta_redirigida:
+                    logging.info(f"🔄 Redirección automática aplicada desde {source_name}")
+                    
+                    # Registrar la redirección en memoria Y Cosmos
+                    try:
+                        # Extraer session_id y agent_id ANTES de registrar redirección
+                        redirect_session_id = (
+                            req.headers.get("Session-ID") or
+                            req.headers.get("X-Session-ID") or
+                            req.params.get("Session-ID") or
+                            f"auto_{int(__import__('time').time())}"
+                        )
+                        
+                        redirect_agent_id = (
+                            req.headers.get("Agent-ID") or
+                            req.headers.get("X-Agent-ID") or
+                            req.params.get("Agent-ID") or
+                            "unknown_agent"
+                        )
+                        
+                        memory_service.registrar_llamada(
+                            source=f"{source_name}_redirected",
+                            endpoint=endpoint,
+                            method=method,
+                            params={
+                                "redireccion_automatica": True, 
+                                "endpoint_original": endpoint,
+                                "session_id": redirect_session_id,
+                                "agent_id": redirect_agent_id
+                            },
+                            response_data={"redirigido": True, "exito": True},
+                            success=True
+                        )
+                        
+                        # Loggear en Cosmos cada redirección semántica
+                        try:
+                            from cosmos_memory_direct import registrar_redireccion_cosmos
+                            registrar_redireccion_cosmos(req, endpoint, fue_redirigido, respuesta_redirigida)
+                        except Exception as cosmos_err:
+                            logging.warning(f"⚠️ Error logging Cosmos redirección: {cosmos_err}")
+                            
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error registrando redirección: {e}")
+                    
+                    return respuesta_redirigida
+                    
+            except Exception as e:
+                logging.warning(f"⚠️ Error en detección de intención: {e}")
+                # Continuar con flujo normal si falla la detección
             
             # Extraer parámetros de forma segura
             try:
@@ -106,54 +186,91 @@ def registrar_memoria(source_name: str):
                 logging.warning(f"⚠️ Error extrayendo parámetros: {e}")
                 params = {}
             
-            # 🧠 CONSULTAR MEMORIA PREVIA AUTOMÁTICAMENTE
+            # 🧠 CONSULTAR MEMORIA PREVIA Y SEMÁNTICA AUTOMÁTICAMENTE
             memoria_contexto = None
+            contexto_semantico = {}
+            session_id = None
+            agent_id = None
+            
             try:
-                # DETECCIÓN AUTOMÁTICA de session_id y agent_id
+                # DETECCIÓN AUTOMÁTICA de session_id y agent_id - PRIORIZAR HEADERS
                 session_id = (
-                    params.get("session_id") or 
-                    params.get("body", {}).get("session_id") or
-                    req.headers.get("X-Session-ID") or
-                    req.headers.get("Session-ID") or
-                    req.headers.get("x-session-id") or
-                    # Generar session_id automático basado en User-Agent + IP
-                    f"auto_{hash(req.headers.get('User-Agent', '') + req.headers.get('X-Forwarded-For', ''))}"
+                    getattr(req, "headers", {}).get("Session-ID")
+                    or getattr(req, "headers", {}).get("X-Session-ID")
+                    or getattr(req, "headers", {}).get("x-session-id")
+                    or getattr(req, "params", {}).get("Session-ID")
+                    or getattr(req, "params", {}).get("session_id")
+                    or (getattr(req, "get_json", lambda: {})() or {}).get("session_id")
+                    or f"auto_{int(__import__('time').time())}"
                 )
-                
+
                 agent_id = (
-                    params.get("agent_id") or 
-                    params.get("body", {}).get("agent_id") or
-                    req.headers.get("X-Agent-ID") or
-                    req.headers.get("Agent-ID") or
-                    req.headers.get("x-agent-id") or
-                    req.headers.get("User-Agent", "UnknownAgent")[:50]  # Usar User-Agent como fallback
+                    getattr(req, "headers", {}).get("Agent-ID")
+                    or getattr(req, "headers", {}).get("X-Agent-ID")
+                    or getattr(req, "headers", {}).get("x-agent-id")
+                    or getattr(req, "params", {}).get("Agent-ID")
+                    or getattr(req, "params", {}).get("agent_id")
+                    or (getattr(req, "get_json", lambda: {})() or {}).get("agent_id")
+                    or "unknown_agent"
                 )
-                
-                # SIEMPRE consultar memoria si tenemos identificadores
+
+                if session_id.startswith("auto_"):
+                    logging.warning(f"⚠️ Session ID no encontrado en headers ni params, generado fallback: {session_id}")
+                else:
+                    logging.info(f"✅ Session ID preservado: {session_id}")
+
+                logging.info(f"🔍 IDs detectados - Session: {session_id}, Agent: {agent_id}")
+
+                # CONSULTAR MEMORIA CRONOLÓGICA
                 if session_id and agent_id:
                     from services.session_memory import consultar_memoria_sesion, generar_contexto_prompt
                     
                     resultado_memoria = consultar_memoria_sesion(session_id, agent_id)
                     if resultado_memoria.get("exito"):
                         memoria_contexto = resultado_memoria["memoria"]
-                        
-                        # Agregar contexto al request para que la función lo use
-                        if hasattr(req, '__dict__'):
-                            req.__dict__["_memoria_contexto"] = memoria_contexto
-                            req.__dict__["_memoria_prompt"] = generar_contexto_prompt(memoria_contexto)
-                            req.__dict__["_session_id"] = session_id
-                            req.__dict__["_agent_id"] = agent_id
-                        
-                        logging.info(f"🧠 Memoria auto-consultada: {session_id[:8]}.../{agent_id[:10]}... -> {memoria_contexto.get('total_interacciones_sesion', 0)} interacciones")
+                        logging.info(f"🧠 Memoria cronológica: {memoria_contexto.get('total_interacciones_sesion', 0)} interacciones")
                     else:
-                        # Primera vez - crear contexto vacío pero válido
-                        if hasattr(req, '__dict__'):
-                            req.__dict__["_session_id"] = session_id
-                            req.__dict__["_agent_id"] = agent_id
                         logging.info(f"🆕 Nueva sesión detectada: {session_id[:8]}.../{agent_id[:10]}...")
                 
+                # 🧠 CONSULTAR MEMORIA SEMÁNTICA AUTOMÁTICAMENTE
+                try:
+                    from services.semantic_memory import obtener_estado_sistema, obtener_contexto_agente
+                    from services.cognitive_supervisor import CognitiveSupervisor
+                    
+                    estado_resultado = obtener_estado_sistema(24)
+                    if estado_resultado.get("exito"):
+                        contexto_semantico["estado_sistema"] = estado_resultado["estado"]
+                    
+                    contexto_agente = obtener_contexto_agente(agent_id, 5)
+                    if contexto_agente.get("exito"):
+                        contexto_semantico["contexto_agente"] = contexto_agente["contexto"]
+                    
+                    supervisor = CognitiveSupervisor()
+                    conocimiento = supervisor.get_latest_knowledge()
+                    if conocimiento.get("exito"):
+                        contexto_semantico["conocimiento_cognitivo"] = conocimiento["conocimiento"]
+                        
+                    logging.info(f"🧠 Contexto semántico enriquecido: {len(contexto_semantico)} fuentes")
+                    
+                except Exception as e:
+                    logging.warning(f"⚠️ Error obteniendo contexto semántico: {e}")
+                    contexto_semantico = {"error": str(e)}
+                
+                # INYECTAR CONTEXTO EN REQUEST PARA USO DEL ENDPOINT
+                if hasattr(req, '__dict__'):
+                    req.__dict__["_memoria_contexto"] = memoria_contexto
+                    req.__dict__["_contexto_semantico"] = contexto_semantico
+                    req.__dict__["_session_id"] = session_id
+                    req.__dict__["_agent_id"] = agent_id
+                    if memoria_contexto:
+                        from services.session_memory import generar_contexto_prompt
+                        req.__dict__["_memoria_prompt"] = generar_contexto_prompt(memoria_contexto)
+                    
+                    # Marcar que el wrapper semántico está activo
+                    req.__dict__["_semantic_wrapper_active"] = True
+                
             except Exception as e:
-                logging.warning(f"⚠️ Error consultando memoria previa: {e}")
+                logging.warning(f"⚠️ Error consultando memoria: {e}")
             
             # Ejecutar función original
             response = None
@@ -194,18 +311,20 @@ def registrar_memoria(source_name: str):
                     # Fallback si func.HttpResponse no está disponible
                     response = {"error": str(e), "source": source_name}
             
-            # Registrar en memoria
+            # 🧠 REGISTRAR EN MEMORIA CRONOLÓGICA Y SEMÁNTICA
             try:
                 duration_ms = (datetime.now() - start_time).total_seconds() * 1000
                 
+                # Obtener session_id y agent_id preservados
+                final_session_id = session_id or "unknown"
+                final_agent_id = agent_id or "unknown_agent"
+                
                 # Agregar session_id y agent_id al registro
                 enhanced_params = params.copy()
-                if hasattr(req, '__dict__'):
-                    if "_session_id" in req.__dict__:
-                        enhanced_params["session_id"] = req.__dict__["_session_id"]
-                    if "_agent_id" in req.__dict__:
-                        enhanced_params["agent_id"] = req.__dict__["_agent_id"]
+                enhanced_params["session_id"] = final_session_id
+                enhanced_params["agent_id"] = final_agent_id
                 
+                # MEMORIA CRONOLÓGICA
                 memory_service.registrar_llamada(
                     source=source_name,
                     endpoint=endpoint,
@@ -214,6 +333,39 @@ def registrar_memoria(source_name: str):
                     response_data=response_data,
                     success=success
                 )
+                
+                # 🧠 MEMORIA SEMÁNTICA AUTOMÁTICA
+                try:
+                    from services.semantic_memory import registrar_snapshot_semantico
+                    
+                    snapshot_data = {
+                        "endpoint": source_name,
+                        "method": method,
+                        "success": success,
+                        "duration_ms": duration_ms,
+                        "timestamp": datetime.now().isoformat(),
+                        "contexto_semantico_disponible": bool(contexto_semantico and not contexto_semantico.get("error"))
+                    }
+                    
+                    # Agregar datos específicos del response si están disponibles
+                    if response_data and isinstance(response_data, dict):
+                        if "intencion" in str(response_data).lower():
+                            snapshot_data["tiene_intencion"] = True
+                        if "exito" in response_data:
+                            snapshot_data["resultado_exito"] = response_data["exito"]
+                    
+                    registrar_snapshot_semantico(
+                        session_id=final_session_id,
+                        agent_id=final_agent_id,
+                        tipo="interaccion_automatica",
+                        contenido=snapshot_data,
+                        metadata={"endpoint": source_name, "wrapper": "automatico"}
+                    )
+                    
+                    logging.debug(f"🧠 Memoria semántica registrada automáticamente")
+                    
+                except Exception as e:
+                    logging.warning(f"⚠️ Error registrando memoria semántica: {e}")
                 
                 logging.debug(f"🧠 Memoria registrada: {source_name} ({duration_ms:.1f}ms)")
                 
@@ -226,7 +378,7 @@ def registrar_memoria(source_name: str):
     return decorator
 
 
-def crear_wrapper_memoria(app: func.FunctionApp):
+def crear_wrapper_memoria(app: Any):
     """
     DEPRECATED: Usar memory_route_wrapper.py en su lugar.
     Esta función se mantiene por compatibilidad.
@@ -239,6 +391,7 @@ def crear_wrapper_memoria(app: func.FunctionApp):
         return decorator
     
     return wrapper_func
+
 
 
 # Función de utilidad para obtener estadísticas de memoria

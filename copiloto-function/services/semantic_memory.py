@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from services.cosmos_store import CosmosMemoryStore
+import uuid
 
 def obtener_estado_sistema(horas_atras: int = 24) -> Dict[str, Any]:
     """
@@ -113,4 +114,44 @@ def obtener_contexto_agente(agent_id: str, limit: int = 10) -> Dict[str, Any]:
         
     except Exception as e:
         logging.error(f"Error obteniendo contexto del agente {agent_id}: {e}")
+        return {"exito": False, "error": str(e)}
+
+def registrar_snapshot_semantico(
+    session_id: str,
+    agent_id: str,
+    tipo: str,
+    contenido: Dict[str, Any],
+    metadata: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Registra un snapshot semántico en Cosmos DB
+    """
+    try:
+        cosmos = CosmosMemoryStore()
+        
+        documento = {
+            "id": f"semantic_{session_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}",
+            "session_id": session_id,
+            "agent_id": agent_id,
+            "tipo": tipo,
+            "contenido": contenido,
+            "metadata": metadata or {},
+            "timestamp": datetime.utcnow().isoformat(),
+            "_ts": int(datetime.utcnow().timestamp()),
+            "categoria": "semantic_snapshot"
+        }
+        
+        # Insertar en Cosmos DB
+        cosmos.container.create_item(documento)
+        
+        logging.info(f"🧠 Snapshot semántico registrado: {tipo} para {session_id[:8]}...")
+        
+        return {
+            "exito": True,
+            "documento_id": documento["id"],
+            "timestamp": documento["timestamp"]
+        }
+        
+    except Exception as e:
+        logging.error(f"Error registrando snapshot semántico: {e}")
         return {"exito": False, "error": str(e)}
