@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "2.13",
-    "description": "Herramienta directa a la Function App con autocorrección inteligente y memoria integrada",
+    "version": "3.2",
+    "description": "Sistema completo con memoria automática integrada, consulta previa y guardado automático de interacciones en Cosmos DB",
     "license": {
       "name": "MIT",
       "url": "https://opensource.org/licenses/MIT"
@@ -396,14 +396,53 @@
     },
     "/api/revisar-correcciones": {
       "get": {
-        "summary": "Ver todas las correcciones pendientes",
-        "description": "Devuelve una lista de todas las correcciones propuestas, filtrables por estado o tipo, para su revisión y gestión.",
+        "summary": "[DESHABILITADO] Usar /api/copiloto en su lugar",
+        "description": "ENDPOINT DESHABILITADO. Este endpoint ya no está disponible. Usa /api/copiloto que tiene memoria integrada y funcionalidad completa.",
         "operationId": "revisarCorrecciones",
+        "deprecated": true,
         "tags": [
-          "Autocorrección"
+          "Deprecated"
         ],
         "security": [],
         "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "required": true,
+            "description": "ID de sesión para continuidad de conversación (REQUERIDO para Foundry)",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "Agent-ID",
+            "in": "header",
+            "required": true,
+            "description": "ID del agente para contexto de memoria (REQUERIDO para Foundry)",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "ID de sesión como parámetro de consulta",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "ID del agente como parámetro de consulta",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          },
           {
             "name": "estado",
             "in": "query",
@@ -1344,6 +1383,26 @@
           "🚀 Universal CLI Executor"
         ],
         "security": [],
+        "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "description": "ID de sesión para continuidad de conversación (prioridad alta)",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "Agent-ID",
+            "in": "header",
+            "description": "ID del agente para contexto de memoria (prioridad alta)",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          }
+        ],
         "x-ai-features": {
           "autofix": true,
           "memory_integration": true,
@@ -1371,11 +1430,13 @@
                   },
                   "session_id": {
                     "type": "string",
-                    "description": "ID de sesión para autocorrección con memoria (opcional, se detecta automáticamente)"
+                    "description": "ID de sesión para autocorrección con memoria (opcional, se detecta automáticamente)",
+                    "example": "test_deduplicado_001"
                   },
                   "agent_id": {
                     "type": "string",
-                    "description": "ID del agente para contexto de memoria (opcional, se detecta automáticamente)"
+                    "description": "ID del agente para contexto de memoria (opcional, se detecta automáticamente)",
+                    "example": "TestAgent"
                   }
                 },
                 "required": [
@@ -1408,7 +1469,15 @@
                     },
                     "tipo_comando": {
                       "type": "string",
-                      "enum": ["azure_cli", "python", "powershell", "bash", "npm", "docker", "generic"],
+                      "enum": [
+                        "azure_cli",
+                        "python",
+                        "powershell",
+                        "bash",
+                        "npm",
+                        "docker",
+                        "generic"
+                      ],
                       "description": "Tipo de comando detectado automáticamente"
                     },
                     "resultado": {
@@ -1429,7 +1498,10 @@
                     },
                     "ejecutor": {
                       "type": "string",
-                      "enum": ["azure_cli_binary", "subprocess_fallback"],
+                      "enum": [
+                        "azure_cli_binary",
+                        "subprocess_fallback"
+                      ],
                       "description": "Ejecutor utilizado internamente"
                     },
                     "autocorreccion": {
@@ -1445,9 +1517,15 @@
                           "items": {
                             "type": "object",
                             "properties": {
-                              "argumento": {"type": "string"},
-                              "valor": {"type": "string"},
-                              "fuente_memoria": {"type": "string"}
+                              "argumento": {
+                                "type": "string"
+                              },
+                              "valor": {
+                                "type": "string"
+                              },
+                              "fuente_memoria": {
+                                "type": "string"
+                              }
                             }
                           },
                           "description": "Argumentos encontrados en memoria"
@@ -1464,7 +1542,14 @@
                       "properties": {
                         "error_categoria": {
                           "type": "string",
-                          "enum": ["argumento_faltante", "comando_no_encontrado", "permisos", "timeout", "sintaxis", "otro"]
+                          "enum": [
+                            "argumento_faltante",
+                            "comando_no_encontrado",
+                            "permisos",
+                            "timeout",
+                            "sintaxis",
+                            "otro"
+                          ]
                         },
                         "solucionable_con_memoria": {
                           "type": "boolean"
@@ -1489,19 +1574,35 @@
                       "type": "object",
                       "description": "Metadata de memoria de sesión",
                       "properties": {
-                        "session_id": {"type": "string"},
-                        "agent_id": {"type": "string"},
-                        "comandos_previos": {"type": "integer"},
-                        "contexto_disponible": {"type": "boolean"}
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "agent_id": {
+                          "type": "string"
+                        },
+                        "comandos_previos": {
+                          "type": "integer"
+                        },
+                        "contexto_disponible": {
+                          "type": "boolean"
+                        }
                       }
                     },
                     "metadata": {
                       "type": "object",
                       "properties": {
-                        "run_id": {"type": "string"},
-                        "endpoint": {"type": "string"},
-                        "timestamp": {"type": "string"},
-                        "version_sistema": {"type": "string"}
+                        "run_id": {
+                          "type": "string"
+                        },
+                        "endpoint": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string"
+                        },
+                        "version_sistema": {
+                          "type": "string"
+                        }
                       }
                     },
                     "timestamp": {
@@ -2430,28 +2531,261 @@
         }
       }
     },
-    "/api/copiloto": {
+    "/api/historial-interacciones": {
       "get": {
-        "summary": "Endpoint principal del copiloto",
-        "operationId": "copiloto",
+        "summary": "📜 HISTORIAL DE INTERACCIONES - Consulta memoria de sesión",
+        "description": "Consulta el historial de interacciones de una sesión específica desde Cosmos DB. Devuelve las últimas interacciones con endpoints correctos detectados automáticamente.",
+        "operationId": "historialInteracciones",
         "tags": [
-          "Internal"
+          "🧠 Memoria Integrada"
         ],
         "security": [],
+        "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "required": true,
+            "description": "ID de sesión para consultar historial",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "Agent-ID",
+            "in": "header",
+            "required": true,
+            "description": "ID del agente",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Número máximo de interacciones a devolver",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "ID de sesión como parámetro alternativo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Información del copiloto",
+            "description": "Historial de interacciones obtenido exitosamente",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "interacciones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "numero": {
+                            "type": "integer"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "endpoint": {
+                            "type": "string",
+                            "example": "historial_interacciones"
+                          },
+                          "consulta": {
+                            "type": "string"
+                          },
+                          "exito": {
+                            "type": "boolean"
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "example": "interaccion_usuario"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "resumen_conversacion": {
+                      "type": "string"
+                    },
+                    "fuente": {
+                      "type": "string",
+                      "example": "memory_collection"
+                    },
+                    "contexto_conversacion": {
+                      "type": "object",
+                      "properties": {
+                        "mensaje": {
+                          "type": "string"
+                        },
+                        "ultimas_consultas": {
+                          "type": "string"
+                        },
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "ultima_actividad": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "memoria_aplicada": {
+                          "type": "boolean"
+                        },
+                        "interacciones_previas": {
+                          "type": "integer"
+                        },
+                        "endpoint_detectado": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "400": {
-            "description": "Solicitud inválida"
+          "500": {
+            "description": "Error consultando historial",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "fuente": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/copiloto": {
+      "get": {
+        "summary": "🧠 COPILOTO CON MEMORIA INTEGRADA - Endpoint principal con historial automático",
+        "description": "Endpoint principal del copiloto que incluye consulta automática de memoria, detección de intenciones de historial y respuesta directa con contexto de conversación. Integra automáticamente el sistema de memoria de Cosmos DB.",
+        "operationId": "copiloto",
+        "tags": [
+          "🧠 Memoria Integrada"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "description": "ID de sesión para continuidad de conversación (prioridad alta)",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "Agent-ID",
+            "in": "header",
+            "description": "ID del agente para contexto de memoria (prioridad alta)",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "ID de sesión como parámetro de consulta",
+            "schema": {
+              "type": "string",
+              "example": "test_deduplicado_001"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "description": "ID del agente como parámetro de consulta",
+            "schema": {
+              "type": "string",
+              "example": "TestAgent"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta del copiloto con memoria integrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "copiloto": {
+                      "type": "string"
+                    },
+                    "memoria_activa": {
+                      "type": "boolean"
+                    },
+                    "contexto_conversacion": {
+                      "type": "object",
+                      "properties": {
+                        "mensaje": {
+                          "type": "string"
+                        },
+                        "ultimas_consultas": {
+                          "type": "string"
+                        },
+                        "session_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "historial_detectado": {
+                      "type": "boolean"
+                    },
+                    "interacciones_previas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2806,6 +3140,10 @@
     {
       "name": "Internal",
       "description": "Operaciones internas de la Function App"
+    },
+    {
+      "name": "🧠 Memoria Integrada",
+      "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
     },
     {
       "name": "Local Storage",

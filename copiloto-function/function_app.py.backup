@@ -52,7 +52,6 @@ import json
 from datetime import datetime
 from azure.functions import HttpRequest, HttpResponse
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "services"))
 
 auto_state = os.environ.get("SEMANTIC_AUTOPILOT", "off")
 if auto_state == "on":
@@ -268,21 +267,101 @@ except ImportError:
 
 # --- FunctionApp instance ---
 app = func.FunctionApp()
-sys.path.insert(0, os.path.dirname(__file__))
 
-# 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - FORZAR APLICACIÓN
+# --- FORZAR WRAPPER DE MEMORIA EN TIEMPO DE CARGA ---
+# 🧠 SISTEMA DE MEMORIA FORZADO PARA AZURE RUNTIME
 try:
-    from memory_route_wrapper import wrap_function_app_with_memory
-    wrap_function_app_with_memory(app)
-    logging.info("✅ WRAPPER AUTOMÁTICO APLICADO - Todos los @app.route() tendrán memoria")
+    from memory_route_wrapper import apply_memory_wrapper
+    
+    # FORZAR aplicación inmediata del wrapper
+    logging.info("🧠 [INIT] Forzando aplicación de memoria wrapper...")
+    
+    # Aplicar wrapper básico
+    apply_memory_wrapper(app)
+    
+    # Wrapper mejorado que se aplica INMEDIATAMENTE
+    def force_memory_wrapper_immediate():
+        """Fuerza la aplicación del wrapper en tiempo de carga del módulo"""
+        try:
+            original_route = app.route
+            
+            def memory_enhanced_route(*args, **kwargs):
+                def decorator(func_ref):
+                    def wrapper(req):
+                        # 1. DETECTAR session_id y agent_id AUTOMÁTICAMENTE
+                        session_id = (
+                            req.params.get("session_id") or
+                            (req.get_json() or {}).get("session_id") or
+                            req.headers.get("X-Session-ID") or
+                            f"auto_{hash(str(req.headers.get('User-Agent', '')) + str(req.url))}"
+                        )
+                        
+                        agent_id = (
+                            req.params.get("agent_id") or
+                            (req.get_json() or {}).get("agent_id") or
+                            req.headers.get("X-Agent-ID") or
+                            "AutoAgent"
+                        )
+                        
+                        # 2. EJECUTAR función original
+                        response = func_ref(req)
+                        
+                        # 3. AGREGAR memoria a respuesta JSON
+                        try:
+                            if (isinstance(response, func.HttpResponse) and 
+                                response.mimetype == "application/json"):
+                                
+                                body_bytes = response.get_body()
+                                if body_bytes:
+                                    data = json.loads(body_bytes.decode('utf-8'))
+                                    
+                                    # Agregar metadata de memoria
+                                    if "metadata" not in data:
+                                        data["metadata"] = {}
+                                    
+                                    data["metadata"]["session_info"] = {
+                                        "session_id": session_id,
+                                        "agent_id": agent_id
+                                    }
+                                    data["metadata"]["memoria_disponible"] = True
+                                    data["metadata"]["wrapper_aplicado"] = True
+                                    
+                                    # Crear nueva respuesta
+                                    return func.HttpResponse(
+                                        json.dumps(data, ensure_ascii=False),
+                                        mimetype="application/json",
+                                        status_code=response.status_code
+                                    )
+                        except Exception as e:
+                            logging.warning(f"🧠 Error aplicando memoria: {e}")
+                        
+                        return response
+                    
+                    return original_route(*args, **kwargs)(wrapper)
+                return decorator
+            
+            # APLICAR INMEDIATAMENTE
+            app.route = memory_enhanced_route
+            logging.info("🧠 [INIT] ✅ Memory wrapper aplicado FORZADAMENTE")
+            return True
+            
+        except Exception as e:
+            logging.error(f"🧠 [INIT] ❌ Error aplicando wrapper: {e}")
+            return False
+    
+    # EJECUTAR INMEDIATAMENTE EN TIEMPO DE CARGA
+    wrapper_success = force_memory_wrapper_immediate()
+    
+    if wrapper_success:
+        logging.info("🧠 [INIT] Sistema de memoria ACTIVADO en tiempo de carga")
+    else:
+        logging.warning("🧠 [INIT] Sistema de memoria FALLÓ - continuando sin memoria")
+        
 except Exception as e:
-    logging.error(f"❌ WRAPPER FALLÓ: {e}")
-    # Fallback: aplicar decorador manual
-    try:
-        from services.memory_decorator import registrar_memoria
-        logging.info("⚠️ Usando decorador manual como fallback")
-    except Exception as e2:
-        logging.error(f"❌ Fallback también falló: {e2}")
+    logging.error(f"🧠 [INIT] Error crítico cargando sistema de memoria: {e}")
+    logging.info("🧠 [INIT] Continuando sin sistema de memoria automática")
+
+# Logging ya incluido en el bloque try/except anterior
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -1349,36 +1428,19 @@ def invocar_endpoint_directo(endpoint: str, method: str = "GET", params: Optiona
 
 FILE_CACHE = {}
 
-# Definir registrar_memoria directamente
-def registrar_memoria(source_name: str):
-    """Decorador de memoria semántica automática"""
-    def decorator(func_ref):
-        return func_ref
-    return decorator
-
-try:
-    from memory_manual import aplicar_memoria_manual
-except ImportError:
-    def aplicar_memoria_manual(req, response_data):
-        return response_data
-
-try:
-    from memory_precheck import aplicar_precheck_memoria
-except ImportError:
-    def aplicar_precheck_memoria(req, response_data):
-        return response_data
 
 @app.function_name(name="leer_archivo_http")
 @app.route(route="leer-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-
 def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     """
     Endpoint mejorado para lectura de archivos con búsqueda inteligente
     y respuestas optimizadas para agentes AI
     """
+    from memory_manual import aplicar_memoria_manual
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     
-    # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
-    memoria_previa = getattr(req, '_memoria_contexto', {})
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
     if memoria_previa and memoria_previa.get("tiene_historial"):
         logging.info(f"🧠 Leer-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
         logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
@@ -1403,7 +1465,9 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                     "endpoint": "/api/leer-archivo"
                 }
             }
-            # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
+            # Aplicar memoria antes de responder
+            res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
+            res_dict = aplicar_memoria_manual(req, res_dict)
             return func.HttpResponse(
                 json.dumps(res_dict, ensure_ascii=False),
                 mimetype="application/json",
@@ -1421,7 +1485,9 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         else:
             res_dict = handle_file_request_dict(params, run_id)
         
-        # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar memoria antes de responder
+        res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
+        res_dict = aplicar_memoria_manual(req, res_dict)
         
         return func.HttpResponse(
             json.dumps(res_dict, ensure_ascii=False),
@@ -1442,7 +1508,9 @@ def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 "endpoint": "/api/leer-archivo"
             }
         }
-        # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar memoria antes de responder
+        res_dict = aplicar_memoria_cosmos_directo(req, res_dict)
+        res_dict = aplicar_memoria_manual(req, res_dict)
         return func.HttpResponse(
             json.dumps(res_dict, ensure_ascii=False),
             mimetype="application/json",
@@ -3698,7 +3766,7 @@ def generar_sugerencias_comando_azure(comando: str) -> list:
     return sugerencias[:3]
 
 
-
+from services.memory_decorator import registrar_memoria
 
 # Alias para compatibilidad con sistema de redirección
 def revisar_correcciones_http(req):
@@ -3719,226 +3787,21 @@ def revisar_correcciones_http(req):
             mimetype="application/json"
         )
 
-# Importar decorador de memoria
-
-@app.function_name(name="historial_interacciones")
-@app.route(route="historial-interacciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
-
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 historial_interacciones: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-
-    # Forzar lectura del contexto si el wrapper lo inyectó
-    try:
-        if not hasattr(req, "_memoria_contexto") or not getattr(req, "_memoria_contexto", {}):
-            from services.memory_service import memory_service
-            session_id = req.headers.get("Session-ID") or req.params.get("session_id")
-            if session_id:
-                interacciones = memory_service.get_session_history(session_id)
-                setattr(req, "_memoria_contexto", {
-                    "tiene_historial": len(interacciones) > 0,
-                    "interacciones_recientes": interacciones,
-                    "total_interacciones": len(interacciones),
-                    "session_id": session_id
-                })
-                logging.info(f"🧠 Cargado contexto manualmente dentro del endpoint ({len(interacciones)} interacciones)")
-    except Exception as e:
-        logging.warning(f"⚠️ Error cargando memoria dentro del endpoint: {e}")
-    
-    # 🔥 MEMORIA DIRECTA - FORZAR FUNCIONAMIENTO
-    logging.info("🔥 ENDPOINT EJECUTÁNDOSE CON MEMORIA DIRECTA")
-    
-    try:
-        session_id = req.headers.get("Session-ID") or "test_session"
-        agent_id = req.headers.get("Agent-ID") or "TestAgent"
-        
-        logging.info(f"🔍 Headers: Session={session_id}, Agent={agent_id}")
-        
-        interacciones = memory_service.get_session_history(session_id)
-        memoria_previa = {
-            "tiene_historial": len(interacciones) > 0,
-            "interacciones_recientes": interacciones,
-            "total_interacciones": len(interacciones),
-            "session_id": session_id
-        }
-        
-        logging.info(f"🧠 Memoria cargada: {len(interacciones)} interacciones")
-        
-        setattr(req, "_memoria_contexto", memoria_previa)
-        
-    except Exception as e:
-        logging.error(f"❌ Error cargando memoria: {e}")
-        memoria_previa = {}
-        session_id = None
-    """Endpoint para consultar historial de interacciones con detección automática de endpoint"""
-    
-    memoria_previa = getattr(req, '_memoria_contexto', {})
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        total = memoria_previa.get("total_interacciones", 0)
-        logging.info(f"🧠 Historial: {total} interacciones encontradas")
-    
-    try:
-        limit = int(req.params.get("limit", "10"))
-        session_id = req.params.get("session_id")
-        
-        if not memoria_previa or not memoria_previa.get("tiene_historial"):
-            response_data = {
-                "exito": True,
-                "interacciones": [],
-                "total": 0,
-                "mensaje": "No se encontraron interacciones previas en esta sesión",
-                "session_id": session_id,
-                "fuente": "wrapper_automatico"
-            }
-        else:
-            interacciones_formateadas = []
-            for i, interaccion in enumerate(memoria_previa.get("interacciones_recientes", [])[:limit]):
-                # Unificar la estructura (compatibilidad entre versiones antiguas y nuevas)
-                registro = interaccion.get("data", interaccion)
-                
-                interacciones_formateadas.append({
-                    "numero": i + 1,
-                    "timestamp": registro.get("timestamp", interaccion.get("timestamp", "")),
-                    "endpoint": registro.get("endpoint", "historial_interacciones"),
-                    "consulta": registro.get("params", {}).get("comando", "")[:200],
-                    "exito": registro.get("success", True),
-                    "texto_semantico": registro.get("texto_semantico", ""),  # ← aquí está el texto enriquecido
-                    "tipo": "interaccion_usuario"
-                })
-            
-            response_data = {
-                "exito": True,
-                "interacciones": interacciones_formateadas,
-                "total": memoria_previa.get("total_interacciones", 0),
-                "session_id": memoria_previa.get("session_id"),
-                "resumen_conversacion": memoria_previa.get("resumen_conversacion", ""),
-                "fuente": "wrapper_automatico",
-                "mensaje": f"Se encontraron {len(interacciones_formateadas)} interacciones recientes"
-            }
-        
-        # Aplicar memoria Cosmos y memoria manual
-        response_data = aplicar_memoria_cosmos_directo(req, response_data)
-        response_data = aplicar_memoria_manual(req, response_data)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for historial_interacciones: success={response_data.get('exito', False)}, endpoint=/api/historial-interacciones")
-        memory_service.registrar_llamada(
-            source="historial_interacciones",
-            endpoint="/api/historial-interacciones",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=response_data,
-            success=response_data.get("exito", False)
-        )
-        
-        # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
-        
-        return func.HttpResponse(
-            json.dumps(response_data, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=200
-        )
-        
-    except Exception as e:
-        logging.error(f"Error en historial-interacciones: {e}")
-        
-        response_data = {
-            "exito": False,
-            "error": str(e),
-            "mensaje": "Error consultando historial de interacciones",
-            "fuente": "wrapper_automatico",
-            "metadata": {"memoria_error": str(e)}
-        }
-        
-        # Aplicar memoria Cosmos y memoria manual
-        response_data = aplicar_memoria_cosmos_directo(req, response_data)
-        response_data = aplicar_memoria_manual(req, response_data)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for historial_interacciones: success={response_data.get('exito', False)}, endpoint=/api/historial-interacciones")
-        memory_service.registrar_llamada(
-            source="historial_interacciones",
-            endpoint="/api/historial-interacciones",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=response_data,
-            success=response_data.get("exito", False)
-        )
-        
-        # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
-        
-        return func.HttpResponse(
-            json.dumps(response_data, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=500
-        )
-
 @app.function_name(name="copiloto")
 @app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
+@registrar_memoria("copiloto")
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
-    # 🔥 MEMORIA DIRECTA - WRAPPER AUTOMÁTICO
-    logging.info("🔥 COPILOTO EJECUTÁNDOSE CON MEMORIA DIRECTA")
-    
-    try:
-        from services.memory_service import memory_service
-        session_id = req.headers.get("Session-ID") or "test_session"
-        agent_id = req.headers.get("Agent-ID") or "TestAgent"
-        
-        logging.info(f"🔍 COPILOTO Headers: Session={session_id}, Agent={agent_id}")
-        
-        interacciones = memory_service.get_session_history(session_id)
-        memoria_previa = {
-            "tiene_historial": len(interacciones) > 0,
-            "interacciones_recientes": interacciones,
-            "total_interacciones": len(interacciones),
-            "session_id": session_id
-        }
-        
-        logging.info(f"🧠 COPILOTO Memoria cargada: {len(interacciones)} interacciones")
-        
-        setattr(req, "_memoria_contexto", memoria_previa)
-        
-        # 💾 REGISTRAR INTERACCIÓN EN MEMORIA
-        try:
-            body = req.get_json() or {}
-            comando = body.get("comando") or body.get("consulta") or "sin_comando"
-            
-            memory_service.registrar_llamada(
-                source="copiloto",
-                endpoint="/api/copiloto",
-                method=req.method,
-                params={"comando": comando, "session_id": session_id, "agent_id": agent_id},
-                response_data={"procesando": True},
-                success=True
-            )
-            logging.info(f"💾 COPILOTO Interacción registrada: {comando}")
-        except Exception as reg_error:
-            logging.warning(f"⚠️ Error registrando en memoria: {reg_error}")
-        
-    except Exception as e:
-        logging.error(f"❌ COPILOTO Error cargando memoria: {e}")
-        memoria_previa = {}
-        session_id = None
-    
+    from memory_manual import aplicar_memoria_manual
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
-    from semantic_helpers import generar_sugerencias_contextuales, interpretar_con_contexto_semantico
     
     logging.info('🤖 Copiloto Semántico activado')
     
-    # 🧠 OBTENER CONTEXTO SEMÁNTICO DEL WRAPPER AUTOMÁTICO
-    contexto_semantico = getattr(req, '_contexto_semantico', {})
-    memoria_previa = getattr(req, '_memoria_contexto', {})
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Memoria Cosmos: {memoria_previa['total_interacciones']} interacciones encontradas")
+        logging.info(f"📝 Resumen: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     
     # Extraer consulta del request
     try:
@@ -3951,41 +3814,52 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             if any(keyword in consulta_lower for keyword in ["historial", "interacciones", "ultimas", "anteriores", "previas", "consultas"]):
                 logging.info(f"📜 Consulta de historial detectada: {consulta[:50]}...")
                 
-                if memoria_previa and memoria_previa.get("tiene_historial"):
-                    # Devolver historial directamente
-                    respuesta_historial = {
-                        "tipo": "historial_interacciones",
-                        "mensaje": f"Encontré {memoria_previa['total_interacciones']} interacciones previas:",
-                        "interacciones": memoria_previa.get("interacciones_recientes", []),
-                        "resumen": memoria_previa.get("resumen_conversacion", ""),
-                        "session_id": memoria_previa.get("session_id"),
-                        "total": memoria_previa.get("total_interacciones", 0),
-                        "metadata": {
-                            "timestamp": datetime.now().isoformat(),
-                            "fuente": "wrapper_automatico",
-                            "consulta_original": consulta
+                # Obtener historial directamente
+                try:
+                    from cosmos_memory_direct import consultar_memoria_cosmos_directo
+                    memoria_directa = consultar_memoria_cosmos_directo(req)
+                    
+                    if memoria_directa and memoria_directa.get("tiene_historial"):
+                        # Devolver historial directamente sin redirección
+                        respuesta_historial = {
+                            "tipo": "historial_interacciones",
+                            "mensaje": f"Encontré {memoria_directa['total_interacciones']} interacciones previas:",
+                            "interacciones": memoria_directa.get("interacciones_recientes", []),
+                            "resumen": memoria_directa.get("resumen_conversacion", ""),
+                            "session_id": memoria_directa.get("session_id"),
+                            "total": memoria_directa.get("total_interacciones", 0),
+                            "metadata": {
+                                "timestamp": datetime.now().isoformat(),
+                                "fuente": "memoria_directa",
+                                "consulta_original": consulta
+                            }
                         }
-                    }
-                    
-                    return func.HttpResponse(
-                        json.dumps(respuesta_historial, ensure_ascii=False),
-                        mimetype="application/json",
-                        status_code=200
-                    )
-                else:
-                    # Sin historial
-                    respuesta_sin_historial = {
-                        "tipo": "sin_historial",
-                        "mensaje": "No encontré interacciones previas en esta sesión",
-                        "session_id": getattr(req, '_session_id', 'unknown'),
-                        "sugerencia": "Esta es una nueva sesión o no hay interacciones guardadas"
-                    }
-                    
-                    return func.HttpResponse(
-                        json.dumps(respuesta_sin_historial, ensure_ascii=False),
-                        mimetype="application/json",
-                        status_code=200
-                    )
+                        
+                        respuesta_historial = aplicar_memoria_cosmos_directo(req, respuesta_historial)
+                        respuesta_historial = aplicar_memoria_manual(req, respuesta_historial)
+                        
+                        return func.HttpResponse(
+                            json.dumps(respuesta_historial, ensure_ascii=False),
+                            mimetype="application/json",
+                            status_code=200
+                        )
+                    else:
+                        # Sin historial
+                        respuesta_sin_historial = {
+                            "tipo": "sin_historial",
+                            "mensaje": "No encontré interacciones previas en esta sesión",
+                            "session_id": req.headers.get("Session-ID", "unknown"),
+                            "sugerencia": "Esta es una nueva sesión o no hay interacciones guardadas"
+                        }
+                        
+                        return func.HttpResponse(
+                            json.dumps(respuesta_sin_historial, ensure_ascii=False),
+                            mimetype="application/json",
+                            status_code=200
+                        )
+                        
+                except Exception as e:
+                    logging.error(f"Error consultando historial directo: {e}")
             
             # 🔍 DETECCIÓN INTELIGENTE DE BING GROUNDING (para otras consultas)
             try:
@@ -3993,8 +3867,12 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 
                 # Si Bing ya resolvió la consulta completamente
                 if bing_result.get("respuesta_final"):
+                    respuesta = bing_result["respuesta_final"]
+                    respuesta = aplicar_memoria_cosmos_directo(req, respuesta)
+                    respuesta = aplicar_memoria_manual(req, respuesta)
+                    
                     return func.HttpResponse(
-                        json.dumps(bing_result["respuesta_final"], ensure_ascii=False),
+                        json.dumps(respuesta, ensure_ascii=False),
                         mimetype="application/json",
                         status_code=200
                     )
@@ -4013,13 +3891,12 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     mensaje = req.params.get('mensaje', '')
 
     if not mensaje:
-        # Panel inicial mejorado con capacidades semánticas Y CONTEXTO ENRIQUECIDO
+        # Panel inicial mejorado con capacidades semánticas
         panel = {
             "tipo": "panel_inicial",
             "titulo": f"🤖 COPILOTO SEMÁNTICO - {'AZURE' if IS_AZURE else 'LOCAL'}",
-            "version": "2.0-semantic-enhanced",
+            "version": "2.0-semantic",
             "capacidades": SEMANTIC_CAPABILITIES,
-            "contexto_semantico": contexto_semantico,
             "estado": {
                 "ambiente": "Azure" if IS_AZURE else "Local",
                 "blob_storage": {
@@ -4031,9 +3908,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 "inteligencia": {
                     "analisis_semantico": True,
                     "generacion_artefactos": True,
-                    "sugerencias_contextuales": True,
-                    "memoria_semantica_activa": bool(contexto_semantico),
-                    "conocimiento_cognitivo": bool(contexto_semantico.get("conocimiento_cognitivo"))
+                    "sugerencias_contextuales": True
                 }
             },
             "comandos": {
@@ -4052,13 +3927,15 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "ready_for_agents": True,
-                "api_version": "2.0-enhanced",
-                "memoria_semantica_integrada": True,
-                "contexto_enriquecido": bool(contexto_semantico)
+                "api_version": "2.0"
             }
         }
 
-        # NOTA: La memoria semántica se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar precheck y memoria manual
+        panel = aplicar_memoria_cosmos_directo(req, panel)
+        panel = aplicar_memoria_manual(req, panel)
+        
+        # NOTA: El guardado automático se maneja por memory_route_wrapper + @registrar_memoria
         
         return func.HttpResponse(
             json.dumps(panel, indent=2, ensure_ascii=False),
@@ -4152,61 +4029,43 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 ]
             })
 
-        # Comando: diagnosticar (CON CONTEXTO SEMÁNTICO)
+        # Comando: diagnosticar
         elif mensaje.startswith("diagnosticar:"):
-            # Enriquecer parámetros con contexto semántico
-            parametros_enriquecidos = {"contexto_semantico": contexto_semantico}
-            resultado = procesar_intencion_semantica(mensaje, parametros_enriquecidos)
-            
-            # Si hay conocimiento cognitivo, agregarlo al resultado
-            if contexto_semantico.get("conocimiento_cognitivo"):
-                if isinstance(resultado, dict):
-                    resultado["evaluacion_cognitiva"] = contexto_semantico["conocimiento_cognitivo"]
-            
+            resultado = procesar_intencion_semantica(mensaje, {})
             respuesta_base.update({
-                "accion": "diagnostico_enriquecido",
+                "accion": "diagnostico",
                 "resultado": resultado,
-                "proximas_acciones": ["sugerir", "explorar:.", "analizar:tendencias"]
+                "proximas_acciones": ["sugerir", "explorar:."]
             })
 
-        # Comando: sugerir (CON CONTEXTO SEMÁNTICO)
+        # Comando: sugerir
         elif mensaje == "sugerir":
-            # Generar sugerencias basadas en contexto semántico
-            sugerencias_contextuales = generar_sugerencias_contextuales(contexto_semantico)
-            resultado = procesar_intencion_semantica("sugerir", {"contexto_semantico": contexto_semantico})
-            
-            # Enriquecer resultado con sugerencias contextuales
-            if isinstance(resultado, dict) and resultado.get("exito"):
-                resultado["sugerencias_contextuales"] = sugerencias_contextuales
-                resultado["sugerencias"] = (resultado.get("sugerencias", []) + sugerencias_contextuales)[:10]
-            
+            resultado = procesar_intencion_semantica("sugerir", {})
             respuesta_base.update({
-                "accion": "sugerencias_enriquecidas",
+                "accion": "sugerencias",
                 "resultado": resultado,
-                "proximas_acciones": resultado.get("sugerencias", [])[:3] if resultado.get("exito") else []
+                "proximas_acciones": resultado["sugerencias"][:3] if resultado["exito"] else []
             })
 
-        # Comando no reconocido - interpretación semántica ENRIQUECIDA
+        # Comando no reconocido - interpretación semántica
         else:
-            # Usar contexto semántico para mejor interpretación
-            interpretacion_enriquecida = interpretar_con_contexto_semantico(mensaje, contexto_semantico)
-            
             respuesta_base.update({
-                "accion": "interpretacion_enriquecida",
+                "accion": "interpretacion",
                 "resultado": {
-                    "mensaje": "No reconozco ese comando específico, pero basándome en el contexto puedo sugerir:",
-                    "interpretacion": interpretacion_enriquecida.get("interpretacion", f"Parece que quieres: {mensaje}"),
-                    "sugerencias": interpretacion_enriquecida.get("sugerencias", [
+                    "mensaje": "No reconozco ese comando específico, pero puedo ayudarte.",
+                    "interpretacion": f"Parece que quieres: {mensaje}",
+                    "sugerencias": [
                         "buscar:" + mensaje,
                         "generar:script para " + mensaje,
                         "sugerir"
-                    ]),
-                    "contexto_aplicado": bool(contexto_semantico)
+                    ]
                 },
-                "proximas_acciones": ["sugerir", "buscar:*", "diagnosticar:sistema"]
+                "proximas_acciones": ["sugerir", "buscar:*"]
             })
 
-        # NOTA: La memoria semántica se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar precheck y memoria manual
+        respuesta_base = aplicar_memoria_cosmos_directo(req, respuesta_base)
+        respuesta_base = aplicar_memoria_manual(req, respuesta_base)
         
         return func.HttpResponse(
             json.dumps(respuesta_base, indent=2, ensure_ascii=False),
@@ -4472,18 +4331,21 @@ def build_status() -> dict:
 
 @app.function_name(name="status")
 @app.route(route="status", auth_level=func.AuthLevel.ANONYMOUS)
-
 def status(req: func.HttpRequest) -> func.HttpResponse:
     """Status endpoint muy ligero, solo confirma estado"""
+    from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
     
-    # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
-    memoria_previa = getattr(req, '_memoria_contexto', {})
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
     if memoria_previa and memoria_previa.get("contexto_recuperado"):
         logging.info(f"🧠 Status: Continuando sesión con {memoria_previa['total_interacciones']} interacciones")
     
     estado = build_status()
     
-    # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
+    # Aplicar precheck y memoria manualmente
+    estado = aplicar_precheck_memoria(req, estado)
+    estado = aplicar_memoria_manual(req, estado)
     
     return func.HttpResponse(
         json.dumps(estado, indent=2, ensure_ascii=False),
@@ -4727,9 +4589,9 @@ def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.function_name(name="listar_blobs")
 @app.route(route="listar-blobs", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-
 def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
     """Lista blobs con conteo total y muestra consistente usando api_ok/api_err."""
+    from memory_manual import aplicar_memoria_manual
     endpoint = "/api/listar-blobs"
     method = "GET"
 
@@ -4796,7 +4658,8 @@ def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
                 "timestamp": datetime.now().isoformat()
             }
         )
-        # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar memoria manual
+        payload = aplicar_memoria_manual(req, payload)
         
         return func.HttpResponse(json.dumps(payload, ensure_ascii=False), mimetype="application/json", status_code=200)
 
@@ -4808,20 +4671,25 @@ def listar_blobs(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.function_name(name="ejecutar")
 @app.route(route="ejecutar", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
-
+@registrar_memoria("ejecutar")
 def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
     """Versión mejorada del endpoint ejecutar con intenciones extendidas"""
+    from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
     
     logging.info('🚀 Endpoint ejecutar (orquestador mejorado) activado')
     
-    # 🧠 OBTENER CONTEXTO SEMÁNTICO DEL WRAPPER AUTOMÁTICO
-    contexto_semantico = getattr(req, '_contexto_semantico', {})
-    memoria_contexto = getattr(req, '_memoria_contexto', {})
-    memoria_prompt = getattr(req, '_memoria_prompt', '')
-    session_info = {
-        'session_id': getattr(req, '_session_id', 'unknown'),
-        'agent_id': getattr(req, '_agent_id', 'unknown')
-    }
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
+    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+        logging.info(f"🧠 Ejecutar: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
+    
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE (legacy)
+    from memory_helpers import obtener_memoria_request, obtener_prompt_memoria, extraer_session_info
+    
+    memoria_contexto = obtener_memoria_request(req)
+    memoria_prompt = obtener_prompt_memoria(req)
+    session_info = extraer_session_info(req)
     
     if memoria_contexto and memoria_contexto.get("tiene_historial"):
         logging.info(f"🧠 Continuando sesión con {memoria_contexto['total_interacciones_sesion']} interacciones previas")
@@ -4930,6 +4798,9 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
             # 🧠 AGREGAR CONTEXTO DE MEMORIA
             if memoria_prompt:
                 nuevo_resultado['contexto_memoria'] = memoria_prompt
+            
+            from memory_helpers import agregar_memoria_a_respuesta
+            nuevo_resultado = agregar_memoria_a_respuesta(nuevo_resultado, req)
 
             # Si hay error de urgencia alta, agregar diagnóstico
             if not nuevo_resultado.get('exito', True) and contexto.get('urgencia') == 'alta':
@@ -4982,7 +4853,9 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=200
             )
 
-        # NOTA: La memoria semántica se registra automáticamente por el wrapper @registrar_memoria
+        # Aplicar precheck y memoria manual
+        resultado = aplicar_precheck_memoria(req, resultado)
+        resultado = aplicar_memoria_manual(req, resultado)
         
         return func.HttpResponse(
             json.dumps(resultado, indent=2, ensure_ascii=False),
@@ -5259,13 +5132,15 @@ def _resolve_handler(endpoint: str):
 
 @app.function_name(name="hybrid")
 @app.route(route="hybrid", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-
+@registrar_memoria("hybrid")
 def hybrid(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
+    from memory_precheck import consultar_memoria_antes_responder, aplicar_precheck_memoria
     
     logging.info('Hybrid (semantico inteligente) activado')
     
-    # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
-    memoria_previa = getattr(req, '_memoria_contexto', {})
+    # 🧠 CONSULTAR MEMORIA AUTOMÁTICAMENTE ANTES DE RESPONDER
+    memoria_previa = consultar_memoria_antes_responder(req)
     if memoria_previa and memoria_previa.get("contexto_recuperado"):
         logging.info(f"🧠 Hybrid: Continuando sesión con {memoria_previa['total_interacciones']} interacciones previas")
     
@@ -6109,50 +5984,6 @@ def conocimiento_cognitivo_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="contexto_agente_http")
 @app.route(route="contexto-agente", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
-    # 🔥 MEMORIA DIRECTA - WRAPPER AUTOMÁTICO
-    logging.info("🔥 CONTEXTO-AGENTE EJECUTÁNDOSE CON MEMORIA DIRECTA")
-    
-    try:
-        from services.memory_service import memory_service
-        session_id = req.headers.get("Session-ID") or "test_session"
-        agent_id = req.headers.get("Agent-ID") or "TestAgent"
-        
-        logging.info(f"🔍 CONTEXTO-AGENTE Headers: Session={session_id}, Agent={agent_id}")
-        
-        interacciones = memory_service.get_session_history(session_id)
-        memoria_previa = {
-            "tiene_historial": len(interacciones) > 0,
-            "interacciones_recientes": interacciones,
-            "total_interacciones": len(interacciones),
-            "session_id": session_id
-        }
-        
-        logging.info(f"🧠 CONTEXTO-AGENTE Memoria cargada: {len(interacciones)} interacciones")
-        
-        setattr(req, "_memoria_contexto", memoria_previa)
-        
-        # 💾 REGISTRAR INTERACCIÓN EN MEMORIA
-        try:
-            body = req.get_json() or {}
-            comando = body.get("comando") or body.get("consulta") or "sin_comando"
-            
-            memory_service.registrar_llamada(
-                source="contexto_agente",
-                endpoint="/api/contexto-agente",
-                method=req.method,
-                params={"agent_id": req.params.get("agent_id"), "session_id": session_id, "agent_id": agent_id},
-                response_data={"procesando": True},
-                success=True
-            )
-            logging.info(f"💾 CONTEXTO-AGENTE Interacción registrada: {comando}")
-        except Exception as reg_error:
-            logging.warning(f"⚠️ Error registrando en memoria: {reg_error}")
-        
-    except Exception as e:
-        logging.error(f"❌ CONTEXTO-AGENTE Error cargando memoria: {e}")
-        memoria_previa = {}
-        session_id = None
-    
     from memory_manual import aplicar_memoria_manual
     """Endpoint que consulta memoria y devuelve contexto del agente"""
     try:
@@ -6167,9 +5998,6 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
             # Estado general del sistema
             resultado = obtener_estado_sistema()
         
-        # Aplicar memoria manual al resultado
-        resultado = aplicar_memoria_manual(req, resultado)
-        
         return func.HttpResponse(
             json.dumps(resultado, ensure_ascii=False, indent=2),
             mimetype="application/json",
@@ -6178,10 +6006,8 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
         
     except Exception as e:
         logging.error(f"Error en contexto-agente: {e}")
-        error_result = {"exito": False, "error": str(e)}
-        error_result = aplicar_memoria_manual(req, error_result)
         return func.HttpResponse(
-            json.dumps(error_result, ensure_ascii=False, indent=2),
+            json.dumps({"exito": False, "error": str(e)}),
             mimetype="application/json",
             status_code=500
         )
@@ -7132,7 +6958,6 @@ def modificar_archivo(
 def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
     
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
     memoria_previa = consultar_memoria_cosmos_directo(req)
@@ -7331,17 +7156,6 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
         res = aplicar_memoria_cosmos_directo(req, res)
         res = aplicar_memoria_manual(req, res)
         
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for escribir_archivo: success={res.get('exito', False)}, endpoint=/api/escribir-archivo")
-        memory_service.registrar_llamada(
-            source="escribir_archivo",
-            endpoint="/api/escribir-archivo",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-        
         # NOTA: El guardado automático se maneja por memory_route_wrapper + @registrar_memoria
 
         return func.HttpResponse(
@@ -7394,7 +7208,6 @@ def is_running_in_azure() -> bool:
 def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
     """Endpoint ultra-resiliente para modificar archivos - nunca falla por formato"""
     
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
@@ -7566,18 +7379,6 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     # Aplicar memoria antes de responder
     res = aplicar_memoria_cosmos_directo(req, res)
     res = aplicar_memoria_manual(req, res)
-
-    # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-    # Registrar llamada en memoria después de construir la respuesta final
-    logging.info(f"💾 Registering call for modificar_archivo: success={res.get('exito', False)}, endpoint=/api/modificar-archivo")
-    memory_service.registrar_llamada(
-        source="modificar_archivo",
-        endpoint="/api/modificar-archivo",
-        method=req.method,
-        params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-        response_data=res,
-        success=res.get("exito", False)
-    )
 
     # NUNCA devolver status de error
     return func.HttpResponse(
@@ -9995,16 +9796,6 @@ def copiar_archivo(origen: str, destino: str, overwrite: bool = False) -> dict:
 @app.route(route="copiar-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def copiar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     try:
         # ✅ VALIDACIÓN DEFENSIVA: Verificar que body no sea None/vacío
         body = None
@@ -10227,21 +10018,6 @@ def copiar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                     "descripcion": f"Copiar '{origen}' a '{destino}' sobrescribiendo el archivo existente"
                 }
 
-            # Aplicar memoria Cosmos y memoria manual DESPUES DE ULTIMA RESPUESTA
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for copiar_archivo: success={res.get('exito', False)}, endpoint=/api/copiar-archivo")
-            memory_service.registrar_llamada(
-                source="copiar_archivo",
-                endpoint="/api/copiar-archivo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             # Determine appropriate status code
             status_code = 200
             if res.get("exito") and "creado" in str(res.get("mensaje", "")).lower():
@@ -10324,16 +10100,6 @@ def preparar_script_desde_blob(ruta_blob: str) -> dict:
 @app.route(route="preparar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def preparar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     try:
         # ✅ LECTURA SIMPLIFICADA Y ROBUSTA: Usar patrón estándar
         try:
@@ -10407,22 +10173,6 @@ def preparar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         else:
             status_code = 400
 
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for preparar_script: success={res.get('exito', False)}, endpoint=/api/preparar-script")
-        memory_service.registrar_llamada(
-            source="preparar_script",
-            endpoint="/api/preparar-script",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
         return func.HttpResponse(
             json.dumps(res, ensure_ascii=False),
             mimetype="application/json",
@@ -10475,45 +10225,14 @@ def render_tool_response(status_code: int, payload: dict) -> str:
 @app.route(route="render-error", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     """Endpoint dedicado para renderizar errores de forma semántica"""
     try:
         # ✅ VALIDACIÓN DEFENSIVA: Verificar que request_body no sea None
         request_body = req.get_body()
         if not request_body:
-            res = {
-                "exito": False,
-                "error": "Request body is empty",
-                "response": "❌ Error: Request body is empty"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-            memory_service.registrar_llamada(
-                source="render_error",
-                endpoint="/api/render-error",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
+                "❌ Error: Request body is empty",
+                mimetype="text/plain",
                 status_code=200
             )
 
@@ -10523,87 +10242,24 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
             body = req.get_json()
         except (ValueError, TypeError, AttributeError) as json_error:
             logging.warning(f"Invalid JSON in render_error_http: {json_error}")
-            res = {
-                "exito": False,
-                "error": "Invalid JSON format in request body",
-                "response": "❌ Error: Invalid JSON format in request body"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-            memory_service.registrar_llamada(
-                source="render_error",
-                endpoint="/api/render-error",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
+                "❌ Error: Invalid JSON format in request body",
+                mimetype="text/plain",
                 status_code=200
             )
 
         # ✅ VALIDACIÓN DEFENSIVA: Verificar que body no sea None y sea dict
         if body is None:
-            res = {
-                "exito": False,
-                "error": "Request body could not be parsed as JSON",
-                "response": "❌ Error: Request body could not be parsed as JSON"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-            memory_service.registrar_llamada(
-                source="render_error",
-                endpoint="/api/render-error",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
+                "❌ Error: Request body could not be parsed as JSON",
+                mimetype="text/plain",
                 status_code=200
             )
 
         if not isinstance(body, dict):
-            res = {
-                "exito": False,
-                "error": "Request body must be valid JSON object",
-                "response": "❌ Error: Request body must be valid JSON object"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-            memory_service.registrar_llamada(
-                source="render_error",
-                endpoint="/api/render-error",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
+                "❌ Error: Request body must be valid JSON object",
+                mimetype="text/plain",
                 status_code=200
             )
 
@@ -10662,32 +10318,9 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
         if semantic_response is None or not isinstance(semantic_response, str):
             semantic_response = f"❌ Error procesando respuesta: {payload.get('error', 'Error desconocido')}"
 
-        res = {
-            "exito": True,
-            "response": semantic_response,
-            "status_code": status_code,
-            "payload": payload
-        }
-
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-        memory_service.registrar_llamada(
-            source="render_error",
-            endpoint="/api/render-error",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
         return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
+            semantic_response,
+            mimetype="text/plain",
             status_code=200  # Siempre 200 para que el agente pueda leer la respuesta
         )
 
@@ -10696,41 +10329,16 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
         # ✅ FALLBACK ULTRA-SEGURO: Garantizar que siempre se devuelva una respuesta válida
         try:
             error_message = str(e) if e else "Unknown exception"
-            res = {
-                "exito": False,
-                "error": f"Error crítico de renderizado: {error_message}",
-                "response": f"❌ Error crítico: No se pudo procesar la respuesta"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for render_error: success={res.get('exito', False)}, endpoint=/api/render-error")
-            memory_service.registrar_llamada(
-                source="render_error",
-                endpoint="/api/render-error",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
+                f"❌ Error crítico de renderizado: {error_message}",
+                mimetype="text/plain",
                 status_code=200
             )
         except:
             # Último recurso si incluso el fallback falla
             return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Error crítico: No se pudo procesar la respuesta",
-                    "response": "❌ Error crítico: No se pudo procesar la respuesta"
-                }),
-                mimetype="application/json",
+                "❌ Error crítico: No se pudo procesar la respuesta",
+                mimetype="text/plain",
                 status_code=200
             )
 
@@ -10742,16 +10350,6 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="crear-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     """Crea una nueva cuenta de almacenamiento en Azure usando CLI con Bing Fallback para parámetros faltantes"""
     try:
         body = req.get_json()
@@ -10777,77 +10375,45 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
                     # Ejecutar el comando sugerido por Bing
                     result = subprocess.run(fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
                     if result.returncode == 0:
-                        res = {
-                            "exito": True,
-                            "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing",
-                            "comando_ejecutado": fallback["comando_sugerido"],
-                            "stdout": result.stdout,
-                            "cuenta": nombre,
-                            "location": location,
-                            "sku": sku,
-                            "kind": kind,
-                            "resource_group": resource_group
-                        }
-                        # Aplicar memoria Cosmos y memoria manual
-                        res = aplicar_memoria_cosmos_directo(req, res)
-                        res = aplicar_memoria_manual(req, res)
-
-                        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                        # Registrar llamada en memoria después de construir la respuesta final
-                        logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                        memory_service.registrar_llamada(
-                            source="crear_contenedor",
-                            endpoint="/api/crear-contenedor",
-                            method=req.method,
-                            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                            response_data=res,
-                            success=res.get("exito", False)
-                        )
                         return func.HttpResponse(
-                            json.dumps(res, ensure_ascii=False),
+                            json.dumps({
+                                "exito": True,
+                                "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing",
+                                "comando_ejecutado": fallback["comando_sugerido"],
+                                "stdout": result.stdout,
+                                "cuenta": nombre,
+                                "location": location,
+                                "sku": sku,
+                                "kind": kind,
+                                "resource_group": resource_group
+                            }, ensure_ascii=False),
                             mimetype="application/json",
                             status_code=201
                         )
             except Exception as bing_error:
                 logging.warning(f"Bing Fallback falló: {bing_error}")
 
-            res = {
-                "exito": False,
-                "error": "Parámetros insuficientes para crear cuenta de almacenamiento",
-                "parametros_requeridos": ["nombre", "location", "sku", "kind", "resource_group"],
-                "parametros_recibidos": {
-                    "nombre": nombre,
-                    "location": location,
-                    "sku": sku,
-                    "kind": kind,
-                    "resource_group": resource_group
-                },
-                "ejemplo": {
-                    "nombre": "mi-storage-account",
-                    "location": "eastus",
-                    "sku": "Standard_LRS",
-                    "kind": "StorageV2",
-                    "resource_group": "mi-resource-group",
-                    "public_access": False
-                }
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-            memory_service.registrar_llamada(
-                source="crear_contenedor",
-                endpoint="/api/crear-contenedor",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
+                json.dumps({
+                    "exito": False,
+                    "error": "Parámetros insuficientes para crear cuenta de almacenamiento",
+                    "parametros_requeridos": ["nombre", "location", "sku", "kind", "resource_group"],
+                    "parametros_recibidos": {
+                        "nombre": nombre,
+                        "location": location,
+                        "sku": sku,
+                        "kind": kind,
+                        "resource_group": resource_group
+                    },
+                    "ejemplo": {
+                        "nombre": "mi-storage-account",
+                        "location": "eastus",
+                        "sku": "Standard_LRS",
+                        "kind": "StorageV2",
+                        "resource_group": "mi-resource-group",
+                        "public_access": False
+                    }
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=400
             )
@@ -10872,59 +10438,27 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
         if result.returncode == 0:
             try:
                 account_info = json.loads(result.stdout)
-                res = {
-                    "exito": True,
-                    "mensaje": f"Cuenta de almacenamiento '{nombre}' creada exitosamente",
-                    "cuenta": account_info.get("name"),
-                    "location": account_info.get("location"),
-                    "sku": account_info.get("sku", {}).get("name"),
-                    "kind": account_info.get("kind"),
-                    "resource_group": account_info.get("resourceGroup"),
-                    "id": account_info.get("id")
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                res = aplicar_memoria_cosmos_directo(req, res)
-                res = aplicar_memoria_manual(req, res)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                # Registrar llamada en memoria después de construir la respuesta final
-                logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                memory_service.registrar_llamada(
-                    source="crear_contenedor",
-                    endpoint="/api/crear-contenedor",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=res,
-                    success=res.get("exito", False)
-                )
                 return func.HttpResponse(
-                    json.dumps(res, ensure_ascii=False),
+                    json.dumps({
+                        "exito": True,
+                        "mensaje": f"Cuenta de almacenamiento '{nombre}' creada exitosamente",
+                        "cuenta": account_info.get("name"),
+                        "location": account_info.get("location"),
+                        "sku": account_info.get("sku", {}).get("name"),
+                        "kind": account_info.get("kind"),
+                        "resource_group": account_info.get("resourceGroup"),
+                        "id": account_info.get("id")
+                    }, ensure_ascii=False),
                     mimetype="application/json",
                     status_code=201
                 )
             except json.JSONDecodeError:
-                res = {
-                    "exito": True,
-                    "mensaje": "Cuenta de almacenamiento creada (respuesta no parseable)",
-                    "stdout": result.stdout
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                res = aplicar_memoria_cosmos_directo(req, res)
-                res = aplicar_memoria_manual(req, res)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                # Registrar llamada en memoria después de construir la respuesta final
-                logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                memory_service.registrar_llamada(
-                    source="crear_contenedor",
-                    endpoint="/api/crear-contenedor",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=res,
-                    success=res.get("exito", False)
-                )
                 return func.HttpResponse(
-                    json.dumps(res, ensure_ascii=False),
+                    json.dumps({
+                        "exito": True,
+                        "mensaje": "Cuenta de almacenamiento creada (respuesta no parseable)",
+                        "stdout": result.stdout
+                    }, ensure_ascii=False),
                     mimetype="application/json",
                     status_code=201
                 )
@@ -10941,29 +10475,13 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
                     # Reintentar con comando sugerido
                     retry_result = subprocess.run(fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
                     if retry_result.returncode == 0:
-                        res = {
-                            "exito": True,
-                            "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing (reintento)",
-                            "comando_ejecutado": fallback["comando_sugerido"],
-                            "cuenta": nombre
-                        }
-                        # Aplicar memoria Cosmos y memoria manual
-                        res = aplicar_memoria_cosmos_directo(req, res)
-                        res = aplicar_memoria_manual(req, res)
-
-                        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                        # Registrar llamada en memoria después de construir la respuesta final
-                        logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                        memory_service.registrar_llamada(
-                            source="crear_contenedor",
-                            endpoint="/api/crear-contenedor",
-                            method=req.method,
-                            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                            response_data=res,
-                            success=res.get("exito", False)
-                        )
                         return func.HttpResponse(
-                            json.dumps(res, ensure_ascii=False),
+                            json.dumps({
+                                "exito": True,
+                                "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing (reintento)",
+                                "comando_ejecutado": fallback["comando_sugerido"],
+                                "cuenta": nombre
+                            }, ensure_ascii=False),
                             mimetype="application/json",
                             status_code=201
                         )
@@ -10985,84 +10503,36 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code = 500
                 error_msg = f"Error creando cuenta de almacenamiento: {result.stderr}"
 
-            res = {
-                "exito": False,
-                "error": error_msg,
-                "stderr": result.stderr,
-                "returncode": result.returncode,
-                "comando_intentado": " ".join(cmd)
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-            memory_service.registrar_llamada(
-                source="crear_contenedor",
-                endpoint="/api/crear-contenedor",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
+                json.dumps({
+                    "exito": False,
+                    "error": error_msg,
+                    "stderr": result.stderr,
+                    "returncode": result.returncode,
+                    "comando_intentado": " ".join(cmd)
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=status_code
             )
 
     except subprocess.TimeoutExpired:
-        res = {
-            "exito": False,
-            "error": "Timeout creando cuenta de almacenamiento (2 minutos)",
-            "sugerencia": "Verificar conectividad de red o reducir parámetros"
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-        memory_service.registrar_llamada(
-            source="crear_contenedor",
-            endpoint="/api/crear-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
         return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
+            json.dumps({
+                "exito": False,
+                "error": "Timeout creando cuenta de almacenamiento (2 minutos)",
+                "sugerencia": "Verificar conectividad de red o reducir parámetros"
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=408
         )
     except Exception as e:
         logging.exception("crear_contenedor_http failed")
-        res = {
-            "exito": False,
-            "error": str(e),
-            "tipo_error": type(e).__name__
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-        memory_service.registrar_llamada(
-            source="crear_contenedor",
-            endpoint="/api/crear-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
         return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "tipo_error": type(e).__name__
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
         )
@@ -11071,19 +10541,10 @@ def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="proxy_local_http")
 @app.route(route="proxy-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
     """Proxy hacia tu servidor local via ngrok"""
     import requests
     import traceback
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
 
     # Initialize comando early to avoid unbound variable errors
     comando = "no_disponible"
@@ -11188,31 +10649,9 @@ def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
         logging.info(
             f"proxy_local_http: Respuesta del servidor local: {response.status_code}")
 
-        # Convertir respuesta externa a un dict usable
-        try:
-            res = response.json()
-        except Exception:
-            res = {"exito": False, "error": "Respuesta no es JSON", "contenido": response.text}
-
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for proxy_local: success={res.get('exito', False)}, endpoint=/api/proxy-local")
-        memory_service.registrar_llamada(
-            source="proxy_local",
-            endpoint="/api/proxy-local",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
         # Capturar y reenviar correctamente el error recibido desde el túnel
         return func.HttpResponse(
-            json.dumps(res),
+            response.text,
             status_code=response.status_code,
             mimetype="application/json"
         )
@@ -11288,17 +10727,6 @@ def debug_auth_environment():
 @app.route(route="gestionar-despliegue", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-
     """🚀 ENDPOINT ROBUSTO Y SEMÁNTICO PARA GESTIÓN DE DESPLIEGUES
     
     Sistema completamente adaptativo que acepta cualquier formato de payload y se adapta
@@ -11334,43 +10762,24 @@ def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
         # === PASO 3: EJECUCIÓN ROBUSTA ===
         resultado = ejecutar_accion_robusta(accion, parametros, run_id)
         
-        # === PASO 4: CONSTRUIR RESPUESTA ===
-        response_data = {
-            "exito": True,
-            "accion_ejecutada": accion,
-            "alias_usado": alias_usado,
-            "resultado": resultado,
-            "metadata": {
-                "run_id": run_id,
-                "endpoint": endpoint,
-                "timestamp": datetime.now().isoformat(),
-                "version_sistema": "robusto_v2.0"
-            },
-            "proximas_acciones": resultado.get("proximas_acciones", [
-                "Verificar estado del sistema",
-                "Monitorear logs de la aplicación"
-            ])
-        }
-        
-        # Aplicar memoria Cosmos y memoria manual
-        response_data = aplicar_memoria_cosmos_directo(req, response_data)
-        response_data = aplicar_memoria_manual(req, response_data)
-        
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for gestionar_despliegue: success={response_data.get('exito', False)}, endpoint=/api/gestionar-despliegue")
-        memory_service.registrar_llamada(
-            source="gestionar_despliegue",
-            endpoint="/api/gestionar-despliegue",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=response_data,
-            success=response_data.get("exito", False)
-        )
-        
-        # === PASO 5: RESPUESTA SIEMPRE EXITOSA ===
+        # === PASO 4: RESPUESTA SIEMPRE EXITOSA ===
         return func.HttpResponse(
-            json.dumps(response_data, ensure_ascii=False, indent=2),
+            json.dumps({
+                "exito": True,
+                "accion_ejecutada": accion,
+                "alias_usado": alias_usado,
+                "resultado": resultado,
+                "metadata": {
+                    "run_id": run_id,
+                    "endpoint": endpoint,
+                    "timestamp": datetime.now().isoformat(),
+                    "version_sistema": "robusto_v2.0"
+                },
+                "proximas_acciones": resultado.get("proximas_acciones", [
+                    "Verificar estado del sistema",
+                    "Monitorear logs de la aplicación"
+                ])
+            }, ensure_ascii=False, indent=2),
             mimetype="application/json",
             status_code=200
         )
@@ -11379,48 +10788,29 @@ def gestionar_despliegue_http(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"[{run_id}] Error crítico en gestionar_despliegue: {str(e)}")
         logging.error(f"[{run_id}] Traceback: {traceback.format_exc()}")
         
-        # Construir respuesta de error
-        error_response_data = {
-            "exito": True,  # SIEMPRE TRUE para compatibilidad con agentes
-            "accion_ejecutada": "error_recovery",
-            "alias_usado": None,
-            "resultado": {
-                "tipo": "error_critico",
-                "mensaje": f"Error del sistema: {str(e)}",
-                "sugerencias": [
-                    "Verificar logs del sistema",
-                    "Reintentar con payload simplificado",
-                    "Usar acción 'detectar' como fallback"
-                ],
-                "fallback_ejecutado": True
-            },
-            "metadata": {
-                "run_id": run_id,
-                "endpoint": endpoint,
-                "timestamp": datetime.now().isoformat(),
-                "error_type": type(e).__name__
-            }
-        }
-        
-        # Aplicar memoria Cosmos y memoria manual
-        error_response_data = aplicar_memoria_cosmos_directo(req, error_response_data)
-        error_response_data = aplicar_memoria_manual(req, error_response_data)
-        
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for gestionar_despliegue: success={error_response_data.get('exito', False)}, endpoint=/api/gestionar-despliegue")
-        memory_service.registrar_llamada(
-            source="gestionar_despliegue",
-            endpoint="/api/gestionar-despliegue",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=error_response_data,
-            success=error_response_data.get("exito", False)
-        )
-        
         # Incluso errores críticos retornan éxito con información del error
         return func.HttpResponse(
-            json.dumps(error_response_data, ensure_ascii=False, indent=2),
+            json.dumps({
+                "exito": True,  # SIEMPRE TRUE para compatibilidad con agentes
+                "accion_ejecutada": "error_recovery",
+                "alias_usado": None,
+                "resultado": {
+                    "tipo": "error_critico",
+                    "mensaje": f"Error del sistema: {str(e)}",
+                    "sugerencias": [
+                        "Verificar logs del sistema",
+                        "Reintentar con payload simplificado",
+                        "Usar acción 'detectar' como fallback"
+                    ],
+                    "fallback_ejecutado": True
+                },
+                "metadata": {
+                    "run_id": run_id,
+                    "endpoint": endpoint,
+                    "timestamp": datetime.now().isoformat(),
+                    "error_type": type(e).__name__
+                }
+            }, ensure_ascii=False, indent=2),
             mimetype="application/json",
             status_code=200  # SIEMPRE 200 para compatibilidad
         )
@@ -11750,16 +11140,6 @@ def ejecutar_reiniciar_simple(parametros: dict) -> dict:
 @app.route(route="desplegar-funcion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     """Automatiza el despliegue de una nueva versión del contenedor"""
 
     try:
@@ -11772,30 +11152,13 @@ def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Verificar que Azure CLI esté disponible
         if not shutil.which("az"):
-            res = {
-                "exito": False,
-                "error": "Azure CLI no está instalado o no está disponible",
-                "codigo_error": "AZ_CLI_NOT_FOUND",
-                "solucion": "Instalar Azure CLI o verificar que esté en el PATH del sistema"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
+                json.dumps({
+                    "exito": False,
+                    "error": "Azure CLI no está instalado o no está disponible",
+                    "codigo_error": "AZ_CLI_NOT_FOUND",
+                    "solucion": "Instalar Azure CLI o verificar que esté en el PATH del sistema"
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=500
             )
@@ -11813,58 +11176,24 @@ def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
                 timeout=30
             )
         except FileNotFoundError:
-            res = {
-                "exito": False,
-                "error": "Comando 'az' no encontrado",
-                "codigo_error": "COMMAND_NOT_FOUND",
-                "solucion": "Verificar que Azure CLI esté instalado y en el PATH"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
+                json.dumps({
+                    "exito": False,
+                    "error": "Comando 'az' no encontrado",
+                    "codigo_error": "COMMAND_NOT_FOUND",
+                    "solucion": "Verificar que Azure CLI esté instalado y en el PATH"
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=500
             )
 
         if result.returncode != 0:
-            res = {
-                "exito": False,
-                "error": "No se pudo obtener tags del ACR",
-                "stderr": result.stderr
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
             return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
+                json.dumps({
+                    "exito": False,
+                    "error": "No se pudo obtener tags del ACR",
+                    "stderr": result.stderr
+                }, ensure_ascii=False),
                 mimetype="application/json",
                 status_code=500
             )
@@ -11882,64 +11211,30 @@ def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
         # 2. NO PODEMOS hacer docker build/push desde aquí
         # Pero podemos actualizar el contenedor si ya existe en ACR
 
-        res = {
-            "exito": False,
-            "mensaje": "El endpoint puede detectar versiones pero no puede ejecutar Docker",
-            "ultimo_tag": ultimo_tag,
-            "proximo_tag": nuevo_tag,
-            "function_app": function_app,
-            "resource_group": resource_group,
-            "limitacion": "Docker build/push debe ejecutarse localmente",
-            "instrucciones": [
-                f"1. Ejecuta localmente: docker build -t copiloto-func-azcli:{nuevo_tag} .",
-                f"2. docker tag copiloto-func-azcli:{nuevo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
-                f"3. az acr login -n boatrentalacr",
-                f"4. docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
-                f"5. Llama a /api/actualizar-contenedor con tag={nuevo_tag}"
-            ]
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-        memory_service.registrar_llamada(
-            source="desplegar_funcion",
-            endpoint="/api/desplegar-funcion",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
         return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
+            json.dumps({
+                "exito": False,
+                "mensaje": "El endpoint puede detectar versiones pero no puede ejecutar Docker",
+                "ultimo_tag": ultimo_tag,
+                "proximo_tag": nuevo_tag,
+                "function_app": function_app,
+                "resource_group": resource_group,
+                "limitacion": "Docker build/push debe ejecutarse localmente",
+                "instrucciones": [
+                    f"1. Ejecuta localmente: docker build -t copiloto-func-azcli:{nuevo_tag} .",
+                    f"2. docker tag copiloto-func-azcli:{nuevo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
+                    f"3. az acr login -n boatrentalacr",
+                    f"4. docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
+                    f"5. Llama a /api/actualizar-contenedor con tag={nuevo_tag}"
+                ]
+            }, ensure_ascii=False),
             mimetype="application/json",
             status_code=200
         )
 
     except Exception as e:
-        res = {"exito": False, "error": str(e)}
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-        memory_service.registrar_llamada(
-            source="desplegar_funcion",
-            endpoint="/api/desplegar-funcion",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
         return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
+            json.dumps({"exito": False, "error": str(e)}),
             mimetype="application/json",
             status_code=500
         )
@@ -11950,15 +11245,6 @@ def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
 def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
     """Actualiza el contenedor de la Function App a una versión específica"""
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
 
     try:
         body = req.get_json() if req.get_body() else {}
@@ -12057,22 +11343,6 @@ def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
             "timestamp": datetime.now().isoformat()
         }
         resultado = aplicar_memoria_manual(req, resultado)
-        
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for actualizar_contenedor: success={resultado.get('exito', False)}, endpoint=/api/actualizar-contenedor")
-        memory_service.registrar_llamada(
-            source="actualizar_contenedor",
-            endpoint="/api/actualizar-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
         
         return func.HttpResponse(
             json.dumps(resultado),
@@ -12263,16 +11533,6 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     """Endpoint UNIVERSAL para ejecutar comandos - NUNCA falla con HTTP 400"""
     comando = None
     az_paths = []
@@ -12288,20 +11548,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 "ejemplo": {"comando": "storage account list"},
                 "accion_requerida": "Proporciona un comando válido en el campo 'comando'"
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
             resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
             return func.HttpResponse(
                 json.dumps(resultado),
                 status_code=200,  # ✅ SIEMPRE 200
@@ -12319,20 +11566,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "alternativa": "O proporciona un comando CLI directo",
                     "ejemplo": {"comando": "storage account list"}
                 }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
                 resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
                 return func.HttpResponse(
                     json.dumps(resultado),
                     status_code=200,  # ✅ SIEMPRE 200
@@ -12352,29 +11586,12 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "storage container list --account-name <nombre>"
                 ]
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
             resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
             return func.HttpResponse(
                 json.dumps(resultado),
                 status_code=200,  # ✅ SIEMPRE 200
                 mimetype="application/json"
             )
-        
-        # 🔧 Forzar cwd real al del proyecto
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        os.chdir(project_root)
         
         # DETECCIÓN ROBUSTA DE AZURE CLI
         az_paths = [
@@ -12394,31 +11611,16 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 break
         
         if not az_binary:
-            resultado = {
-                "exito": False,
-                "error": "Azure CLI no está instalado o no está disponible en el PATH",
-                "diagnostico": {
-                    "paths_verificados": [p for p in az_paths if p],
-                    "sugerencia": "Instalar Azure CLI o verificar PATH",
-                    "ambiente": "Azure" if IS_AZURE else "Local"
-                }
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
             return func.HttpResponse(
-                json.dumps(resultado),
+                json.dumps({
+                    "exito": False,
+                    "error": "Azure CLI no está instalado o no está disponible en el PATH",
+                    "diagnostico": {
+                        "paths_verificados": [p for p in az_paths if p],
+                        "sugerencia": "Instalar Azure CLI o verificar PATH",
+                        "ambiente": "Azure" if IS_AZURE else "Local"
+                    }
+                }),
                 status_code=503,
                 mimetype="application/json"
             )
@@ -12426,20 +11628,6 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         # ✅ VERIFICACIÓN PREVIA: Comprobar existencia de archivos si el comando los referencia
         archivo_verificado = _verificar_archivos_en_comando(comando)
         if not archivo_verificado["exito"]:
-            # Aplicar memoria Cosmos y memoria manual
-            archivo_verificado = aplicar_memoria_cosmos_directo(req, archivo_verificado)
-            archivo_verificado = aplicar_memoria_manual(req, archivo_verificado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={archivo_verificado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=archivo_verificado,
-                success=archivo_verificado.get("exito", False)
-            )
             return func.HttpResponse(
                 json.dumps(archivo_verificado, ensure_ascii=False),
                 mimetype="application/json",
@@ -12466,20 +11654,6 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 
                 # Usar la función ejecutar_comando_sistema directamente
                 resultado = ejecutar_comando_sistema(comando_normalizado, command_type)
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
                 return func.HttpResponse(
                     json.dumps(resultado, ensure_ascii=False),
                     mimetype="application/json",
@@ -12499,20 +11673,6 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 logging.info(f"Comando fallback normalizado: {comando_normalizado}")
                 # Usar la función ejecutar_comando_sistema directamente
                 resultado = ejecutar_comando_sistema(comando_normalizado, "generic")
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
                 return func.HttpResponse(
                     json.dumps(resultado, ensure_ascii=False),
                     mimetype="application/json",
@@ -12610,20 +11770,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                         "resultado": output_json,
                         "codigo_salida": result.returncode
                     }
-                    # Aplicar memoria Cosmos y memoria manual
-                    resultado_temp = aplicar_memoria_cosmos_directo(req, resultado_temp)
                     resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-                    # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                    logging.info(f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                    memory_service.registrar_llamada(
-                        source="ejecutar_cli",
-                        endpoint="/api/ejecutar-cli",
-                        method=req.method,
-                        params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                        response_data=resultado_temp,
-                        success=resultado_temp.get("exito", False)
-                    )
                     return func.HttpResponse(
                         json.dumps(resultado_temp),
                         mimetype="application/json",
@@ -12640,20 +11787,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 "codigo_salida": result.returncode,
                 "formato": "texto"
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado_temp = aplicar_memoria_cosmos_directo(req, resultado_temp)
             resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado_temp,
-                success=resultado_temp.get("exito", False)
-            )
             return func.HttpResponse(
                 json.dumps(resultado_temp),
                 mimetype="application/json",
@@ -12718,20 +11852,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                                     },
                                     "mensaje": f"✅ Comando autocorregido usando memoria: --{missing_arg_info['argumento']} {valor_memoria}"
                                 }
-                                # Aplicar memoria Cosmos y memoria manual
-                                resultado_temp = aplicar_memoria_cosmos_directo(req, resultado_temp)
                                 resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-                                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                                logging.info(f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                                memory_service.registrar_llamada(
-                                    source="ejecutar_cli",
-                                    endpoint="/api/ejecutar-cli",
-                                    method=req.method,
-                                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                                    response_data=resultado_temp,
-                                    success=resultado_temp.get("exito", False)
-                                )
                                 return func.HttpResponse(
                                     json.dumps(resultado_temp),
                                     mimetype="application/json",
@@ -12762,20 +11883,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     ],
                     "ejemplo_corregido": f"{comando} --{missing_arg_info['argumento']} <valor>"
                 }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado_temp = aplicar_memoria_cosmos_directo(req, resultado_temp)
                 resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado_temp,
-                    success=resultado_temp.get("exito", False)
-                )
                 return func.HttpResponse(
                     json.dumps(resultado_temp),
                     mimetype="application/json",
@@ -12804,20 +11912,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 ],
                 "timestamp": datetime.now().isoformat()
             }
-            # Aplicar memoria Cosmos y memoria manual
-            error_result = aplicar_memoria_cosmos_directo(req, error_result)
             error_result = aplicar_memoria_manual(req, error_result)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(f"💾 Registering call for ejecutar_cli: success={error_result.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=error_result,
-                success=error_result.get("exito", False)
-            )
             return func.HttpResponse(
                 json.dumps(error_result),
                 mimetype="application/json",
@@ -12825,117 +11920,71 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             )
     
     except subprocess.TimeoutExpired:
-        resultado = {
-            "exito": False,
-            "error": "Comando excedió tiempo límite (60s)",
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "timeout",
-                "timeout_segundos": 60,
-                "sugerencia": "El comando tardó más de 60 segundos en ejecutarse"
-            },
-            "sugerencias_solucion": [
-                "Verificar conectividad de red",
-                "Simplificar el comando si es muy complejo",
-                "Verificar que Azure CLI esté respondiendo"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
         return func.HttpResponse(
-            json.dumps(resultado),
+            json.dumps({
+                "exito": False,
+                "error": "Comando excedió tiempo límite (60s)",
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "timeout",
+                    "timeout_segundos": 60,
+                    "sugerencia": "El comando tardó más de 60 segundos en ejecutarse"
+                },
+                "sugerencias_solucion": [
+                    "Verificar conectividad de red",
+                    "Simplificar el comando si es muy complejo",
+                    "Verificar que Azure CLI esté respondiendo"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }),
             mimetype="application/json",
             status_code=200  # ✅ CAMBIO: 200 en lugar de 500
         )
     except FileNotFoundError as e:
-        resultado = {
-            "exito": False,
-            "error": "Azure CLI no encontrado en el sistema",
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "programa_no_encontrado",
-                "programa_buscado": "az (Azure CLI)",
-                "paths_verificados": [p for p in az_paths if p] if 'az_paths' in locals() else [],
-                "error_detallado": str(e)
-            },
-            "sugerencias_solucion": [
-                "Instalar Azure CLI desde https://docs.microsoft.com/cli/azure/install-azure-cli",
-                "Verificar que Azure CLI esté en el PATH del sistema",
-                "Reiniciar terminal después de la instalación"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
         return func.HttpResponse(
-            json.dumps(resultado),
+            json.dumps({
+                "exito": False,
+                "error": "Azure CLI no encontrado en el sistema",
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "programa_no_encontrado",
+                    "programa_buscado": "az (Azure CLI)",
+                    "paths_verificados": [p for p in az_paths if p] if 'az_paths' in locals() else [],
+                    "error_detallado": str(e)
+                },
+                "sugerencias_solucion": [
+                    "Instalar Azure CLI desde https://docs.microsoft.com/cli/azure/install-azure-cli",
+                    "Verificar que Azure CLI esté en el PATH del sistema",
+                    "Reiniciar terminal después de la instalación"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }),
             mimetype="application/json",
             status_code=200  # ✅ CAMBIO: 200 en lugar de 503
         )
     except Exception as e:
         logging.error(f"Error en ejecutar_cli_http: {str(e)}")
-        resultado = {
-            "exito": False,
-            "error": str(e),
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "excepcion_inesperada",
-                "tipo_excepcion": type(e).__name__,
-                "mensaje_completo": str(e)
-            },
-            "sugerencias_debug": [
-                "Verificar formato del comando",
-                "Comprobar logs del sistema",
-                "Reportar este error si persiste"
-            ],
-            "timestamp": datetime.now().isoformat(),
-            "ambiente": "Azure" if IS_AZURE else "Local"
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
         return func.HttpResponse(
-            json.dumps(resultado),
+            json.dumps({
+                "exito": False,
+                "error": str(e),
+                "comando": comando or "desconocido",
+                "diagnostico": {
+                    "tipo_error": "excepcion_inesperada",
+                    "tipo_excepcion": type(e).__name__,
+                    "mensaje_completo": str(e)
+                },
+                "sugerencias_debug": [
+                    "Verificar formato del comando",
+                    "Comprobar logs del sistema",
+                    "Reportar este error si persiste"
+                ],
+                "timestamp": datetime.now().isoformat(),
+                "ambiente": "Azure" if IS_AZURE else "Local"
+            }),
             mimetype="application/json",
             status_code=200  # ✅ CAMBIO: 200 en lugar de 500
         )
-
 
 
 def _verificar_archivos_en_comando(comando: str) -> dict:
@@ -13614,16 +12663,6 @@ def diagnosticar_function_app_con_sdk() -> dict:
 @app.route(route="diagnostico-recursos-completo", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     """
     Diagnóstico completo de recursos Azure usando SDK en lugar de CLI
     """
@@ -13688,22 +12727,6 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
                     "cli_habilitado": False
                 }
 
-                # Aplicar memoria Cosmos y memoria manual
-                diagnostico = aplicar_memoria_cosmos_directo(req, diagnostico)
-                diagnostico = aplicar_memoria_manual(req, diagnostico)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                # Registrar llamada en memoria después de construir la respuesta final
-                logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={diagnostico.get('exito', False)}, endpoint=/api/diagnostico-recursos-completo")
-                memory_service.registrar_llamada(
-                    source="diagnostico_recursos_completo",
-                    endpoint="/api/diagnostico-recursos-completo",
-                    method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=diagnostico,
-                    success=diagnostico.get("exito", False)
-                )
-
                 return func.HttpResponse(
                     json.dumps(diagnostico, indent=2, ensure_ascii=False),
                     mimetype="application/json",
@@ -13718,42 +12741,10 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
         rid = _s(body.get("recurso")) or _s(req.params.get("recurso", ""))
 
         if not rid:
-            res = {"ok": False, "error": "Falta 'recurso'", "next_steps": ["Proporciona 'recurso' en el body (POST) o query string (GET)"]}
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={res.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-            memory_service.registrar_llamada(
-                source="diagnostico_recursos_completo",
-                endpoint="/api/diagnostico-recursos-completo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
             return _error("BadRequest", 400, "Falta 'recurso'",
                           next_steps=["Proporciona 'recurso' en el body (POST) o query string (GET)"])
 
         if not _try_default_credential():
-            res = {"ok": False, "error": "No se pudieron obtener credenciales para ARM", "next_steps": ["Configura identidad administrada o variables de servicio."]}
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={res.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-            memory_service.registrar_llamada(
-                source="diagnostico_recursos_completo",
-                endpoint="/api/diagnostico-recursos-completo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
             return _error("AZURE_AUTH_MISSING", 401, "No se pudieron obtener credenciales para ARM",
                           next_steps=["Configura identidad administrada o variables de servicio."])
 
@@ -13828,79 +12819,16 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
                 })
 
             result = {"ok": True, **diagnostico}
-            # Aplicar memoria Cosmos y memoria manual
-            result = aplicar_memoria_cosmos_directo(req, result)
-            result = aplicar_memoria_manual(req, result)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={result.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-            memory_service.registrar_llamada(
-                source="diagnostico_recursos_completo",
-                endpoint="/api/diagnostico-recursos-completo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=result,
-                success=result.get("ok", False)
-            )
             return _json(result)
 
         except PermissionError as e:
-            res = {"ok": False, "error": str(e), "next_steps": ["Verifica permisos de la identidad en el recurso especificado."]}
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={res.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-            memory_service.registrar_llamada(
-                source="diagnostico_recursos_completo",
-                endpoint="/api/diagnostico-recursos-completo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
             return _error("AZURE_AUTH_FORBIDDEN", 403, str(e),
                           next_steps=["Verifica permisos de la identidad en el recurso especificado."])
         except Exception as e:
-            res = {"ok": False, "error": str(e)}
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={res.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-            memory_service.registrar_llamada(
-                source="diagnostico_recursos_completo",
-                endpoint="/api/diagnostico-recursos-completo",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
             return _error("DiagFullError", 500, str(e))
 
     except Exception as e:
         logging.exception("diagnostico_recursos_completo_http failed")
-        res = {"ok": False, "error": str(e)}
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for diagnostico_recursos_completo: success={res.get('ok', False)}, endpoint=/api/diagnostico-recursos-completo")
-        memory_service.registrar_llamada(
-            source="diagnostico_recursos_completo",
-            endpoint="/api/diagnostico-recursos-completo",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
         return _error("UnexpectedError", 500, str(e))
 
 # ========== FUNCIONES AUXILIARES PARA INTENCIONES ==========
@@ -14106,16 +13034,6 @@ def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="bateria-endpoints", methods=["POST", "GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def bateria_endpoints_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     endpoint, method = "/api/bateria-endpoints", req.method
     try:
         # ✅ ROBUSTO: Acepta cualquier body o sin body, GET o POST
@@ -14191,41 +13109,11 @@ def bateria_endpoints_http(req: func.HttpRequest) -> func.HttpResponse:
         payload = {"summary": summary, "results": results}
         ok = api_ok(endpoint, method, 200, "Batería ejecutada", payload)
         ok = aplicar_memoria_manual(req, ok)
-        # Aplicar memoria Cosmos y memoria manual
-        ok = aplicar_memoria_cosmos_directo(req, ok)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for bateria_endpoints: success={ok.get('ok', False)}, endpoint=/api/bateria-endpoints")
-        memory_service.registrar_llamada(
-            source="bateria_endpoints",
-            endpoint="/api/bateria-endpoints",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=ok,
-            success=ok.get("ok", False)
-        )
-
         return func.HttpResponse(json.dumps(ok, ensure_ascii=False), mimetype="application/json", status_code=200)
 
     except Exception as e:
         err = api_err(endpoint, method, 500, "BatteryError", str(e))
         err = aplicar_memoria_manual(req, err)
-        # Aplicar memoria Cosmos y memoria manual
-        err = aplicar_memoria_cosmos_directo(req, err)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for bateria_endpoints: success={err.get('ok', False)}, endpoint=/api/bateria-endpoints")
-        memory_service.registrar_llamada(
-            source="bateria_endpoints",
-            endpoint="/api/bateria-endpoints",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=err,
-            success=err.get("ok", False)
-        )
-
         return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
 
 
@@ -14625,43 +13513,16 @@ def update_app_service_plan(plan_name: str, resource_group: str, sku: str) -> di
 @app.route(route="deploy", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
     import json
     import time
     import traceback
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
     try:
         body = req.get_json()
     except Exception:
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "INVALID_JSON",
             "cause": "Cuerpo no es JSON válido."
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+        }), status_code=400, mimetype="application/json")
 
     rg_name = body.get("resourceGroup") or os.environ.get("RESOURCE_GROUP")
     location = body.get("location", "eastus")
@@ -14674,72 +13535,24 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 
     # Validaciones previas
     if not rg_name:
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "MISSING_RESOURCE_GROUP",
             "cause": "Falta 'resourceGroup'."
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+        }), status_code=400, mimetype="application/json")
 
     if not (template or template_uri):
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "MISSING_TEMPLATE",
             "cause": "No se recibió 'template' ni 'templateUri'."
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+        }), status_code=400, mimetype="application/json")
 
     # Validación más flexible del template para permitir templates básicos
     if template is not None:
         if not isinstance(template, dict):
-            res = {
+            return func.HttpResponse(json.dumps({
                 "ok": False, "error_code": "INVALID_TEMPLATE",
                 "cause": "El 'template' debe ser un objeto JSON válido."
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-            memory_service.registrar_llamada(
-                source="deploy",
-                endpoint="/api/deploy",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
-            return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+            }), status_code=400, mimetype="application/json")
         # Si no tiene resources, agregamos un array vacío para hacer el template válido
         if not template.get("resources"):
             logging.info(
@@ -14770,28 +13583,12 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 
     # Si es solo validación, no inicialices ARM ni credenciales
     if validate_only:
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": True, "mode": "validate_only",
             "resourceGroup": rg_name, "location": location,
             "hasTemplate": bool(template), "hasTemplateUri": bool(template_uri),
             "parameters_keys": list(parameters.keys())
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=200, mimetype="application/json")
+        }), status_code=200, mimetype="application/json")
 
     # Credenciales: preferir MI de sistema; fallback a DefaultAzureCredential
     try:
@@ -14806,48 +13603,16 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
             )
         subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
         if not subscription_id:
-            res = {
+            return func.HttpResponse(json.dumps({
                 "ok": False, "error_code": "MISSING_SUBSCRIPTION_ID",
                 "cause": "Falta AZURE_SUBSCRIPTION_ID en App Settings."
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-            memory_service.registrar_llamada(
-                source="deploy",
-                endpoint="/api/deploy",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("ok", False)
-            )
-            return func.HttpResponse(json.dumps(res), status_code=500, mimetype="application/json")
+            }), status_code=500, mimetype="application/json")
         rm_client = ResourceManagementClient(credential, subscription_id)
     except Exception as e:
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "CREDENTIALS_ERROR",
             "cause": str(e)
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=500, mimetype="application/json")
+        }), status_code=500, mimetype="application/json")
 
     # Crear RG y lanzar deployment
     try:
@@ -14880,71 +13645,23 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
         result = poller.result()
         state = getattr(result.properties, "provisioning_state", "Unknown")
 
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": True, "deploymentName": deployment_name,
             "resourceGroup": rg_name, "location": location, "state": state
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res, default=str), mimetype="application/json")
+        }, default=str), mimetype="application/json")
 
     except HttpResponseError as hre:
         status = getattr(hre, "status_code", 500) or 500
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "ARM_HTTP_ERROR",
             "status": status, "cause": getattr(hre, "message", str(hre))
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=status, mimetype="application/json")
+        }), status_code=status, mimetype="application/json")
 
     except Exception as e:
-        res = {
+        return func.HttpResponse(json.dumps({
             "ok": False, "error_code": "DEPLOYMENT_EXCEPTION",
             "cause": str(e), "trace": traceback.format_exc()[:2000]
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=500, mimetype="application/json")
+        }), status_code=500, mimetype="application/json")
 
 
 @app.function_name(name="configurar_cors_http")
@@ -15560,26 +14277,11 @@ def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.function_name(name="revisar_correcciones")
 @app.route(route="revisar-correcciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-
+@registrar_memoria("revisar_correcciones")
 def revisar_correcciones(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from services.semantic_intent_parser import aplicar_deteccion_intencion
-    
-    # 🚫 GUARD CLAUSE: Prevenir redirección infinita
-    if req.url.endswith("/api/revisar-correcciones"):
-        try:
-            from services.semantic_intent_parser import detectar_intencion
-            deteccion_test = detectar_intencion("revisar correcciones", "/api/revisar-correcciones")
-            
-            if deteccion_test.get("redirigir"):
-                destino = deteccion_test.get("endpoint_destino", "")
-                if "revisar-correcciones" in destino:
-                    logging.warning("🚫 Previniendo redirección infinita en revisar-correcciones")
-                    # Forzar procesamiento local sin redirección
-                    pass
-        except Exception as e:
-            logging.warning(f"Error en guard clause: {e}")
     
     # 🔄 DETECCIÓN SIMPLE Y REDIRECCIÓN DIRECTA
     try:
@@ -16821,21 +15523,68 @@ def get_ejecutar_cli_handler():
     
     return None
 
-@app.function_name(name="historial_directo")
-@app.route(route="historial-directo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def historial_directo(req: func.HttpRequest) -> func.HttpResponse:
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo
-    session_id = req.headers.get("Session-ID") or "none"
-    resultado = consultar_memoria_cosmos_directo(req)
-    return func.HttpResponse(
-        json.dumps({
-            "session_id": session_id,
-            "resultado": resultado
-        }, default=str),
-        mimetype="application/json",
-        status_code=200
-    )
 
-# Función historial_interacciones ya definida anteriormente en el archivo
+# Endpoint específico para historial de interacciones (lee solo de memory, no fixes)
+@app.function_name(name="historial_interacciones")
+@app.route(route="historial-interacciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
+    from memory_manual import aplicar_memoria_manual
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
+    
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    memoria_previa = consultar_memoria_cosmos_directo(req)
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        logging.info(f"🧠 Historial: {memoria_previa['total_interacciones']} interacciones encontradas")
+    
+    try:
+        limit = int(req.params.get("limit", "10"))
+        
+        if not memoria_previa or not memoria_previa.get("tiene_historial"):
+            response_data = {
+                "exito": True,
+                "interacciones": [],
+                "total": 0,
+                "mensaje": "No se encontraron interacciones previas",
+                "fuente": "memory_collection"
+            }
+        else:
+            interacciones_formateadas = []
+            for i, interaccion in enumerate(memoria_previa.get("interacciones_recientes", [])[:limit]):
+                interacciones_formateadas.append({
+                    "numero": i + 1,
+                    "timestamp": interaccion.get("timestamp", ""),
+                    "endpoint": interaccion.get("endpoint", "unknown"),
+                    "consulta": interaccion.get("consulta", "")[:200],
+                    "tipo": "interaccion_usuario"
+                })
+            
+            response_data = {
+                "exito": True,
+                "interacciones": interacciones_formateadas,
+                "total": memoria_previa.get("total_interacciones", 0),
+                "resumen_conversacion": memoria_previa.get("resumen_conversacion", ""),
+                "fuente": "memory_collection"
+            }
+        
+        response_data = aplicar_memoria_cosmos_directo(req, response_data)
+        response_data = aplicar_memoria_manual(req, response_data)
+        
+        return func.HttpResponse(
+            json.dumps(response_data, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+        
+    except Exception as e:
+        logging.error(f"Error en historial-interacciones: {e}")
+        response_data = {"exito": False, "error": str(e), "fuente": "memory_collection"}
+        response_data = aplicar_memoria_cosmos_directo(req, response_data)
+        response_data = aplicar_memoria_manual(req, response_data)
+        
+        return func.HttpResponse(
+            json.dumps(response_data, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=500
+        )
 
 

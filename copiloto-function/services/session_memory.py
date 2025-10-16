@@ -17,6 +17,11 @@ def consultar_memoria_sesion(session_id: str, agent_id: Optional[str] = None) ->
         
         cosmos = CosmosMemoryStore()
         
+        # Verificar que el container esté disponible
+        if not cosmos.container:
+            logging.warning("Cosmos DB container no disponible")
+            return {"exito": False, "error": "Cosmos DB no disponible"}
+        
         # Consultar interacciones previas de esta sesión
         query = f"""
         SELECT * FROM c 

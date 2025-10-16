@@ -9,69 +9,78 @@ from typing import Any, Callable
 import azure.functions as azfunc
 from services.memory_service import CosmosMemoryStore
 
+
 def registrar_memoria(source: str):
-    """Decorador para registrar automáticamente interacciones en memoria"""
+    """Decorador inteligente para registrar interacciones con memoria semántica."""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(req: azfunc.HttpRequest) -> azfunc.HttpResponse:
-            # 1️⃣ Consultar contexto previo antes de ejecutar
+            url = req.url or ""
+            metodo = req.method.upper()
+
+            # 🧩 Bypass para endpoints de solo lectura
+            if any(endpoint in url for endpoint in [
+                "/api/historial-interacciones",
+                "/api/historial-directo",
+                "/api/verificar-cosmos"
+            ]):
+                logging.info(f"[wrapper] 🧩 Bypass registrar_memoria para {url}")
+                return func(req)
+
+            # === 1️⃣ Consultar contexto previo antes de ejecutar ===
             try:
                 cosmos = CosmosMemoryStore()
-                agent_id = req.headers.get("X-Agent-Auth", "System")
+                agent_id = req.headers.get("X-Agent-Auth") or req.headers.get("Agent-ID") or "System"
                 contexto_prev = cosmos.query(agent_id, limit=5)
                 setattr(req, "contexto_prev", contexto_prev)
+                logging.info(f"[wrapper] 🧠 Contexto previo encontrado ({len(contexto_prev)}) para agente {agent_id}")
             except Exception as e:
-                logging.warning(f"[memoria] No se pudo consultar memoria previa: {e}")
+                logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria previa: {e}")
                 setattr(req, "contexto_prev", [])
-            
-            # Ejecutar función original
+
+            # === 2️⃣ Ejecutar función original ===
             response = func(req)
-            
-            # Registrar en memoria después de la ejecución
+
+            # === 3️⃣ Registrar interacción en memoria ===
             try:
                 from services.memory_service import memory_service
-                
-                # Extraer datos de entrada
                 input_data = {}
                 try:
-                    if req.method in ["POST", "PUT", "PATCH"]:
+                    if metodo in ["POST", "PUT", "PATCH"]:
                         input_data = req.get_json() or {}
                     else:
                         input_data = dict(req.params)
-                except:
-                    input_data = {"method": req.method, "url": req.url}
-                
-                # Extraer datos de salida
+                except Exception:
+                    input_data = {"method": metodo, "url": url}
+
                 output_data = {}
                 try:
                     if response.get_body():
                         output_data = json.loads(response.get_body().decode())
                     else:
                         output_data = {"status_code": response.status_code}
-                except:
+                except Exception:
                     output_data = {"status_code": response.status_code, "raw": True}
-                
-                # Determinar agent_id
-                agent_id = "System"
-                if isinstance(input_data, dict):
-                    agent_id = (input_data.get("agent_name") or 
-                              input_data.get("origen") or 
-                              req.headers.get("X-Agent-Auth", "System"))
-                
-                # Registrar interacción
+
+                agent_id = (input_data.get("agent_name") or
+                            input_data.get("origen") or
+                            req.headers.get("Agent-ID") or
+                            "System")
+
                 memory_service.record_interaction(
                     agent_id=agent_id,
                     source=source,
                     input_data=input_data,
                     output_data=output_data
                 )
-                
+                logging.info(f"[wrapper] 💾 Interacción registrada correctamente para {source}")
             except Exception as e:
-                logging.warning(f"[memoria] Fallo al registrar {source}: {e}")
-            
+                logging.warning(f"[wrapper] ⚠️ Fallo al registrar interacción {source}: {e}")
+
             return response
         return wrapper
     return decorator
+
 
 # Wrapper para app.route que aplica automáticamente el decorador
 def create_memory_wrapper(original_app):

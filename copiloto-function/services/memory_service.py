@@ -72,13 +72,34 @@ class MemoryService:
     def _log_cosmos(self, event: Dict[str, Any]) -> bool:
         """Escribe en Cosmos DB contenedor memory"""
         if not self.cosmos_available or not self.memory_container:
+            logging.warning("Cosmos DB no disponible para escritura")
             return False
         
         try:
-            self.memory_container.upsert_item(event)
+            # Asegurar que el evento tiene partition key (session_id)
+            if "session_id" not in event:
+                event["session_id"] = f"fallback_{int(datetime.utcnow().timestamp())}"
+            
+            # Asegurar que el ID es único
+            if "id" not in event or not event["id"]:
+                event["id"] = f"{event['session_id']}_{event.get('event_type', 'unknown')}_{int(datetime.utcnow().timestamp())}"
+            
+            logging.info(f"💾 Guardando en Cosmos: {event.get('id', 'N/A')} - Session: {event.get('session_id', 'N/A')}")
+            logging.info(f"📄 Evento: {event.get('event_type', 'unknown')} - Tamaño: {len(str(event))} chars")
+            
+            if "texto_semantico" in event.get("data", {}):
+                event["texto_semantico"] = event["data"]["texto_semantico"]
+            
+            # Intentar upsert
+            result = self.memory_container.upsert_item(event)
+            logging.info(f"✅ Guardado exitoso en Cosmos DB - ID: {result.get('id', 'unknown')}")
+            logging.info(f"🧠 Texto semántico guardado: {event.get('texto_semantico', '')[:200]}")
             return True
         except Exception as e:
-            logging.error(f"Error escribiendo en Cosmos memory: {e}")
+            logging.error(f"❌ Error escribiendo en Cosmos memory: {e}")
+            logging.error(f"📄 Evento que falló: {json.dumps(event, ensure_ascii=False)[:500]}...")
+            print(f"DEBUG Cosmos error: {e}")
+            print(f"DEBUG Event keys: {list(event.keys()) if isinstance(event, dict) else 'not dict'}")
             return False
     
     def save_pending_fix(self, fix_data: Dict[str, Any]) -> bool:
@@ -124,6 +145,158 @@ class MemoryService:
         }
         
         return self.log_event("agent_interaction", interaction)
+    
+    def registrar_llamada(self, source: str, endpoint: str, method: str, params: Dict[str, Any], response_data: Any, success: bool) -> bool:
+        """Método requerido por memory_decorator.py para registrar llamadas a endpoints"""
+        
+        logging.warning(f"🧩 DEBUG registrar_llamada - params keys: {list(params.keys())}")
+        logging.warning(f"🧩 DEBUG registrar_llamada - headers en memoria: {params.get('headers')}")
+        
+        # Extraer session_id y agent_id de params - PRIORIZAR LOS PRESERVADOS
+        session_id = params.get("session_id")
+        agent_id = params.get("agent_id")
+        
+        # Solo generar fallback si no hay session_id
+        if not session_id:
+            import time
+            session_id = f"auto_{int(time.time())}"
+            logging.warning(f"⚠️ Session ID no encontrado en params, generando fallback: {session_id}")
+        
+        if not agent_id:
+            agent_id = "unknown_agent"
+        
+        # DEBUG: Log session info
+        logging.info(f"📝 Registrando llamada - Session: {session_id}, Agent: {agent_id}, Source: {source}")
+        
+        # Limpiar response_data para evitar documentos muy grandes
+        cleaned_response = response_data
+        if isinstance(response_data, dict) and len(str(response_data)) > 2000:
+            cleaned_response = {
+                "status": "truncated",
+                "original_keys": list(response_data.keys()) if isinstance(response_data, dict) else [],
+                "success": response_data.get("exito", response_data.get("success", success))
+            }
+        
+        llamada_data = {
+            "source": source,
+            "endpoint": endpoint,
+            "method": method,
+            "params": {k: v for k, v in params.items() if k not in ["body"]},  # Excluir body grande
+            "response_data": cleaned_response,
+            "success": success,
+            "agent_id": agent_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Crear resumen semántico básico
+        texto_semantico = (
+            f"Interacción en '{endpoint}' ejecutada por {agent_id}.\n"
+            f"Método: {method}. Éxito: {'✅' if success else '❌'}.\n"
+            f"Respuesta resumida: {str(response_data)[:150]}..."
+        )
+        
+        # Inyectarlo en el evento
+        llamada_data["texto_semantico"] = texto_semantico
+        
+        # Registrar como evento de tipo "endpoint_call" con session_id preservado
+        result = self.log_event("endpoint_call", llamada_data, session_id=session_id)
+        logging.info(f"💾 Guardado en memoria: {'✅' if result else '❌'} - Session: {session_id}")
+        return result
+    
+
+    def obtener_estadisticas(self, source_name: Optional[str] = None) -> Dict[str, Any]:
+        """Obtiene estadísticas del sistema de memoria"""
+        try:
+            if not self.cosmos_available or not self.memory_container:
+                return {
+                    "total_llamadas": 0,
+                    "llamadas_exitosas": 0, 
+                    "llamadas_fallidas": 0,
+                    "fuentes_activas": [],
+                    "ultimo_registro": None,
+                    "servicio": "local_only"
+                }
+            
+            # Consultar estadísticas desde Cosmos DB
+            query = "SELECT * FROM c WHERE c.event_type = 'endpoint_call'"
+            params = []
+            
+            if source_name:
+                query += " AND c.data.source = @source_name"
+                params.append({"name": "@source_name", "value": source_name})
+            
+            items = list(self.memory_container.query_items(
+                query,
+                parameters=params,
+                enable_cross_partition_query=True
+            ))
+            
+            # Calcular estadísticas
+            total = len(items)
+            exitosas = sum(1 for item in items if item.get("data", {}).get("success", False))
+            fallidas = total - exitosas
+            
+            fuentes = list(set(item.get("data", {}).get("source", "unknown") for item in items))
+            ultimo = max(items, key=lambda x: x.get("timestamp", ""), default=None)
+            
+            return {
+                "total_llamadas": total,
+                "llamadas_exitosas": exitosas,
+                "llamadas_fallidas": fallidas, 
+                "fuentes_activas": fuentes,
+                "ultimo_registro": ultimo.get("timestamp") if ultimo else None,
+                "servicio": "cosmos_db"
+            }
+            
+        except Exception as e:
+            logging.error(f"Error obteniendo estadísticas: {e}")
+            return {
+                "error": str(e),
+                "servicio": "error"
+            }
+    
+    def limpiar_registros(self, source_name: Optional[str] = None) -> bool:
+        """Limpia registros de memoria"""
+        try:
+            if not self.cosmos_available or not self.memory_container:
+                # Limpiar archivo local
+                if self.semantic_log_file.exists():
+                    self.semantic_log_file.unlink()
+                    logging.info("🧹 Archivo local de memoria limpiado")
+                return True
+            
+            # Consultar elementos a eliminar
+            query = "SELECT c.id, c.session_id FROM c WHERE c.event_type = 'endpoint_call'"
+            params = []
+            
+            if source_name:
+                query += " AND c.data.source = @source_name"
+                params.append({"name": "@source_name", "value": source_name})
+            
+            items = list(self.memory_container.query_items(
+                query,
+                parameters=params,
+                enable_cross_partition_query=True
+            ))
+            
+            # Eliminar elementos
+            deleted_count = 0
+            for item in items:
+                try:
+                    self.memory_container.delete_item(
+                        item["id"], 
+                        partition_key=item["session_id"]
+                    )
+                    deleted_count += 1
+                except Exception as e:
+                    logging.warning(f"Error eliminando item {item['id']}: {e}")
+            
+            logging.info(f"🧹 Limpiados {deleted_count} registros de memoria")
+            return deleted_count > 0
+            
+        except Exception as e:
+            logging.error(f"Error limpiando memoria: {e}")
+            return False
 
 # Instancia global
 memory_service = MemoryService()
