@@ -159,7 +159,7 @@ class MemoryService:
         # Solo generar fallback si no hay session_id
         if not session_id:
             import time
-            session_id = f"auto_{int(time.time())}"
+            session_id = "constant-session-id"
             logging.warning(f"⚠️ Session ID no encontrado en params, generando fallback: {session_id}")
         
         if not agent_id:

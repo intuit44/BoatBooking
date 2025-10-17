@@ -14,13 +14,14 @@ def aplicar_memoria_manual(req, response_data):
     try:
         # Detectar session_id y agent_id (PRIORIZAR HEADERS)
         session_id = (
-            req.headers.get("Session-ID") or
-            req.headers.get("X-Session-ID") or
-            req.headers.get("x-session-id") or
-            req.params.get("session_id") or
-            (req.get_json() or {}).get("session_id") or
-            f"auto_{abs(hash(str(req.headers.get('User-Agent', 'default')) + str(req.headers.get('X-Forwarded-For', 'localhost'))))}"
+            req.headers.get("Session-ID")
+            or req.headers.get("X-Session-ID")
+            or req.headers.get("x-session-id")
+            or req.params.get("session_id")
+            or (req.get_json() or {}).get("session_id")
+            or "constant-session-id"
         )
+
         
         agent_id = (
             req.headers.get("Agent-ID") or

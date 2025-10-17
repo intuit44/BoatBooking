@@ -2865,53 +2865,6 @@
         }
       }
     },
-    "/api/actualizar-contenedor": {
-      "post": {
-        "summary": "Actualizar propiedades de un contenedor en Blob Storage",
-        "operationId": "actualizarContenedor",
-        "tags": [
-          "Azure Storage"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "nombre": {
-                    "type": "string",
-                    "description": "Nombre del contenedor"
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "description": "Metadata a actualizar"
-                  }
-                },
-                "required": [
-                  "nombre"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Contenedor actualizado correctamente"
-          },
-          "400": {
-            "description": "Solicitud inválida"
-          },
-          "404": {
-            "description": "Contenedor no encontrado"
-          },
-          "500": {
-            "description": "Error del servidor"
-          }
-        }
-      }
-    },
     "/api/proxy-local": {
       "post": {
         "summary": "Endpoint interno de proxy",
@@ -3010,55 +2963,6 @@
           },
           "404": {
             "description": "Archivo no encontrado"
-          }
-        }
-      }
-    },
-    "/api/desplegar-funcion": {
-      "post": {
-        "summary": "Desplegar función Azure",
-        "operationId": "desplegarFuncion",
-        "tags": [
-          "Azure Deployment"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "function_name": {
-                    "type": "string",
-                    "description": "Nombre de la función"
-                  },
-                  "code": {
-                    "type": "string",
-                    "description": "Código de la función"
-                  },
-                  "config": {
-                    "type": "object",
-                    "description": "Configuración de la función"
-                  }
-                },
-                "required": [
-                  "function_name",
-                  "code"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Función desplegada correctamente"
-          },
-          "400": {
-            "description": "Solicitud inválida"
-          },
-          "500": {
-            "description": "Error del servidor"
           }
         }
       }

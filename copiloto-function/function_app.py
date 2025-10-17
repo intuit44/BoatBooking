@@ -1970,8 +1970,6 @@ def find_similar_files(filename: str, extension: str) -> List[Dict[str, str]]:
 def extract_function_code(content: str, function_name: str) -> Optional[str]:
     """Extrae el código de una función específica del contenido"""
 
-    import re
-
     # Buscar la definición de la función
     patterns = [
         # Azure Functions
@@ -2982,7 +2980,6 @@ def invocar_endpoint_local(endpoint: str, method: str = "GET", body: Optional[di
             "/api/info-archivo": info_archivo_http,
             "/api/descargar-archivo": descargar_archivo_http,
             "/api/ejecutar-script": ejecutar_script_http,
-            "/api/preparar-script": preparar_script_http,
             "/api/crear-contenedor": crear_contenedor_http,
             "/api/ejecutar-cli": ejecutar_cli_http
         }
@@ -3729,13 +3726,16 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from services.memory_service import memory_service
 
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
     memoria_previa = consultar_memoria_cosmos_directo(req)
     if memoria_previa and memoria_previa.get("tiene_historial"):
         logging.info(f"🧠 historial_interacciones: {memoria_previa['total_interacciones']} interacciones encontradas")
         logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     advertencias = []
 
+    # Inyectar memoria previa al contexto del request antes de generar respuesta
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        setattr(req, "_memoria_contexto", memoria_previa)
 
     # Forzar lectura del contexto si el wrapper lo inyectó
     try:
@@ -3756,6 +3756,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     
     # 🔥 MEMORIA DIRECTA - FORZAR FUNCIONAMIENTO
     logging.info("🔥 ENDPOINT EJECUTÁNDOSE CON MEMORIA DIRECTA")
+
+    session_id = None
+    agent_id = None
+    memoria_previa = getattr(req, '_memoria_contexto', {})
     
     try:
         session_id = req.headers.get("Session-ID") or "test_session"
@@ -3763,22 +3767,23 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         
         logging.info(f"🔍 Headers: Session={session_id}, Agent={agent_id}")
         
-        interacciones = memory_service.get_session_history(session_id)
-        memoria_previa = {
-            "tiene_historial": len(interacciones) > 0,
-            "interacciones_recientes": interacciones,
-            "total_interacciones": len(interacciones),
-            "session_id": session_id
-        }
-        
-        logging.info(f"🧠 Memoria cargada: {len(interacciones)} interacciones")
-        
-        setattr(req, "_memoria_contexto", memoria_previa)
-        
+        # Solo intenta cargar desde memory_service si no hay memoria previa
+        if not memoria_previa or not memoria_previa.get("tiene_historial"):
+            interacciones = memory_service.get_session_history(session_id)
+            memoria_previa = {
+                "tiene_historial": len(interacciones) > 0,
+                "interacciones_recientes": interacciones,
+                "total_interacciones": len(interacciones),
+                "session_id": session_id
+            }
+            setattr(req, "_memoria_contexto", memoria_previa)
+            logging.info(f"🧠 Memoria local cargada: {len(interacciones)} interacciones")
+        else:
+            logging.info("🧠 Usando memoria previa de Cosmos sin sobrescribirla.")
     except Exception as e:
         logging.error(f"❌ Error cargando memoria: {e}")
-        memoria_previa = {}
-        session_id = None
+        memoria_previa = memoria_previa or {}
+        session_id = session_id or None
     """Endpoint para consultar historial de interacciones con detección automática de endpoint"""
     
     memoria_previa = getattr(req, '_memoria_contexto', {})
@@ -3829,9 +3834,16 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         response_data = aplicar_memoria_cosmos_directo(req, response_data)
         response_data = aplicar_memoria_manual(req, response_data)
 
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for historial_interacciones: success={response_data.get('exito', False)}, endpoint=/api/historial-interacciones")
+        # Generar texto semántico si no existe
+        if not response_data.get("texto_semantico"):
+            response_data["texto_semantico"] = (
+                f"Interacción en '/api/historial-interacciones' ejecutada por "
+                f"{req.headers.get('Agent-ID', 'unknown')}. "
+                f"Éxito: {'✅' if response_data.get('exito', False) else '❌'}. "
+                f"Mensaje: {response_data.get('mensaje', 'sin mensaje')}."
+            )
+
+        # Registrar llamada en memoria
         memory_service.registrar_llamada(
             source="historial_interacciones",
             endpoint="/api/historial-interacciones",
@@ -3864,9 +3876,14 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         response_data = aplicar_memoria_cosmos_directo(req, response_data)
         response_data = aplicar_memoria_manual(req, response_data)
 
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for historial_interacciones: success={response_data.get('exito', False)}, endpoint=/api/historial-interacciones")
+        # Generar texto semántico específico para errores
+        response_data["texto_semantico"] = (
+            f"Error en '/api/historial-interacciones'. "
+            f"Tipo: {type(e).__name__}. "
+            f"Mensaje: {str(e)[:150]}."
+        )
+
+        # Registrar llamada en memoria para errores
         memory_service.registrar_llamada(
             source="historial_interacciones",
             endpoint="/api/historial-interacciones",
@@ -6596,7 +6613,6 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
         # Normalizar rutas de Windows con espacios
         if has_spaces_in_paths and not has_quotes and tipo == "python":
             # Detectar rutas de Windows y agregar comillas si es necesario
-            import re
             # Buscar patrones como "C:\path with spaces\file.py"
             path_pattern = r'([A-Za-z]:\\[^"]*\s[^"]*\.[a-zA-Z]+)'
             matches = re.findall(path_pattern, comando)
@@ -7211,6 +7227,184 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 for keyword in ["local", "filesystem"])
         )
 
+        # 🔍 FASE 1: VALIDACIÓN PREVIA COMPLETA
+        # Validación de encoding UTF-8
+        try:
+            contenido.encode("utf-8")
+        except UnicodeEncodeError as e:
+            return func.HttpResponse(
+                json.dumps({
+                    "exito": False,
+                    "error": f"Codificación inválida UTF-8: {e}",
+                    "sugerencia": "Usa solo caracteres UTF-8 válidos"
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=400
+            )
+        
+        # 🧹 DESERIALIZACIÓN ULTRA-AGRESIVA - INDEPENDIENTE DE AGENTES
+        if contenido:
+            contenido_original = contenido
+            
+            # PASO 1: Múltiples capas de deserialización
+            try:
+                # Capa 1: HTML entities primero
+                html_entities = {
+                    "&quot;": '"', "&#39;": "'", "&lt;": "<", "&gt;": ">", "&amp;": "&"
+                }
+                for entity, char in html_entities.items():
+                    if entity in contenido:
+                        contenido = contenido.replace(entity, char)
+                        advertencias.append(f"🔧 HTML: {entity} → {char}")
+                
+                # Capa 2: Escapes múltiples iterativos
+                for i in range(3):  # Hasta 3 niveles de escape
+                    if "\\" in contenido:
+                        old_contenido = contenido
+                        contenido = contenido.replace("\\\\", "\\")
+                        contenido = contenido.replace("\\'", "'")
+                        contenido = contenido.replace('\\"', '"')
+                        contenido = contenido.replace("\\n", "\n")
+                        contenido = contenido.replace("\\t", "\t")
+                        if contenido != old_contenido:
+                            advertencias.append(f"🔧 Escape nivel {i+1} procesado")
+                        else:
+                            break
+            except Exception as e:
+                advertencias.append(f"⚠️ Error deserialización: {str(e)}")
+            
+            # PASO 2: Reparación f-strings automática
+            if ruta.endswith('.py') and ("f'" in contenido or 'f"' in contenido):
+                def fix_fstring(match):
+                    quote = match.group(1)
+                    content = match.group(2)
+                    if ("'" in content and quote == "'") or ('"' in content and quote == '"'):
+                        vars_found = re.findall(r'\{([^}]+)\}', content)
+                        format_content = content
+                        for i, var in enumerate(vars_found):
+                            format_content = format_content.replace(f'{{{var}}}', f'{{{i}}}')
+                        vars_str = ', '.join(vars_found)
+                        return f"'{format_content}'.format({vars_str})"
+                    return match.group(0)
+                
+                old_contenido = contenido
+                contenido = re.sub(r"f(['\"])([^'\"]*?)\1", fix_fstring, contenido)
+                if contenido != old_contenido:
+                    advertencias.append("🔧 F-strings → .format()")
+            
+            # PASO 3: Reparación específica de f-strings (solo para Python)
+            if ruta.endswith('.py'):
+                
+                # Reparar f-strings con comillas anidadas problemáticas
+                if "f'" in contenido and "[" in contenido and "'" in contenido:
+                    # Patrón específico: f'{variable['key']}' 
+                    problematic_pattern = r"f'([^']*\{[^}]*\[[^\]]*'[^\]]*'[^\]]*\][^}]*)\}[^']*)'" 
+                    matches = re.findall(problematic_pattern, contenido)
+                    
+                    for match in matches:
+                        # Reemplazar comillas simples internas con comillas dobles
+                        fixed_match = re.sub(r"\[([^\]]*)'([^']*)'([^\]]*)\]", r'[\1"\2"\3]', match)
+                        contenido = contenido.replace(match, fixed_match)
+                        advertencias.append(f"🔧 F-string reparada: comillas internas convertidas")
+                
+                # Reparar patrón específico memoria['key'] dentro de f-strings
+                if "memoria[" in contenido and "f'" in contenido:
+                    # Buscar y reparar memoria['key'] → memoria["key"]
+                    contenido = re.sub(r"(memoria\[)'([^']+)'(\])", r'\1"\2"\3', contenido)
+                    advertencias.append("🔧 F-string: memoria['key'] → memoria[\"key\"]")
+                
+                # Fallback: convertir f-strings problemáticas a format()
+                if "f'" in contenido and "[" in contenido and "'" in contenido:
+                    # Si aún hay problemas, convertir a .format()
+                    fstring_matches = re.findall(r"f'([^']*\{[^}]*\}[^']*)'" , contenido)
+                    for fmatch in fstring_matches:
+                        if "[" in fmatch and "'" in fmatch:
+                            # Extraer variables dentro de {}
+                            vars_in_braces = re.findall(r"\{([^}]+)\}", fmatch)
+                            format_str = fmatch
+                            for i, var in enumerate(vars_in_braces):
+                                format_str = format_str.replace(f"{{{var}}}", f"{{{i}}}")
+                            
+                            new_format = f"'{format_str}'.format({', '.join(vars_in_braces)})"
+                            old_fstring = f"f'{fmatch}'"
+                            contenido = contenido.replace(old_fstring, new_format)
+                            advertencias.append(f"🔧 F-string convertida a .format(): {old_fstring} → {new_format}")
+            
+            if contenido != contenido_original:
+                advertencias.append("✅ Contenido deserializado y reparado")
+        
+        # Validación sintáctica Python
+        if ruta.endswith('.py') and contenido:
+            try:
+                import ast
+                if ruta.endswith('.py') and contenido:
+                    # 👇 Primero intenta deserializar los escapes comunes
+                    contenido = bytes(contenido, "utf-8").decode("unicode_escape")
+                    
+                    # 👇 Luego intenta balancear comillas internas en f-strings
+                    contenido = re.sub(r"(f[\"'])({?.*?\[)'(.*?\]}?.*?)([\"'])", r"\1\2\"\3\4", contenido)
+                ast.parse(contenido)
+                advertencias.append("✅ Validación sintáctica Python exitosa")
+            except SyntaxError as e:
+                return func.HttpResponse(
+                    json.dumps({
+                        "exito": False,
+                        "error": f"Error de sintaxis Python: {e}",
+                        "linea": e.lineno,
+                        "columna": e.offset,
+                        "sugerencia": "Corrige la sintaxis antes de guardar"
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=400
+                )
+        
+        # Detección de imports recursivos
+        if "import" in contenido and ruta.endswith('.py'):
+            module_name = ruta.split("/")[-1].replace(".py", "")
+            if module_name in contenido:
+                advertencias.append("⚠️ Posible import recursivo detectado")
+
+        # 🔧 BLOQUES DELIMITADOS DE INYECCIÓN
+        if "from error_handler import ErrorHandler" in contenido and ruta.endswith('.py'):
+            if "# ===BEGIN AUTO-INJECT: ErrorHandler===" not in contenido:
+                lines = contenido.split('\n')
+                new_lines = []
+                import_inserted = False
+                
+                for i, line in enumerate(lines):
+                    new_lines.append(line)
+                    if not import_inserted and line.strip() == "" and i > 0:
+                        new_lines.insert(-1, "# ===BEGIN AUTO-INJECT: ErrorHandler===")
+                        new_lines.insert(-1, "from error_handler import ErrorHandler")
+                        new_lines.insert(-1, "# ===END AUTO-INJECT: ErrorHandler===")
+                        import_inserted = True
+                        break
+                
+                if not import_inserted:
+                    new_lines = [
+                        "# ===BEGIN AUTO-INJECT: ErrorHandler===",
+                        "from error_handler import ErrorHandler", 
+                        "# ===END AUTO-INJECT: ErrorHandler===",
+                        ""
+                    ] + new_lines
+                
+                contenido = '\n'.join(new_lines)
+                advertencias.append("🔧 Bloque de inyección ErrorHandler aplicado")
+
+        # 💾 RESPALDO AUTOMÁTICO ANTES DE MODIFICAR
+        backup_created = False
+        if usar_local:
+            import shutil
+            archivo_path = Path(ruta) if Path(ruta).is_absolute() else PROJECT_ROOT / ruta
+            if archivo_path.exists():
+                try:
+                    backup_path = archivo_path.with_suffix(archivo_path.suffix + '.bak')
+                    shutil.copyfile(archivo_path, backup_path)
+                    backup_created = True
+                    advertencias.append(f"💾 Respaldo creado: {backup_path.name}")
+                except Exception as e:
+                    advertencias.append(f"⚠️ No se pudo crear respaldo: {str(e)}")
+        
         # EJECUCIÓN ULTRA-TOLERANTE
         res = {"exito": False}
 
@@ -7324,7 +7518,10 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             "timestamp": datetime.now().isoformat(),
             "tamaño_contenido": len(contenido) if contenido else 0,
             "advertencias": advertencias,
-            "ruta_procesada": ruta
+            "ruta_procesada": ruta,
+            "validacion_sintactica": ruta.endswith('.py'),
+            "respaldo_creado": backup_created if 'backup_created' in locals() else False,
+            "bloques_inyeccion": "ErrorHandler" in contenido
         })
 
         # Aplicar memoria Cosmos y memoria manual
@@ -10320,127 +10517,6 @@ def preparar_script_desde_blob(ruta_blob: str) -> dict:
         return {"exito": False, "error": str(e)}
 
 
-@app.function_name(name="preparar_script_http")
-@app.route(route="preparar-script", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def preparar_script_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    try:
-        # ✅ LECTURA SIMPLIFICADA Y ROBUSTA: Usar patrón estándar
-        try:
-            body = req.get_json() if req.get_body() else {}
-        except Exception as e:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "JSON inválido",
-                    "detalle": str(e)
-                }),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ VALIDACIÓN CORRECTA: Mantener la validación del parámetro 'ruta'
-        ruta = body.get("ruta")
-        if not ruta:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Parámetro 'ruta' es requerido",
-                    "ejemplo": {"ruta": "scripts/setup.sh"},
-                    "descripcion": "Especifica la ruta del script a preparar desde Blob Storage"
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ VALIDACIÓN ADICIONAL: Verificar que la ruta no esté vacía después del strip
-        if not isinstance(ruta, str) or len(ruta.strip()) == 0:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Parámetro 'ruta' no puede estar vacío",
-                    "tipo_recibido": type(ruta).__name__,
-                    "valor_recibido": ruta,
-                    "ejemplo": {"ruta": "scripts/setup.sh"}
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ EJECUTAR LÓGICA: Procesar la preparación del script
-        res = preparar_script_desde_blob(ruta.strip())
-
-        # 🔍 FALLBACK GUARD: Si falla, intentar Bing Grounding
-        if not res.get("exito"):
-            try:
-                from bing_fallback_guard import ejecutar_grounding_fallback
-                
-                contexto = f"script preparation failed: {res.get('error', '')}"
-                fallback_result = ejecutar_grounding_fallback(
-                    prompt=f"prepare script: {ruta}",
-                    contexto=contexto,
-                    error_info={"tipo_error": "script_generation_failed"}
-                )
-                
-                if fallback_result.get("exito"):
-                    from bing_fallback_guard import aplicar_fallback_a_respuesta
-                    res = aplicar_fallback_a_respuesta(res, fallback_result)
-                    logging.info(f"🔍 Fallback aplicado para script: {ruta}")
-                    
-            except Exception as e:
-                logging.warning(f"Fallback guard no disponible: {e}")
-
-        # ✅ DETERMINAR STATUS CODE: Basado en el resultado
-        if res.get("exito"):
-            status_code = 201 if "preparado" in str(
-                res.get("mensaje", "")).lower() else 200
-        else:
-            status_code = 400
-
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for preparar_script: success={res.get('exito', False)}, endpoint=/api/preparar-script")
-        memory_service.registrar_llamada(
-            source="preparar_script",
-            endpoint="/api/preparar-script",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=status_code
-        )
-
-    except Exception as e:
-        logging.exception("preparar_script_http failed")
-        return func.HttpResponse(
-            json.dumps({
-                "exito": False,
-                "error": str(e),
-                "tipo_error": type(e).__name__
-            }),
-            mimetype="application/json",
-            status_code=500
-        )
-
 
 def render_tool_response(status_code: int, payload: dict) -> str:
     """Renderiza respuestas de herramientas de forma semántica para el agente"""
@@ -11746,348 +11822,6 @@ def ejecutar_reiniciar_simple(parametros: dict) -> dict:
     }
 
 
-@app.function_name(name="desplegar_funcion_http")
-@app.route(route="desplegar-funcion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def desplegar_funcion_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    """Automatiza el despliegue de una nueva versión del contenedor"""
-
-    try:
-        # Leer datos del body
-        data = req.get_json()
-        function_app = data.get(
-            "function_app") or os.environ.get("WEBSITE_SITE_NAME")
-        resource_group = data.get(
-            "resource_group") or os.environ.get("RESOURCE_GROUP")
-
-        # Verificar que Azure CLI esté disponible
-        if not shutil.which("az"):
-            res = {
-                "exito": False,
-                "error": "Azure CLI no está instalado o no está disponible",
-                "codigo_error": "AZ_CLI_NOT_FOUND",
-                "solucion": "Instalar Azure CLI o verificar que esté en el PATH del sistema"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
-            return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # 1. Obtener última versión del ACR
-        try:
-            result = subprocess.run(
-                ["az", "acr", "repository", "show-tags",
-                 "-n", "boatrentalacr",
-                 "--repository", "copiloto-func-azcli",
-                 "--orderby", "time_desc",
-                 "--top", "1"],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-        except FileNotFoundError:
-            res = {
-                "exito": False,
-                "error": "Comando 'az' no encontrado",
-                "codigo_error": "COMMAND_NOT_FOUND",
-                "solucion": "Verificar que Azure CLI esté instalado y en el PATH"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
-            return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        if result.returncode != 0:
-            res = {
-                "exito": False,
-                "error": "No se pudo obtener tags del ACR",
-                "stderr": result.stderr
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-            memory_service.registrar_llamada(
-                source="desplegar_funcion",
-                endpoint="/api/desplegar-funcion",
-                method=req.method,
-                params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-
-            return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        tags = json.loads(result.stdout) if result.stdout else []
-        ultimo_tag = tags[0] if tags else "v0"
-
-        # Extraer número y calcular siguiente
-        import re
-        match = re.search(r'v(\d+)', ultimo_tag)
-        ultimo_numero = int(match.group(1)) if match else 0
-        nuevo_numero = ultimo_numero + 1
-        nuevo_tag = f"v{nuevo_numero}"
-
-        # 2. NO PODEMOS hacer docker build/push desde aquí
-        # Pero podemos actualizar el contenedor si ya existe en ACR
-
-        res = {
-            "exito": False,
-            "mensaje": "El endpoint puede detectar versiones pero no puede ejecutar Docker",
-            "ultimo_tag": ultimo_tag,
-            "proximo_tag": nuevo_tag,
-            "function_app": function_app,
-            "resource_group": resource_group,
-            "limitacion": "Docker build/push debe ejecutarse localmente",
-            "instrucciones": [
-                f"1. Ejecuta localmente: docker build -t copiloto-func-azcli:{nuevo_tag} .",
-                f"2. docker tag copiloto-func-azcli:{nuevo_tag} boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
-                f"3. az acr login -n boatrentalacr",
-                f"4. docker push boatrentalacr.azurecr.io/copiloto-func-azcli:{nuevo_tag}",
-                f"5. Llama a /api/actualizar-contenedor con tag={nuevo_tag}"
-            ]
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-        memory_service.registrar_llamada(
-            source="desplegar_funcion",
-            endpoint="/api/desplegar-funcion",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=200
-        )
-
-    except Exception as e:
-        res = {"exito": False, "error": str(e)}
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for desplegar_funcion: success={res.get('exito', False)}, endpoint=/api/desplegar-funcion")
-        memory_service.registrar_llamada(
-            source="desplegar_funcion",
-            endpoint="/api/desplegar-funcion",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=500
-        )
-
-
-@app.function_name(name="actualizar_contenedor_http")
-@app.route(route="actualizar-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def actualizar_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Actualiza el contenedor de la Function App a una versión específica"""
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-        # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    try:
-        body = req.get_json() if req.get_body() else {}
-        tag = body.get("tag")
-
-        if not tag:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Tag requerido",
-                    "ejemplo": {"tag": "v12"},
-                    "descripcion": "Especifica la versión del contenedor a desplegar"
-                }),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ VALIDAR AZURE CLI DISPONIBLE
-        if platform.system() == "Windows":
-            AZ_BIN = shutil.which("az.cmd") or shutil.which("az")
-        else:
-            AZ_BIN = shutil.which("az") or "/usr/bin/az"
-
-        if not AZ_BIN:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Azure CLI no encontrado en el sistema",
-                    "codigo_error": "AZ_CLI_NOT_FOUND",
-                    "sistema": platform.system(),
-                    "solucion": "Instalar Azure CLI o verificar que esté en el PATH"
-                }),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # Actualizar contenedor
-        imagen = f"boatrentalacr.azurecr.io/copiloto-func-azcli:{tag}"
-
-        cmd_parts = [
-            AZ_BIN, "functionapp", "config", "container", "set",
-            "-g", "boat-rental-app-group",
-            "-n", "copiloto-semantico-func-us2",
-            "--docker-custom-image-name", imagen
-        ]
-
-        # ✅ LOG DEL COMANDO ANTES DE EJECUTAR
-        logging.info(f"Ejecutando comando: {' '.join(cmd_parts)}")
-
-        try:
-            result = subprocess.run(
-                cmd_parts,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-        except FileNotFoundError as fnf_error:
-            logging.error(f"Archivo no encontrado: {fnf_error}")
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Comando no encuentra archivo: {str(fnf_error)}",
-                    "codigo_error": "FILE_NOT_FOUND",
-                    "comando_intentado": ' '.join(cmd_parts),
-                    "az_bin_usado": AZ_BIN,
-                    "solucion": "Verificar que Azure CLI esté correctamente instalado"
-                }),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        if result.returncode != 0:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Error actualizando contenedor",
-                    "stderr": result.stderr
-                }),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # Reiniciar
-        restart_cmd = [
-            AZ_BIN, "functionapp", "restart",
-            "-g", "boat-rental-app-group",
-            "-n", "copiloto-semantico-func-us2"
-        ]
-        logging.info(f"Ejecutando restart: {' '.join(restart_cmd)}")
-        subprocess.run(restart_cmd, capture_output=True, text=True, timeout=30)
-
-        resultado = {
-            "exito": True,
-            "mensaje": f"Contenedor actualizado a {tag}",
-            "imagen": imagen,
-            "timestamp": datetime.now().isoformat()
-        }
-        resultado = aplicar_memoria_manual(req, resultado)
-        
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(f"💾 Registering call for actualizar_contenedor: success={resultado.get('exito', False)}, endpoint=/api/actualizar-contenedor")
-        memory_service.registrar_llamada(
-            source="actualizar_contenedor",
-            endpoint="/api/actualizar-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200
-        )
-
-    except Exception as e:
-        return func.HttpResponse(
-            json.dumps({"exito": False, "error": str(e)}),
-            mimetype="application/json",
-            status_code=500
-        )
-
-
 def _run_az(args, timeout=30):
     """Ejecuta comandos Azure CLI con encoding UTF-8 forzado"""
     az_bin = shutil.which("az.cmd") or shutil.which("az") or "az"
@@ -12943,7 +12677,6 @@ def _verificar_archivos_en_comando(comando: str) -> dict:
     Verifica si el comando referencia archivos que deben existir antes de ejecutar
     """
     try:
-        import re
         from pathlib import Path
         
         # Patrones para detectar referencias a archivos
@@ -13032,9 +12765,7 @@ def _normalizar_comando_robusto(comando: str) -> str:
     Normaliza comandos de forma robusta para manejar rutas con espacios,
     caracteres especiales y diferentes tipos de comandos.
     """
-    try:
-        import re
-        
+    try:        
         # Casos especiales para comandos comunes primero
         if 'findstr' in comando.lower():
             return _normalizar_findstr(comando)

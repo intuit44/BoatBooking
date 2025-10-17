@@ -85,13 +85,9 @@ def extraer_session_id_para_guardar(req: func.HttpRequest) -> str:
     except:
         pass
     
-    # 4. Generar único con timestamp + UUID
-    try:
-        timestamp_unico = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        unique_id = str(uuid.uuid4())[:8]
-        return f"session_{timestamp_unico}_{unique_id}"
-    except:
-        return f"session_fallback_{str(uuid.uuid4())[:12]}"
+    # 4. FORZAR session_id constante
+    return "constant-session-id"
+
 
 def extraer_agent_id_para_guardar(req: func.HttpRequest) -> str:
     """Extrae o genera agent_id para guardar"""
