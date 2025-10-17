@@ -13,7 +13,7 @@ class CommandTypeDetector:
     """Detector inteligente de tipo de comando sin predefiniciones"""
     
     def __init__(self):
-        # Patrones de detección dinámicos
+        # Patrones de detección dinámicos (mantener para compatibilidad, pero usar lógica estructural)
         self.command_patterns = {
             "azure_cli": {
                 "prefixes": ["az ", "azure "],
@@ -49,7 +49,7 @@ class CommandTypeDetector:
     
     def detect_command_type(self, command: str) -> Dict[str, Any]:
         """
-        Detecta el tipo de comando dinámicamente
+        Detecta el tipo de comando usando lógica estructural dinámica
         """
         if not command or not command.strip():
             return {
@@ -60,45 +60,80 @@ class CommandTypeDetector:
                 "needs_prefix": False
             }
         
-        command_lower = command.lower().strip()
-        best_match = None
-        best_score = 0.0
+        # Usar la nueva lógica dinámica para normalizar
+        normalized_command = self._detect_and_prefix_command(command)
         
-        # Evaluar cada tipo de comando
-        for cmd_type, patterns in self.command_patterns.items():
-            score = self._calculate_match_score(command_lower, patterns)
-            
-            if score > best_score:
-                best_score = score
-                best_match = cmd_type
+        # Determinar tipo basado en el comando normalizado
+        cmd_type = "generic"
+        confidence = 0.5  # Confianza base para detección estructural
         
-        # Determinar si necesita prefijo
-        needs_prefix = False
-        normalized_command = command.strip()
-        
-        if best_match == "azure_cli" and not command_lower.startswith("az "):
-            needs_prefix = True
-            normalized_command = f"az {command.strip()}"
-        elif best_match == "python" and command_lower.startswith("pip "):
-            # pip es comando directo, no necesita prefijo
-            needs_prefix = False
-        elif best_match == "powershell" and not any(command_lower.startswith(p) for p in ["powershell ", "pwsh "]):
-            # Solo agregar prefijo si no es un cmdlet nativo
-            if not any(command_lower.startswith(p.lower()) for p in ["get-", "set-", "new-", "remove-"]):
-                needs_prefix = True
-                normalized_command = f"powershell {command.strip()}"
+        if normalized_command.startswith("az "):
+            cmd_type = "azure_cli"
+            confidence = 0.9
+        elif any(normalized_command.lower().startswith(p) for p in ["python ", "pip ", "conda ", "poetry "]):
+            cmd_type = "python"
+            confidence = 0.8
+        elif any(normalized_command.lower().startswith(p) for p in ["powershell ", "pwsh ", "Get-", "Set-", "New-", "Remove-"]):
+            cmd_type = "powershell"
+            confidence = 0.8
+        elif any(normalized_command.lower().startswith(p) for p in ["bash ", "sh ", "chmod ", "ls ", "cd ", "mkdir ", "rm "]):
+            cmd_type = "bash"
+            confidence = 0.8
+        elif any(normalized_command.lower().startswith(p) for p in ["npm ", "yarn ", "pnpm "]):
+            cmd_type = "npm"
+            confidence = 0.8
+        elif any(normalized_command.lower().startswith(p) for p in ["docker ", "docker-compose "]):
+            cmd_type = "docker"
+            confidence = 0.8
         
         return {
-            "type": best_match or "generic",
-            "confidence": best_score,
+            "type": cmd_type,
+            "confidence": confidence,
             "original_command": command,
             "normalized_command": normalized_command,
-            "needs_prefix": needs_prefix,
-            "detected_patterns": self._get_matched_patterns(command_lower, best_match) if best_match else []
+            "needs_prefix": normalized_command != command,
+            "detected_patterns": []  # Simplificado, ya no usado
         }
     
+    def _detect_and_prefix_command(self, command: str) -> str:
+        """
+        Decide dinámicamente si anteponer 'az' al comando.
+        Usa señales estructurales, no predefiniciones.
+        """
+        cmd = command.strip()
+        cmd_lower = cmd.lower()
+        
+        # 1️⃣ Si ya comienza con un ejecutable conocido, no tocar
+        # (Tiene extensión .exe, .cmd, o ruta absoluta)
+        if re.match(r'^[A-Za-z]:|^\.', cmd_lower):
+            return cmd  # ejecutable local o script
+
+        # 2️⃣ Si empieza con az o azure → ya es CLI de Azure
+        if cmd_lower.startswith(("az ", "azure ")):
+            return cmd
+
+        # 3️⃣ Si el primer token parece un binario de herramienta externa
+        # detecta automáticamente por patrón (palabra sin 'az' y sin subcomandos)
+        first = cmd_lower.split(" ")[0]
+        if re.match(r'^(func|docker|bash|sh|pwsh|powershell|python|pip|npm|yarn|node|git)$', first):
+            return cmd  # herramientas externas → no agregar 'az'
+
+        # 4️⃣ Si contiene subcomandos tipo 'webapp', 'functionapp', 'group', etc. → Azure CLI
+        # En vez de lista fija, usa patrón por contexto (verbo + nombre de recurso)
+        if re.search(r'\b(functionapp|webapp|storage|group|vm|account|cosmos|acr|resource|monitor)\b', cmd_lower):
+            if not cmd_lower.startswith("az "):
+                return f"az {cmd}"
+        
+        # 5️⃣ Si contiene opciones típicas del CLI de Azure → agregar az
+        if re.search(r'--resource-group|--subscription|--output', cmd_lower):
+            if not cmd_lower.startswith("az "):
+                return f"az {cmd}"
+
+        # 6️⃣ En cualquier otro caso, dejarlo limpio
+        return cmd
+    
     def _calculate_match_score(self, command: str, patterns: Dict) -> float:
-        """Calcula score de coincidencia para un tipo de comando"""
+        """Calcula score de coincidencia para un tipo de comando (mantener para compatibilidad)"""
         score = 0.0
         
         # Verificar prefijos (peso alto)
@@ -128,7 +163,7 @@ class CommandTypeDetector:
         return min(1.0, score)
     
     def _get_matched_patterns(self, command: str, cmd_type: str) -> list:
-        """Obtiene los patrones que coincidieron"""
+        """Obtiene los patrones que coincidieron (mantener para compatibilidad)"""
         if not cmd_type or cmd_type not in self.command_patterns:
             return []
         

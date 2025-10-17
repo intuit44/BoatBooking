@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Consulta directa a Cosmos DB para memoria semántica
 Reemplaza las funciones que no consultan realmente la base de datos
@@ -117,17 +118,11 @@ def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
     except:
         pass
     
-    # 4. Generar uno temporal basado en User-Agent + IP (fallback CONSISTENTE)
-    try:
-        user_agent = req.headers.get("User-Agent", "default")
-        client_ip = req.headers.get("X-Forwarded-For", "localhost").split(",")[0]
-        session_id = f"auto_{abs(hash(user_agent + client_ip))}"
-        logging.info(f"🔍 Session ID generado automáticamente: {session_id}")
-        return session_id
-    except:
-        fallback_id = f"temp_session_{datetime.now().strftime('%Y%m%d_%H')}"
-        logging.info(f"🔍 Session ID fallback: {fallback_id}")
-        return fallback_id
+    # 4. Forzar constante para evitar sesiones basura
+    session_id = "constant-session-id"
+    logging.info(f"🔍 Session ID forzado (constante): {session_id}")
+    return session_id
+
 
 def generar_resumen_conversacion(interacciones: List[Dict]) -> str:
     """Genera un resumen legible de la conversación para el agente"""

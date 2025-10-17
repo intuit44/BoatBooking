@@ -95,19 +95,17 @@ class CosmosMemoryStore:
             logging.error(f"Error writing to Cosmos: {e}")
             return False
 
-    def query(self, session_id: str, limit: int = 100) -> list:
+    def query_all(self, limit=5):
         if not self.enabled or not self.container:
+            logging.warning("[COSMOS_DEBUG] Cosmos DB not enabled or container missing.")
+            return []
+        try:
+            query = f"SELECT TOP {limit} * FROM c ORDER BY c._ts DESC"
+            return list(self.container.query_items(
+                query=query,
+                enable_cross_partition_query=True
+            ))
+        except Exception as e:
+            logging.error(f"Error querying Cosmos DB (global): {e}")
             return []
 
-        try:
-            query = "SELECT * FROM c WHERE c.session_id = @session_id ORDER BY c.timestamp DESC"
-            items = list(self.container.query_items(
-                query=query,
-                parameters=[{"name": "@session_id", "value": session_id}],
-                enable_cross_partition_query=True,
-                max_item_count=limit
-            ))
-            return items
-        except Exception as e:
-            logging.error(f"Error querying Cosmos: {e}")
-            return []

@@ -26,22 +26,22 @@ def registrar_memoria(source: str):
             ]):
                 logging.info(f"[wrapper] 🧩 Bypass registrar_memoria para {url}")
                 return func(req)
-
+            
             # === 1️⃣ Consultar contexto previo antes de ejecutar ===
             try:
                 cosmos = CosmosMemoryStore()
                 agent_id = req.headers.get("X-Agent-Auth") or req.headers.get("Agent-ID") or "System"
-                contexto_prev = cosmos.query(agent_id, limit=5)
+                contexto_prev = cosmos.query_all(limit=10)
                 setattr(req, "contexto_prev", contexto_prev)
                 logging.info(f"[wrapper] 🧠 Contexto previo encontrado ({len(contexto_prev)}) para agente {agent_id}")
             except Exception as e:
                 logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria previa: {e}")
                 setattr(req, "contexto_prev", [])
 
-            # === 2️⃣ Ejecutar función original ===
+            # === 2️⃣ Ejecutar función original (con contexto disponible en req.contexto_prev) ===
             response = func(req)
 
-            # === 3️⃣ Registrar interacción en memoria ===
+            # === 3️⃣ Registrar interacción en memoria (enriquecida) ===
             try:
                 from services.memory_service import memory_service
                 input_data = {}
@@ -62,11 +62,22 @@ def registrar_memoria(source: str):
                 except Exception:
                     output_data = {"status_code": response.status_code, "raw": True}
 
-                agent_id = (input_data.get("agent_name") or
-                            input_data.get("origen") or
-                            req.headers.get("Agent-ID") or
-                            "System")
+                agent_id = (
+                    input_data.get("agent_name") or
+                    input_data.get("origen") or
+                    req.headers.get("Agent-ID") or
+                    "System"
+                )
 
+                # 🧠 Generar texto semántico enriquecido (antes del guardado)
+                if not output_data.get("texto_semantico"):
+                    output_data["texto_semantico"] = (
+                        f"Interacción en '{url}' ejecutada por {agent_id}. "
+                        f"Éxito: {'✅' if response.status_code == 200 else '❌'}. "
+                        f"Mensaje: {output_data.get('mensaje', 'sin mensaje')}."
+                    )
+
+                # Guardar en memoria semántica
                 memory_service.record_interaction(
                     agent_id=agent_id,
                     source=source,

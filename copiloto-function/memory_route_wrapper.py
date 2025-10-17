@@ -31,7 +31,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         session_id = (
                             req.headers.get("Session-ID")
                             or req.params.get("session_id")
-                            or f"auto_{int(time.time())}"
+                            or "constant-session-id"
                         )
                         interacciones = memory_service.get_session_history(session_id)
                         memoria_previa = {
@@ -59,7 +59,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         session_id = (
                             req.headers.get("Session-ID")
                             or req.params.get("session_id")
-                            or f"auto_{int(time.time())}"
+                            or "constant-session-id"
                         )
                         agent_id = (
                             req.headers.get("Agent-ID")
