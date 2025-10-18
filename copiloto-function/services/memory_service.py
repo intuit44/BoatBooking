@@ -87,13 +87,28 @@ class MemoryService:
             logging.info(f"💾 Guardando en Cosmos: {event.get('id', 'N/A')} - Session: {event.get('session_id', 'N/A')}")
             logging.info(f"📄 Evento: {event.get('event_type', 'unknown')} - Tamaño: {len(str(event))} chars")
             
+            # Mover texto_semantico al nivel raíz si está en data
             if "texto_semantico" in event.get("data", {}):
                 event["texto_semantico"] = event["data"]["texto_semantico"]
+                logging.info(f"📝 Moviendo texto_semantico al nivel raíz: {event['texto_semantico'][:100]}...")
+            
+            # Asegurar que siempre hay texto_semantico en el nivel raíz
+            if not event.get("texto_semantico"):
+                # Generar uno básico si no existe
+                event["texto_semantico"] = f"Evento {event.get('event_type', 'unknown')} en sesión {event.get('session_id', 'unknown')}"
+                logging.warning(f"⚠️ Generando texto_semantico de fallback: {event['texto_semantico']}")
             
             # Intentar upsert
             result = self.memory_container.upsert_item(event)
             logging.info(f"✅ Guardado exitoso en Cosmos DB - ID: {result.get('id', 'unknown')}")
-            logging.info(f"🧠 Texto semántico guardado: {event.get('texto_semantico', '')[:200]}")
+            # Log detallado del texto semántico
+            texto_guardado = event.get('texto_semantico', '')
+            logging.info(f"🧠 Texto semántico guardado (longitud: {len(texto_guardado)}): {texto_guardado[:200]}")
+            
+            # Verificar también si está en data
+            texto_en_data = event.get('data', {}).get('texto_semantico', '')
+            if texto_en_data:
+                logging.info(f"📄 Texto semántico también en data: {texto_en_data[:100]}...")
             return True
         except Exception as e:
             logging.error(f"❌ Error escribiendo en Cosmos memory: {e}")
@@ -134,17 +149,21 @@ class MemoryService:
     
     def record_interaction(self, agent_id: str, source: str, input_data: Any, output_data: Any) -> bool:
         """Registra interacción de agente"""
-        interaction = {
+        document = {
             "id": str(uuid.uuid4()),
-            "timestamp": datetime.utcnow().isoformat(),
+            "session_id": input_data.get("session_id") or f"agent_{agent_id}_{int(datetime.utcnow().timestamp())}",
             "agent_id": agent_id,
             "source": source,
-            "input": input_data,
-            "output": output_data,
-            "session_id": f"agent_{agent_id}_{int(datetime.utcnow().timestamp())}"
+            "timestamp": datetime.utcnow().isoformat(),
+            "endpoint": input_data.get("endpoint", source),
+            "params": input_data,
+            "data": output_data  # ← Aquí aseguramos que el contenido de output_data se incluya dentro de "data"
         }
         
-        return self.log_event("agent_interaction", interaction)
+        success_cosmos = self._log_cosmos(document)
+        success_local = self._log_local(document)
+        
+        return success_local or success_cosmos
     
     def registrar_llamada(self, source: str, endpoint: str, method: str, params: Dict[str, Any], response_data: Any, success: bool) -> bool:
         """Método requerido por memory_decorator.py para registrar llamadas a endpoints"""
@@ -188,15 +207,24 @@ class MemoryService:
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        # Crear resumen semántico básico
-        texto_semantico = (
+        # Crear resumen semántico - PRIORIZAR EL QUE VIENE EN RESPONSE_DATA
+        texto_semantico_generado = (
             f"Interacción en '{endpoint}' ejecutada por {agent_id}.\n"
             f"Método: {method}. Éxito: {'✅' if success else '❌'}.\n"
             f"Respuesta resumida: {str(response_data)[:150]}..."
         )
         
+        # Usar el texto_semantico de response_data si existe, sino el generado
+        texto_semantico_final = None
+        if isinstance(response_data, dict) and response_data.get("texto_semantico"):
+            texto_semantico_final = response_data["texto_semantico"]
+            logging.info(f"📝 Usando texto_semantico de response_data: {texto_semantico_final[:100]}...")
+        else:
+            texto_semantico_final = texto_semantico_generado
+            logging.info(f"📝 Usando texto_semantico generado: {texto_semantico_final[:100]}...")
+        
         # Inyectarlo en el evento
-        llamada_data["texto_semantico"] = texto_semantico
+        llamada_data["texto_semantico"] = texto_semantico_final
         
         # Registrar como evento de tipo "endpoint_call" con session_id preservado
         result = self.log_event("endpoint_call", llamada_data, session_id=session_id)

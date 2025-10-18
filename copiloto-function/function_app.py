@@ -3730,6 +3730,12 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     memoria_previa = consultar_memoria_cosmos_directo(req)
     if memoria_previa and memoria_previa.get("tiene_historial"):
         logging.info(f"🧠 historial_interacciones: {memoria_previa['total_interacciones']} interacciones encontradas")
+        # Debug: verificar estructura de memoria_previa
+        if memoria_previa.get("interacciones_recientes"):
+            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {}
+            logging.info(f"   Primera interacción keys: {list(primera.keys())}")
+            if "texto_semantico" in primera:
+                logging.info(f"   Texto semántico encontrado: '{primera['texto_semantico'][:50]}...'")
         logging.info(f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
     advertencias = []
 
@@ -3778,8 +3784,20 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             }
             setattr(req, "_memoria_contexto", memoria_previa)
             logging.info(f"🧠 Memoria local cargada: {len(interacciones)} interacciones")
+            # Debug: verificar si las interacciones tienen texto_semantico
+            for idx, inter in enumerate(interacciones[:3]):
+                texto = inter.get("texto_semantico", "")
+                logging.info(f"   Interacción {idx}: texto_semantico = '{texto[:50]}...'")
         else:
             logging.info("🧠 Usando memoria previa de Cosmos sin sobrescribirla.")
+        # Debug: verificar estructura de memoria previa
+        if memoria_previa.get("interacciones_recientes"):
+            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {}
+            logging.info(f"   Primera interacción de Cosmos keys: {list(primera.keys())}")
+            if "texto_semantico" in primera:
+                logging.info(f"   Texto semántico de Cosmos: '{primera['texto_semantico'][:50]}...'")
+            else:
+                logging.warning(f"   ⚠️ No hay texto_semantico en interacción de Cosmos")
     except Exception as e:
         logging.error(f"❌ Error cargando memoria: {e}")
         memoria_previa = memoria_previa or {}
@@ -3810,13 +3828,35 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 # Unificar la estructura (compatibilidad entre versiones antiguas y nuevas)
                 registro = interaccion.get("data", interaccion)
                 
+                # CORRECCIÓN: Buscar texto_semantico en el nivel raíz PRIMERO
+                texto_semantico = (
+                    interaccion.get("texto_semantico") or  # Nivel raíz (donde se guarda)
+                    registro.get("texto_semantico") or     # En data
+                    interaccion.get("data", {}).get("texto_semantico") or  # Nested en data
+                    ""  # Fallback vacío
+                )
+                
+                # Log detallado para debug
+                if texto_semantico:
+                    logging.info(f"🔍 Interacción {i+1}: texto_semantico encontrado = '{texto_semantico[:50]}...'")
+                else:
+                    logging.info(f"🔍 Interacción {i+1}: texto_semantico vacío")
+                if not texto_semantico:
+                    logging.warning(f"⚠️ Interacción {i+1} sin texto_semantico")
+                    logging.warning(f"   Keys nivel raíz: {list(interaccion.keys())}")
+                    if "data" in interaccion:
+                        logging.warning(f"   Keys en data: {list(interaccion['data'].keys())}")
+                    # Generar uno de fallback si no existe
+                    texto_semantico = f"Interacción {i+1} en {registro.get('endpoint', 'unknown')} - {registro.get('timestamp', 'sin fecha')}"
+                    logging.info(f"   Generado fallback: {texto_semantico}")
+                
                 interacciones_formateadas.append({
                     "numero": i + 1,
                     "timestamp": registro.get("timestamp", interaccion.get("timestamp", "")),
                     "endpoint": registro.get("endpoint", "historial_interacciones"),
                     "consulta": registro.get("params", {}).get("comando", "")[:200],
                     "exito": registro.get("success", True),
-                    "texto_semantico": registro.get("texto_semantico", ""),  # ← aquí está el texto enriquecido
+                    "texto_semantico": texto_semantico,
                     "tipo": "interaccion_usuario"
                 })
             
