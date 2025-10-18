@@ -38,10 +38,13 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
         database = client.get_database_client(database_name)
         container = database.get_container_client(container_name)
         
-        # Consultar últimas interacciones de esta sesión
+        # FILTRAR SOLO DOCUMENTOS CON TEXTO_SEMANTICO (tipo endpoint_call)
         query = """
         SELECT TOP 10 * FROM c 
         WHERE c.session_id = @session_id 
+        AND c.event_type = 'endpoint_call'
+        AND IS_DEFINED(c.texto_semantico)
+        AND c.texto_semantico != ''
         ORDER BY c._ts DESC
         """
         
@@ -52,18 +55,25 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
         ))
         
         if items:
-            # Procesar interacciones encontradas
+            # Procesar interacciones encontradas CON TEXTO_SEMANTICO
             interacciones_formateadas = []
             
             for item in items:
+                # Extraer datos del nivel raíz y de data
+                data_section = item.get("data", {})
+                
                 interaccion = {
                     "timestamp": item.get("timestamp", ""),
-                    "endpoint": item.get("endpoint", "unknown"),
-                    "consulta": item.get("consulta", "")[:100],  # Primeros 100 chars
-                    "exito": item.get("exito", True),
-                    "respuesta_resumen": item.get("respuesta", "")[:150]  # Primeros 150 chars
+                    "endpoint": data_section.get("endpoint", item.get("endpoint", "unknown")),
+                    "consulta": data_section.get("params", {}).get("comando", "")[:100],
+                    "exito": data_section.get("success", True),
+                    "texto_semantico": item.get("texto_semantico", ""),  # NIVEL RAÍZ
+                    "respuesta_resumen": str(data_section.get("response_data", ""))[:150]
                 }
                 interacciones_formateadas.append(interaccion)
+                
+                # Log para verificar
+                logging.info(f"📝 Interacción recuperada: {interaccion['endpoint']} - texto: {interaccion['texto_semantico'][:50]}...")
             
             # Generar resumen para el agente
             resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
@@ -72,6 +82,7 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
                 "tiene_historial": True,
                 "session_id": session_id,
                 "total_interacciones": len(items),
+                "total_interacciones_sesion": len(items),  # Para compatibilidad
                 "interacciones_recientes": interacciones_formateadas,
                 "resumen_conversacion": resumen_conversacion,
                 "ultima_actividad": items[0].get("timestamp") if items else None,
