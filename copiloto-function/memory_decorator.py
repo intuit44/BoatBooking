@@ -70,7 +70,7 @@ def registrar_memoria(source: str):
                 )
 
                 # 🧠 Generar texto semántico enriquecido (antes del guardado)
-                if not output_data.get("texto_semantico"):
+                if not output_data.get("texto_semantico", "").strip():
                     output_data["texto_semantico"] = (
                         f"Interacción en '{url}' ejecutada por {agent_id}. "
                         f"Éxito: {'✅' if response.status_code == 200 else '❌'}. "
