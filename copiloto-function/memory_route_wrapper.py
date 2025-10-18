@@ -26,34 +26,67 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     logging.warning(f"🚨 Wrapper ACTIVADO en endpoint: {source_name}")
                     from services.memory_service import memory_service
 
-                    # 1️⃣ LEER MEMORIA PREVIA
+                    # 1️⃣ CONSULTAR MEMORIA COSMOS DIRECTAMENTE
+                    memoria_previa = {}
                     try:
-                        session_id = (
-                            req.headers.get("Session-ID")
-                            or req.params.get("session_id")
-                            or "constant-session-id"
-                        )
-                        interacciones = memory_service.get_session_history(session_id)
-                        memoria_previa = {
-                            "tiene_historial": len(interacciones) > 0,
-                            "interacciones_recientes": interacciones,
-                            "total_interacciones": len(interacciones),
-                            "session_id": session_id,
-                        }
-                        setattr(req, "_memoria_contexto", memoria_previa)
-
-                        if memoria_previa["tiene_historial"]:
-                            logging.info(f"🧠 [{source_name}] Contexto cargado: {len(interacciones)} interacciones")
+                        from cosmos_memory_direct import consultar_memoria_cosmos_directo
+                        memoria = consultar_memoria_cosmos_directo(req)
+                        
+                        if memoria and memoria.get("tiene_historial"):
+                            memoria_previa = memoria
+                            logging.info(f"🧠 [{source_name}] Memoria cargada: {memoria['total_interacciones']} interacciones con texto_semantico")
                         else:
+                            memoria_previa = {"tiene_historial": False, "nueva_sesion": True}
                             logging.info(f"🧠 [{source_name}] Sin memoria previa")
+                            
+                        setattr(req, "_memoria_contexto", memoria_previa)
                     except Exception as e:
-                        logging.warning(f"⚠️ [{source_name}] No se pudo cargar memoria: {e}")
-                        setattr(req, "_memoria_contexto", {})
+                        logging.warning(f"⚠️ [{source_name}] Error consultando memoria: {e}")
+                        setattr(req, "_memoria_contexto", {"tiene_historial": False})
 
                     # 2️⃣ EJECUTAR ENDPOINT ORIGINAL
                     response = func_ref(req)
+                    
+                    # 3️⃣ INYECTAR CONTEXTO DE MEMORIA EN RESPUESTA
+                    try:
+                        if isinstance(response, func.HttpResponse):
+                            body = response.get_body()
+                            if body:
+                                response_data = json.loads(body.decode("utf-8"))
+                                
+                                if isinstance(response_data, dict):
+                                    # SIEMPRE inyectar metadata del wrapper
+                                    if "metadata" not in response_data:
+                                        response_data["metadata"] = {}
+                                    response_data["metadata"]["wrapper_aplicado"] = True
+                                    
+                                    # Si hay memoria, inyectar contexto
+                                    if memoria_previa.get("tiene_historial"):
+                                        response_data["contexto_conversacion"] = {
+                                            "mensaje": f"Continuando conversación con {memoria_previa['total_interacciones']} interacciones previas",
+                                            "ultimas_consultas": memoria_previa.get("resumen_conversacion", ""),
+                                            "session_id": memoria_previa["session_id"],
+                                            "ultima_actividad": memoria_previa.get("ultima_actividad")
+                                        }
+                                        response_data["metadata"]["memoria_aplicada"] = True
+                                        response_data["metadata"]["interacciones_previas"] = memoria_previa["total_interacciones"]
+                                        logging.info(f"🧠 [{source_name}] Contexto inyectado: {memoria_previa['total_interacciones']} interacciones")
+                                    else:
+                                        response_data["metadata"]["nueva_sesion"] = True
+                                        response_data["metadata"]["memoria_aplicada"] = False
+                                    
+                                    # Crear nueva respuesta
+                                    new_body = json.dumps(response_data, ensure_ascii=False)
+                                    response = func.HttpResponse(
+                                        new_body,
+                                        mimetype="application/json",
+                                        status_code=response.status_code,
+                                        headers=dict(response.headers)
+                                    )
+                    except Exception as e:
+                        logging.warning(f"⚠️ [{source_name}] Error procesando respuesta: {e}")
 
-                    # === Registro de nueva interacción en Cosmos ===
+                    # 4️⃣ REGISTRO DE NUEVA INTERACCIÓN EN COSMOS
                     try:
                         from services.memory_service import memory_service
                         session_id = (
@@ -74,6 +107,11 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         else:
                             output_data = {"raw_response": True}
 
+                        # Generar texto_semantico para la respuesta
+                        texto_semantico = f"Interacción en '{route_path}' ejecutada por {agent_id}. Éxito: ✅. Endpoint: {source_name}."
+                        if isinstance(output_data, dict):
+                            output_data["texto_semantico"] = texto_semantico
+                        
                         memory_service.registrar_llamada(
                             source=source_name,
                             endpoint=route_path,

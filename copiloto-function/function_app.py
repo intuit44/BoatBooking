@@ -270,19 +270,14 @@ except ImportError:
 app = func.FunctionApp()
 sys.path.insert(0, os.path.dirname(__file__))
 
-# 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - FORZAR APLICACIÓN
+# 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - APLICAR ANTES DE DEFINIR ENDPOINTS
 try:
-    from memory_route_wrapper import wrap_function_app_with_memory
-    wrap_function_app_with_memory(app)
+    from memory_route_wrapper import apply_memory_wrapper
+    apply_memory_wrapper(app)
     logging.info("✅ WRAPPER AUTOMÁTICO APLICADO - Todos los @app.route() tendrán memoria")
 except Exception as e:
     logging.error(f"❌ WRAPPER FALLÓ: {e}")
-    # Fallback: aplicar decorador manual
-    try:
-        from services.memory_decorator import registrar_memoria
-        logging.info("⚠️ Usando decorador manual como fallback")
-    except Exception as e2:
-        logging.error(f"❌ Fallback también falló: {e2}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -704,7 +699,7 @@ def _download_script_from_blob(nombre_script: str) -> Optional[Path]:
         return None
 
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+# Esta línea se eliminó porque ya se definió app arriba
 
 
 # Configuración adaptativa mejorada
@@ -3818,7 +3813,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "exito": True,
                 "interacciones": [],
                 "total": 0,
-                "mensaje": "No se encontraron interacciones previas en esta sesión",
+                "mensaje": "🔍 CONSULTA DE HISTORIAL COMPLETADA\n\n📊 RESULTADO: No se encontraron interacciones previas en esta sesión.\n\n💡 CONTEXTO: Esta es una nueva sesión o no hay interacciones guardadas previamente.\n\n🎯 RECOMENDACIÓN: Puedes comenzar a interactuar normalmente. Todas las nuevas interacciones se guardarán automáticamente.",
                 "session_id": session_id,
                 "fuente": "wrapper_automatico"
             }
@@ -3860,14 +3855,36 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                     "tipo": "interaccion_usuario"
                 })
             
+            # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÁNTICO
+            total_interacciones = memoria_previa.get("total_interacciones", 0)
+            resumen = memoria_previa.get("resumen_conversacion", "")
+            
+            mensaje_enriquecido = f"""🔍 CONSULTA DE HISTORIAL COMPLETADA
+
+📊 RESULTADO: Se encontraron {len(interacciones_formateadas)} interacciones recientes de un total de {total_interacciones}.
+
+📝 CONTEXTO SEMÁNTICO:
+{resumen[:300] if resumen else 'Sin resumen de conversación disponible'}
+
+🕒 INTERACCIONES RECIENTES:
+"""
+            
+            for i, inter in enumerate(interacciones_formateadas[:3]):
+                mensaje_enriquecido += f"\n{i+1}. {inter['texto_semantico'][:100]}..."
+            
+            if len(interacciones_formateadas) > 3:
+                mensaje_enriquecido += f"\n... y {len(interacciones_formateadas) - 3} más."
+            
+            mensaje_enriquecido += f"\n\n🎯 CONTINUIDAD: Esta sesión tiene contexto previo. Puedes hacer referencia a interacciones anteriores."
+            
             response_data = {
                 "exito": True,
                 "interacciones": interacciones_formateadas,
-                "total": memoria_previa.get("total_interacciones", 0),
+                "total": total_interacciones,
                 "session_id": memoria_previa.get("session_id"),
-                "resumen_conversacion": memoria_previa.get("resumen_conversacion", ""),
+                "resumen_conversacion": resumen,
                 "fuente": "wrapper_automatico",
-                "mensaje": f"Se encontraron {len(interacciones_formateadas)} interacciones recientes"
+                "mensaje": mensaje_enriquecido
             }
         
         # Aplicar memoria Cosmos y memoria manual
@@ -4263,6 +4280,94 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 "proximas_acciones": ["sugerir", "buscar:*", "diagnosticar:sistema"]
             })
 
+        # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÁNTICO DIRECTAMENTE EN EL MENSAJE PRINCIPAL
+        # Extraer información clave del contexto semántico
+        resumen_conversacion = memoria_previa.get("resumen_conversacion", "") if memoria_previa else ""
+        total_interacciones = memoria_previa.get("total_interacciones", 0) if memoria_previa else 0
+        conocimiento_cognitivo = contexto_semantico.get("conocimiento_cognitivo", {}) if contexto_semantico else {}
+        
+        # Construir mensaje principal enriquecido
+        mensaje_enriquecido = f"""🤖 COPILOTO SEMÁNTICO - RESPUESTA PROCESADA
+
+📊 CONTEXTO SEMÁNTICO:
+• Sesión activa: {'Sí' if memoria_previa and memoria_previa.get('tiene_historial') else 'No'}
+• Interacciones previas: {total_interacciones}
+• Resumen conversación: {resumen_conversacion[:200] + '...' if len(resumen_conversacion) > 200 else resumen_conversacion}
+• Conocimiento cognitivo: {'Disponible' if conocimiento_cognitivo else 'No disponible'}
+
+🎯 ACCIÓN EJECUTADA: {respuesta_base.get('accion', 'desconocida').replace('_', ' ').title()}
+
+"""
+        
+        # Agregar detalles específicos según la acción
+        if respuesta_base.get("accion") == "leer_archivo":
+            resultado = respuesta_base.get("resultado", {})
+            if resultado.get("exito"):
+                mensaje_enriquecido += f"✅ Archivo leído exitosamente: {resultado.get('ruta', 'desconocida')}\n"
+                mensaje_enriquecido += f"📄 Contenido: {resultado.get('contenido', '')[:300]}...\n" if resultado.get("contenido") else ""
+            else:
+                mensaje_enriquecido += f"❌ Error leyendo archivo: {resultado.get('error', 'desconocido')}\n"
+        
+        elif respuesta_base.get("accion") == "busqueda_semantica":
+            resultado = respuesta_base.get("resultado", {})
+            archivos = resultado.get("archivos", [])
+            mensaje_enriquecido += f"🔍 Búsqueda completada: {len(archivos)} archivos encontrados\n"
+            if archivos:
+                mensaje_enriquecido += "📁 Archivos encontrados:\n"
+                for archivo in archivos[:3]:
+                    mensaje_enriquecido += f"  • {archivo.get('ruta', '')} (relevancia: {archivo.get('relevancia', 0):.1f})\n"
+        
+        elif respuesta_base.get("accion") == "explorar_directorio":
+            resultado = respuesta_base.get("resultado", {})
+            total = resultado.get("total", 0)
+            mensaje_enriquecido += f"📂 Exploración completada: {total} archivos en {resultado.get('directorio', 'desconocido')}\n"
+        
+        elif respuesta_base.get("accion") == "analisis_semantico":
+            resultado = respuesta_base.get("resultado", {})
+            if resultado.get("exito"):
+                analisis = resultado.get("analisis", {})
+                mensaje_enriquecido += f"🔬 Análisis completado: {analisis.get('metricas', {}).get('lineas', 0)} líneas, {analisis.get('estructura', {}).get('funciones', 0)} funciones\n"
+        
+        elif respuesta_base.get("accion") == "generar_artefacto":
+            resultado = respuesta_base.get("resultado", {})
+            if resultado.get("exito"):
+                mensaje_enriquecido += f"🎨 Artefacto generado: {resultado.get('tipo', 'desconocido')}\n"
+        
+        elif respuesta_base.get("accion") == "diagnostico_enriquecido":
+            resultado = respuesta_base.get("resultado", {})
+            if resultado.get("exito"):
+                mensaje_enriquecido += f"🔍 Diagnóstico completado con contexto semántico\n"
+                if resultado.get("evaluacion_cognitiva"):
+                    mensaje_enriquecido += f"🧠 Evaluación cognitiva: {resultado['evaluacion_cognitiva'].get('evaluacion_sistema', 'N/A')}\n"
+        
+        elif respuesta_base.get("accion") == "sugerencias_enriquecidas":
+            resultado = respuesta_base.get("resultado", {})
+            sugerencias = resultado.get("sugerencias", [])
+            mensaje_enriquecido += f"💡 {len(sugerencias)} sugerencias generadas basadas en contexto\n"
+            if sugerencias:
+                mensaje_enriquecido += "📋 Sugerencias:\n"
+                for sug in sugerencias[:3]:
+                    mensaje_enriquecido += f"  • {sug}\n"
+        
+        elif respuesta_base.get("accion") == "interpretacion_enriquecida":
+            resultado = respuesta_base.get("resultado", {})
+            mensaje_enriquecido += f"🤔 Interpretación: {resultado.get('interpretacion', 'No se pudo interpretar')}\n"
+            sugerencias = resultado.get("sugerencias", [])
+            if sugerencias:
+                mensaje_enriquecido += "💡 Sugerencias alternativas:\n"
+                for sug in sugerencias[:3]:
+                    mensaje_enriquecido += f"  • {sug}\n"
+        
+        # Agregar próximas acciones si existen
+        proximas_acciones = respuesta_base.get("proximas_acciones", [])
+        if proximas_acciones:
+            mensaje_enriquecido += f"\n🎯 PRÓXIMAS ACCIONES POSIBLES:\n"
+            for accion in proximas_acciones[:3]:
+                mensaje_enriquecido += f"  • {accion}\n"
+        
+        # Agregar el mensaje enriquecido al response_base
+        respuesta_base["mensaje"] = mensaje_enriquecido
+
         # NOTA: La memoria semántica se registra automáticamente por el wrapper @registrar_memoria
         
         return func.HttpResponse(
@@ -4290,6 +4395,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
+
 
 
 def generar_proximas_acciones(intencion: str, resultado: dict) -> list:
@@ -4529,21 +4635,50 @@ def build_status() -> dict:
 
 @app.function_name(name="status")
 @app.route(route="status", auth_level=func.AuthLevel.ANONYMOUS)
-
 def status(req: func.HttpRequest) -> func.HttpResponse:
-    """Status endpoint muy ligero, solo confirma estado"""
+    """Status endpoint que confirma el estado y proporciona contexto semántico."""
     
     # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
     memoria_previa = getattr(req, '_memoria_contexto', {})
-    if memoria_previa and memoria_previa.get("contexto_recuperado"):
+    if memoria_previa and memoria_previa.get("tiene_historial"):
         logging.info(f"🧠 Status: Continuando sesión con {memoria_previa['total_interacciones']} interacciones")
     
+    # Construir el estado del sistema
     estado = build_status()
-    
+
+    # Mensaje enriquecido con contexto semántico
+    if memoria_previa and memoria_previa.get("tiene_historial"):
+        resumen = memoria_previa.get("resumen_conversacion", "Sin resumen disponible.")
+        mensaje_enriquecido = f"""🔍 Estado del sistema consultado.
+
+📊 RESULTADO: El sistema está en funcionamiento.
+
+📝 CONTEXTO SEMÁNTICO:
+{resumen[:300] if resumen else 'Sin resumen de conversación disponible'}
+
+🎯 CONTINUIDAD: Esta sesión tiene contexto previo. Puedes hacer referencia a interacciones anteriores.
+"""
+    else:
+        mensaje_enriquecido = """🔍 Estado del sistema consultado.
+
+📊 RESULTADO: El sistema está en funcionamiento.
+
+💡 CONTEXTO: Esta es una nueva sesión o no hay interacciones guardadas previamente.
+🎯 RECOMENDACIÓN: Puedes comenzar a interactuar normalmente. Todas las nuevas interacciones se guardarán automáticamente.
+"""
+
     # NOTA: La memoria se registra automáticamente por el wrapper @registrar_memoria
     
+    # Construir la respuesta final
+    response_data = {
+        "exito": True,
+        "estado": estado,
+        "mensaje": mensaje_enriquecido,
+        "fuente": "wrapper_automatico"
+    }
+
     return func.HttpResponse(
-        json.dumps(estado, indent=2, ensure_ascii=False),
+        json.dumps(response_data, ensure_ascii=False),
         mimetype="application/json",
         status_code=200
     )
@@ -16607,6 +16742,5 @@ def historial_directo(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200
     )
 
-# Función historial_interacciones ya definida anteriormente en el archivo
 
 
