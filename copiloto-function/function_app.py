@@ -264,6 +264,13 @@ except ImportError:
     def render_tool_response(status_code: int, payload: dict) -> str:
         return f"Status {status_code}: {payload.get('error', 'Unknown error')}"
 
+# --- Importar endpoints modulares ---
+try:
+    from endpoints.msearch import msearch_http
+    logging.info("✅ Endpoint msearch cargado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo cargar endpoint msearch: {e}")
+
 # --- Red, almacenamiento y otros ---
 
 # --- FunctionApp instance ---
