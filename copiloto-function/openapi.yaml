@@ -3141,6 +3141,354 @@
           }
         }
       }
+    },
+    "/api/msearch": {
+      "post": {
+        "summary": "🔍 ANÁLISIS SEMÁNTICO AVANZADO - Detección de clases, funciones, duplicados y errores lógicos",
+        "description": "⭐ ENDPOINT ROBUSTO para análisis semántico profundo de código Python. Detecta clases, funciones, imports duplicados, problemas de indentación, errores lógicos y conflictos de nombres. Acepta archivo por ruta o contenido directo. Formato dinámico sin predefiniciones rígidas.",
+        "operationId": "msearch",
+        "tags": [
+          "🔍 Análisis Semántico"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_path": {
+                    "type": "string",
+                    "description": "Ruta del archivo a analizar (Azure Blob o local)",
+                    "example": "function_app.py"
+                  },
+                  "ruta": {
+                    "type": "string",
+                    "description": "Alias para file_path"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "Alias para file_path"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Contenido directo del archivo a analizar"
+                  },
+                  "contenido": {
+                    "type": "string",
+                    "description": "Alias para content"
+                  },
+                  "search_type": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "classes",
+                      "functions",
+                      "imports",
+                      "duplicates",
+                      "indentation",
+                      "logical_errors",
+                      "syntax_errors"
+                    ],
+                    "default": "all",
+                    "description": "Tipo de análisis a realizar"
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "description": "Alias para search_type"
+                  },
+                  "pattern": {
+                    "type": "string",
+                    "description": "Patrón regex para filtrar resultados (opcional)",
+                    "example": ".*Handler.*"
+                  },
+                  "patron": {
+                    "type": "string",
+                    "description": "Alias para pattern"
+                  }
+                },
+                "additionalProperties": true,
+                "examples": [
+                  {
+                    "file_path": "function_app.py",
+                    "search_type": "all"
+                  },
+                  {
+                    "content": "class MyClass:\n    def method(self):\n        pass",
+                    "search_type": "classes"
+                  },
+                  {
+                    "ruta": "endpoints/msearch.py",
+                    "tipo": "functions",
+                    "patron": ".*_http"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Análisis semántico completado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "file_path": {
+                      "type": "string",
+                      "description": "Ruta del archivo analizado"
+                    },
+                    "analysis_type": {
+                      "type": "string",
+                      "description": "Tipo de análisis realizado"
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "description": "Patrón utilizado para filtrar"
+                    },
+                    "results": {
+                      "type": "object",
+                      "properties": {
+                        "classes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": "integer"
+                              },
+                              "methods": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "bases": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "decorators": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "functions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": "integer"
+                              },
+                              "args": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "decorators": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "is_async": {
+                                "type": "boolean"
+                              },
+                              "docstring": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "imports": {
+                          "type": "object",
+                          "properties": {
+                            "regular": {
+                              "type": "array"
+                            },
+                            "from_imports": {
+                              "type": "array"
+                            },
+                            "conflicts": {
+                              "type": "array"
+                            }
+                          }
+                        },
+                        "duplicates": {
+                          "type": "object",
+                          "properties": {
+                            "functions": {
+                              "type": "array"
+                            },
+                            "classes": {
+                              "type": "array"
+                            }
+                          }
+                        },
+                        "indentation_issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "line": {
+                                "type": "integer"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "logical_errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "line": {
+                                "type": "integer"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "syntax_errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "line": {
+                                "type": "integer"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "statistics": {
+                      "type": "object",
+                      "properties": {
+                        "total_lines": {
+                          "type": "integer"
+                        },
+                        "classes_found": {
+                          "type": "integer"
+                        },
+                        "functions_found": {
+                          "type": "integer"
+                        },
+                        "imports_found": {
+                          "type": "integer"
+                        },
+                        "issues_found": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "run_id": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "exito",
+                    "results",
+                    "statistics"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida o parámetros faltantes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "campos_aceptados": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "error_type": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -3191,6 +3539,10 @@
     {
       "name": "🚀 Despliegues Robustos",
       "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
+    },
+    {
+      "name": "🔍 Análisis Semántico",
+      "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
     }
   ],
   "components": {
