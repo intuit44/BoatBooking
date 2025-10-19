@@ -5227,6 +5227,8 @@ def ejecutar(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+
+
 @app.function_name(name="escribir_archivo_local_http")
 @app.route(route="escribir-archivo-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def escribir_archivo_local_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -7402,26 +7404,42 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
                 for keyword in ["local", "filesystem"])
         )
 
-        # 🔍 FASE 1: VALIDACIÓN PREVIA COMPLETA
-        # Validación de encoding UTF-8
+        # 🔧 AUTOREPARACIÓN PARA PYTHON
+        if ruta.endswith('.py'):
+            try:
+                from escribir_archivo_fix import procesar_escribir_archivo_robusto
+                resultado_procesado = procesar_escribir_archivo_robusto(ruta, contenido)
+                contenido = resultado_procesado["contenido_procesado"]
+                advertencias.extend(resultado_procesado["advertencias"])
+            except Exception as e:
+                advertencias.append(f"⚠️ Error en autoreparación: {str(e)}")
+        
+        # 🔍 VALIDACIÓN UTF-8 (no fallar)
         try:
             contenido.encode("utf-8")
         except UnicodeEncodeError as e:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": f"Codificación inválida UTF-8: {e}",
-                    "sugerencia": "Usa solo caracteres UTF-8 válidos"
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
+            contenido = contenido.encode('utf-8', errors='replace').decode('utf-8')
+            advertencias.append(f"🔧 Caracteres inválidos reparados: {str(e)[:50]}")
         
         # 🧹 DESERIALIZACIÓN ULTRA-AGRESIVA - INDEPENDIENTE DE AGENTES
         if contenido:
             contenido_original = contenido
             
             # PASO 1: Múltiples capas de deserialización
+            # Limpiar HTML entities comunes
+            html_entities = {
+                "&quot;": '"',
+                "&#39;": "'",
+                "&lt;": "<",
+                "&gt;": ">",
+                "&amp;": "&"
+            }
+            
+            for entity, char in html_entities.items():
+                if entity in contenido:
+                    contenido = contenido.replace(entity, char)
+                    advertencias.append(f"🔧 HTML entity reparada: {entity} → {char}")
+            
             try:
                 # Capa 1: HTML entities primero
                 html_entities = {
@@ -13594,6 +13612,29 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
                     "cli_habilitado": False
                 }
 
+                # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÁNTICO PARA DIAGNÓSTICO GENERAL
+                ambiente = diagnostico.get("ambiente", "Desconocido")
+                cache_archivos = diagnostico["sistema"]["cache_archivos"]
+                memoria_cache = diagnostico["sistema"]["memoria_cache_kb"]
+                storage_contenedores = diagnostico["recursos"].get("storage_stats", {}).get("contenedores", 0)
+                storage_blobs = diagnostico["recursos"].get("storage_stats", {}).get("total_blobs", 0)
+                alertas_count = len(diagnostico.get("alertas", []))
+                recomendaciones_count = len(diagnostico.get("recomendaciones", []))
+
+                mensaje_enriquecido = f"""🔍 DIAGNÓSTICO DE RECURSOS COMPLETADO
+
+📊 RESULTADO: Diagnóstico general del sistema completado exitosamente.
+
+🌐 AMBIENTE: {ambiente}
+💾 CACHE: {cache_archivos} archivos ({memoria_cache} KB)
+🗄️ STORAGE: {storage_contenedores} contenedores, {storage_blobs} blobs totales
+⚠️ ALERTAS: {alertas_count} detectadas
+💡 RECOMENDACIONES: {recomendaciones_count} sugeridas
+
+🎯 CONTEXTO SEMÁNTICO: Sistema operativo en {ambiente}. Cache activo con {cache_archivos} archivos. Storage conectado con {storage_blobs} archivos distribuidos en {storage_contenedores} contenedores. {'Hay alertas críticas que requieren atención.' if alertas_count > 0 else 'Sistema funcionando normalmente.'}"""
+
+                diagnostico["mensaje"] = mensaje_enriquecido
+
                 # Aplicar memoria Cosmos y memoria manual
                 diagnostico = aplicar_memoria_cosmos_directo(req, diagnostico)
                 diagnostico = aplicar_memoria_manual(req, diagnostico)
@@ -13732,6 +13773,26 @@ def diagnostico_recursos_completo_http(req: func.HttpRequest) -> func.HttpRespon
                     "mensaje": "Recurso en estado de error",
                     "accion": "Revisar configuración y logs del recurso"
                 })
+
+            # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÁNTICO PARA RECURSO ESPECÍFICO
+            recurso = diagnostico.get("recurso", "Desconocido")
+            estado_detalle = diagnostico["detalle"].get("estado", "Desconocido")
+            tipo_recurso = diagnostico["detalle"].get("tipo", "Desconocido")
+            metricas_count = len(diagnostico.get("metricas", {}))
+            recomendaciones_count = len(diagnostico.get("recomendaciones", []))
+
+            mensaje_enriquecido = f"""🔍 DIAGNÓSTICO DE RECURSO COMPLETADO
+
+📊 RESULTADO: Diagnóstico específico del recurso '{recurso}' completado.
+
+🏷️ TIPO: {tipo_recurso}
+📍 ESTADO: {estado_detalle}
+📈 MÉTRICAS: {metricas_count} métricas analizadas
+💡 RECOMENDACIONES: {recomendaciones_count} sugeridas
+
+🎯 CONTEXTO SEMÁNTICO: Recurso '{recurso}' de tipo {tipo_recurso} se encuentra en estado {estado_detalle}. {'Se detectaron métricas de rendimiento disponibles.' if metricas_count > 0 else 'No se obtuvieron métricas específicas.'} {'Hay recomendaciones importantes para revisar.' if recomendaciones_count > 0 else 'El recurso parece estar funcionando correctamente.'}"""
+
+            diagnostico["mensaje"] = mensaje_enriquecido
 
             result = {"ok": True, **diagnostico}
             # Aplicar memoria Cosmos y memoria manual
