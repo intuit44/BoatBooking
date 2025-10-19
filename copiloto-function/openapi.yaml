@@ -3014,12 +3014,139 @@
           }
         }
       }
+    },
+    "/api/descargar-archivo": {
+      "get": {
+        "summary": "Descargar archivo desde Azure Blob Storage o sistema local",
+        "description": "Descarga archivos de forma robusta desde Azure Blob Storage o filesystem local. Soporta modo inline (texto) y base64 (binario). Detección automática de content-type.",
+        "operationId": "descargarArchivo",
+        "tags": [
+          "Azure Storage"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "ruta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Ruta del archivo a descargar"
+            },
+            "example": "scripts/test.py"
+          },
+          {
+            "name": "modo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["inline", "base64"],
+              "default": "inline",
+              "description": "Modo de descarga: inline para texto, base64 para binarios"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo descargado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "ruta": {
+                      "type": "string",
+                      "description": "Ruta del archivo descargado"
+                    },
+                    "content_type": {
+                      "type": "string",
+                      "description": "Tipo MIME del archivo"
+                    },
+                    "contenido": {
+                      "type": "string",
+                      "description": "Contenido del archivo (solo en modo inline)"
+                    },
+                    "base64": {
+                      "type": "string",
+                      "description": "Contenido codificado en base64 (solo en modo base64 o archivos binarios)"
+                    }
+                  },
+                  "required": ["exito", "ruta", "content_type"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Archivo no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "No existe"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
     {
       "name": "Azure Storage",
-      "description": "Operaciones de Azure Blob Storage"
+      "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
     },
     {
       "name": "🚀 Universal CLI Executor",

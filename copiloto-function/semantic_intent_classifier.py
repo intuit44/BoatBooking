@@ -8,6 +8,8 @@ Sin dependencia de palabras clave predefinidas
 import json
 import logging
 import numpy as np
+import hashlib
+
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime
 
@@ -20,7 +22,6 @@ def get_text_embedding(text: str) -> List[float]:
     - Sentence transformers local
     """
     # Simulación simple basada en hash para consistencia
-    import hashlib
     hash_obj = hashlib.md5(text.lower().encode())
     hash_hex = hash_obj.hexdigest()
     
