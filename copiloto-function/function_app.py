@@ -257,6 +257,10 @@ logging.info(f"WEBAPP_AVAILABLE: {WEBAPP_AVAILABLE}")
 logging.info(f"COMPUTE_AVAILABLE: {COMPUTE_AVAILABLE}")
 logging.info(f"NETWORK_AVAILABLE: {NETWORK_AVAILABLE}")
 
+# --- FunctionApp instance ---
+app = func.FunctionApp()
+sys.path.insert(0, os.path.dirname(__file__))
+
 # --- Semantic utilities ---
 try:
     from utils_semantic import render_tool_response
@@ -264,18 +268,33 @@ except ImportError:
     def render_tool_response(status_code: int, payload: dict) -> str:
         return f"Status {status_code}: {payload.get('error', 'Unknown error')}"
 
-# --- Importar endpoints modulares ---
+# --- Registrar endpoints modulares ---
 try:
-    from endpoints.msearch import msearch_http
-    logging.info("✅ Endpoint msearch cargado correctamente")
+    from msearch_endpoint import register_msearch_endpoint
+    register_msearch_endpoint(app)
+    logging.info("✅ Endpoint msearch registrado correctamente")
 except ImportError as e:
-    logging.warning(f"⚠️ No se pudo cargar endpoint msearch: {e}")
+    logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando msearch: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
 
 # --- Red, almacenamiento y otros ---
 
 # --- FunctionApp instance ---
 app = func.FunctionApp()
 sys.path.insert(0, os.path.dirname(__file__))
+
+# --- Registrar endpoints modulares DESPUÉS de crear app ---
+try:
+    from msearch_endpoint import register_msearch_endpoint
+    register_msearch_endpoint(app)
+    logging.info("✅ Endpoint msearch registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando msearch: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
 
 # 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - APLICAR ANTES DE DEFINIR ENDPOINTS
 try:
@@ -16809,6 +16828,4 @@ def historial_directo(req: func.HttpRequest) -> func.HttpResponse:
         mimetype="application/json",
         status_code=200
     )
-
-
 

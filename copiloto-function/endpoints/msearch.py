@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from function_app import app
 from utils_helpers import get_run_id
 
+
 class SemanticAnalyzer:
     """Analizador semántico para código Python"""
     
@@ -34,7 +35,7 @@ class SemanticAnalyzer:
                 "text": e.text
             })
     
-    def find_classes(self, pattern: str = None) -> List[Dict]:
+    def find_classes(self, pattern: Optional[str] = None) -> List[Dict]:
         """Detectar clases con patrón opcional"""
         classes = []
         if not self.tree:
@@ -55,7 +56,7 @@ class SemanticAnalyzer:
         
         return classes
     
-    def find_functions(self, pattern: str = None) -> List[Dict]:
+    def find_functions(self, pattern: Optional[str] = None) -> List[Dict]:
         """Detectar funciones con patrón opcional"""
         functions = []
         if not self.tree:
