@@ -9,6 +9,7 @@ import uuid
 import azure.functions as func
 from datetime import datetime
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 def is_running_in_azure() -> bool:
     """Detecta si está corriendo en Azure"""
@@ -18,7 +19,30 @@ def is_running_in_azure() -> bool:
         os.environ.get("WEBSITE_RESOURCE_GROUP")
     )
 
-def get_run_id(req: func.HttpRequest) -> str:
+# Variables globales
+IS_AZURE = is_running_in_azure()
+PROJECT_ROOT = Path("/home/site/wwwroot" if IS_AZURE else os.getcwd())
+CONTAINER_NAME = os.environ.get("AZURE_STORAGE_CONTAINER_NAME", "boat-rental-project")
+
+def get_blob_client():
+    """Obtiene cliente de Blob Storage"""
+    try:
+        from azure.storage.blob import BlobServiceClient
+        from azure.identity import DefaultAzureCredential
+        
+        connection_string = os.environ.get("AzureWebJobsStorage")
+        if connection_string:
+            return BlobServiceClient.from_connection_string(connection_string)
+        
+        account_url = os.environ.get("AZURE_STORAGE_ACCOUNT_URL")
+        if account_url:
+            return BlobServiceClient(account_url, credential=DefaultAzureCredential())
+        
+        return None
+    except Exception:
+        return None
+
+def get_run_id(req: func.HttpRequest = None) -> str:
     """Genera un ID único para la request"""
     return uuid.uuid4().hex[:8]
 
