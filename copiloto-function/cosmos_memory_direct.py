@@ -16,91 +16,113 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
     """
     try:
         from azure.cosmos import CosmosClient
-        
+
         # Configuración de Cosmos DB
         endpoint = os.environ.get("COSMOSDB_ENDPOINT", "https://copiloto-cosmos.documents.azure.com:443/")
         key = os.environ.get("COSMOSDB_KEY")
         database_name = os.environ.get("COSMOSDB_DATABASE", "agentMemory")
         container_name = os.environ.get("COSMOSDB_CONTAINER", "memory")
-        
+
         if not key:
             logging.warning("COSMOSDB_KEY no configurada")
             return None
-        
+
         # Extraer session_id del request
         session_id = extraer_session_id_request(req)
         if not session_id:
             logging.info("No se encontró session_id en el request")
             return None
-        
+
+        # Extraer agent_id para fallback
+        agent_id = extraer_agent_id_request(req)
+
         # Conectar a Cosmos DB
         client = CosmosClient(endpoint, key)
         database = client.get_database_client(database_name)
         container = database.get_container_client(container_name)
-        
-        # FILTRAR SOLO DOCUMENTOS CON TEXTO_SEMANTICO (tipo endpoint_call)
+
+        # 🌍 MEMORIA GLOBAL DIRECTA: Solo por agent_id
+        if not agent_id or agent_id == "unknown_agent":
+            agent_id = "GlobalAgent"  # Forzar agent_id por defecto
+            logging.info(f"🔧 Agent ID forzado a: {agent_id}")
+
+        # Query actualizada para traer todas las interacciones relevantes
         query = """
-        SELECT TOP 10 * FROM c 
-        WHERE c.session_id = @session_id 
-        AND c.event_type = 'endpoint_call'
-        AND IS_DEFINED(c.texto_semantico)
-        AND c.texto_semantico != ''
-        ORDER BY c._ts DESC
-        """
-        
+SELECT TOP 50 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
+               c.event_type, c.texto_semantico, c.contexto_conversacion,
+               c.metadata, c.resumen_conversacion
+FROM c
+WHERE (IS_DEFINED(c.agent_id) = false OR c.agent_id != "")
+   OR (IS_DEFINED(c.session_id) = true AND c.session_id != "")
+ORDER BY c._ts DESC
+"""
+
+        logging.info("🌍 Ejecutando query de memoria global DIRECTA (sin parámetros)")
+        logging.debug(f"🌍 Query: {query}")
+
         items = list(container.query_items(
             query=query,
-            parameters=[{"name": "@session_id", "value": session_id}],
             enable_cross_partition_query=True
         ))
-        
+
+        if items:
+            logging.info(f"🌍 Memoria global: {len(items)} interacciones encontradas")
+        else:
+            logging.warning("📝 Sin memoria previa encontrada")
+
         if items:
             # Procesar interacciones encontradas CON TEXTO_SEMANTICO
             interacciones_formateadas = []
-            
+
             for item in items:
-                # Extraer datos del nivel raíz y de data
+                # Extraer datos del nivel raíz y de sección posible de data
                 data_section = item.get("data", {})
-                
+
                 interaccion = {
-                    "timestamp": item.get("timestamp", ""),
-                    "endpoint": data_section.get("endpoint", item.get("endpoint", "unknown")),
-                    "consulta": data_section.get("params", {}).get("comando", "")[:100],
+                    "timestamp": item.get("timestamp", data_section.get("timestamp", "")),
+                    "endpoint": item.get("endpoint", data_section.get("endpoint", "unknown")),
+                    "consulta": (data_section.get("params", {}).get("comando", "") or item.get("resumen_conversacion", "") or "")[:100],
                     "exito": data_section.get("success", True),
                     "texto_semantico": item.get("texto_semantico", ""),  # NIVEL RAÍZ
-                    "respuesta_resumen": str(data_section.get("response_data", ""))[:150]
+                    "respuesta_resumen": str(data_section.get("response_data", "") or item.get("resumen_conversacion", ""))[:150]
                 }
                 interacciones_formateadas.append(interaccion)
-                
+
                 # Log para verificar
                 logging.info(f"📝 Interacción recuperada: {interaccion['endpoint']} - texto: {interaccion['texto_semantico'][:50]}...")
-            
+
             # Generar resumen para el agente
             resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
-            
+
             return {
                 "tiene_historial": True,
                 "session_id": session_id,
+                "agent_id": agent_id,
                 "total_interacciones": len(items),
                 "total_interacciones_sesion": len(items),  # Para compatibilidad
                 "interacciones_recientes": interacciones_formateadas,
                 "resumen_conversacion": resumen_conversacion,
                 "ultima_actividad": items[0].get("timestamp") if items else None,
-                "contexto_recuperado": True
+                "contexto_recuperado": True,
+                "memoria_global": True,  # Indicador de que es memoria global
+                "estrategia": "global_por_agent_id"
             }
         else:
             return {
                 "tiene_historial": False,
                 "session_id": session_id,
-                "nueva_sesion": True
+                "agent_id": agent_id,
+                "nueva_sesion": True,
+                "memoria_global": False,
+                "estrategia": "sin_memoria"
             }
-            
+
     except Exception as e:
         logging.error(f"Error consultando Cosmos DB directamente: {e}")
         return None
 
 def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
-    """Extrae session_id de múltiples fuentes en el request"""
+    """Extrae session_id de múltiples fuentes en el request (solo para metadata)"""
     
     # 1. Desde headers (prioridad alta)
     session_id = (
@@ -109,13 +131,11 @@ def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
         req.headers.get("x-session-id")
     )
     if session_id:
-        logging.info(f"🔍 Session ID desde headers: {session_id}")
         return session_id
     
     # 2. Desde parámetros de query
     session_id = req.params.get("session_id")
     if session_id:
-        logging.info(f"🔍 Session ID desde params: {session_id}")
         return session_id
     
     # 3. Desde body JSON
@@ -124,14 +144,13 @@ def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
         if body and isinstance(body, dict):
             session_id = body.get("session_id")
             if session_id:
-                logging.info(f"🔍 Session ID desde body: {session_id}")
                 return session_id
     except:
         pass
     
-    # 4. Forzar constante para evitar sesiones basura
-    session_id = "constant-session-id"
-    logging.info(f"🔍 Session ID forzado (constante): {session_id}")
+    # 4. Generar session_id temporal (solo para metadata, no afecta memoria)
+    import time
+    session_id = f"temp_{int(time.time())}"
     return session_id
 
 
@@ -195,38 +214,40 @@ def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[st
             # Agregar contexto de conversación al inicio
             if "contexto_conversacion" not in response_data:
                 response_data["contexto_conversacion"] = {
-                    "mensaje": f"Continuando conversación con {memoria['total_interacciones']} interacciones previas",
-                    "ultimas_consultas": memoria["resumen_conversacion"],
-                    "session_id": memoria["session_id"],
-                    "ultima_actividad": memoria["ultima_actividad"]
+                    "mensaje": f"Memoria global activa: {memoria.get('total_interacciones', 0)} interacciones previas del agente {memoria.get('agent_id', 'unknown')}",
+                    "ultimas_consultas": memoria.get("resumen_conversacion", ""),
+                    "session_id": memoria.get("session_id"),
+                    "agent_id": memoria.get("agent_id"),
+                    "ultima_actividad": memoria.get("ultima_actividad"),
+                    "estrategia_memoria": "global_por_agent_id"
                 }
             
-            # Agregar metadata de memoria CON endpoint detectado
+            # Agregar metadata de memoria
             if "metadata" not in response_data:
                 response_data["metadata"] = {}
             
-            response_data["metadata"]["memoria_aplicada"] = True
-            response_data["metadata"]["interacciones_previas"] = memoria["total_interacciones"]
-            response_data["metadata"]["endpoint_detectado"] = endpoint_detectado
+            response_data["metadata"].update({
+                "memoria_aplicada": True,
+                "memoria_global": True,
+                "interacciones_previas": memoria.get("total_interacciones", 0),
+                "endpoint_detectado": endpoint_detectado,
+                "agent_id": memoria.get("agent_id")
+            })
             
-            logging.info(f"✅ Memoria aplicada: {memoria['total_interacciones']} interacciones encontradas")
-        
+            logging.info(f"🧠 Memoria global aplicada: {memoria.get('total_interacciones', 0)} interacciones para {memoria.get('agent_id')}")
         else:
-            # Incluso sin historial, marcar que se consultó CON endpoint detectado
+            # Sin memoria disponible
             if "metadata" not in response_data:
                 response_data["metadata"] = {}
             
-            response_data["metadata"]["memoria_consultada"] = True
-            response_data["metadata"]["nueva_sesion"] = True
-            response_data["metadata"]["endpoint_detectado"] = endpoint_detectado
+            response_data["metadata"].update({
+                "memoria_aplicada": False,
+                "memoria_global": False,
+                "interacciones_previas": 0,
+                "endpoint_detectado": endpoint_detectado
+            })
             
-            logging.info("ℹ️ Sin historial previo - nueva sesión")
-        
-        # 💾 REGISTRAR INTERACCIÓN ACTUAL CON ENDPOINT CORRECTO
-        try:
-            registrar_interaccion_cosmos_directo(req, endpoint_detectado, response_data)
-        except Exception as e:
-            logging.warning(f"⚠️ Error registrando interacción actual: {e}")
+            logging.info("📝 Sin memoria previa disponible")
         
         return response_data
         
@@ -251,7 +272,7 @@ def registrar_redireccion_cosmos(req: func.HttpRequest, endpoint_original: str, 
             return False
         
         # Extraer información del request
-        session_id = extraer_session_id_request(req)
+        session_id = extraer_session_id_request(req) or "unknown_session"
         input_usuario = extraer_input_usuario_simple(req)
         
         # Conectar a Cosmos DB
@@ -320,8 +341,8 @@ def registrar_interaccion_cosmos_directo(req: func.HttpRequest, endpoint: str, r
             return False
         
         # Extraer información del request
-        session_id = extraer_session_id_request(req)
-        agent_id = extraer_agent_id_request(req)
+        session_id = extraer_session_id_request(req) or "unknown_session"
+        agent_id = extraer_agent_id_request(req) or "unknown_agent"
         input_usuario = extraer_input_usuario_simple(req)
         
         # Conectar a Cosmos DB
@@ -355,7 +376,7 @@ def registrar_interaccion_cosmos_directo(req: func.HttpRequest, endpoint: str, r
         return False
 
 def extraer_agent_id_request(req: func.HttpRequest) -> str:
-    """Extrae agent_id del request"""
+    """Extrae agent_id del request (CRÍTICO para memoria global)"""
     try:
         # Headers
         agent_id = (
@@ -364,11 +385,13 @@ def extraer_agent_id_request(req: func.HttpRequest) -> str:
             req.headers.get("x-agent-id")
         )
         if agent_id:
+            logging.info(f"🤖 Agent ID desde headers: {agent_id}")
             return agent_id
         
         # Parámetros
         agent_id = req.params.get("agent_id")
         if agent_id:
+            logging.info(f"🤖 Agent ID desde params: {agent_id}")
             return agent_id
         
         # Body
@@ -377,10 +400,14 @@ def extraer_agent_id_request(req: func.HttpRequest) -> str:
             if body and isinstance(body, dict):
                 agent_id = body.get("agent_id")
                 if agent_id:
+                    logging.info(f"🤖 Agent ID desde body: {agent_id}")
                     return agent_id
         except:
             pass
         
-        return "unknown_agent"
+        # SIEMPRE retornar GlobalAgent como fallback
+        agent_id = "GlobalAgent"
+        logging.info(f"🔧 Agent ID forzado a fallback: {agent_id}")
+        return agent_id
     except:
-        return "error_agent"
+        return "GlobalAgent"

@@ -1,5 +1,38 @@
 # AGENTS.md
 
+## 🧠 PROTOCOLO DE MEMORIA AUTOMÁTICA
+
+ANTES de responder cualquier consulta del usuario:
+
+1. EJECUTAR OBLIGATORIO:
+
+   ```
+   GET /api/historial-interacciones
+   Headers: Session-ID, Agent-ID: assistant
+   ```
+
+2. Si `tiene_historial: true` → usar ese contexto en la respuesta
+
+3. NUNCA decir "no tengo contexto" sin consultarlo primero
+
+## HERRAMIENTAS DISPONIBLES
+
+Usa automáticamente estas herramientas según la necesidad:
+
+* **Memoria de sesión**: GET /api/historial-interacciones  
+* **Estado del sistema**: GET /api/status
+* **Archivos**: GET /api/leer-archivo, POST /api/escribir-archivo
+* **Azure CLI**: POST /api/ejecutar-cli (acepta CUALQUIER comando)
+* **Diagnóstico**: GET /api/diagnostico-recursos
+
+## REGLAS DE ORO
+
+✅ Consultar memoria ANTES de responder  
+✅ Usar herramientas automáticamente (no preguntar)  
+✅ Respuestas en español, contextualizadas  
+❌ Nunca decir "no sé" sin consultar memoria  
+❌ Nunca mostrar JSON crudo sin procesar
+
 Este archivo define las capacidades, responsabilidades y rutas de los agentes CodeGPT utilizados en el repositorio `BoatBooking`.
 
 ## 🧠 Agentes Definidos

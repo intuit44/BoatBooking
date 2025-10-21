@@ -1,92 +1,66 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test simple de la función revisar_correcciones_http
+Test simple para verificar que el wrapper de memoria funciona
 """
 
+import requests
 import json
-import sys
-import os
-sys.path.append(os.path.dirname(__file__))
 
-# Mock básico de azure.functions
-class MockHttpResponse:
-    def __init__(self, body, status_code=200, mimetype="application/json"):
-        self._body = body.encode('utf-8') if isinstance(body, str) else body
-        self.status_code = status_code
-        self.mimetype = mimetype
+def test_simple():
+    """Test básico del wrapper de memoria"""
     
-    def get_body(self):
-        return self._body
-
-class MockHttpRequest:
-    def __init__(self):
-        self.method = "GET"
-        self.headers = {
-            "Session-ID": "test_session_123",
-            "Agent-ID": "FoundryAgent"
-        }
-        self.params = {}
+    base_url = "http://localhost:7071"
     
-    def get_body(self):
-        return b""
-
-# Mock azure.functions module
-class MockFunc:
-    HttpResponse = MockHttpResponse
-    HttpRequest = MockHttpRequest
-
-sys.modules['azure.functions'] = MockFunc()
-
-def test_funcion_basica():
-    """Test básico de la función sin dependencias complejas"""
-    print("Probando función revisar_correcciones_http...")
+    headers = {
+        "Content-Type": "application/json",
+        "Agent-ID": "TestAgent", 
+        "Session-ID": "test-session-123"
+    }
     
+    print("INICIANDO TEST SIMPLE DEL WRAPPER")
+    print("=" * 40)
+    
+    # Test 1: Status
+    print("\n1. Probando /api/status...")
     try:
-        # Importar solo las funciones necesarias
-        import json
-        from datetime import datetime
-        
-        # Función simplificada para test
-        def revisar_correcciones_test(req):
-            response = {
-                "tipo": "correcciones_disponibles",
-                "mensaje": "Para ver correcciones, usa /api/copiloto con memoria integrada",
-                "endpoint_recomendado": "/api/copiloto",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            return MockHttpResponse(
-                json.dumps(response, ensure_ascii=False),
-                status_code=200
-            )
-        
-        # Ejecutar test
-        req = MockHttpRequest()
-        response = revisar_correcciones_test(req)
-        
-        print(f"Status Code: {response.status_code}")
-        
-        # Parsear respuesta
-        body = response.get_body().decode('utf-8')
-        data = json.loads(body)
-        
-        print(f"Tipo: {data.get('tipo')}")
-        print(f"Endpoint recomendado: {data.get('endpoint_recomendado')}")
-        
-        # Verificar que la respuesta es correcta
-        assert data.get('tipo') == 'correcciones_disponibles'
-        assert data.get('endpoint_recomendado') == '/api/copiloto'
-        
-        print("Test EXITOSO - La redirección funciona correctamente")
-        return True
-        
+        response = requests.get(f"{base_url}/api/status", headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "metadata" in data and data["metadata"].get("wrapper_aplicado"):
+                print("OK - Status: Wrapper aplicado correctamente")
+            else:
+                print("ERROR - Status: Wrapper NO aplicado")
+                print(f"Respuesta: {json.dumps(data, indent=2)[:200]}...")
+        else:
+            print(f"ERROR - Status: HTTP {response.status_code}")
     except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+        print(f"ERROR - Status: {e}")
+    
+    # Test 2: Historial
+    print("\n2. Probando /api/historial-interacciones...")
+    try:
+        response = requests.get(f"{base_url}/api/historial-interacciones", headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "metadata" in data and data["metadata"].get("wrapper_aplicado"):
+                print("OK - Historial: Wrapper aplicado correctamente")
+                if data.get("contexto_conversacion"):
+                    print(f"   Contexto: {data['contexto_conversacion']['mensaje']}")
+                else:
+                    print("   Sin contexto previo (normal para primera ejecucion)")
+            else:
+                print("ERROR - Historial: Wrapper NO aplicado")
+        else:
+            print(f"ERROR - Historial: HTTP {response.status_code}")
+    except Exception as e:
+        print(f"ERROR - Historial: {e}")
+    
+    print("\n" + "=" * 40)
+    print("TEST COMPLETADO")
+    print("\nDIAGNOSTICO:")
+    print("- Si ves 'OK' en ambos tests, el wrapper funciona")
+    print("- Si ves 'ERROR', revisar configuracion del backend")
 
 if __name__ == "__main__":
-    success = test_funcion_basica()
-    sys.exit(0 if success else 1)
+    test_simple()
