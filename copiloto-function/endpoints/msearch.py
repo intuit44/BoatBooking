@@ -243,6 +243,10 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
             "campos_aceptados": ["file_path", "ruta", "path", "content", "contenido", "search_type", "tipo", "pattern", "patron"]
         }
     
+    # Manejar búsqueda en todos los archivos
+    if file_path == "*":
+        return search_all_files(search_type, pattern)
+    
     # Leer archivo si se proporciona ruta
     if file_path and not content:
         try:
@@ -312,6 +316,89 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     return results
+
+def search_all_files(search_type: str, pattern: Optional[str] = None) -> Dict[str, Any]:
+    """Buscar patrón en todos los archivos del proyecto"""
+    from utils_helpers import get_blob_client, PROJECT_ROOT, IS_AZURE, CONTAINER_NAME
+    
+    all_results = {
+        "exito": True,
+        "search_type": search_type,
+        "pattern": pattern,
+        "files_analyzed": [],
+        "matches": [],
+        "total_files": 0,
+        "files_with_matches": 0
+    }
+    
+    try:
+        if IS_AZURE:
+            client = get_blob_client()
+            if not client:
+                return {"exito": False, "error": "No se pudo conectar a Azure Blob Storage"}
+            
+            container_client = client.get_container_client(CONTAINER_NAME)
+            blobs = container_client.list_blobs()
+            
+            for blob in blobs:
+                if blob.name.endswith(('.py', '.js', '.ts', '.json', '.md', '.txt')):
+                    all_results["total_files"] += 1
+                    try:
+                        blob_client = container_client.get_blob_client(blob.name)
+                        content = blob_client.download_blob().readall().decode('utf-8')
+                        
+                        # Buscar patrón en contenido
+                        if pattern and re.search(pattern, content, re.IGNORECASE):
+                            matches = find_pattern_matches(content, pattern, blob.name)
+                            if matches:
+                                all_results["matches"].extend(matches)
+                                all_results["files_with_matches"] += 1
+                        
+                        all_results["files_analyzed"].append(blob.name)
+                        
+                    except Exception as e:
+                        logging.warning(f"Error procesando {blob.name}: {str(e)}")
+        else:
+            # Búsqueda local
+            for file_path in PROJECT_ROOT.rglob('*'):
+                if file_path.is_file() and file_path.suffix in ['.py', '.js', '.ts', '.json', '.md', '.txt']:
+                    all_results["total_files"] += 1
+                    try:
+                        content = file_path.read_text(encoding='utf-8')
+                        relative_path = str(file_path.relative_to(PROJECT_ROOT))
+                        
+                        # Buscar patrón en contenido
+                        if pattern and re.search(pattern, content, re.IGNORECASE):
+                            matches = find_pattern_matches(content, pattern, relative_path)
+                            if matches:
+                                all_results["matches"].extend(matches)
+                                all_results["files_with_matches"] += 1
+                        
+                        all_results["files_analyzed"].append(relative_path)
+                        
+                    except Exception as e:
+                        logging.warning(f"Error procesando {file_path}: {str(e)}")
+    
+    except Exception as e:
+        return {"exito": False, "error": f"Error en búsqueda global: {str(e)}"}
+    
+    return all_results
+
+def find_pattern_matches(content: str, pattern: str, file_path: str) -> List[Dict]:
+    """Encontrar coincidencias de patrón en contenido"""
+    matches = []
+    lines = content.split('\n')
+    
+    for line_num, line in enumerate(lines, 1):
+        if re.search(pattern, line, re.IGNORECASE):
+            matches.append({
+                "file": file_path,
+                "line": line_num,
+                "content": line.strip(),
+                "match": pattern
+            })
+    
+    return matches
 
 @app.function_name(name="msearch")
 @app.route(route="msearch", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)

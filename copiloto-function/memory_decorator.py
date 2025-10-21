@@ -18,25 +18,24 @@ def registrar_memoria(source: str):
             url = req.url or ""
             metodo = req.method.upper()
 
-            # 🧩 Bypass para endpoints de solo lectura
-            if any(endpoint in url for endpoint in [
-                "/api/historial-interacciones",
-                "/api/historial-directo",
-                "/api/verificar-cosmos"
-            ]):
+            # 🧩 Bypass SOLO para verificar-cosmos (mantener historial-interacciones activo)
+            if "/api/verificar-cosmos" in url:
                 logging.info(f"[wrapper] 🧩 Bypass registrar_memoria para {url}")
                 return func(req)
             
-            # === 1️⃣ Consultar contexto previo antes de ejecutar ===
+            # === 1️⃣ Consultar contexto previo GLOBAL antes de ejecutar ===
             try:
-                cosmos = CosmosMemoryStore()
-                agent_id = req.headers.get("X-Agent-Auth") or req.headers.get("Agent-ID") or "System"
-                contexto_prev = cosmos.query_all(limit=10)
-                setattr(req, "contexto_prev", contexto_prev)
-                logging.info(f"[wrapper] 🧠 Contexto previo encontrado ({len(contexto_prev)}) para agente {agent_id}")
+                from cosmos_memory_direct import consultar_memoria_cosmos_directo
+                memoria_global = consultar_memoria_cosmos_directo(req)
+                setattr(req, "memoria_global", memoria_global)
+                
+                if memoria_global and memoria_global.get("tiene_historial"):
+                    logging.info(f"[wrapper] 🌍 Memoria global: {memoria_global['total_interacciones']} interacciones para {memoria_global.get('agent_id')}")
+                else:
+                    logging.info("[wrapper] 📝 Sin memoria global previa")
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria previa: {e}")
-                setattr(req, "contexto_prev", [])
+                logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria global: {e}")
+                setattr(req, "memoria_global", None)
 
             # === 2️⃣ Ejecutar función original (con contexto disponible en req.contexto_prev) ===
             response = func(req)
@@ -62,19 +61,21 @@ def registrar_memoria(source: str):
                 except Exception:
                     output_data = {"status_code": response.status_code, "raw": True}
 
+                # 🌍 Extraer agent_id para memoria global
                 agent_id = (
-                    input_data.get("agent_name") or
-                    input_data.get("origen") or
                     req.headers.get("Agent-ID") or
-                    "System"
+                    req.headers.get("X-Agent-ID") or
+                    input_data.get("agent_id") or
+                    input_data.get("agent_name") or
+                    "GlobalAgent"
                 )
 
-                # 🧠 Generar texto semántico enriquecido (antes del guardado)
+                # 🧠 Generar texto semántico enriquecido para memoria global
                 if not output_data.get("texto_semantico", "").strip():
+                    endpoint_name = url.split('/')[-1] if '/' in url else source
                     output_data["texto_semantico"] = (
-                        f"Interacción en '{url}' ejecutada por {agent_id}. "
-                        f"Éxito: {'✅' if response.status_code == 200 else '❌'}. "
-                        f"Mensaje: {output_data.get('mensaje', 'sin mensaje')}."
+                        f"[{agent_id}] Ejecutó '{endpoint_name}' con éxito: {'✅' if response.status_code == 200 else '❌'}. "
+                        f"Respuesta: {str(output_data.get('mensaje', output_data.get('resultado', 'procesado')))[:100]}..."
                     )
 
                 # Guardar en memoria semántica
@@ -84,9 +85,9 @@ def registrar_memoria(source: str):
                     input_data=input_data,
                     output_data=output_data
                 )
-                logging.info(f"[wrapper] 💾 Interacción registrada correctamente para {source}")
+                logging.info(f"[wrapper] 💾 Interacción registrada en memoria global para agente {agent_id}")
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ Fallo al registrar interacción {source}: {e}")
+                logging.warning(f"[wrapper] ⚠️ Fallo al registrar en memoria global {source}: {e}")
 
             return response
         return wrapper

@@ -3145,7 +3145,7 @@
     "/api/msearch": {
       "post": {
         "summary": "🔍 ANÁLISIS SEMÁNTICO AVANZADO - Detección de clases, funciones, duplicados y errores lógicos",
-        "description": "⭐ ENDPOINT ROBUSTO para análisis semántico profundo de código Python. Detecta clases, funciones, imports duplicados, problemas de indentación, errores lógicos y conflictos de nombres. Acepta archivo por ruta o contenido directo. Formato dinámico sin predefiniciones rígidas.",
+        "description": "⭐ ENDPOINT ROBUSTO para análisis semántico profundo de código Python. Detecta clases, funciones, imports duplicados, problemas de indentación, errores lógicos y conflictos de nombres. Acepta archivo por ruta o contenido directo. ✨ BÚSQUEDA GLOBAL: Usar file_path='*' para buscar patrones en todos los archivos del proyecto. Formato dinámico sin predefiniciones rígidas.",
         "operationId": "msearch",
         "tags": [
           "🔍 Análisis Semántico"
@@ -3160,7 +3160,7 @@
                 "properties": {
                   "file_path": {
                     "type": "string",
-                    "description": "Ruta del archivo a analizar (Azure Blob o local)",
+                    "description": "Ruta del archivo a analizar (Azure Blob o local). Usar '*' para búsqueda global en todos los archivos del proyecto.",
                     "example": "function_app.py"
                   },
                   "ruta": {
@@ -3215,6 +3215,11 @@
                     "search_type": "all"
                   },
                   {
+                    "file_path": "*",
+                    "search_type": "all",
+                    "pattern": "memoria.*10|interacciones.*19"
+                  },
+                  {
                     "content": "class MyClass:\n    def method(self):\n        pass",
                     "search_type": "classes"
                   },
@@ -3230,7 +3235,7 @@
         },
         "responses": {
           "200": {
-            "description": "Análisis semántico completado exitosamente",
+            "description": "Análisis semántico completado exitosamente. Para búsqueda global (file_path='*'), retorna coincidencias de patrón en todos los archivos.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3252,8 +3257,49 @@
                       "type": "string",
                       "description": "Patrón utilizado para filtrar"
                     },
+                    "matches": {
+                      "type": "array",
+                      "description": "Coincidencias encontradas (solo para búsqueda global con file_path='*')",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "file": {
+                            "type": "string",
+                            "description": "Archivo donde se encontró la coincidencia"
+                          },
+                          "line": {
+                            "type": "integer",
+                            "description": "Número de línea"
+                          },
+                          "content": {
+                            "type": "string",
+                            "description": "Contenido de la línea"
+                          },
+                          "match": {
+                            "type": "string",
+                            "description": "Patrón que coincidió"
+                          }
+                        }
+                      }
+                    },
+                    "files_analyzed": {
+                      "type": "array",
+                      "description": "Lista de archivos analizados (solo para búsqueda global)",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "total_files": {
+                      "type": "integer",
+                      "description": "Total de archivos analizados (solo para búsqueda global)"
+                    },
+                    "files_with_matches": {
+                      "type": "integer",
+                      "description": "Archivos que contienen coincidencias (solo para búsqueda global)"
+                    },
                     "results": {
                       "type": "object",
+                      "description": "Resultados de análisis semántico (solo para archivos individuales)",
                       "properties": {
                         "classes": {
                           "type": "array",

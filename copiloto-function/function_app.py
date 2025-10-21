@@ -3753,7 +3753,8 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         logging.info(f"🧠 historial_interacciones: {memoria_previa['total_interacciones']} interacciones encontradas")
         # Debug: verificar estructura de memoria_previa
         if memoria_previa.get("interacciones_recientes"):
-            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {}
+            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {
+            }
             logging.info(f"   Primera interacción keys: {list(primera.keys())}")
             if "texto_semantico" in primera:
                 logging.info(f"   Texto semántico encontrado: '{primera['texto_semantico'][:50]}...'")
@@ -3832,7 +3833,8 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     
     try:
         limit = int(req.params.get("limit", "10"))
-        session_id = req.params.get("session_id")
+        # ✅ CORRECCIÓN: Obtener session_id desde headers primero, luego params
+        session_id = req.headers.get("Session-ID") or req.params.get("session_id")
         
         if not memoria_previa or not memoria_previa.get("tiene_historial"):
             response_data = {
