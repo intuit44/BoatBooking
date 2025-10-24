@@ -1,0 +1,101 @@
+{
+    "exito": true,
+    "status_code": 200,
+    "data": {
+        "timestamp": "2025-10-23T06:01:43.889594",
+        "ambiente": "Azure",
+        "recursos": {
+            "function_app": {
+                "nombre": "copiloto-semantico-func-us2",
+                "estado": "NotFound",
+                "error": "Function App 'copiloto-semantico-func-us2' no encontrada en 'boat-rental-app-group'"
+            },
+            "storage_account": {
+                "nombre": "boatrentalstorage",
+                "estado": "NotFound",
+                "error": "Storage Account 'boatrentalstorage' no encontrado"
+            },
+            "storage_stats": {
+                "contenedores": 35,
+                "total_blobs": 1286,
+                "contenedor_principal": "boat-rental-project"
+            }
+        },
+        "metricas": {
+            "cache": {
+                "archivos_en_cache": 0,
+                "memoria_cache_bytes": 0
+            }
+        },
+        "alertas": [],
+        "recomendaciones": [
+            {
+                "nivel": "critico",
+                "mensaje": "La Function App no está en estado Running",
+                "accion": "Verificar configuración y reiniciar si es necesario"
+            }
+        ],
+        "modo": "general",
+        "function_app": "copiloto-semantico-func-us2",
+        "checks": {
+            "configuracion": {
+                "blob_storage": true,
+                "openai_configurado": false,
+                "app_insights": true,
+                "ambiente": "Azure"
+            },
+            "blob_storage_detalles": {
+                "conectado": true,
+                "container": "boat-rental-project",
+                "archivos": 1006
+            }
+        },
+        "optimizado": true,
+        "sistema": {
+            "cache_archivos": 0,
+            "memoria_cache_kb": 0,
+            "endpoints_activos": [
+                "/api/crear-contenedor",
+                "/api/ejecutar-cli",
+                "/api/diagnostico-recursos"
+            ],
+            "sdk_habilitado": true,
+            "cli_habilitado": false
+        },
+        "mensaje": "DIAGNOSTICO DE RECURSOS COMPLETADO\n\nRESULTADO: Diagnostico general del sistema completado exitosamente.\n\nAMBIENTE: Azure\nCACHE: 0 archivos (0 KB)\nSTORAGE: 35 contenedores, 1286 blobs totales\nALERTAS: 0 detectadas\nRECOMENDACIONES: 1 sugeridas\n\nCONTEXTO SEMANTICO: Sistema operativo en Azure. Cache activo con 0 archivos. Storage conectado con 1286 archivos distribuidos en 35 contenedores. Sistema funcionando normalmente.",
+        "metadata": {
+            "memoria_aplicada": false,
+            "memoria_global": false,
+            "interacciones_previas": 0,
+            "endpoint_detectado": "diagnostico_recursos_completo",
+            "memoria_error": "HTTP request does not contain valid JSON data",
+            "wrapper_aplicado": true,
+            "nueva_sesion": true
+        }
+    },
+    "endpoint": "/api/diagnostico-recursos-completo",
+    "method": "GET",
+    "mensaje": "✅ Endpoint /api/diagnostico-recursos-completo respondió correctamente",
+    "metadata": {
+        "timestamp": "2025-10-23T02:01:45.941848",
+        "modo": "normal",
+        "intencion_procesada": "diagnosticar:completo",
+        "procesador": "semantico",
+        "ambiente": "Azure",
+        "copiloto_version": "2.0-orchestrator-extendido",
+        "session_info": {
+            "session_id": "unknown",
+            "agent_id": "unknown"
+        },
+        "memoria_disponible": true,
+        "wrapper_aplicado": true,
+        "memoria_aplicada": true,
+        "interacciones_previas": 50
+    },
+    "contexto_conversacion": {
+        "mensaje": "Continuando conversación con 50 interacciones previas",
+        "ultimas_consultas": "1. [06:00] Consulta en unknown\\n2. [06:00] Consulta en unknown\\n3. [05:56] Consulta en unknown\\n4. [05:56] Consulta en unknown\\n5. [05:56] Consulta en unknown",
+        "session_id": "temp_1761199302",
+        "ultima_actividad": "2025-10-23T06:00:06.693811"
+    }
+}

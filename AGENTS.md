@@ -6,6 +6,24 @@ ANTES de responder cualquier consulta del usuario:
 
 1. EJECUTAR OBLIGATORIO:
 
+```json
+"pre_conversation_hooks": [
+   {
+      "name": "consultar_memoria_semantica",
+      "endpoint": "https://copiloto-semantico-func-us2.azurewebsites.net/api/historial-interacciones",
+      "method": "GET",
+      "headers": {
+         "Session-ID": "{{session_id}}",
+         "Agent-ID": "{{agent_id}}",
+         "Content-Type": "application/json"
+      },
+      "timeout_ms": 8000,
+      "inject_into_context": true,
+      "required": true
+   }
+]
+```
+
    ```
    GET /api/historial-interacciones
    Headers: Session-ID, Agent-ID: assistant
