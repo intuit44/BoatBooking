@@ -114,7 +114,7 @@
                       type: array
                       items:
                         type: string
-                      example: ["boat-rental-app-group", "boat-rental-rg", "DefaultResourceGroup-EUS2"]
+                      example: ["boat-rental-app-group", "boat-rental-app-group", "DefaultResourceGroup-EUS2"]
                       description: "Valores comunes para este argumento"
                   required:
                     - argumento_faltante

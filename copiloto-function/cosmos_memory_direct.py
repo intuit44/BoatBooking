@@ -6,9 +6,12 @@ Reemplaza las funciones que no consultan realmente la base de datos
 
 import logging
 import os
+import azure.functions as func
+
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-import azure.functions as func
+from opentelemetry import metrics, trace
+
 
 def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str, Any]]:
     """
@@ -65,6 +68,26 @@ ORDER BY c._ts DESC
             enable_cross_partition_query=True
         ))
 
+        # LOG de aplicación (aparece en 'traces' table)
+        logging.info("historial-interacciones: memoria_global_aplicada count=%d", len(items))
+
+        # MÉTRICA personalizada como log (AI la convierte en customMetrics)
+        try:
+            logging.info(
+                f"customMetric|name=historial_interacciones_hits;value=1;agent_id={agent_id};endpoint=historial_interacciones"
+            )
+        except Exception as _:
+            pass
+
+        # TRACE manual (aparece en 'traces' con span)
+        try:
+            tracer = trace.get_tracer("copiloto.memory")
+            with tracer.start_as_current_span("consultar_memoria_cosmos_directo") as span:
+                span.set_attribute("items_encontrados", len(items))
+                span.set_attribute("agent_id", agent_id or "unknown")
+        except Exception as _:
+            pass
+
         if items:
             logging.info(f"🌍 Memoria global: {len(items)} interacciones encontradas")
         else:
@@ -93,6 +116,9 @@ ORDER BY c._ts DESC
 
             # Generar resumen para el agente
             resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
+
+            # Dejar registro local adicional justo antes del return para verificar emisión
+            logging.info("✅ customMetric|name=historial_interacciones_hits;value=1;agent_id=%s;endpoint=historial_interacciones", agent_id)
 
             return {
                 "tiene_historial": True,

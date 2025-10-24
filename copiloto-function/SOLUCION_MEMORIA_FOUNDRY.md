@@ -12,6 +12,7 @@ El agente en Foundry **NO está usando automáticamente** el endpoint `/api/hist
 ## 🔍 DIAGNÓSTICO COMPLETO
 
 ### Endpoints Encontrados (50+ endpoints activos)
+
 ```bash
 # Endpoints principales con memoria automática:
 /api/historial-interacciones  ✅ Memoria integrada
@@ -23,6 +24,7 @@ El agente en Foundry **NO está usando automáticamente** el endpoint `/api/hist
 ```
 
 ### Wrapper de Memoria
+
 ```python
 # ✅ CONFIRMADO: Aplicado correctamente en function_app.py línea 303
 from memory_route_wrapper import apply_memory_wrapper
@@ -31,6 +33,7 @@ logging.info("✅ WRAPPER AUTOMÁTICO APLICADO - Todos los @app.route() tendrán
 ```
 
 ### OpenAPI Specification
+
 ```yaml
 # ✅ CONFIRMADO: /api/historial-interacciones está en openapi.yaml
 "/api/historial-interacciones": {
@@ -46,6 +49,7 @@ logging.info("✅ WRAPPER AUTOMÁTICO APLICADO - Todos los @app.route() tendrán
 ## 🚀 SOLUCIONES IMPLEMENTADAS
 
 ### 1. Test de Verificación
+
 ```python
 # Archivo: test_memory_wrapper.py
 # Ejecutar: python test_memory_wrapper.py
@@ -53,6 +57,7 @@ logging.info("✅ WRAPPER AUTOMÁTICO APLICADO - Todos los @app.route() tendrán
 ```
 
 ### 2. Endpoint de Diagnóstico
+
 ```bash
 # Probar wrapper específico:
 curl -X GET "http://localhost:7071/api/test-wrapper-memoria" \
@@ -71,6 +76,7 @@ curl -X GET "http://localhost:7071/api/test-wrapper-memoria" \
 ## 🔧 CONFIGURACIÓN REQUERIDA EN FOUNDRY
 
 ### Headers Obligatorios
+
 ```json
 {
   "Session-ID": "session_constante_001",
@@ -79,6 +85,7 @@ curl -X GET "http://localhost:7071/api/test-wrapper-memoria" \
 ```
 
 ### Flujo Recomendado
+
 ```
 1. Foundry inicia conversación
 2. AUTOMÁTICAMENTE llama GET /api/historial-interacciones
@@ -87,6 +94,7 @@ curl -X GET "http://localhost:7071/api/test-wrapper-memoria" \
 ```
 
 ### Ejemplo de Configuración
+
 ```json
 {
   "pre_conversation_hooks": [
@@ -105,6 +113,7 @@ curl -X GET "http://localhost:7071/api/test-wrapper-memoria" \
 ## 🧪 TESTS DE VALIDACIÓN
 
 ### Test 1: Wrapper Funcionando
+
 ```bash
 # Resultado esperado: wrapper_aplicado: true
 curl -X GET "http://localhost:7071/api/status" \
@@ -113,6 +122,7 @@ curl -X GET "http://localhost:7071/api/status" \
 ```
 
 ### Test 2: Memoria Funcionando
+
 ```bash
 # Resultado esperado: interacciones registradas
 curl -X GET "http://localhost:7071/api/historial-interacciones" \
@@ -121,6 +131,7 @@ curl -X GET "http://localhost:7071/api/historial-interacciones" \
 ```
 
 ### Test 3: Flujo Completo
+
 ```bash
 # 1. Hacer una consulta
 curl -X POST "http://localhost:7071/api/copiloto" \
@@ -153,6 +164,7 @@ curl -X GET "http://localhost:7071/api/historial-interacciones" \
 ## 📞 SOPORTE
 
 Si necesitas ayuda configurando Foundry:
+
 1. Ejecuta `python test_memory_wrapper.py` para verificar el backend
 2. Revisa los logs de Foundry para ver si está llamando al endpoint
 3. Verifica que los headers se están enviando correctamente
