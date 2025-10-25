@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "3.2",
+    "version": "3.4",
     "description": "Sistema completo con memoria automática integrada, consulta previa y guardado automático de interacciones en Cosmos DB",
     "license": {
       "name": "MIT",
@@ -3041,7 +3041,10 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["inline", "base64"],
+              "enum": [
+                "inline",
+                "base64"
+              ],
               "default": "inline",
               "description": "Modo de descarga: inline para texto, base64 para binarios"
             }
@@ -3076,7 +3079,11 @@
                       "description": "Contenido codificado en base64 (solo en modo base64 o archivos binarios)"
                     }
                   },
-                  "required": ["exito", "ruta", "content_type"]
+                  "required": [
+                    "exito",
+                    "ruta",
+                    "content_type"
+                  ]
                 }
               }
             }

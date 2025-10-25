@@ -903,7 +903,7 @@ def get_blob_client():
 
 
 def leer_archivo_blob(ruta: str) -> dict:
-    """Lee un archivo desde Azure Blob Storage con mejor manejo de errores"""
+    """Lee un archivo desde Azure Blob Storage con búsqueda robusta"""
     try:
         client = get_blob_client()
         if not client:
@@ -913,42 +913,68 @@ def leer_archivo_blob(ruta: str) -> dict:
                 "detalles": "El cliente de Blob Storage no se pudo inicializar"
             }
 
-        # Normalizar la ruta (quitar barras iniciales)
-        ruta_normalizada = ruta.replace('\\', '/').lstrip('/')
-
         container_client = client.get_container_client(CONTAINER_NAME)
-        blob_client = container_client.get_blob_client(ruta_normalizada)
+        
+        # Normalizar y generar múltiples rutas candidatas
+        clean_path = ruta.replace('\\', '/').lstrip('/')
+        
+        # Remover prefijos redundantes del contenedor
+        if clean_path.startswith(f"{CONTAINER_NAME}/"):
+            clean_path = clean_path[len(CONTAINER_NAME)+1:]
+        elif clean_path.startswith("boat-rental-project/"):
+            clean_path = clean_path[len("boat-rental-project")+1:]
+        
+        # Lista de rutas a probar
+        rutas_candidatas = [
+            clean_path,
+            clean_path.lstrip('/'),
+            ruta.replace('\\', '/').lstrip('/'),
+        ]
+        
+        # Remover duplicados
+        rutas_candidatas = list(dict.fromkeys(rutas_candidatas))
+        
+        for ruta_candidata in rutas_candidatas:
+            try:
+                blob_client = container_client.get_blob_client(ruta_candidata)
+                
+                if blob_client.exists():
+                    # Descargar el contenido
+                    download_stream = blob_client.download_blob()
+                    contenido = download_stream.readall().decode('utf-8')
 
-        # Verificar si el blob existe
-        if not blob_client.exists():
-            # Intentar listar blobs similares
-            blobs_similares = []
+                    return {
+                        "exito": True,
+                        "contenido": contenido,
+                        "ruta": f"blob://{CONTAINER_NAME}/{ruta_candidata}",
+                        "tamaño": len(contenido),
+                        "fuente": "Azure Blob Storage",
+                        "metadata": {
+                            "last_modified": str(blob_client.get_blob_properties().last_modified),
+                            "content_type": blob_client.get_blob_properties().content_settings.content_type,
+                            "ruta_encontrada": ruta_candidata
+                        }
+                    }
+            except Exception:
+                continue
+        
+        # Si no se encontró, buscar blobs similares
+        blobs_similares = []
+        try:
             for blob in container_client.list_blobs():
-                if ruta_normalizada.lower() in blob.name.lower():
+                if any(parte in blob.name.lower() for parte in clean_path.lower().split('/')):
                     blobs_similares.append(blob.name)
-
-            return {
-                "exito": False,
-                "error": f"Archivo no encontrado en Blob: {ruta_normalizada}",
-                "sugerencias": blobs_similares[:5] if blobs_similares else [],
-                "total_similares": len(blobs_similares)
-            }
-
-        # Descargar el contenido
-        download_stream = blob_client.download_blob()
-        contenido = download_stream.readall().decode('utf-8')
+        except Exception:
+            pass
 
         return {
-            "exito": True,
-            "contenido": contenido,
-            "ruta": f"blob://{CONTAINER_NAME}/{ruta_normalizada}",
-            "tamaño": len(contenido),
-            "fuente": "Azure Blob Storage",
-            "metadata": {
-                "last_modified": str(blob_client.get_blob_properties().last_modified),
-                "content_type": blob_client.get_blob_properties().content_settings.content_type
-            }
+            "exito": False,
+            "error": f"Archivo no encontrado en Blob: {clean_path}",
+            "rutas_intentadas": rutas_candidatas,
+            "sugerencias": blobs_similares[:5] if blobs_similares else [],
+            "total_similares": len(blobs_similares)
         }
+        
     except Exception as e:
         return {
             "exito": False,
@@ -1471,7 +1497,6 @@ except ImportError:
 
 @app.function_name(name="leer_archivo_http")
 @app.route(route="leer-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-
 def leer_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     """
     Endpoint mejorado para lectura de archivos con búsqueda inteligente
@@ -1591,7 +1616,25 @@ def detect_request_type(path: str) -> str:
 
 
 def handle_api_function_request_dict(path: str, run_id: str) -> dict:
-    """Versión que devuelve diccionario para integración de memoria"""
+    """Versión que devuelve diccionario para integración de memoria con soporte para Blob Storage"""
+    
+    blob_result = None
+    # Intentar leer function_app.py desde Blob Storage primero si estamos en Azure
+    if IS_AZURE:
+        blob_result = leer_archivo_blob("function_app.py")
+        if blob_result["exito"]:
+            return {
+                "exito": True,
+                "contenido": blob_result["contenido"],
+                "tipo": "python",
+                "ruta": blob_result["ruta"],
+                "fuente": blob_result["fuente"],
+                "mensaje": f"Código de función API desde Blob: {path}",
+                "run_id": run_id,
+                "metadata": blob_result.get("metadata", {})
+            }
+    
+    # Fallback a lectura local
     try:
         with open("function_app.py", "r", encoding="utf-8") as f:
             contenido = f.read()
@@ -1600,20 +1643,44 @@ def handle_api_function_request_dict(path: str, run_id: str) -> dict:
             "contenido": contenido,
             "tipo": "python",
             "ruta": "function_app.py",
+            "fuente": "Sistema Local",
             "mensaje": f"Código de función API: {path}",
             "run_id": run_id
         }
     except Exception as e:
+        error_msg = f"No se pudo leer función API: {path}"
+        if IS_AZURE and blob_result:
+            blob_error = blob_result.get("error", "Error en Blob")
+            error_msg += f" (Blob: {blob_error}, Local: {str(e)})"
+            
         return {
             "exito": False,
-            "error": str(e),
-            "mensaje": f"No se pudo leer función API: {path}",
+            "error": error_msg,
+            "mensaje": error_msg,
             "run_id": run_id
         }
 
 
 def handle_special_path_request_dict(path: str, run_id: str) -> dict:
-    """Versión que devuelve diccionario para integración de memoria"""
+    """Versión que devuelve diccionario para integración de memoria con soporte para Blob Storage"""
+    
+    blob_result = None
+    # Intentar leer desde Blob Storage primero si estamos en Azure
+    if IS_AZURE:
+        blob_result = leer_archivo_blob(path)
+        if blob_result["exito"]:
+            return {
+                "exito": True,
+                "contenido": blob_result["contenido"],
+                "tipo": "text",
+                "ruta": blob_result["ruta"],
+                "fuente": blob_result["fuente"],
+                "mensaje": f"Archivo especial leído desde Blob: {path}",
+                "run_id": run_id,
+                "metadata": blob_result.get("metadata", {})
+            }
+    
+    # Fallback a lectura local
     try:
         with open(path, "r", encoding="utf-8") as f:
             contenido = f.read()
@@ -1622,21 +1689,49 @@ def handle_special_path_request_dict(path: str, run_id: str) -> dict:
             "contenido": contenido,
             "tipo": "text",
             "ruta": path,
+            "fuente": "Sistema Local",
             "mensaje": f"Archivo especial leído: {path}",
             "run_id": run_id
         }
     except Exception as e:
+        error_msg = f"No se pudo leer archivo especial: {path}"
+        if IS_AZURE and blob_result:
+            blob_error = blob_result.get("error", "Error en Blob")
+            error_msg += f" (Blob: {blob_error}, Local: {str(e)})"
+        
         return {
             "exito": False,
-            "error": str(e),
-            "mensaje": f"No se pudo leer archivo especial: {path}",
+            "error": error_msg,
+            "mensaje": error_msg,
             "run_id": run_id
         }
 
 
 def handle_file_request_dict(params: dict, run_id: str) -> dict:
-    """Versión que devuelve diccionario para integración de memoria"""
+    """Versión que devuelve diccionario para integración de memoria con soporte para Blob Storage"""
     ruta = params["ruta_raw"]
+    
+    blob_result = None
+    # Intentar leer desde Blob Storage primero si estamos en Azure
+    if IS_AZURE:
+        blob_result = leer_archivo_blob(ruta)
+        if blob_result["exito"]:
+            return {
+                "exito": True,
+                "contenido": blob_result["contenido"],
+                "tipo": "markdown" if ruta.endswith(".md") else "text",
+                "ruta": blob_result["ruta"],
+                "tamaño": blob_result["tamaño"],
+                "fuente": blob_result["fuente"],
+                "mensaje": f"Archivo leído desde Blob Storage: {ruta}",
+                "run_id": run_id,
+                "metadata": blob_result.get("metadata", {})
+            }
+        else:
+            # Si falla Blob, intentar local como fallback
+            logging.info(f"Blob Storage falló para {ruta}, intentando local...")
+    
+    # Intentar lectura local
     try:
         with open(ruta, "r", encoding="utf-8") as f:
             contenido = f.read()
@@ -1649,15 +1744,30 @@ def handle_file_request_dict(params: dict, run_id: str) -> dict:
             "tipo": tipo,
             "ruta": ruta,
             "tamaño": len(contenido),
+            "fuente": "Sistema Local",
             "mensaje": f"Archivo leído exitosamente: {ruta}",
             "run_id": run_id
         }
     except Exception as e:
+        # Si ambos fallan, devolver error con información de ambos intentos
+        error_msg = f"No se pudo leer archivo: {ruta}"
+        if IS_AZURE and blob_result:
+            blob_error = blob_result.get("error", "Error desconocido en Blob")
+            error_msg += f" (Blob: {blob_error}, Local: {str(e)})"
+        else:
+            error_msg += f" (Local: {str(e)})"
+            
         return {
             "exito": False,
-            "error": str(e),
-            "mensaje": f"No se pudo leer archivo: {ruta}",
-            "run_id": run_id
+            "error": error_msg,
+            "mensaje": error_msg,
+            "run_id": run_id,
+            "intentos": ["blob_storage" if IS_AZURE else None, "local_filesystem"],
+            "sugerencias": [
+                "Verificar que el archivo existe en Azure Blob Storage",
+                "Confirmar la ruta del archivo",
+                "Usar /api/listar-blobs para ver archivos disponibles"
+            ]
         }
 
 
@@ -1822,7 +1932,14 @@ def smart_file_search(path: str, container: str, run_id: str) -> Dict[str, Any]:
     normalized_path = normalize_path(path)
     file_name = Path(path).name
 
-    # === ESTRATEGIA 1: BÚSQUEDA LOCAL ===
+    # === ESTRATEGIA 1: BÚSQUEDA EN BLOB STORAGE PRIMERO (si estamos en Azure) ===
+    if IS_AZURE:
+        blob_result = search_in_blob_storage(
+            container, normalized_path, attempts, run_id)
+        if blob_result["found"]:
+            return blob_result
+
+    # === ESTRATEGIA 2: BÚSQUEDA LOCAL ===
     local_search_paths = generate_local_search_paths(
         path, normalized_path, file_name)
 
@@ -1842,12 +1959,6 @@ def smart_file_search(path: str, container: str, run_id: str) -> Dict[str, Any]:
                 }
             except Exception as e:
                 logging.warning(f"[{run_id}] Error leyendo {search_path}: {e}")
-
-    # === ESTRATEGIA 2: BÚSQUEDA EN BLOB STORAGE ===
-    blob_result = search_in_blob_storage(
-        container, normalized_path, attempts, run_id)
-    if blob_result["found"]:
-        return blob_result
 
     # === ESTRATEGIA 3: BÚSQUEDA FUZZY ===
     fuzzy_result = fuzzy_file_search(file_name, path, attempts, run_id)
@@ -1896,7 +2007,7 @@ def generate_local_search_paths(path: str, normalized: str, filename: str) -> Li
 
 
 def search_in_blob_storage(container: str, path: str, attempts: List[str], run_id: str) -> Dict[str, Any]:
-    """Busca archivo en Azure Blob Storage"""
+    """Busca archivo en Azure Blob Storage con múltiples estrategias robustas"""
 
     try:
         client = get_blob_client()
@@ -1909,32 +2020,54 @@ def search_in_blob_storage(container: str, path: str, attempts: List[str], run_i
             attempts.append(f"blob:container_not_found:{container}")
             return {"found": False}
 
-        # Intentar ruta directa
-        bc = cc.get_blob_client(path)
-        attempts.append(f"blob:{container}/{path}")
+        # Normalizar path removiendo prefijos redundantes del contenedor
+        clean_path = path
+        if path.startswith(f"{container}/"):
+            clean_path = path[len(container)+1:]
+        elif path.startswith("boat-rental-project/"):
+            clean_path = path[len("boat-rental-project")+1:]
 
-        if bc.exists():
-            content = bc.download_blob().readall()
+        # Lista robusta de rutas a intentar
+        paths_to_try = [
+            clean_path,  # Ruta limpia sin prefijos
+            clean_path.lstrip('/'),  # Sin barra inicial
+            path,  # Ruta original por si acaso
+            path.lstrip('/'),  # Ruta original sin barra
+        ]
+        
+        # Remover duplicados manteniendo orden
+        paths_to_try = list(dict.fromkeys(paths_to_try))
+
+        for try_path in paths_to_try:
             try:
-                text_content = content.decode("utf-8")
-                return {
-                    "found": True,
-                    "path": f"blob://{container}/{path}",
-                    "content": text_content,
-                    "source": "blob",
-                    "attempts": attempts,
-                    "strategy": "blob_direct"
-                }
-            except UnicodeDecodeError:
-                # Es un archivo binario
-                return {
-                    "found": True,
-                    "path": f"blob://{container}/{path}",
-                    "content": base64.b64encode(content).decode("utf-8"),
-                    "source": "blob_binary",
-                    "attempts": attempts,
-                    "strategy": "blob_binary"
-                }
+                bc = cc.get_blob_client(try_path)
+                attempts.append(f"blob:{container}/{try_path}")
+
+                if bc.exists():
+                    content = bc.download_blob().readall()
+                    try:
+                        text_content = content.decode("utf-8")
+                        return {
+                            "found": True,
+                            "path": f"blob://{container}/{try_path}",
+                            "content": text_content,
+                            "source": "blob",
+                            "attempts": attempts,
+                            "strategy": "blob_direct"
+                        }
+                    except UnicodeDecodeError:
+                        # Es un archivo binario
+                        return {
+                            "found": True,
+                            "path": f"blob://{container}/{try_path}",
+                            "content": base64.b64encode(content).decode("utf-8"),
+                            "source": "blob_binary",
+                            "attempts": attempts,
+                            "strategy": "blob_binary"
+                        }
+            except Exception as e:
+                logging.debug(f"[{run_id}] Ruta {try_path} no encontrada: {e}")
+                continue
 
     except Exception as e:
         logging.warning(f"[{run_id}] Error en blob storage: {e}")
@@ -7623,17 +7756,20 @@ def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
             # PASO 3: Reparación específica de f-strings (solo para Python)
             if ruta.endswith('.py'):
                 
-                # Reparar f-strings con comillas anidadas problemáticas
+                # Reparar f-strings con comillas anidadas problemáticas usando método seguro
                 if "f'" in contenido and "[" in contenido and "'" in contenido:
-                    # Patrón específico: f'{variable['key']}' 
-                    problematic_pattern = r"f'([^']*\{[^}]*\[[^\]]*'[^\]]*'[^\]]*\][^}]*)\}[^']*)'" 
-                    matches = re.findall(problematic_pattern, contenido)
+                    # Método seguro: buscar y reemplazar patrones específicos sin regex compleja
+                    lines = contenido.split('\n')
+                    fixed_lines = []
                     
-                    for match in matches:
-                        # Reemplazar comillas simples internas con comillas dobles
-                        fixed_match = re.sub(r"\[([^\]]*)'([^']*)'([^\]]*)\]", r'[\1"\2"\3]', match)
-                        contenido = contenido.replace(match, fixed_match)
-                        advertencias.append(f"🔧 F-string reparada: comillas internas convertidas")
+                    for line in lines:
+                        if "f'" in line and "['" in line and "']" in line:
+                            # Reemplazar memoria['key'] con memoria["key"] dentro de f-strings
+                            line = re.sub(r"(f'[^']*)(\w+)\['([^']+)'\]([^']*')", r"\1\2[\"\3\"]\4", line)
+                            advertencias.append(f"🔧 F-string reparada: comillas internas convertidas")
+                        fixed_lines.append(line)
+                    
+                    contenido = '\n'.join(fixed_lines)
                 
                 # Reparar patrón específico memoria['key'] dentro de f-strings
                 if "memoria[" in contenido and "f'" in contenido:
