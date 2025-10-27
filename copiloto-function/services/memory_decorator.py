@@ -255,6 +255,7 @@ def registrar_memoria(source_name: str):
                 except Exception as e:
                     logging.warning(f"⚠️ Error obteniendo contexto semántico: {e}")
                     contexto_semantico = {"error": str(e)}
+
                 
                 # INYECTAR CONTEXTO EN REQUEST PARA USO DEL ENDPOINT
                 if hasattr(req, '__dict__'):
