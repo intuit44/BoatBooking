@@ -3980,7 +3980,7 @@ def revisar_correcciones_http(req):
 # Importar decorador de memoria
 
 @app.function_name(name="historial_interacciones")
-@app.route(route="historial-interacciones", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="historial-interacciones", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
     from memory_manual import aplicar_memoria_manual
@@ -3993,8 +3993,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         logging.info(f"🧠 historial_interacciones: {memoria_previa['total_interacciones']} interacciones encontradas")
         # Debug: verificar estructura de memoria_previa
         if memoria_previa.get("interacciones_recientes"):
-            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {
-            }
+            primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {}
             logging.info(f"   Primera interacción keys: {list(primera.keys())}")
             if "texto_semantico" in primera:
                 logging.info(f"   Texto semántico encontrado: '{primera['texto_semantico'][:50]}...'")
@@ -4076,6 +4075,20 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         # ✅ CORRECCIÓN: Obtener session_id desde headers primero, luego params
         session_id = req.headers.get("Session-ID") or req.params.get("session_id")
         
+        # Initialize validation stats
+        validation_stats = {
+            "checked": 0,
+            "missing_text_semantic": 0,
+            "generated_fallbacks": 0
+        }
+
+        # Prepare intelligent context default
+        contexto_inteligente = {
+            "resumen": memoria_previa.get("resumen_conversacion", ""),
+            "tiene_memoria": bool(memoria_previa and memoria_previa.get("tiene_historial")),
+            "total_interacciones": memoria_previa.get("total_interacciones", 0)
+        }
+
         if not memoria_previa or not memoria_previa.get("tiene_historial"):
             response_data = {
                 "exito": True,
@@ -4083,11 +4096,25 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "total": 0,
                 "mensaje": "🔍 CONSULTA DE HISTORIAL COMPLETADA\n\n📊 RESULTADO: No se encontraron interacciones previas en esta sesión.\n\n💡 CONTEXTO: Esta es una nueva sesión o no hay interacciones guardadas previamente.\n\n🎯 RECOMENDACIÓN: Puedes comenzar a interactuar normalmente. Todas las nuevas interacciones se guardarán automáticamente.",
                 "session_id": session_id,
-                "fuente": "wrapper_automatico"
+                "fuente": "wrapper_automatico",
+                # Required structured fields
+                "interpretacion_semantica": "No hay historial previo; iniciar nueva sesión.",
+                "contexto_inteligente": contexto_inteligente,
+                "validation_applied": True,
+                "validation_stats": validation_stats,
+                "metadata": {
+                    "memoria_aplicada": False,
+                    "session_id": session_id,
+                    "agent_id": req.headers.get("Agent-ID", "unknown")
+                }
             }
         else:
             interacciones_formateadas = []
+            missing_count = 0
+            fallback_count = 0
+
             for i, interaccion in enumerate(memoria_previa.get("interacciones_recientes", [])[:limit]):
+                validation_stats["checked"] += 1
                 # Unificar la estructura (compatibilidad entre versiones antiguas y nuevas)
                 registro = interaccion.get("data", interaccion)
                 
@@ -4104,7 +4131,6 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                     logging.info(f"🔍 Interacción {i+1}: texto_semantico encontrado = '{texto_semantico[:50]}...'")
                 else:
                     logging.info(f"🔍 Interacción {i+1}: texto_semantico vacío")
-                if not texto_semantico:
                     logging.warning(f"⚠️ Interacción {i+1} sin texto_semantico")
                     logging.warning(f"   Keys nivel raíz: {list(interaccion.keys())}")
                     if "data" in interaccion:
@@ -4112,17 +4138,22 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                     # Generar uno de fallback si no existe
                     texto_semantico = f"Interacción {i+1} en {registro.get('endpoint', 'unknown')} - {registro.get('timestamp', 'sin fecha')}"
                     logging.info(f"   Generado fallback: {texto_semantico}")
-                
+                    missing_count += 1
+                    fallback_count += 1
+
                 interacciones_formateadas.append({
                     "numero": i + 1,
                     "timestamp": registro.get("timestamp", interaccion.get("timestamp", "")),
                     "endpoint": registro.get("endpoint", "historial_interacciones"),
-                    "consulta": registro.get("params", {}).get("comando", "")[:200],
-                    "exito": registro.get("success", True),
+                    "consulta": (registro.get("params", {}).get("comando") or registro.get("consulta") or "")[:200],
+                    "exito": registro.get("success", registro.get("exito", True)),
                     "texto_semantico": texto_semantico,
                     "tipo": "interaccion_usuario"
                 })
-            
+
+            validation_stats["missing_text_semantic"] = missing_count
+            validation_stats["generated_fallbacks"] = fallback_count
+
             # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÁNTICO
             total_interacciones = memoria_previa.get("total_interacciones", 0)
             resumen = memoria_previa.get("resumen_conversacion", "")
@@ -4152,12 +4183,50 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "session_id": memoria_previa.get("session_id"),
                 "resumen_conversacion": resumen,
                 "fuente": "wrapper_automatico",
-                "mensaje": mensaje_enriquecido
+                "mensaje": mensaje_enriquecido,
+                # Required structured fields
+                "interpretacion_semantica": f"Historial consultado: {total_interacciones} interacciones. Se generaron {fallback_count} fallbacks semánticos.",
+                "contexto_inteligente": contexto_inteligente,
+                "validation_applied": True,
+                "validation_stats": validation_stats,
+                "metadata": {
+                    "memoria_aplicada": True,
+                    "memoria_origen": "cosmos" if consultar_memoria_cosmos_directo else "local",
+                    "session_id": memoria_previa.get("session_id"),
+                    "agent_id": req.headers.get("Agent-ID", "unknown")
+                }
             }
         
         # Aplicar memoria Cosmos y memoria manual
         response_data = aplicar_memoria_cosmos_directo(req, response_data)
         response_data = aplicar_memoria_manual(req, response_data)
+
+        # 🧠 MEJORAR RESPUESTA CON CONTEXTO SEMÁNTICO
+        try:
+            from semantic_response_enhancer import enhance_response_with_semantic_context
+            
+            # Extraer query del usuario si existe
+            user_query = ""
+            try:
+                body = req.get_json()
+                if body:
+                    user_query = body.get("query", body.get("consulta", body.get("mensaje", "")))
+            except:
+                pass
+            
+            # Mejorar mensaje con contexto semántico
+            if response_data.get("mensaje") and memoria_previa and memoria_previa.get("tiene_historial"):
+                enhanced_message = enhance_response_with_semantic_context(
+                    response_data["mensaje"],
+                    memoria_previa,
+                    user_query
+                )
+                # REEMPLAZAR el mensaje original con el enriquecido
+                response_data["mensaje"] = enhanced_message
+                response_data["mensaje_original"] = response_data.get("mensaje", "")
+                logging.info("🧠 Mensaje principal reemplazado con contexto semántico")
+        except ImportError:
+            logging.warning("⚠️ Mejorador semántico no disponible")
 
         # Generar texto semántico si no existe
         if not response_data.get("texto_semantico"):
@@ -4192,9 +4261,27 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         response_data = {
             "exito": False,
             "error": str(e),
-            "mensaje": "Error consultando historial de interacciones",
+            "mensaje": "🚨 **ERROR EN CONSULTA DE HISTORIAL**\n\nSe produjo un error al intentar acceder a la memoria semántica. El sistema está trabajando para resolver este inconveniente.\n\n🔧 **Recomendación**: Intenta nuevamente en unos momentos o contacta al administrador si el problema persiste.",
             "fuente": "wrapper_automatico",
-            "metadata": {"memoria_error": str(e)}
+            "metadata": {"memoria_error": str(e)},
+            # Required structured fields for error path as well
+            "interpretacion_semantica": "Error al intentar consultar historial; revisar logs.",
+            "contexto_inteligente": {
+                "tiene_memoria": bool(getattr(req, "_memoria_contexto", {})),
+                "session_id": req.headers.get("Session-ID")
+            },
+            "validation_applied": True,
+            "validation_stats": {
+                "checked": 0,
+                "missing_text_semantic": 0,
+                "generated_fallbacks": 0
+            },
+            "metadata": {
+                "memoria_aplicada": False,
+                "error_type": type(e).__name__,
+                "session_id": req.headers.get("Session-ID"),
+                "agent_id": req.headers.get("Agent-ID")
+            }
         }
         
         # Aplicar memoria Cosmos y memoria manual

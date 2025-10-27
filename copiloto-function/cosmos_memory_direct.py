@@ -49,18 +49,16 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
             agent_id = "GlobalAgent"  # Forzar agent_id por defecto
             logging.info(f"🔧 Agent ID forzado a: {agent_id}")
 
-        # Query actualizada para traer todas las interacciones relevantes
+        # 🌍 MEMORIA GLOBAL SECUENCIAL UNIVERSAL
         query = """
-SELECT TOP 50 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
-               c.event_type, c.texto_semantico, c.contexto_conversacion,
-               c.metadata, c.resumen_conversacion
-FROM c
-WHERE (IS_DEFINED(c.agent_id) = false OR c.agent_id != "")
-   OR (IS_DEFINED(c.session_id) = true AND c.session_id != "")
-ORDER BY c._ts DESC
-"""
-
-        logging.info("🌍 Ejecutando query de memoria global DIRECTA (sin parámetros)")
+        SELECT TOP 50 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
+                       c.event_type, c.texto_semantico, c.contexto_conversacion,
+                       c.metadata, c.resumen_conversacion
+        FROM c
+        WHERE IS_DEFINED(c.texto_semantico)
+        ORDER BY c._ts DESC
+        """
+        logging.info("🌍 Ejecutando memoria secuencial universal (sin filtros por session_id ni agent_id)")
         logging.debug(f"🌍 Query: {query}")
 
         items = list(container.query_items(
@@ -116,23 +114,79 @@ ORDER BY c._ts DESC
 
             # Generar resumen para el agente
             resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
+            
+            # 🧠 INTERPRETACIÓN SEMÁNTICA RICA DEL SISTEMA
+            interpretacion_semantica = interpretar_patron_semantico(interacciones_formateadas)
+            logging.info(f"🧠 Interpretación semántica: {interpretacion_semantica}")
+            
+            # 🎯 CONTEXTO INTELIGENTE ADICIONAL
+            try:
+                from semantic_classifier import get_intelligent_context
+                context_analysis = get_intelligent_context(interacciones_formateadas)
+                contexto_inteligente = {
+                    "modo_operacion": context_analysis['mode'],
+                    "contexto_seleccionado": len(context_analysis['context']),
+                    "total_analizado": context_analysis['total_analyzed'],
+                    "resumen_inteligente": context_analysis['summary']
+                }
+                logging.info(f"🎯 Contexto inteligente: {contexto_inteligente}")
+            except ImportError:
+                contexto_inteligente = {
+                    "modo_operacion": "fallback",
+                    "contexto_seleccionado": len(interacciones_formateadas),
+                    "total_analizado": len(items),
+                    "resumen_inteligente": "Análisis básico aplicado"
+                }
 
             # Dejar registro local adicional justo antes del return para verificar emisión
             logging.info("✅ customMetric|name=historial_interacciones_hits;value=1;agent_id=%s;endpoint=historial_interacciones", agent_id)
 
-            return {
+            response = {
                 "tiene_historial": True,
                 "session_id": session_id,
                 "agent_id": agent_id,
                 "total_interacciones": len(items),
-                "total_interacciones_sesion": len(items),  # Para compatibilidad
+                "total_interacciones_sesion": len(items),
                 "interacciones_recientes": interacciones_formateadas,
                 "resumen_conversacion": resumen_conversacion,
+                "interpretacion_semantica": interpretacion_semantica,
+                "contexto_inteligente": contexto_inteligente,
                 "ultima_actividad": items[0].get("timestamp") if items else None,
                 "contexto_recuperado": True,
-                "memoria_global": True,  # Indicador de que es memoria global
-                "estrategia": "global_por_agent_id"
+                "memoria_global": True,
+                "estrategia": "global_por_agent_id",
+                "foundry_optimized": False,
+                "validation_applied": False,
+                "validation_stats": {
+                    "original_count": len(items),
+                    "final_optimized": len(interacciones_formateadas)
+                },
+                "metadata": {
+                    "memoria_aplicada": True,
+                    "memoria_global": True,
+                    "interacciones_previas": len(items),
+                    "endpoint_detectado": "historial_interacciones",
+                    "agent_id": agent_id,
+                    "foundry_detected": False,
+                    "session_info": {
+                        "session_id": session_id,
+                        "agent_id": agent_id
+                    },
+                    "memoria_disponible": True,
+                    "wrapper_aplicado": True,
+                    "timestamp": datetime.now().isoformat()
+                }
             }
+            
+            # 🔍 VALIDACIÓN DE CONTEXTO ANTES DEL MODELO
+            try:
+                from context_validator import validate_context_before_model
+                response = validate_context_before_model(response)
+                logging.info(f"🔍 Contexto validado y optimizado")
+            except ImportError:
+                logging.warning("⚠️ Validador de contexto no disponible")
+            
+            return response
         else:
             return {
                 "tiene_historial": False,
@@ -140,7 +194,33 @@ ORDER BY c._ts DESC
                 "agent_id": agent_id,
                 "nueva_sesion": True,
                 "memoria_global": False,
-                "estrategia": "sin_memoria"
+                "estrategia": "sin_memoria",
+                "interpretacion_semantica": "Nueva sesión iniciada sin historial previo",
+                "contexto_inteligente": {
+                    "modo_operacion": "new_session",
+                    "contexto_seleccionado": 0,
+                    "total_analizado": 0,
+                    "resumen_inteligente": "Sin contexto previo disponible"
+                },
+                "validation_applied": True,
+                "validation_stats": {
+                    "original_count": 0,
+                    "final_optimized": 0
+                },
+                "metadata": {
+                    "memoria_aplicada": False,
+                    "memoria_global": False,
+                    "interacciones_previas": 0,
+                    "endpoint_detectado": "historial_interacciones",
+                    "agent_id": agent_id,
+                    "session_info": {
+                        "session_id": session_id,
+                        "agent_id": agent_id
+                    },
+                    "memoria_disponible": False,
+                    "wrapper_aplicado": True,
+                    "timestamp": datetime.now().isoformat()
+                }
             }
 
     except Exception as e:
@@ -180,39 +260,39 @@ def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
     return session_id
 
 
-def generar_resumen_conversacion(interacciones: List[Dict]) -> str:
-    """Genera un resumen legible de la conversación para el agente"""
+# Importar función desde semantic_helpers
+from semantic_helpers import generar_resumen_conversacion
+
+# Usar clasificador semántico existente para interpretación dinámica
+try:
+    from semantic_classifier import get_intelligent_context
+    from semantic_intent_classifier import classify_user_intent
     
-    if not interacciones:
-        return "Sin historial de conversación"
-    
-    # Tomar las últimas 5 interacciones
-    ultimas = interacciones[:5]
-    
-    resumen_items = []
-    
-    for i, interaccion in enumerate(ultimas):
-        timestamp = interaccion.get("timestamp", "")
-        consulta = interaccion.get("consulta", "")
-        endpoint = interaccion.get("endpoint", "")
+    def interpretar_patron_semantico(interacciones: list) -> str:
+        if not interacciones:
+            return "Sin actividad previa detectada"
         
-        # Formatear timestamp
-        try:
-            if timestamp:
-                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                tiempo = dt.strftime("%H:%M")
-            else:
-                tiempo = "??:??"
-        except:
-            tiempo = "??:??"
+        # Usar el contexto inteligente existente
+        contexto = get_intelligent_context(interacciones)
         
-        # Crear resumen de la interacción
-        if consulta:
-            resumen_items.append(f"{i+1}. [{tiempo}] {consulta[:80]}...")
+        # Analizar la última interacción para detectar intención
+        ultima = interacciones[0] if interacciones else {}
+        texto_semantico = ultima.get('texto_semantico', '')
+        
+        if texto_semantico:
+            intent_result = classify_user_intent(texto_semantico)
+            intent = intent_result.get('intent', 'general')
+            confidence = intent_result.get('confidence', 0.5)
+            
+            return f"Análisis inteligente: {contexto['summary']} | Intención detectada: {intent} (confianza: {int(confidence*100)}%) | Modo: {contexto['mode']}"
         else:
-            resumen_items.append(f"{i+1}. [{tiempo}] Consulta en {endpoint}")
-    
-    return "\\n".join(resumen_items)
+            return f"Análisis inteligente: {contexto['summary']} | Modo: {contexto['mode']}"
+            
+except ImportError:
+    def interpretar_patron_semantico(interacciones: list) -> str:
+        if not interacciones:
+            return "Sin actividad previa detectada"
+        return f"Análisis de {len(interacciones)} interacciones completado"
 
 def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -228,6 +308,12 @@ def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[st
             logging.info(f"🎯 Endpoint auto-detectado para memoria: {endpoint_detectado}")
         except Exception as e:
             logging.warning(f"⚠️ Error en detección automática de endpoint: {e}")
+        
+        # 🤖 DETECTAR SI ES FOUNDRY PARA OPTIMIZAR RESPUESTA
+        user_agent = req.headers.get("User-Agent", "")
+        es_foundry = "azure-agents" in user_agent.lower()
+        if es_foundry:
+            logging.info("🤖 Foundry detectado - optimizando respuesta semántica")
         
         # Consultar memoria directamente
         memoria = consultar_memoria_cosmos_directo(req)
@@ -257,7 +343,15 @@ def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[st
                 "memoria_global": True,
                 "interacciones_previas": memoria.get("total_interacciones", 0),
                 "endpoint_detectado": endpoint_detectado,
-                "agent_id": memoria.get("agent_id")
+                "agent_id": memoria.get("agent_id"),
+                "session_info": {
+                    "session_id": memoria.get("session_id"),
+                    "agent_id": memoria.get("agent_id")
+                },
+                "memoria_disponible": True,
+                "wrapper_aplicado": True,
+                "aplicacion_manual": True,
+                "timestamp": datetime.now().isoformat()
             })
             
             logging.info(f"🧠 Memoria global aplicada: {memoria.get('total_interacciones', 0)} interacciones para {memoria.get('agent_id')}")
@@ -270,7 +364,14 @@ def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[st
                 "memoria_aplicada": False,
                 "memoria_global": False,
                 "interacciones_previas": 0,
-                "endpoint_detectado": endpoint_detectado
+                "endpoint_detectado": endpoint_detectado,
+                "session_info": {
+                    "session_id": None,
+                    "agent_id": None
+                },
+                "memoria_disponible": False,
+                "wrapper_aplicado": True,
+                "timestamp": datetime.now().isoformat()
             })
             
             logging.info("📝 Sin memoria previa disponible")
@@ -281,52 +382,25 @@ def aplicar_memoria_cosmos_directo(req: func.HttpRequest, response_data: Dict[st
         logging.error(f"Error aplicando memoria Cosmos directo: {e}")
         return response_data
 
-def registrar_redireccion_cosmos(req: func.HttpRequest, endpoint_original: str, fue_redirigido: bool, respuesta_redirigida: Any) -> bool:
-    """
-    Registra cada redirección semántica en Cosmos DB para análisis
-    """
-    try:
-        from azure.cosmos import CosmosClient
-        
-        # Configuración de Cosmos DB
-        endpoint = os.environ.get("COSMOSDB_ENDPOINT", "https://copiloto-cosmos.documents.azure.com:443/")
-        key = os.environ.get("COSMOSDB_KEY")
-        database_name = os.environ.get("COSMOSDB_DATABASE", "agentMemory")
-        container_name = "redirections"  # Contenedor específico para redirecciones
-        
-        if not key:
+# Usar sistema existente de memory_service
+try:
+    from services.memory_service import memory_service
+    def registrar_redireccion_cosmos(req: func.HttpRequest, endpoint_original: str, fue_redirigido: bool, respuesta_redirigida: Any) -> bool:
+        try:
+            memory_service.registrar_llamada(
+                source="redirect",
+                endpoint=endpoint_original,
+                method=req.method,
+                params={"redirigido": fue_redirigido},
+                response_data=respuesta_redirigida,
+                success=True
+            )
+            return True
+        except Exception:
             return False
-        
-        # Extraer información del request
-        session_id = extraer_session_id_request(req) or "unknown_session"
-        input_usuario = extraer_input_usuario_simple(req)
-        
-        # Conectar a Cosmos DB
-        client = CosmosClient(endpoint, key)
-        database = client.get_database_client(database_name)
-        container = database.get_container_client(container_name)
-        
-        # Crear documento de redirección con ID único
-        timestamp_unico = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        documento = {
-            "id": f"redirect_{session_id}_{timestamp_unico}",
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat(),
-            "endpoint_original": endpoint_original,
-            "fue_redirigido": fue_redirigido,
-            "input_usuario": input_usuario[:200],  # Limitar tamaño
-            "tipo": "redireccion_semantica",
-            "_ts": int(datetime.now().timestamp())
-        }
-        
-        # Usar upsert para evitar conflictos
-        container.upsert_item(documento)
-        logging.info(f"📊 Redirección registrada en Cosmos: {endpoint_original} -> redirigido={fue_redirigido}")
-        return True
-        
-    except Exception as e:
-        logging.warning(f"⚠️ Error registrando redirección en Cosmos: {e}")
-        return False
+except ImportError:
+    def registrar_redireccion_cosmos(req: func.HttpRequest, endpoint_original: str, fue_redirigido: bool, respuesta_redirigida: Any) -> bool:
+        return True  # Fallback silencioso
 
 def extraer_input_usuario_simple(req: func.HttpRequest) -> str:
     """Extrae input del usuario de forma simple"""

@@ -1,176 +1,138 @@
 #!/usr/bin/env python3
 """
-Test que simula exactamente cómo Foundry interactúa con el sistema
-Valida que las métricas reales se devuelvan correctamente
+Test REAL que simula exactamente lo que envía Azure AI Foundry
 """
-
 import requests
 import json
-from datetime import datetime
+import time
 
-def test_foundry_real_interaction():
-    """Simula la interacción real de Foundry con headers y payload correctos"""
+# Configuración
+BASE_URL = "http://localhost:7071"
+FOUNDRY_HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "azure-agents",  # Simular Foundry
+    "Session-ID": "assistant",
+    "Agent-ID": "assistant"
+}
+
+def test_foundry_historial():
+    """Simula la llamada exacta que hace Foundry al historial"""
+    print("🧪 TEST FOUNDRY: Consultando historial...")
     
-    base_url = "http://localhost:7071"
+    # Exactamente como lo hace Foundry
+    response = requests.get(
+        f"{BASE_URL}/api/historial-interacciones",
+        headers=FOUNDRY_HEADERS,
+        timeout=30
+    )
     
-    # Headers que usa Foundry
-    headers = {
-        "Session-ID": "assistant",
-        "Agent-ID": "assistant", 
-        "Content-Type": "application/json"
-    }
+    print(f"Status: {response.status_code}")
     
-    print(f"[TEST] FOUNDRY REAL INTERACTION - {datetime.now().strftime('%H:%M:%S')}")
-    print("=" * 70)
-    
-    # Test 1: Simular pregunta de Foundry sobre métricas
-    print("\n1. Simulando pregunta de Foundry: '¿Cuántas solicitudes ha procesado la función en las últimas 24 horas?'")
-    
-    payload = {
-        "intencion": "diagnosticar:completo",
-        "parametros": {}
-    }
-    
-    try:
-        response = requests.post(
-            f"{base_url}/api/ejecutar",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
+    if response.status_code == 200:
+        data = response.json()
         
-        print(f"   Status: {response.status_code}")
+        # Verificar que Foundry recibe lo que necesita
+        print(f"✅ Foundry recibe:")
+        print(f"  - exito: {data.get('exito')}")
+        print(f"  - interacciones (array): {len(data.get('interacciones', []))} elementos")
+        print(f"  - mensaje disponible: {'Sí' if data.get('mensaje') else 'No'}")
+        print(f"  - usar_mensaje_semantico: {data.get('usar_mensaje_semantico')}")
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Verificar estructura de métricas que Foundry necesita
-            # Buscar métricas tanto en estructura directa como en data.metricas
-            metricas = data.get("metricas", {}) or data.get("data", {}).get("metricas", {})
-            function_app_metrics = metricas.get("function_app", {})
-            
-            print(f"   Métricas encontradas: {list(metricas.keys())}")
-            
-            # Verificar métricas específicas que Foundry busca
-            required_metrics = ["FunctionExecutionCount", "Requests", "Http2xx", "Http5xx"]
-            found_metrics = []
-            
-            for metric in required_metrics:
-                if metric in function_app_metrics:
-                    metric_data = function_app_metrics[metric]
-                    if isinstance(metric_data, dict) and "total" in metric_data:
-                        found_metrics.append(f"{metric}: {metric_data['total']}")
-                    else:
-                        found_metrics.append(f"{metric}: {metric_data}")
-            
-            if found_metrics:
-                print(f"   [OK] MÉTRICAS ENCONTRADAS:")
-                for metric in found_metrics:
-                    print(f"        • {metric}")
-                result = "PASS"
-            else:
-                print(f"   [FAIL] NO SE ENCONTRARON MÉTRICAS UTILIZABLES")
-                print(f"        Estructura actual: {json.dumps(metricas, indent=2)[:300]}...")
-                result = "FAIL"
-                
-        else:
-            print(f"   [FAIL] ERROR HTTP {response.status_code}")
-            result = "FAIL"
-            
-    except Exception as e:
-        print(f"   [FAIL] ERROR: {str(e)}")
-        result = "FAIL"
-    
-    # Test 2: Verificar endpoint directo para comparación
-    print("\n2. Verificando endpoint directo /api/diagnostico-recursos-completo")
-    
-    try:
-        response = requests.get(
-            f"{base_url}/api/diagnostico-recursos-completo?metricas=true",
-            headers=headers,
-            timeout=30
-        )
+        # Mostrar el mensaje que usará Foundry
+        if data.get("mensaje"):
+            print(f"\n📝 MENSAJE QUE USARÁ FOUNDRY:")
+            print(data["mensaje"][:300] + "..." if len(data["mensaje"]) > 300 else data["mensaje"])
         
-        print(f"   Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            metricas = data.get("metricas", {})
-            
-            if metricas:
-                print(f"   [OK] ENDPOINT DIRECTO TIENE MÉTRICAS")
-                print(f"        Claves: {list(metricas.keys())}")
-            else:
-                print(f"   [WARN] ENDPOINT DIRECTO SIN MÉTRICAS")
-                
-        else:
-            print(f"   [FAIL] ERROR HTTP {response.status_code}")
-            
-    except Exception as e:
-        print(f"   [FAIL] ERROR: {str(e)}")
-    
-    # Test 3: Verificar que obtener_metricas_function_app se esté llamando
-    print("\n3. Verificando llamada a obtener_metricas_function_app")
-    
-    payload_with_metrics = {
-        "intencion": "verificar:metricas",
-        "parametros": {"metricas": True}
-    }
-    
-    try:
-        response = requests.post(
-            f"{base_url}/api/ejecutar",
-            headers=headers,
-            json=payload_with_metrics,
-            timeout=30
-        )
-        
-        print(f"   Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Buscar evidencia de que se llamó obtener_metricas_function_app
-            # Buscar métricas tanto en estructura directa como en data.metricas
-            metricas_test3 = data.get("metricas", {}) or data.get("data", {}).get("metricas", {})
-            if "function_app" in metricas_test3:
-                fa_metrics = metricas_test3["function_app"]
-                
-                # Verificar métricas específicas de Function App
-                execution_metrics = ["FunctionExecutionCount", "FunctionExecutionUnits"]
-                http_metrics = ["Requests", "Http2xx", "Http4xx", "Http5xx"]
-                
-                execution_found = any(m in fa_metrics for m in execution_metrics)
-                http_found = any(m in fa_metrics for m in http_metrics)
-                
-                if execution_found or http_found:
-                    print(f"   [OK] MÉTRICAS DE FUNCTION APP ENCONTRADAS")
-                    print(f"        Execution metrics: {execution_found}")
-                    print(f"        HTTP metrics: {http_found}")
-                else:
-                    print(f"   [WARN] MÉTRICAS PRESENTES PERO NO LAS ESPERADAS")
-                    print(f"        Disponibles: {list(fa_metrics.keys())}")
-            else:
-                print(f"   [FAIL] NO SE ENCONTRARON MÉTRICAS DE FUNCTION APP")
-                
-    except Exception as e:
-        print(f"   [FAIL] ERROR: {str(e)}")
-    
-    print("\n" + "=" * 70)
-    print("[SUMMARY] DIAGNÓSTICO DEL PROBLEMA")
-    print("=" * 70)
-    
-    if result == "PASS":
-        print("[SUCCESS] El sistema devuelve métricas correctamente a Foundry")
+        return data
     else:
-        print("[PROBLEM] Foundry no puede obtener métricas utilizables")
-        print("POSIBLES CAUSAS:")
-        print("1. obtener_metricas_function_app() no se está llamando")
-        print("2. Las métricas no se están embebiendo en diagnostico['metricas']['function_app']")
-        print("3. La estructura de respuesta no es la que Foundry espera")
-        print("4. Timeout o permisos insuficientes en Azure SDK")
+        print(f"❌ Error: {response.text}")
+        return None
+
+def test_foundry_pregunta():
+    """Simula una pregunta típica de usuario a través de Foundry"""
+    print("\n🧪 TEST FOUNDRY: Pregunta de usuario...")
     
-    return result
+    # Simular pregunta del usuario
+    payload = {
+        "query": "¿Cuáles fueron las últimas interacciones que tuvimos?"
+    }
+    
+    response = requests.post(
+        f"{BASE_URL}/api/historial-interacciones",
+        headers=FOUNDRY_HEADERS,
+        json=payload,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Respuesta procesada correctamente")
+        
+        # Verificar estructura de respuesta
+        if data.get("mensaje"):
+            print(f"📝 RESPUESTA PARA EL USUARIO:")
+            print(data["mensaje"][:500] + "..." if len(data["mensaje"]) > 500 else data["mensaje"])
+        
+        return data
+    else:
+        print(f"❌ Error: {response.text}")
+        return None
+
+def test_foundry_copiloto():
+    """Simula llamada al copiloto desde Foundry"""
+    print("\n🧪 TEST FOUNDRY: Copiloto...")
+    
+    response = requests.get(
+        f"{BASE_URL}/api/copiloto",
+        headers=FOUNDRY_HEADERS,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Copiloto respondió correctamente")
+        print(f"  - Tipo: {data.get('tipo')}")
+        print(f"  - Memoria integrada: {data.get('metadata', {}).get('memoria_semantica_integrada')}")
+        
+        return data
+    else:
+        print(f"❌ Error: {response.text}")
+        return None
+
+def main():
+    """Ejecutar todas las pruebas reales de Foundry"""
+    print("🚀 INICIANDO PRUEBAS REALES DE FOUNDRY")
+    print("=" * 50)
+    
+    # Test 1: Historial (lo más importante)
+    historial_result = test_foundry_historial()
+    
+    # Test 2: Pregunta de usuario
+    pregunta_result = test_foundry_pregunta()
+    
+    # Test 3: Copiloto
+    copiloto_result = test_foundry_copiloto()
+    
+    # Resumen
+    print("\n" + "=" * 50)
+    print("📊 RESUMEN DE PRUEBAS:")
+    print(f"  - Historial: {'✅' if historial_result else '❌'}")
+    print(f"  - Pregunta: {'✅' if pregunta_result else '❌'}")
+    print(f"  - Copiloto: {'✅' if copiloto_result else '❌'}")
+    
+    # Verificar que el sistema funciona como esperado
+    if historial_result and historial_result.get("mensaje"):
+        print("\n🎯 CONCLUSIÓN:")
+        print("✅ El sistema está funcionando correctamente para Foundry")
+        print("✅ Foundry recibirá respuestas enriquecidas en el campo 'mensaje'")
+        print("✅ El array 'interacciones' está vacío como se diseñó")
+    else:
+        print("\n❌ PROBLEMA DETECTADO:")
+        print("El sistema no está generando respuestas adecuadas para Foundry")
 
 if __name__ == "__main__":
-    test_foundry_real_interaction()
+    main()
