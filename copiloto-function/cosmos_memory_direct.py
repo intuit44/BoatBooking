@@ -13,9 +13,82 @@ from datetime import datetime, timedelta
 from opentelemetry import metrics, trace
 
 
+def deduplicar_interacciones_semanticas(items: list, max_items: int = 50) -> list:
+    """
+    Deduplica interacciones semánticamente similares
+    Excluye endpoints meta-operacionales (historial, health, verificar)
+    Mantiene solo la más reciente de cada grupo
+    """
+    from collections import defaultdict
+    import hashlib
+    
+    # 🚫 FILTROS DE EXCLUSIÓN
+    ENDPOINTS_EXCLUIDOS = {
+        'historial-interacciones', '/api/historial-interacciones',
+        'health', '/api/health',
+        'verificar-sistema', 'verificar-cosmos', 'verificar-app-insights'
+    }
+    
+    PATRONES_BASURA = [
+        'CONSULTA DE HISTORIAL',
+        'Se encontraron',
+        'interacciones recientes',
+        'Consulta completada',
+        'Sin resumen de conversación'
+    ]
+    
+    # Filtrar items excluidos
+    items_filtrados = []
+    for item in items:
+        endpoint = item.get('endpoint', '')
+        texto = item.get('texto_semantico', '')
+        
+        # Excluir endpoints meta-operacionales
+        if endpoint in ENDPOINTS_EXCLUIDOS:
+            continue
+        
+        # Excluir contenido basura
+        if any(patron in texto for patron in PATRONES_BASURA):
+            continue
+        
+        # Excluir texto muy corto
+        if len(texto.strip()) < 30:
+            continue
+        
+        items_filtrados.append(item)
+    
+    logging.info(f"🚫 Filtrados {len(items) - len(items_filtrados)} items (meta-operacionales + basura)")
+    
+    # Agrupar por endpoint + hash semántico del texto
+    grupos = defaultdict(list)
+    
+    for item in items_filtrados:
+        endpoint = item.get('endpoint', 'unknown')
+        texto = item.get('texto_semantico', '')
+        
+        # Hash semántico: primeros 100 chars normalizados
+        texto_norm = texto[:100].lower().strip()
+        hash_semantico = hashlib.md5(texto_norm.encode()).hexdigest()[:8]
+        
+        # Clave de agrupación: endpoint + hash
+        clave = f"{endpoint}_{hash_semantico}"
+        grupos[clave].append(item)
+    
+    # Tomar solo el más reciente de cada grupo
+    items_unicos = []
+    for grupo in grupos.values():
+        grupo_ordenado = sorted(grupo, key=lambda x: x.get('_ts', 0), reverse=True)
+        items_unicos.append(grupo_ordenado[0])
+    
+    # Ordenar por timestamp y limitar
+    items_unicos.sort(key=lambda x: x.get('_ts', 0), reverse=True)
+    return items_unicos[:max_items]
+
+
 def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str, Any]]:
     """
     Consulta DIRECTAMENTE Cosmos DB para obtener historial de interacciones
+    CON DEDUPLICACIÓN SEMÁNTICA
     """
     try:
         from azure.cosmos import CosmosClient
@@ -49,22 +122,38 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
             agent_id = "GlobalAgent"  # Forzar agent_id por defecto
             logging.info(f"🔧 Agent ID forzado a: {agent_id}")
 
-        # 🌍 MEMORIA GLOBAL SECUENCIAL UNIVERSAL
+        # 🌍 MEMORIA GLOBAL CON DEDUPLICACIÓN SEMÁNTICA
+        # Traer más items para luego deduplicar
         query = """
-        SELECT TOP 50 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
+        SELECT TOP 150 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
                        c.event_type, c.texto_semantico, c.contexto_conversacion,
-                       c.metadata, c.resumen_conversacion
+                       c.metadata, c.resumen_conversacion, c.data.respuesta_resumen,
+                       c.data.interpretacion_semantica, c.data.contexto_inteligente,
+                       c.data.response_data.respuesta_usuario, c._ts
         FROM c
-        WHERE IS_DEFINED(c.texto_semantico)
+        WHERE IS_DEFINED(c.texto_semantico) 
+          AND LENGTH(c.texto_semantico) > 30
+          AND NOT CONTAINS(c.texto_semantico, 'Evento semantic en sesi')
+          AND NOT CONTAINS(c.texto_semantico, 'CONSULTA DE HISTORIAL')
+          AND NOT CONTAINS(c.texto_semantico, 'Se encontraron')
+          AND NOT CONTAINS(c.texto_semantico, 'interacciones recientes')
+          AND NOT CONTAINS(c.texto_semantico, 'Consulta completada')
+          AND NOT CONTAINS(c.endpoint, 'health')
+          AND NOT CONTAINS(c.endpoint, 'verificar-')
+          AND NOT CONTAINS(c.endpoint, 'historial-interacciones')
         ORDER BY c._ts DESC
         """
-        logging.info("🌍 Ejecutando memoria secuencial universal (sin filtros por session_id ni agent_id)")
+        logging.info("🌍 Ejecutando memoria con deduplicación semántica")
         logging.debug(f"🌍 Query: {query}")
 
-        items = list(container.query_items(
+        raw_items = list(container.query_items(
             query=query,
             enable_cross_partition_query=True
         ))
+        
+        # ✅ DEDUPLICACIÓN SEMÁNTICA: Agrupar por endpoint + texto similar
+        items = deduplicar_interacciones_semanticas(raw_items, max_items=50)
+        logging.info(f"🧹 Deduplicación: {len(raw_items)} → {len(items)} interacciones únicas")
 
         # LOG de aplicación (aparece en 'traces' table)
         logging.info("historial-interacciones: memoria_global_aplicada count=%d", len(items))
@@ -95,30 +184,63 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
             # Procesar interacciones encontradas CON TEXTO_SEMANTICO
             interacciones_formateadas = []
 
+            # Ajustes de truncado más generosos para evitar pérdida de contexto
+            CONSULTA_MAX = int(os.environ.get("CONSULTA_MAX_CHARS", "1000"))
+            RESPUESTA_MAX = int(os.environ.get("RESPUESTA_MAX_CHARS", "1000"))
+            LOG_SNIPPET = int(os.environ.get("LOG_SNIPPET_CHARS", "200"))
+
             for item in items:
                 # Extraer datos del nivel raíz y de sección posible de data
                 data_section = item.get("data", {})
 
+                # ✅ EXTRAER INFORMACIÓN ENRIQUECIDA
+                consulta_text = (
+                    data_section.get("params", {}).get("comando", "") or
+                    data_section.get("params", {}).get("consulta", "") or
+                    item.get("resumen_conversacion", "") or
+                    ""
+                )
+                
+                # ✅ PRIORIZAR respuesta_resumen si existe
+                respuesta_text = (
+                    item.get("respuesta_resumen") or  # Campo directo
+                    data_section.get("respuesta_resumen") or  # En data
+                    data_section.get("interpretacion_semantica", "") or  # Interpretación
+                    str(data_section.get("response_data", {}).get("respuesta_usuario", "")) or  # respuesta_usuario
+                    item.get("resumen_conversacion", "")
+                )
+                
+                # ✅ EXTRAER CONTEXTO INTELIGENTE si existe
+                contexto_extra = None
+                if data_section.get("contexto_inteligente"):
+                    ctx = data_section["contexto_inteligente"]
+                    if isinstance(ctx, dict) and ctx.get("resumen_inteligente"):
+                        contexto_extra = ctx["resumen_inteligente"]
+
                 interaccion = {
                     "timestamp": item.get("timestamp", data_section.get("timestamp", "")),
                     "endpoint": item.get("endpoint", data_section.get("endpoint", "unknown")),
-                    "consulta": (data_section.get("params", {}).get("comando", "") or item.get("resumen_conversacion", "") or "")[:100],
+                    "consulta": consulta_text[:CONSULTA_MAX],
                     "exito": data_section.get("success", True),
                     "texto_semantico": item.get("texto_semantico", ""),  # NIVEL RAÍZ
-                    "respuesta_resumen": str(data_section.get("response_data", "") or item.get("resumen_conversacion", ""))[:150]
+                    "respuesta_resumen": respuesta_text[:RESPUESTA_MAX],
+                    "contexto_extra": contexto_extra  # ✅ NUEVO: Contexto adicional
                 }
                 interacciones_formateadas.append(interaccion)
 
-                # Log para verificar
-                logging.info(f"📝 Interacción recuperada: {interaccion['endpoint']} - texto: {interaccion['texto_semantico'][:50]}...")
+                # Log para verificar (mostrar snippet mayor)
+                texto_snippet = interaccion['texto_semantico'][:LOG_SNIPPET] if interaccion['texto_semantico'] else interaccion['consulta'][:LOG_SNIPPET]
+                logging.info(f"📝 Interacción recuperada: {interaccion['endpoint']} - texto: {texto_snippet}...")
+                if contexto_extra:
+                    logging.info(f"  🎯 Contexto extra: {contexto_extra[:100]}...")
 
             # Generar resumen para el agente
             resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
-            
+
             # 🧠 INTERPRETACIÓN SEMÁNTICA RICA DEL SISTEMA
             interpretacion_semantica = interpretar_patron_semantico(interacciones_formateadas)
             logging.info(f"🧠 Interpretación semántica: {interpretacion_semantica}")
-            
+
             # 🎯 CONTEXTO INTELIGENTE ADICIONAL
             try:
                 from semantic_classifier import get_intelligent_context
@@ -177,7 +299,7 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
                     "timestamp": datetime.now().isoformat()
                 }
             }
-            
+
             # 🔍 VALIDACIÓN DE CONTEXTO ANTES DEL MODELO
             try:
                 from context_validator import validate_context_before_model
@@ -185,7 +307,7 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str
                 logging.info(f"🔍 Contexto validado y optimizado")
             except ImportError:
                 logging.warning("⚠️ Validador de contexto no disponible")
-            
+
             return response
         else:
             return {

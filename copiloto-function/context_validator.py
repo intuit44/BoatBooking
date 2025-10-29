@@ -14,7 +14,7 @@ class ContextValidator:
     def __init__(self):
         self.similarity_threshold = 0.8  # Umbral para detectar duplicados
         self.max_context_age_hours = 24  # Máximo 24 horas de contexto
-        self.max_tokens_estimate = 2000  # Estimación máxima de tokens
+        self.max_tokens_estimate = 8000  # Estimación máxima de tokens (aumentado para más contexto)
         
     def validate_and_clean_context(self, context_data: Dict[str, Any]) -> Dict[str, Any]:
         """Valida y limpia el contexto completo antes de enviarlo al modelo"""
@@ -131,9 +131,9 @@ class ContextValidator:
                     if failed_sorted:
                         resolved.append(failed_sorted[0])
                 else:
-                    # Sin contradicciones: mantener las 2 más recientes
+                    # Sin contradicciones: mantener las 5 más recientes para más contexto
                     sorted_group = sorted(group, key=lambda x: x.get("timestamp", ""), reverse=True)
-                    resolved.extend(sorted_group[:2])
+                    resolved.extend(sorted_group[:5])
         
         return resolved
     
@@ -205,10 +205,15 @@ class ContextValidator:
         if not interacciones:
             return "Sin contexto relevante disponible"
         
-        # Analizar patrones principales
-        endpoints = [i.get("endpoint", "") for i in interacciones[:5]]
+        # Analizar patrones principales usando más interacciones
+        endpoints = [i.get("endpoint", "") for i in interacciones[:10]]  # Analizar más endpoints
         success_count = sum(1 for i in interacciones if i.get("exito", True))
         total_count = len(interacciones)
+        
+        # Identificar endpoints más frecuentes
+        from collections import Counter
+        endpoint_counts = Counter(endpoints)
+        top_endpoints = [ep for ep, count in endpoint_counts.most_common(3) if ep and ep != 'unknown']
         
         # Detectar patrón principal
         if total_count <= 3:
@@ -223,7 +228,13 @@ class ContextValidator:
         # Último endpoint significativo
         last_endpoint = endpoints[0] if endpoints else "unknown"
         
-        return f"{pattern}: {total_count} interacciones. Última acción: {last_endpoint} ({'✅' if interacciones[0].get('exito', True) else '❌'})"
+        # Agregar información de endpoints frecuentes si hay suficientes interacciones
+        if total_count > 5 and top_endpoints:
+            endpoints_info = f" | Endpoints frecuentes: {', '.join(top_endpoints[:2])}"
+        else:
+            endpoints_info = ""
+        
+        return f"{pattern}: {total_count} interacciones. Última acción: {last_endpoint} ({'✅' if interacciones[0].get('exito', True) else '❌'}){endpoints_info}"
 
 # Instancia global
 context_validator = ContextValidator()

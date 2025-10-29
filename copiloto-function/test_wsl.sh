@@ -1,1 +1,0 @@
-echo "WSL funcionando correctamente"

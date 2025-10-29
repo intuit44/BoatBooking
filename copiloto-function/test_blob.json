@@ -1,1 +1,0 @@
-{"ruta":"scripts/test_blob.sh","contenido":"#!/bin/bash\necho 'Este archivo va a blob storage'"}

@@ -1,2 +1,0 @@
-@echo off
-curl -X POST http://localhost:7071/api/escribir-archivo -H "Content-Type: application/json" -d "{\"ruta\": \"test_html_entities.py\", \"contenido\": \"f&#39;{memoria[\\&#39;total_interacciones\\&#39;]}&#39;\"}"
