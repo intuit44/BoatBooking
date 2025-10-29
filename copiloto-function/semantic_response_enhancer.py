@@ -46,16 +46,21 @@ def detect_query_intent(user_query: str) -> str:
     
     query_lower = user_query.lower()
     
-    # Consultas históricas
-    if any(word in query_lower for word in ["antes", "habíamos", "detectado", "anterior", "previo"]):
+    # Consultas históricas (AMPLIADO)
+    historical_keywords = [
+        "antes", "habíamos", "hablando", "hablamos", "conversando", 
+        "detectado", "anterior", "previo", "hicimos", "quedamos",
+        "estuvimos", "estabamos", "discutimos", "vimos", "tratamos"
+    ]
+    if any(word in query_lower for word in historical_keywords):
         return "historical_inquiry"
     
     # Solicitudes de contexto
-    if any(word in query_lower for word in ["contexto", "semántico", "enriquecido", "validar"]):
+    if any(word in query_lower for word in ["contexto", "semántico", "enriquecido", "validar", "resumen"]):
         return "context_request"
     
     # Continuación de conversación
-    if any(word in query_lower for word in ["continuar", "siguiente", "ahora", "después"]):
+    if any(word in query_lower for word in ["continuar", "siguiente", "ahora", "después", "sigue"]):
         return "continuation"
     
     return "general"
@@ -237,28 +242,16 @@ def generate_continuation_suggestions(ultimo_endpoint: str, interacciones: list)
     suggestions = []
     
     if "verificar" in ultimo_endpoint:
-        suggestions.extend([
-            "Revisar resultados del diagnóstico",
-            "Ejecutar correcciones si se detectaron problemas",
-            "Continuar con verificación de otros componentes"
-        ])
+        suggestions.append("Revisar resultados de la verificación y corregir issues detectados")
+        suggestions.append("Ejecutar diagnóstico completo del sistema")
     elif "ejecutar" in ultimo_endpoint:
-        suggestions.extend([
-            "Analizar output del comando ejecutado",
-            "Ejecutar comandos de seguimiento",
-            "Verificar que los cambios se aplicaron correctamente"
-        ])
+        suggestions.append("Analizar output del comando ejecutado")
+        suggestions.append("Continuar con el siguiente paso del flujo")
     elif "hybrid" in ultimo_endpoint:
-        suggestions.extend([
-            "Procesar resultados del análisis híbrido",
-            "Aplicar insights obtenidos",
-            "Continuar con flujo de trabajo integrado"
-        ])
+        suggestions.append("Aprovechar procesamiento híbrido para consultas complejas")
+        suggestions.append("Validar resultados de múltiples fuentes")
     else:
-        suggestions.extend([
-            "Continuar con la siguiente tarea planificada",
-            "Revisar estado general del sistema",
-            "Explorar nuevas funcionalidades disponibles"
-        ])
-    
-    return suggestions[:3]  # Limitar a 3 sugerencias
+        suggestions.append("Continuar con la siguiente acción planificada")
+        suggestions.append("Solicitar más contexto si es necesario")
+
+    return suggestions

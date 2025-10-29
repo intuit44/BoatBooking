@@ -13,8 +13,49 @@ import uuid
 def guardar_interaccion_cosmos(req: func.HttpRequest, response_data: Dict[str, Any], endpoint: str) -> None:
     """
     Guarda automáticamente la interacción en Cosmos DB colección 'memory'
+    EXCLUYE endpoints meta-operacionales para evitar bucles de introspección
     """
     try:
+        # 🚫 FILTRO 1: NO guardar endpoints meta-operacionales (REFORZADO)
+        ENDPOINTS_EXCLUIDOS = {
+            'historial-interacciones', '/api/historial-interacciones',
+            'historial_interacciones',  # Versión con guión bajo
+            'health', '/api/health',
+            'verificar-sistema', 'verificar-cosmos', 'verificar-app-insights',
+            '/api/verificar-sistema', '/api/verificar-cosmos', '/api/verificar-app-insights'
+        }
+        
+        endpoint_normalizado = endpoint.strip('/').lower().replace('_', '-')
+        if any(excluido in endpoint_normalizado for excluido in ENDPOINTS_EXCLUIDOS):
+            logging.info(f"⏭️ Endpoint meta-operacional excluido: {endpoint}")
+            return
+        
+        # 🚫 FILTRO 1.5: Verificación adicional por nombre de función
+        if 'historial' in endpoint_normalizado:
+            logging.info(f"⏭️ Endpoint de historial excluido por patrón: {endpoint}")
+            return
+        
+        # 🚫 FILTRO 2: NO guardar contenido basura en texto_semantico
+        texto_semantico = response_data.get('texto_semantico', '') or response_data.get('mensaje', '')
+        PATRONES_BASURA = [
+            '🔍 CONSULTA DE HISTORIAL',
+            'Se encontraron',
+            'interacciones recientes',
+            '✅ Éxito',
+            'Consulta completada',
+            'RESULTADO:',
+            'Sin resumen de conversación'
+        ]
+        
+        if any(patron in texto_semantico for patron in PATRONES_BASURA):
+            logging.info(f"⏭️ Contenido basura excluido: {texto_semantico[:50]}...")
+            return
+        
+        # 🚫 FILTRO 3: Texto muy corto o vacío
+        if len(texto_semantico.strip()) < 30:
+            logging.info(f"⏭️ Texto muy corto excluido: {texto_semantico}")
+            return
+        
         from azure.cosmos import CosmosClient
         
         # Configuración de Cosmos DB

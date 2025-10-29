@@ -187,6 +187,11 @@ class MemoryService:
         # DEBUG: Log session info
         logging.info(f"📝 Registrando llamada - Session: {session_id}, Agent: {agent_id}, Source: {source}")
         
+        # ✅ Extraer respuesta_usuario antes del truncamiento, para reinyectarlo
+        respuesta_usuario_completa = None
+        if isinstance(response_data, dict) and response_data.get("respuesta_usuario"):
+            respuesta_usuario_completa = str(response_data["respuesta_usuario"]).strip()
+        
         # Limpiar response_data para evitar documentos muy grandes
         cleaned_response = response_data
         if isinstance(response_data, dict) and len(str(response_data)) > 2000:
@@ -195,6 +200,17 @@ class MemoryService:
                 "original_keys": list(response_data.keys()) if isinstance(response_data, dict) else [],
                 "success": response_data.get("exito", response_data.get("success", success))
             }
+        elif isinstance(response_data, (list, tuple)) and len(str(response_data)) > 2000:
+            cleaned_response = {
+                "status": "truncated_list",
+                "length": len(response_data),
+                "success": success
+            }
+        
+        # ✅ Reinyectar respuesta_usuario si fue eliminado por truncamiento
+        if respuesta_usuario_completa:
+            if isinstance(cleaned_response, dict):
+                cleaned_response["respuesta_usuario"] = respuesta_usuario_completa
         
         llamada_data = {
             "source": source,
@@ -207,30 +223,91 @@ class MemoryService:
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        # Crear resumen semántico - PRIORIZAR EL QUE VIENE EN RESPONSE_DATA
-        texto_semantico_generado = (
-            f"Interacción en '{endpoint}' ejecutada por {agent_id}.\n"
-            f"Método: {method}. Éxito: {'✅' if success else '❌'}.\n"
-            f"Respuesta resumida: {str(response_data)[:150]}..."
-        )
+        # ❌ FILTRAR EVENTOS BASURA: No guardar eventos genéricos sin valor
+        if endpoint == "unknown" and not params.get("respuesta_usuario"):
+            # Evento genérico sin contenido útil
+            if isinstance(response_data, dict):
+                msg = str(response_data.get("mensaje", ""))
+                if "Evento semantic" in msg or not msg.strip():
+                    logging.info("🚫 Evento basura filtrado: sin contenido útil")
+                    return False  # No guardar
         
-        # Usar el texto_semantico de response_data si existe, sino el generado
+        # ✅ ENRIQUECER respuesta_resumen con información valiosa
+        respuesta_resumen = None
+        if isinstance(response_data, dict):
+            # Extraer información útil para resumen
+            resumen_parts = []
+            if response_data.get("interpretacion_semantica"):
+                resumen_parts.append(f"Interpretación: {response_data['interpretacion_semantica'][:200]}")
+            if response_data.get("contexto_inteligente", {}).get("resumen_inteligente"):
+                resumen_parts.append(f"Contexto: {response_data['contexto_inteligente']['resumen_inteligente'][:200]}")
+            if response_data.get("total"):
+                resumen_parts.append(f"Total procesado: {response_data['total']}")
+            
+            if resumen_parts:
+                respuesta_resumen = " | ".join(resumen_parts)
+                llamada_data["respuesta_resumen"] = respuesta_resumen
+                logging.info(f"📊 Resumen enriquecido: {respuesta_resumen[:100]}...")
+        
+        # Crear texto semántico ENRIQUECIDO
         texto_semantico_final = None
-        if isinstance(response_data, dict) and response_data.get("texto_semantico"):
-            texto_semantico_final = response_data["texto_semantico"]
-            logging.info(f"📝 Usando texto_semantico de response_data: {texto_semantico_final[:100]}...")
+        auto_generated = False
+
+        # 1) Preferir respuesta_usuario si viene en response_data
+        if isinstance(response_data, dict) and response_data.get("respuesta_usuario"):
+            texto_semantico_final = str(response_data.get("respuesta_usuario")).strip()
+            logging.info("📝 Usando 'respuesta_usuario' desde response_data como texto_semantico.")
+        # 2) Luego preferir texto_semantico provisto por el servicio
+        elif isinstance(response_data, dict) and response_data.get("texto_semantico"):
+            texto_semantico_final = str(response_data.get("texto_semantico")).strip()
+            logging.info("📝 Usando 'texto_semantico' desde response_data como texto_semantico.")
+        # 3) Luego preferir un campo summary o summary_text
+        elif isinstance(response_data, dict) and (response_data.get("summary") or response_data.get("summary_text")):
+            texto_semantico_final = str(response_data.get("summary") or response_data.get("summary_text")).strip()
+            logging.info("📝 Usando 'summary' desde response_data como texto_semantico.")
+        # 4) Si params contiene un mensaje del usuario, usarlo
+        elif params.get("user_message"):
+            texto_semantico_final = str(params.get("user_message")).strip()
+            logging.info("📝 Usando 'user_message' desde params como texto_semantico.")
+        # 5) Si response_data es texto plano, usarlo (truncado)
+        elif isinstance(response_data, str) and response_data.strip():
+            texto_semantico_final = response_data.strip()[:1000]
+            logging.info("📝 Usando texto plano de response_data como texto_semantico (truncado).")
+        # 6) Generar un resumen ENRIQUECIDO (no genérico)
         else:
-            texto_semantico_final = texto_semantico_generado
-            logging.info(f"📝 Usando texto_semantico generado: {texto_semantico_final[:100]}...")
+            auto_generated = True
+            # Intentar extraer información útil
+            if isinstance(response_data, dict):
+                partes = []
+                if response_data.get("mensaje"):
+                    partes.append(str(response_data["mensaje"])[:300])
+                if response_data.get("interpretacion_semantica"):
+                    partes.append(f"Interpretación: {response_data['interpretacion_semantica'][:200]}")
+                if response_data.get("total"):
+                    partes.append(f"Total: {response_data['total']}")
+                
+                if partes:
+                    texto_semantico_final = " | ".join(partes)
+                else:
+                    texto_semantico_final = f"Interacción en '{endpoint}' por {agent_id}. Éxito: {'sí' if success else 'no'}."
+            else:
+                texto_semantico_final = f"Interacción en '{endpoint}' por {agent_id}. Éxito: {'sí' if success else 'no'}."
+            
+            logging.warning("⚠️ Texto semántico autogenerado (enriquecido).")
         
         # Inyectarlo en el evento
-        llamada_data["texto_semantico"] = texto_semantico_final
+        if texto_semantico_final and len(texto_semantico_final.strip()) > 10:
+            llamada_data["texto_semantico"] = texto_semantico_final
+            if auto_generated:
+                llamada_data["texto_semantico_auto_generated"] = True
+        else:
+            logging.warning("⚠️ Texto semántico vacío o muy corto, no se guardará.")
+            return False  # No guardar eventos sin contenido útil
         
         # Registrar como evento de tipo "endpoint_call" con session_id preservado
         result = self.log_event("endpoint_call", llamada_data, session_id=session_id)
         logging.info(f"💾 Guardado en memoria: {'✅' if result else '❌'} - Session: {session_id}")
         return result
-    
 
     def obtener_estadisticas(self, source_name: Optional[str] = None) -> Dict[str, Any]:
         """Obtiene estadísticas del sistema de memoria"""

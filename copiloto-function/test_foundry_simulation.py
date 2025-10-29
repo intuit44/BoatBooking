@@ -1,183 +1,233 @@
 """
-Simulacion del comportamiento de Foundry
-Prueba los cambios antes del despliegue
+Test de simulación REAL de cómo Foundry invoca el endpoint historial-interacciones
+Simula el formato exacto de arguments que envía Foundry
 """
-
 import requests
 import json
 
-def simulate_foundry_agent():
-    """Simula exactamente como Foundry hace la llamada"""
+# URL del endpoint
+BASE_URL = "http://localhost:7071"
+ENDPOINT = "/api/historial-interacciones"
+
+def test_foundry_basic_call():
+    """Test 1: Llamada básica como la hace Foundry (headers en arguments)"""
+    print("\n" + "="*80)
+    print("TEST 1: Llamada básica (simulando Foundry)")
+    print("="*80)
     
-    print("SIMULANDO COMPORTAMIENTO DE FOUNDRY")
-    print("=" * 50)
-    
-    # Simular la llamada exacta que hace Foundry
-    url = "http://localhost:7071/api/historial-interacciones"
-    headers = {
-        "Content-Type": "application/json",
+    # Foundry envía los headers como parte del body en 'arguments'
+    # NO como headers HTTP reales
+    payload = {
         "Session-ID": "assistant",
         "Agent-ID": "assistant"
     }
     
-    print("1. Haciendo llamada como Foundry...")
-    print(f"   URL: {url}")
-    print(f"   Headers: {headers}")
+    # Pero también los enviamos como headers HTTP para compatibilidad
+    headers = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "Content-Type": "application/json"
+    }
     
-    try:
-        response = requests.post(url, headers=headers, json={})
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            print(f"\n2. Respuesta recibida (Status: {response.status_code})")
-            print("   Campos principales:")
-            for key in ["exito", "mensaje", "interacciones", "total"]:
-                if key in data:
-                    if key == "mensaje":
-                        mensaje = data[key][:200] + "..." if len(data[key]) > 200 else data[key]
-                        print(f"   - {key}: {mensaje}")
-                    elif key == "interacciones":
-                        print(f"   - {key}: {len(data[key])} elementos")
-                    else:
-                        print(f"   - {key}: {data[key]}")
-            
-            # Simular como Foundry procesaria la respuesta
-            print("\n3. SIMULACION DE PROCESAMIENTO FOUNDRY:")
-            
-            # Foundry prioriza interacciones si existen
-            if data.get("interacciones") and len(data["interacciones"]) > 0:
-                print("   -> Foundry usaria el array 'interacciones' (comportamiento anterior)")
-                print("   -> Respuesta: Lista basica de interacciones")
-                return "COMPORTAMIENTO_ANTERIOR"
-            
-            # Si no hay interacciones, usa el mensaje
-            elif data.get("mensaje"):
-                print("   -> Foundry usaria el campo 'mensaje' (comportamiento deseado)")
-                print("   -> Respuesta: Analisis semantico enriquecido")
-                mensaje = data["mensaje"]
-                
-                # Verificar si es respuesta semantica enriquecida
-                if "ANALISIS CONTEXTUAL" in mensaje or "Patron de Actividad" in mensaje:
-                    print("   ✅ RESPUESTA SEMANTICA DETECTADA")
-                    return "COMPORTAMIENTO_MEJORADO"
-                else:
-                    print("   ⚠️ Mensaje basico detectado")
-                    return "MENSAJE_BASICO"
-            
-            else:
-                print("   -> Sin contenido utilizable")
-                return "SIN_CONTENIDO"
-                
-        else:
-            print(f"   ❌ Error: Status {response.status_code}")
-            return "ERROR"
-            
-    except Exception as e:
-        print(f"   ❌ Excepcion: {str(e)}")
-        return "EXCEPCION"
-
-def test_multiple_scenarios():
-    """Prueba multiples escenarios"""
+    response = requests.get(
+        f"{BASE_URL}{ENDPOINT}",
+        params=payload,
+        headers=headers,
+        timeout=30
+    )
     
-    print("\nPROBANDO MULTIPLES ESCENARIOS")
-    print("=" * 50)
+    print(f"Status: {response.status_code}")
+    print(f"Response preview: {response.text[:500]}...")
     
-    scenarios = [
-        {"name": "Consulta historica", "query": "¿Cuáles fueron las últimas interacciones?"},
-        {"name": "Contexto enriquecido", "query": "necesito contexto semántico enriquecido"},
-        {"name": "Continuacion", "query": "continuar con el análisis"}
-    ]
-    
-    results = []
-    
-    for scenario in scenarios:
-        print(f"\n🧪 Escenario: {scenario['name']}")
-        print(f"   Query: {scenario['query']}")
-        
-        # Hacer llamada con query especifica
-        url = "http://localhost:7071/api/historial-interacciones"
-        headers = {
-            "Content-Type": "application/json", 
-            "Session-ID": "assistant",
-            "Agent-ID": "assistant"
-        }
-        
-        try:
-            response = requests.post(url, headers=headers, json={"query": scenario["query"]})
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Analizar respuesta
-                interacciones_count = len(data.get("interacciones", []))
-                mensaje_length = len(data.get("mensaje", ""))
-                tiene_semantico = "usar_mensaje_semantico" in data
-                
-                print(f"   - Interacciones: {interacciones_count}")
-                print(f"   - Mensaje length: {mensaje_length}")
-                print(f"   - Marcador semantico: {tiene_semantico}")
-                
-                # Determinar comportamiento esperado
-                if interacciones_count == 0 and mensaje_length > 100:
-                    result = "✅ FORZARA_MENSAJE_SEMANTICO"
-                elif interacciones_count > 0:
-                    result = "⚠️ USARA_INTERACCIONES_BASICAS"
-                else:
-                    result = "❌ SIN_CONTENIDO_UTIL"
-                
-                print(f"   Resultado: {result}")
-                results.append((scenario["name"], result))
-                
-            else:
-                print(f"   ❌ Error: {response.status_code}")
-                results.append((scenario["name"], "ERROR"))
-                
-        except Exception as e:
-            print(f"   ❌ Excepcion: {str(e)}")
-            results.append((scenario["name"], "EXCEPCION"))
-    
-    # Resumen final
-    print("\n" + "=" * 50)
-    print("RESUMEN DE RESULTADOS")
-    print("=" * 50)
-    
-    success_count = 0
-    for name, result in results:
-        status = "✅" if "FORZARA_MENSAJE" in result else "❌"
-        print(f"{status} {name}: {result}")
-        if "FORZARA_MENSAJE" in result:
-            success_count += 1
-    
-    print(f"\nExito: {success_count}/{len(results)} escenarios")
-    
-    if success_count == len(results):
-        print("🎉 TODOS LOS ESCENARIOS PASARON")
-        print("🚀 LISTO PARA DESPLIEGUE")
-        return True
+    if response.status_code == 200:
+        data = response.json()
+        print(f"\n✅ Total interacciones: {data.get('total', 0)}")
+        print(f"✅ Interacciones devueltas: {len(data.get('interacciones', []))}")
+        if data.get('interacciones'):
+            print(f"\n📝 Primera interacción:")
+            primera = data['interacciones'][0]
+            print(f"   - Endpoint: {primera.get('endpoint')}")
+            print(f"   - Timestamp: {primera.get('timestamp')}")
+            print(f"   - Texto semántico: {primera.get('texto_semantico', '')[:100]}...")
     else:
-        print("🔧 REQUIERE AJUSTES ADICIONALES")
-        return False
+        print(f"❌ Error: {response.text}")
+
+def test_foundry_with_filters():
+    """Test 2: Con filtros dinámicos (tipo, contiene, etc)"""
+    print("\n" + "="*80)
+    print("TEST 2: Con filtros dinámicos")
+    print("="*80)
+    
+    payload = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "tipo": "interaccion_usuario",
+        "contiene": "copiloto",
+        "limite": 5
+    }
+    
+    headers = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.get(
+        f"{BASE_URL}{ENDPOINT}",
+        params=payload,
+        headers=headers,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"\n✅ Query dinámica aplicada: {data.get('query_dinamica_aplicada', False)}")
+        print(f"✅ Total encontrado: {data.get('total', 0)}")
+        print(f"✅ Filtros aplicados: {data.get('filtros_aplicados', {})}")
+        
+        if data.get('interacciones'):
+            print(f"\n📝 Interacciones filtradas:")
+            for inter in data['interacciones'][:3]:
+                print(f"   - {inter.get('endpoint')}: {inter.get('texto_semantico', '')[:80]}...")
+    else:
+        print(f"❌ Error: {response.text}")
+
+def test_foundry_temporal_filter():
+    """Test 3: Filtro temporal (últimas 24h)"""
+    print("\n" + "="*80)
+    print("TEST 3: Filtro temporal (últimas 24h)")
+    print("="*80)
+    
+    payload = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "fecha_inicio": "últimas 24h",
+        "limite": 10
+    }
+    
+    headers = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.get(
+        f"{BASE_URL}{ENDPOINT}",
+        params=payload,
+        headers=headers,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"\n✅ Query dinámica: {data.get('query_dinamica_aplicada', False)}")
+        print(f"✅ Total: {data.get('total', 0)}")
+        print(f"✅ SQL generado: {data.get('metadata', {}).get('query_sql', 'N/A')}")
+    else:
+        print(f"❌ Error: {response.text}")
+
+def test_foundry_endpoint_filter():
+    """Test 4: Filtrar por endpoint específico"""
+    print("\n" + "="*80)
+    print("TEST 4: Filtrar por endpoint específico")
+    print("="*80)
+    
+    payload = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "endpoint": "/api/copiloto",
+        "limite": 5
+    }
+    
+    headers = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.get(
+        f"{BASE_URL}{ENDPOINT}",
+        params=payload,
+        headers=headers,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"\n✅ Query dinámica: {data.get('query_dinamica_aplicada', False)}")
+        print(f"✅ Total: {data.get('total', 0)}")
+        
+        if data.get('interacciones'):
+            print(f"\n📝 Interacciones del endpoint /api/copiloto:")
+            for inter in data['interacciones']:
+                print(f"   - {inter.get('endpoint')}: {inter.get('timestamp')}")
+    else:
+        print(f"❌ Error: {response.text}")
+
+def test_foundry_post_method():
+    """Test 5: Usando POST (como a veces hace Foundry)"""
+    print("\n" + "="*80)
+    print("TEST 5: POST con body (alternativa de Foundry)")
+    print("="*80)
+    
+    payload = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "tipo": "interaccion_usuario",
+        "limite": 3
+    }
+    
+    headers = {
+        "Session-ID": "assistant",
+        "Agent-ID": "assistant",
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.post(
+        f"{BASE_URL}{ENDPOINT}",
+        json=payload,
+        headers=headers,
+        timeout=30
+    )
+    
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"\n✅ Total: {data.get('total', 0)}")
+        print(f"✅ Query dinámica: {data.get('query_dinamica_aplicada', False)}")
+    else:
+        print(f"❌ Error: {response.text}")
 
 if __name__ == "__main__":
-    print("🧪 SIMULACION DE FOUNDRY - PRUEBAS PRE-DESPLIEGUE")
-    print("=" * 60)
+    print("\nSIMULACION DE INVOCACIONES DESDE FOUNDRY")
+    print("=" * 80)
+    print("Estos tests simulan exactamente como Foundry invoca el endpoint")
+    print("=" * 80)
     
-    # Prueba basica
-    basic_result = simulate_foundry_agent()
-    
-    # Pruebas de escenarios
-    scenarios_passed = test_multiple_scenarios()
-    
-    print("\n" + "=" * 60)
-    print("CONCLUSION FINAL")
-    print("=" * 60)
-    
-    if basic_result == "COMPORTAMIENTO_MEJORADO" and scenarios_passed:
-        print("✅ SISTEMA LISTO PARA DESPLIEGUE")
-        print("   - Foundry usara respuestas semanticas enriquecidas")
-        print("   - Todos los escenarios funcionan correctamente")
-    else:
-        print("❌ SISTEMA REQUIERE AJUSTES")
-        print(f"   - Resultado basico: {basic_result}")
-        print(f"   - Escenarios: {'PASS' if scenarios_passed else 'FAIL'}")
+    try:
+        test_foundry_basic_call()
+        test_foundry_with_filters()
+        test_foundry_temporal_filter()
+        test_foundry_endpoint_filter()
+        test_foundry_post_method()
+        
+        print("\n" + "="*80)
+        print("✅ TESTS COMPLETADOS")
+        print("="*80)
+        
+    except requests.exceptions.ConnectionError:
+        print("\n❌ ERROR: No se pudo conectar al servidor")
+        print("Asegúrate de que el servidor esté corriendo:")
+        print("  cd copiloto-function")
+        print("  func start")
+    except Exception as e:
+        print(f"\n❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()

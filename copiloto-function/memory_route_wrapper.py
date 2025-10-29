@@ -81,53 +81,81 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                         new_body,
                                         mimetype="application/json",
                                         status_code=response.status_code,
-                                        headers=dict(response.headers)
+                                        headers={k: v for k, v in response.headers.items()} if response.headers else {}
                                     )
                     except Exception as e:
                         logging.warning(f"⚠️ [{source_name}] Error procesando respuesta: {e}")
 
                     # 4️⃣ REGISTRO DE NUEVA INTERACCIÓN EN COSMOS
-                    try:
-                        from services.memory_service import memory_service
-                        session_id = (
-                            req.headers.get("Session-ID")
-                            or req.params.get("session_id")
-                            or "constant-session-id"
-                        )
-                        agent_id = (
-                            req.headers.get("Agent-ID")
-                            or req.params.get("agent_id")
-                            or "unknown_agent"
-                        )
+                    # ❌ EXCLUIR historial-interacciones para evitar recursión infinita
+                    es_endpoint_historial = (
+                        "historial" in route_path.lower() or 
+                        "historial" in source_name.lower() or
+                        route_path.endswith("/historial-interacciones")
+                    )
+                    
+                    if not es_endpoint_historial:
+                        try:
+                            from services.memory_service import memory_service
+                            session_id = (
+                                req.headers.get("Session-ID")
+                                or req.params.get("session_id")
+                                or "constant-session-id"
+                            )
+                            agent_id = (
+                                req.headers.get("Agent-ID")
+                                or req.params.get("agent_id")
+                                or "unknown_agent"
+                            )
 
-                        # Procesar el cuerpo de respuesta si existe
-                        if isinstance(response, func.HttpResponse):
-                            body = response.get_body()
-                            output_data = json.loads(body.decode("utf-8")) if body else {"status": response.status_code}
-                        else:
-                            output_data = {"raw_response": True}
+                            # Procesar el cuerpo de respuesta si existe
+                            if isinstance(response, func.HttpResponse):
+                                body = response.get_body()
+                                output_data = json.loads(body.decode("utf-8")) if body else {"status": response.status_code}
+                            else:
+                                output_data = {"raw_response": True}
 
-                        # Generar texto_semantico para la respuesta
-                        texto_semantico = f"Interacción en '{route_path}' ejecutada por {agent_id}. Éxito: ✅. Endpoint: {source_name}."
-                        if isinstance(output_data, dict):
-                            output_data["texto_semantico"] = texto_semantico
-                        
-                        memory_service.registrar_llamada(
-                            source=source_name,
-                            endpoint=route_path,
-                            method=req.method,
-                            params={"session_id": session_id, "agent_id": agent_id},
-                            response_data=output_data,
-                            success=True
-                        )
+                            # Generar texto_semantico para la respuesta (limitado para evitar anidación)
+                            texto_semantico = f"Interacción en '{route_path}' ejecutada por {agent_id}. Éxito: ✅. Endpoint: {source_name}."
+                            if isinstance(output_data, dict):
+                                # Limpiar campos verbosos antes de guardar
+                                output_data_limpio = {
+                                    k: v for k, v in output_data.items() 
+                                    if k not in ["interacciones", "mensaje", "respuesta_usuario", "mensaje_original"]
+                                }
+                                # TRUNCAR texto_semantico si es muy largo (máximo 500 caracteres)
+                                if "texto_semantico" in output_data:
+                                    texto_original = str(output_data["texto_semantico"])
+                                    if len(texto_original) > 500:
+                                        output_data_limpio["texto_semantico"] = texto_original[:500] + "..."
+                                        logging.info(f"🔪 texto_semantico truncado de {len(texto_original)} a 500 caracteres")
+                                    else:
+                                        output_data_limpio["texto_semantico"] = texto_original
+                                else:
+                                    output_data_limpio["texto_semantico"] = texto_semantico
+                                output_data = output_data_limpio
+                            
+                            memory_service.registrar_llamada(
+                                source=source_name,
+                                endpoint=route_path,
+                                method=req.method,
+                                params={"session_id": session_id, "agent_id": agent_id},
+                                response_data=output_data,
+                                success=True
+                            )
 
-                        logging.info(f"💾 [{source_name}] Interacción registrada en Cosmos ✅ - sesión {session_id}")
-                    except Exception as e:
-                        logging.warning(f"⚠️ [{source_name}] Error registrando llamada: {e}")
+                            logging.info(f"💾 [{source_name}] Interacción registrada en Cosmos ✅ - sesión {session_id}")
+                        except Exception as e:
+                            logging.warning(f"⚠️ [{source_name}] Error registrando llamada: {e}")
+                    else:
+                        logging.info(f"⏭️ [{source_name}] Endpoint de historial excluido del registro")
 
                     return response
 
-                logging.info(f"✅ Memoria automática aplicada a endpoint: {route_path}")
+                if "historial" not in route_path.lower():
+                    logging.info(f"✅ Memoria automática aplicada a endpoint: {route_path}")
+                else:
+                    logging.info(f"⏭️ Endpoint de historial: wrapper aplicado SIN registro")
                 return original_route(*args, **kwargs)(wrapper)
 
             except Exception as e:
