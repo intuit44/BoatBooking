@@ -135,7 +135,7 @@ def interpretar_intencion_agente(mensaje_agente: str, headers: Dict[str, str]) -
     
     Returns:
         Dict con parámetros interpretados
-    """
+    """ 
     params = {
         "session_id": headers.get("Session-ID", "unknown"),
         "agent_id": headers.get("Agent-ID"),

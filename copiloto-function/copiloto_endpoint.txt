@@ -1,0 +1,539 @@
+﻿
+@app.function_name(name="copiloto")
+@app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
+def copiloto(req: func.HttpRequest) -> func.HttpResponse:
+    # ðŸ”¥ MEMORIA DIRECTA - WRAPPER AUTOMÃTICO
+    logging.info("ðŸ”¥ COPILOTO EJECUTÃNDOSE CON MEMORIA DIRECTA")
+
+    def _as_dict(d):
+        return d if isinstance(d, dict) else {}
+
+    try:
+        from services.memory_service import memory_service
+        session_id = req.headers.get("Session-ID") or "test_session"
+        agent_id = req.headers.get("Agent-ID") or "TestAgent"
+
+        logging.info(f"ðŸ” COPILOTO Headers: Session={session_id}, Agent={agent_id}")
+
+        interacciones = memory_service.get_session_history(session_id) or []
+        memoria_previa = {
+            "tiene_historial": len(interacciones) > 0,
+            "interacciones_recientes": interacciones,
+            "total_interacciones": len(interacciones),
+            "session_id": session_id
+        }
+
+        logging.info(f"ðŸ§  COPILOTO Memoria cargada: {len(interacciones)} interacciones")
+
+        setattr(req, "_memoria_contexto", memoria_previa)
+
+        # ðŸ’¾ REGISTRAR INTERACCIÃ“N EN MEMORIA
+        try:
+            body = req.get_json() or {}
+            comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
+
+            memory_service.registrar_llamada(
+                source="copiloto",
+                endpoint="/api/copiloto",
+                method=req.method,
+                params={"comando": comando, "consulta": comando, "session_id": session_id, "agent_id": agent_id},
+                response_data={"procesando": True},
+                success=True
+            )
+            logging.info(f"ðŸ’¾ COPILOTO InteracciÃ³n registrada: {comando}")
+        except Exception as reg_error:
+            logging.warning(f"âš ï¸ Error registrando en memoria: {reg_error}")
+
+    except Exception as e:
+        logging.error(f"âŒ COPILOTO Error cargando memoria: {e}")
+        memoria_previa = {}
+        session_id = None
+
+    from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
+    from semantic_helpers import generar_sugerencias_contextuales, interpretar_con_contexto_semantico
+
+    logging.info('ðŸ¤– Copiloto SemÃ¡ntico activado')
+
+    # ðŸ§  OBTENER CONTEXTO SEMÃNTICO DEL WRAPPER AUTOMÃTICO
+    contexto_semantico = getattr(req, '_contexto_semantico', {}) or {}
+    memoria_previa = getattr(req, '_memoria_contexto', {}) or {}
+    
+    body = req.get_json() or {}
+    comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
+    # Extraer consulta del request
+    try:
+        consulta = body.get("consulta") or body.get("query") or body.get("mensaje") or body.get("prompt") or ""
+
+        if consulta:
+            # ðŸ§  CLASIFICACIÃ“N SEMÃNTICA ROBUSTA PARA DETECTAR INTENCIÃ“N DE CONTEXTO
+            from intelligent_intent_detector import analizar_intencion_semantica
+
+            clasificacion = analizar_intencion_semantica(consulta) or {}
+            tipo_intencion = clasificacion.get("tipo", "")
+            confianza = clasificacion.get("confianza", 0)
+
+            # Detectar patrones especÃ­ficos de consultas de contexto/memoria
+            es_consulta_contexto = detectar_consulta_contexto_semantica(consulta) or {}
+
+            # Combinar clasificaciÃ³n semÃ¡ntica con detecciÃ³n de contexto
+            if es_consulta_contexto.get("es_contexto") and es_consulta_contexto.get("confianza", 0) > 0.6:
+                logging.info(f"ðŸ§  Consulta de contexto detectada: {es_consulta_contexto.get('tipo')} (confianza: {es_consulta_contexto.get('confianza'):.2f})")
+
+                # ðŸ”¥ APLICAR WRAPPER PARA OBTENER CONTEXTO SEMÃNTICO
+                from cosmos_memory_direct import aplicar_memoria_cosmos_directo
+                temp_response = {"procesando_consulta": True, "intencion_clasificada": es_consulta_contexto.get('tipo')}
+                temp_response = aplicar_memoria_cosmos_directo(req, temp_response) or {}
+                temp_response = _as_dict(temp_response)
+
+                # ðŸ§  GENERAR RESPUESTA ORIENTADA AL USUARIO CON RESUMEN SEMÃNTICO
+                try:
+                    from semantic_summarizer import generar_resumen_semantico_inteligente
+
+                    # Obtener interacciones del contexto
+                    interacciones = memoria_previa.get("interacciones_recientes", []) or []
+
+                    # Generar resumen semÃ¡ntico inteligente
+                    resumen_inteligente = generar_resumen_semantico_inteligente(
+                        interacciones,
+                        temp_response.get("contexto_inteligente", {}),
+                        temp_response.get("interpretacion_semantica", "")
+                    ) or ""
+
+                    # USAR DIRECTAMENTE EL RESUMEN COMO RESPUESTA PRINCIPAL
+                    respuesta_usuario = {
+                        "tipo": "respuesta_contextual_inteligente",
+                        "respuesta_usuario": resumen_inteligente,
+                        "mensaje": resumen_inteligente,  # AGREGAR MENSAJE DIRECTO
+                        "intencion_clasificada": es_consulta_contexto.get('tipo'),
+                        "contexto_aplicado": temp_response.get("contexto_inteligente", {}),
+                        "metadata": {
+                            "timestamp": datetime.now().isoformat(),
+                            "consulta_original": consulta,
+                            "fuente": "resumen_semantico_inteligente",
+                            "total_interacciones": len(interacciones)
+                        }
+                    }
+
+                except Exception as e:
+                    logging.warning(f"âš ï¸ Error generando resumen inteligente: {e}")
+                    # Fallback a la funciÃ³n original, asegurando dict de retorno
+                    respuesta_usuario = generar_respuesta_contextual_usuario(
+                        consulta,
+                        temp_response.get("contexto_inteligente", {}),
+                        temp_response.get("interpretacion_semantica", ""),
+                        memoria_previa,
+                        es_consulta_contexto.get('tipo', "")
+                    ) or {
+                        "tipo": "respuesta_contextual_fallback",
+                        "respuesta_usuario": "No fue posible generar resumen inteligente en este momento.",
+                        "intencion_clasificada": es_consulta_contexto.get('tipo')
+                    }
+
+                return func.HttpResponse(
+                    json.dumps(respuesta_usuario, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+
+            # ðŸ” DETECCIÃ“N INTELIGENTE DE BING GROUNDING (para otras consultas)
+            try:
+                bing_result = integrar_con_validador_semantico_inteligente(req, consulta, memoria_previa) or {}
+
+                # Si Bing ya resolviÃ³ la consulta completamente
+                if isinstance(bing_result.get("respuesta_final"), (dict, list, str)):
+                    return func.HttpResponse(
+                        json.dumps(bing_result["respuesta_final"], ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=200
+                    )
+
+                # Si se detectÃ³ necesidad de Bing pero fallÃ³, continuar con nota
+                if bing_result.get("bing_fallido"):
+                    logging.info(f"ðŸ” Bing Grounding detectado pero fallÃ³, continuando con flujo normal")
+            except Exception as redirect_error:
+                logging.warning(f"Error en redirecciÃ³n: {redirect_error}")
+                # Continuar con flujo normal si falla la redirecciÃ³n
+
+    except Exception as e:
+        logging.error(f"Error en detecciÃ³n Bing: {e}")
+        # Continuar con flujo normal si hay error
+
+    mensaje = req.params.get('mensaje', '') or (body.get("mensaje") if isinstance(body, dict) else "")
+    
+    # ðŸŽ¯ DETECCIÃ“N DE INTENCIONES Y ENRUTAMIENTO AUTOMÃTICO
+    if mensaje and not mensaje.startswith(("leer:", "buscar:", "explorar:", "analizar:", "generar:", "diagnosticar:")):
+        # Detectar intenciones comunes y redirigir
+        mensaje_lower = mensaje.lower()
+        
+        if any(kw in mensaje_lower for kw in ["verifica", "estado", "cosmos", "db", "base de datos"]):
+            # Redirigir a diagnÃ³stico de Cosmos DB
+            logging.info(f"ðŸŽ¯ IntenciÃ³n detectada: verificar Cosmos DB")
+            resultado = invocar_endpoint_directo_seguro("/api/diagnostico-recursos-completo", "GET", params={"recurso": "cosmos"})
+            resultado["intencion_detectada"] = "verificar_cosmos_db"
+            resultado["comando_original"] = mensaje
+            resultado["respuesta_usuario"] = f"VerificaciÃ³n de Cosmos DB solicitada: {mensaje}\n\nResultado: {resultado.get('mensaje', 'Procesando...')}"
+            return func.HttpResponse(
+                json.dumps(resultado, indent=2, ensure_ascii=False),
+                mimetype="application/json"
+            )
+        
+        elif any(kw in mensaje_lower for kw in ["diagnostica", "revisa", "analiza sistema"]):
+            logging.info(f"ðŸŽ¯ IntenciÃ³n detectada: diagnÃ³stico completo")
+            resultado = procesar_intencion_semantica("diagnosticar:completo", {})
+            resultado["intencion_detectada"] = "diagnostico_completo"
+            resultado["comando_original"] = mensaje
+            return func.HttpResponse(
+                json.dumps(resultado, indent=2, ensure_ascii=False),
+                mimetype="application/json"
+            )
+
+    if not mensaje:
+        # Panel inicial mejorado con capacidades semÃ¡nticas Y CONTEXTO ENRIQUECIDO
+        panel = {
+            "tipo": "panel_inicial",
+            "titulo": f"ðŸ¤– COPILOTO SEMÃNTICO - {'AZURE' if IS_AZURE else 'LOCAL'}",
+            "version": "2.0-semantic-enhanced",
+            "capacidades": SEMANTIC_CAPABILITIES,
+            "contexto_semantico": contexto_semantico,
+            "estado": {
+                "ambiente": "Azure" if IS_AZURE else "Local",
+                "blob_storage": {
+                    "configurado": bool(STORAGE_CONNECTION_STRING),
+                    "conectado": bool(get_blob_client()),
+                    "container": CONTAINER_NAME if STORAGE_CONNECTION_STRING else None
+                },
+                "cache_activo": len(CACHE),
+                "inteligencia": {
+                    "analisis_semantico": True,
+                    "generacion_artefactos": True,
+                    "sugerencias_contextuales": True,
+                    "memoria_semantica_activa": bool(contexto_semantico),
+                    "conocimiento_cognitivo": bool(contexto_semantico.get("conocimiento_cognitivo"))
+                }
+            },
+            "comandos": {
+                "basicos": {
+                    "leer:<ruta>": "Lee cualquier archivo del proyecto",
+                    "buscar:<patron>": "BÃºsqueda semÃ¡ntica inteligente",
+                    "explorar:<dir>": "Explora directorios con metadata"
+                },
+                "semanticos": {
+                    "analizar:<ruta>": "AnÃ¡lisis profundo de cÃ³digo",
+                    "generar:<tipo>": "Genera artefactos (readme, config, test, script)",
+                    "diagnosticar:<aspecto>": "DiagnÃ³stico del sistema",
+                    "sugerir": "Sugerencias basadas en contexto"
+                }
+            },
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "ready_for_agents": True,
+                "api_version": "2.0-enhanced",
+                "memoria_semantica_integrada": True,
+                "contexto_enriquecido": bool(contexto_semantico)
+            }
+        }
+
+        # ðŸ”¥ APLICAR WRAPPER AUTOMÃTICO TAMBIÃ‰N AL PANEL INICIAL
+        from cosmos_memory_direct import aplicar_memoria_cosmos_directo
+        panel = aplicar_memoria_cosmos_directo(req, panel) or _as_dict(panel)
+
+        # NOTA: La memoria semÃ¡ntica se registra automÃ¡ticamente por el wrapper @registrar_memoria
+
+        return func.HttpResponse(
+            json.dumps(panel, indent=2, ensure_ascii=False),
+            mimetype="application/json"
+        )
+
+    # Procesar comandos con respuesta estructurada
+    try:
+        respuesta_base = {
+            "tipo": "respuesta_semantica",
+            "timestamp": datetime.now().isoformat(),
+            "comando_original": mensaje,
+            "metadata": {
+                "procesado_por": "copiloto-semantico",
+                "ambiente": "Azure" if IS_AZURE else "Local",
+                "version": "2.0"
+            }
+        }
+
+        # Comando: leer
+        if mensaje.startswith("leer:"):
+            ruta = mensaje.split(":", 1)[1]
+            resultado = leer_archivo_dinamico(ruta) or {}
+            respuesta_base.update({
+                "accion": "leer_archivo",
+                "resultado": resultado,
+                "proximas_acciones": [
+                    f"analizar:{ruta}",
+                    f"generar:test para {ruta}",
+                    "buscar:archivos similares"
+                ] if resultado.get("exito") else ["buscar:*", "explorar:."]
+            })
+
+        # Comando: buscar (semÃ¡ntico)
+        elif mensaje.startswith("buscar:"):
+            patron = mensaje.split(":", 1)[1]
+            resultado = buscar_archivos_semantico(patron) or {}
+            respuesta_base.update({
+                "accion": "busqueda_semantica",
+                "resultado": resultado,
+                "proximas_acciones": [
+                    f"leer:{archivo['ruta']}" for archivo in resultado.get("archivos", [])[:3]
+                ] + ["explorar:directorio relevante"]
+            })
+
+        # Comando: explorar
+        elif mensaje.startswith("explorar:"):
+            directorio = mensaje.split(":", 1)[1]
+            archivos = explorar_directorio_blob(directorio) if IS_AZURE else []
+            archivos = archivos or []
+
+            respuesta_base.update({
+                "accion": "explorar_directorio",
+                "resultado": {
+                    "directorio": directorio,
+                    "archivos": archivos[:30],
+                    "total": len(archivos),
+                    "estadisticas": {
+                        "tipos": {},
+                        "tamaÃ±o_total": sum(a.get("tamaÃ±o", 0) for a in archivos)
+                    }
+                },
+                "proximas_acciones": [
+                    f"analizar:{directorio}/*.py",
+                    f"generar:readme para {directorio}"
+                ]
+            })
+
+        # Comando: analizar
+        elif mensaje.startswith("analizar:"):
+            ruta = mensaje.split(":", 1)[1]
+            resultado = analizar_codigo_semantico(ruta) or {}
+            respuesta_base.update({
+                "accion": "analisis_semantico",
+                "resultado": resultado,
+                "proximas_acciones": resultado.get("intenciones_sugeridas", [])
+            })
+
+        # Comando: generar
+        elif mensaje.startswith("generar:"):
+            partes = mensaje.split(":", 1)[1].split(" para ")
+            tipo = partes[0]
+            contexto = {"target": partes[1]} if len(partes) > 1 else {}
+
+            resultado = generar_artefacto(tipo, contexto) or {}
+            respuesta_base.update({
+                "accion": "generar_artefacto",
+                "resultado": resultado,
+                "proximas_acciones": [
+                    "leer:archivo generado",
+                    "analizar:calidad del artefacto"
+                ]
+            })
+
+        # Comando: diagnosticar (CON CONTEXTO SEMÃNTICO)
+        elif mensaje.startswith("diagnosticar:"):
+            parametros_enriquecidos = {"contexto_semantico": contexto_semantico}
+            resultado = procesar_intencion_semantica(mensaje, parametros_enriquecidos) or {}
+
+            if contexto_semantico.get("conocimiento_cognitivo") and isinstance(resultado, dict):
+                resultado["evaluacion_cognitiva"] = contexto_semantico["conocimiento_cognitivo"]
+
+            respuesta_base.update({
+                "accion": "diagnostico_enriquecido",
+                "resultado": resultado,
+                "proximas_acciones": ["sugerir", "explorar:.", "analizar:tendencias"]
+            })
+
+        # Comando: sugerir (CON CONTEXTO SEMÃNTICO)
+        elif mensaje == "sugerir":
+            sugerencias_contextuales = generar_sugerencias_contextuales(contexto_semantico) or []
+            resultado = procesar_intencion_semantica("sugerir", {"contexto_semantico": contexto_semantico}) or {}
+
+            if isinstance(resultado, dict) and resultado.get("exito"):
+                resultado["sugerencias_contextuales"] = sugerencias_contextuales
+                resultado["sugerencias"] = (resultado.get("sugerencias", []) + sugerencias_contextuales)[:10]
+
+            respuesta_base.update({
+                "accion": "sugerencias_enriquecidas",
+                "resultado": resultado,
+                "proximas_acciones": resultado.get("sugerencias", [])[:3] if resultado.get("exito") else []
+            })
+
+        # Comando no reconocido - interpretaciÃ³n semÃ¡ntica ENRIQUECIDA
+        else:
+            interpretacion_enriquecida = interpretar_con_contexto_semantico(mensaje, contexto_semantico) or {}
+            respuesta_base.update({
+                "accion": "interpretacion_enriquecida",
+                "resultado": {
+                    "mensaje": "No reconozco ese comando especÃ­fico, pero basÃ¡ndome en el contexto puedo sugerir:",
+                    "interpretacion": interpretacion_enriquecida.get("interpretacion", f"Parece que quieres: {mensaje}"),
+                    "sugerencias": interpretacion_enriquecida.get("sugerencias", [
+                        "buscar:" + mensaje,
+                        "generar:script para " + mensaje,
+                        "sugerir"
+                    ]),
+                    "contexto_aplicado": bool(contexto_semantico)
+                },
+                "proximas_acciones": ["sugerir", "buscar:*", "diagnosticar:sistema"]
+            })
+
+        # Asegurar respuesta_base es dict antes de usar
+        respuesta_base = _as_dict(respuesta_base)
+
+        # CONSTRUIR MENSAJE ENRIQUECIDO CON CONTEXTO SEMÃNTICO DIRECTAMENTE EN EL MENSAJE PRINCIPAL
+        contexto_inteligente = getattr(req, '_contexto_inteligente', {}) or {}
+        interpretacion_semantica = getattr(req, '_interpretacion_semantica', "") or ""
+
+        resumen_conversacion = memoria_previa.get("resumen_conversacion", "") if isinstance(memoria_previa, dict) else ""
+        total_interacciones = memoria_previa.get("total_interacciones", 0) if isinstance(memoria_previa, dict) else 0
+        conocimiento_cognitivo = contexto_semantico.get("conocimiento_cognitivo", {}) if isinstance(contexto_semantico, dict) else {}
+
+        if contexto_inteligente.get("resumen_inteligente"):
+            resumen_conversacion = contexto_inteligente["resumen_inteligente"]
+        if contexto_inteligente.get("total_analizado"):
+            total_interacciones = contexto_inteligente["total_analizado"]
+
+        accion_ejecutada = respuesta_base.get('accion', 'desconocida')
+        mensaje_enriquecido = f"""ðŸ¤– COPILOTO SEMÃNTICO - RESPUESTA PROCESADA
+
+ðŸ“Š CONTEXTO SEMÃNTICO:
+â€¢ SesiÃ³n activa: {'SÃ­' if memoria_previa and memoria_previa.get('tiene_historial') else 'No'}
+â€¢ Interacciones previas: {total_interacciones}
+â€¢ Resumen conversaciÃ³n: {resumen_conversacion[:200] + '...' if len(resumen_conversacion) > 200 else resumen_conversacion}
+â€¢ Conocimiento cognitivo: {'Disponible' if conocimiento_cognitivo else 'No disponible'}
+
+ðŸ§  INTERPRETACIÃ“N SEMÃNTICA:
+{interpretacion_semantica if interpretacion_semantica else 'No disponible'}
+
+ðŸ“Œ CONTEXTO INTELIGENTE:
+{contexto_inteligente.get('modo_operacion', 'N/A')} | Contexto seleccionado: {contexto_inteligente.get('contexto_seleccionado', 0)} | Total analizado: {contexto_inteligente.get('total_analizado', 0)}
+
+ðŸŽ¯ ACCIÃ“N EJECUTADA: {accion_ejecutada.replace('_', ' ').title()}
+
+"""
+
+        # Detalles segÃºn acciÃ³n (defensivo, usando .get)
+        if accion_ejecutada == "leer_archivo":
+            resultado = respuesta_base.get("resultado", {}) or {}
+            if resultado.get("exito"):
+                mensaje_enriquecido += f"âœ… Archivo leÃ­do exitosamente: {resultado.get('ruta', 'desconocida')}\n"
+                contenido_preview = resultado.get('contenido') or ""
+                if contenido_preview:
+                    mensaje_enriquecido += f"ðŸ“„ Contenido: {contenido_preview[:300]}...\n"
+            else:
+                mensaje_enriquecido += f"âŒ Error leyendo archivo: {resultado.get('error', 'desconocido')}\n"
+
+        elif accion_ejecutada == "busqueda_semantica":
+            resultado = respuesta_base.get("resultado", {}) or {}
+            archivos = resultado.get("archivos", []) or []
+            mensaje_enriquecido += f"ðŸ” BÃºsqueda completada: {len(archivos)} archivos encontrados\n"
+            if archivos:
+                mensaje_enriquecido += "ðŸ“ Archivos encontrados:\n"
+                for archivo in archivos[:3]:
+                    mensaje_enriquecido += f"  â€¢ {archivo.get('ruta', '')} (relevancia: {archivo.get('relevancia', 0):.1f})\n"
+
+        # ... (otros casos mantienen la misma lÃ³gica defensiva) ...
+
+        proximas_acciones = respuesta_base.get("proximas_acciones", []) or []
+        if proximas_acciones:
+            mensaje_enriquecido += f"\nðŸŽ¯ PRÃ“XIMAS ACCIONES POSIBLES:\n"
+            for accion in proximas_acciones[:3]:
+                mensaje_enriquecido += f"  â€¢ {accion}\n"
+
+        respuesta_base["mensaje"] = mensaje_enriquecido
+
+        # ðŸ”¥ APLICAR WRAPPER AUTOMÃTICO PARA CONTEXTO_INTELIGENTE E INTERPRETACION_SEMANTICA
+        from cosmos_memory_direct import aplicar_memoria_cosmos_directo
+        respuesta_base = aplicar_memoria_cosmos_directo(req, respuesta_base) or _as_dict(respuesta_base)
+
+        # ðŸ§  EXTRAER CONTEXTO_INTELIGENTE E INTERPRETACION_SEMANTICA DEL WRAPPER
+        contexto_inteligente_wrapper = respuesta_base.get("contexto_inteligente", {}) or {}
+        interpretacion_semantica_wrapper = respuesta_base.get("interpretacion_semantica", "") or ""
+
+        # ðŸ”„ RECONSTRUIR MENSAJE CON INFORMACIÃ“N DEL WRAPPER SI ESTÃ DISPONIBLE
+        if contexto_inteligente_wrapper or interpretacion_semantica_wrapper:
+            mensaje_final = f"""ðŸ¤– COPILOTO SEMÃNTICO - RESPUESTA PROCESADA CON MEMORIA
+
+ðŸ“Š CONTEXTO SEMÃNTICO:
+â€¢ SesiÃ³n activa: {'SÃ­' if memoria_previa and memoria_previa.get('tiene_historial') else 'No'}
+â€¢ Interacciones previas: {contexto_inteligente_wrapper.get('total_analizado', total_interacciones)}
+â€¢ Resumen inteligente: {contexto_inteligente_wrapper.get('resumen_inteligente', resumen_conversacion)}
+
+ðŸ§  INTERPRETACIÃ“N SEMÃNTICA:
+{interpretacion_semantica_wrapper if interpretacion_semantica_wrapper else 'No disponible'}
+
+ðŸ“Œ CONTEXTO INTELIGENTE:
+{contexto_inteligente_wrapper.get('modo_operacion', 'N/A')} | Contexto seleccionado: {contexto_inteligente_wrapper.get('contexto_seleccionado', 0)} | Total analizado: {contexto_inteligente_wrapper.get('total_analizado', 0)}
+
+ðŸŽ¯ ACCIÃ“N EJECUTADA: {accion_ejecutada.replace('_', ' ').title()}
+
+"""
+            # Agregar prÃ³ximas acciones si existen
+            proximas_acciones = respuesta_base.get("proximas_acciones", []) or []
+            if proximas_acciones:
+                mensaje_final += f"\nðŸŽ¯ PRÃ“XIMAS ACCIONES POSIBLES:\n"
+                for accion in proximas_acciones[:3]:
+                    mensaje_final += f"  â€¢ {accion}\n"
+
+            respuesta_base["mensaje"] = mensaje_final
+
+        # ðŸ§  APLICAR POSTPROCESAMIENTO PARA GENERAR RESPUESTA NATURAL AL USUARIO
+        try:
+            contexto_detectado = detectar_consulta_contexto_semantica(mensaje) or {}
+            if contexto_detectado.get("es_contexto", False):
+                respuesta_semantica = generar_respuesta_contextual_usuario(
+                    consulta=mensaje,
+                    contexto_inteligente=respuesta_base.get("contexto_inteligente", {}) or {},
+                    interpretacion_semantica=respuesta_base.get("interpretacion_semantica", "") or "",
+                    memoria_previa=memoria_previa,
+                    intencion_detectada=contexto_detectado.get("tipo", "")
+                ) or {}
+                respuesta_base["respuesta_usuario"] = respuesta_semantica.get("respuesta_usuario")
+                respuesta_base["intencion_clasificada"] = respuesta_semantica.get("intencion_clasificada")
+                respuesta_base["contexto_aplicado"] = respuesta_semantica.get("contexto_aplicado")
+                logging.info(f"ðŸ§  Respuesta contextual generada en copiloto: {str(respuesta_base.get('respuesta_usuario',''))[:100]}...")
+        except Exception as e:
+            logging.warning(f"âš ï¸ Error en postprocesamiento contextual copiloto: {e}")
+
+        # Registrar con datos enriquecidos
+        try:
+            from services.memory_service import memory_service
+            session_id = req.headers.get("Session-ID") or "unknown"
+            agent_id = req.headers.get("Agent-ID") or "unknown"
+            accion = respuesta_base.get("accion", "consulta")
+            resultado_exito = respuesta_base.get("resultado", {}).get("exito", True) if isinstance(respuesta_base.get("resultado"), dict) else True
+            texto_semantico = f"Usuario solicito: {comando}. Accion: {accion}. Resultado: {'OK' if resultado_exito else 'FAIL'}."
+            respuesta_base["texto_semantico"] = texto_semantico
+            respuesta_base["respuesta_usuario"] = respuesta_base.get("respuesta_usuario") or respuesta_base.get("mensaje", "")[:500]
+            memory_service.registrar_llamada(source="copiloto", endpoint="/api/copiloto", method=req.method, params={"comando": comando, "consulta": comando, "mensaje": comando, "session_id": session_id, "agent_id": agent_id}, response_data=respuesta_base, success=resultado_exito)
+            logging.info(f"Registrado: {texto_semantico[:80]}")
+        except Exception as e:
+            logging.warning(f"Error registrando: {e}")
+
+        return func.HttpResponse(
+            json.dumps(respuesta_base, indent=2, ensure_ascii=False),
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        return func.HttpResponse(
+            json.dumps({
+                "tipo": "error",
+                "error": str(e),
+                "detalles": {
+                    "tipo_error": type(e).__name__,
+                    "ambiente": "Azure" if IS_AZURE else "Local",
+                    "blob_configurado": bool(STORAGE_CONNECTION_STRING)
+                },
+                "sugerencias": [
+                    "Verificar la sintaxis del comando",
+                    "Consultar el panel inicial para ver comandos disponibles",
+                    "Intentar con 'sugerir' para obtener ayuda"
+                ]
+            }, indent=2),
+            mimetype="application/json",
+            status_code=500
+        )

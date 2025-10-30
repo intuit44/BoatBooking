@@ -34,4 +34,7 @@ azure-mgmt-network
 # Cosmos DB support
 azure-cosmos>=4.2.0
 
+# Azure AI Search support
+azure-search-documents>=11.4.0
+
 psutil==5.9.8

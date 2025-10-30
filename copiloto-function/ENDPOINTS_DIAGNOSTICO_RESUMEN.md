@@ -7,6 +7,7 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
 ## 📋 Endpoints Implementados
 
 ### 1. `/api/verificar-app-insights`
+
 - **Función**: `verificar_app_insights()`
 - **Propósito**: Verifica conectividad con Application Insights usando SDK con DefaultAzureCredential
 - **Estado**: ✅ **CORREGIDO**
@@ -16,6 +17,7 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
   - Código limpio y sin errores de Pylance
 
 ### 2. `/api/verificar-cosmos`
+
 - **Función**: `verificar_cosmos()`
 - **Propósito**: Verifica conectividad con CosmosDB usando clave o Managed Identity
 - **Estado**: ✅ **CORREGIDO Y MEJORADO**
@@ -26,6 +28,7 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
   - Respuesta JSON completa con metadata
 
 ### 3. `/api/verificar-sistema`
+
 - **Función**: `verificar_estado_sistema()`
 - **Propósito**: Autodiagnóstico completo del sistema
 - **Estado**: ✅ **FUNCIONANDO**
@@ -37,6 +40,7 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
 ## 🧪 Resultados de Pruebas
 
 ### Application Insights
+
 ```json
 {
   "exito": false,
@@ -44,9 +48,11 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
   "mensaje": "Esto es normal en desarrollo local"
 }
 ```
+
 **✅ Comportamiento esperado**: En desarrollo local no tenemos configurado Application Insights.
 
 ### CosmosDB
+
 ```json
 {
   "exito": false,
@@ -54,17 +60,20 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
   "auth_method": "MI"
 }
 ```
+
 **✅ Comportamiento esperado**: CosmosDB está configurado para usar solo AAD, no claves locales.
 
 ## 🔧 Correcciones Aplicadas
 
-### Errores de Pylance Corregidos:
+### Errores de Pylance Corregidos
+
 1. **Importaciones duplicadas**: Eliminadas las importaciones redundantes
 2. **Parámetros innecesarios**: Removido `default=str` en `json.dumps()`
 3. **Funciones incompletas**: Completada la función `verificar_cosmos`
 4. **Manejo de errores**: Mejorado el manejo de excepciones
 
-### Mejoras de Funcionalidad:
+### Mejoras de Funcionalidad
+
 1. **Fallback inteligente**: CosmosDB intenta clave → Managed Identity
 2. **Logging mejorado**: Mensajes informativos para debugging
 3. **Respuestas estructuradas**: JSON consistente con metadata
@@ -73,6 +82,7 @@ Los endpoints de diagnóstico han sido **corregidos y están funcionando correct
 ## 🚀 Uso en Producción
 
 En **Azure**, estos endpoints funcionarán perfectamente porque:
+
 - **Managed Identity** estará disponible automáticamente
 - **Application Insights** tendrá `APPINSIGHTS_WORKSPACE_ID` configurado
 - **CosmosDB** usará autenticación AAD sin problemas
