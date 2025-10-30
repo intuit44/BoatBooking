@@ -17,6 +17,8 @@ from hybrid_processor import process_hybrid_request
 from azure.mgmt.resource import ResourceManagementClient
 from bing_grounding_fallback import ejecutar_bing_grounding_fallback
 from utils_helpers import is_running_in_azure, get_run_id, api_ok, api_err
+from file_summarizer import generar_resumen_archivo
+from semantic_query_builder import interpretar_intencion_agente, construir_query_dinamica, ejecutar_query_cosmos
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
@@ -317,7 +319,7 @@ if not globals().get("_APPINSIGHTS_INITIALIZED", False):
         # Marcar como inicializado para evitar reintentos posteriores en este proceso
         globals()["_APPINSIGHTS_INITIALIZED"] = True
 
-# --- FunctionApp instance ---
+# --- FunctionApp instance (CREAR PRIMERO) ---
 app = func.FunctionApp()
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -328,45 +330,7 @@ except ImportError:
     def render_tool_response(status_code: int, payload: dict) -> str:
         return f"Status {status_code}: {payload.get('error', 'Unknown error')}"
 
-# --- Registrar endpoints modulares ---
-try:
-    from msearch_endpoint import register_msearch_endpoint
-    register_msearch_endpoint(app)
-    logging.info("✅ Endpoint msearch registrado correctamente")
-except ImportError as e:
-    logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
-except Exception as e:
-    logging.error(f"❌ Error registrando msearch: {e}")
-    logging.error(f"Traceback: {traceback.format_exc()}")
-
-try:
-    from buscar_interacciones_endpoint import register_buscar_interacciones_endpoint
-    register_buscar_interacciones_endpoint(app)
-    logging.info("✅ Endpoint buscar-interacciones registrado correctamente")
-except ImportError as e:
-    logging.warning(f"⚠️ No se pudo registrar endpoint buscar-interacciones: {e}")
-except Exception as e:
-    logging.error(f"❌ Error registrando buscar-interacciones: {e}")
-    logging.error(f"Traceback: {traceback.format_exc()}")
-
-# --- Red, almacenamiento y otros ---
-
-# --- FunctionApp instance ---
-app = func.FunctionApp()
-sys.path.insert(0, os.path.dirname(__file__))
-
-# --- Registrar endpoints modulares DESPUÉS de crear app ---
-try:
-    from msearch_endpoint import register_msearch_endpoint
-    register_msearch_endpoint(app)
-    logging.info("✅ Endpoint msearch registrado correctamente")
-except ImportError as e:
-    logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
-except Exception as e:
-    logging.error(f"❌ Error registrando msearch: {e}")
-    logging.error(f"Traceback: {traceback.format_exc()}")
-
-# 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - APLICAR ANTES DE DEFINIR ENDPOINTS
+# 🧠 WRAPPER AUTOMÁTICO DE MEMORIA - APLICAR ANTES DE IMPORTAR ENDPOINTS
 try:
     from memory_route_wrapper import apply_memory_wrapper
     apply_memory_wrapper(app)
@@ -374,6 +338,50 @@ try:
 except Exception as e:
     logging.error(f"❌ WRAPPER FALLÓ: {e}")
     logging.error(f"Traceback: {traceback.format_exc()}")
+
+# --- Registrar endpoints modulares DESPUÉS de crear app y aplicar wrapper ---
+# (Los endpoints se auto-registran al importarse con decoradores @app.route)
+try:
+    import endpoints.msearch
+    logging.info("✅ Endpoint msearch registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando msearch: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
+    import buscar_interacciones_endpoint
+    logging.info("✅ Endpoint buscar-interacciones registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint buscar-interacciones: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando buscar-interacciones: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
+    import endpoints.sugerencias
+    logging.info("✅ Endpoint sugerencias registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint sugerencias: {e}")
+
+try:
+    import endpoints.contexto_inteligente
+    logging.info("✅ Endpoint contexto-inteligente registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint contexto-inteligente: {e}")
+
+try:
+    import endpoints.memoria_global
+    logging.info("✅ Endpoint memoria-global registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint memoria-global: {e}")
+
+try:
+    import endpoints.diagnostico
+    logging.info("✅ Endpoint diagnostico registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint diagnostico: {e}")
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -1633,13 +1641,17 @@ def handle_api_function_request_dict(path: str, run_id: str) -> dict:
     if IS_AZURE:
         blob_result = leer_archivo_blob("function_app.py")
         if blob_result["exito"]:
+            contenido = blob_result["contenido"]
+            # 🧠 GENERAR RESUMEN SEMÁNTICO DEL CONTENIDO
+            resumen = f"He leído el archivo function_app.py ({len(contenido)} caracteres). Contiene {contenido.count('def ')} funciones Python y {contenido.count('@app.route')} endpoints HTTP."
             return {
                 "exito": True,
-                "contenido": blob_result["contenido"],
+                "contenido": contenido,
                 "tipo": "python",
                 "ruta": blob_result["ruta"],
                 "fuente": blob_result["fuente"],
                 "mensaje": f"Código de función API desde Blob: {path}",
+                "texto_semantico": resumen,  # 🔥 AGREGAR RESUMEN SEMÁNTICO
                 "run_id": run_id,
                 "metadata": blob_result.get("metadata", {})
             }
@@ -1648,6 +1660,8 @@ def handle_api_function_request_dict(path: str, run_id: str) -> dict:
     try:
         with open("function_app.py", "r", encoding="utf-8") as f:
             contenido = f.read()
+        # 🧠 GENERAR RESUMEN SEMÁNTICO DEL CONTENIDO
+        resumen = f"He leído el archivo function_app.py ({len(contenido)} caracteres). Contiene {contenido.count('def ')} funciones Python y {contenido.count('@app.route')} endpoints HTTP."
         return {
             "exito": True,
             "contenido": contenido,
@@ -1655,6 +1669,7 @@ def handle_api_function_request_dict(path: str, run_id: str) -> dict:
             "ruta": "function_app.py",
             "fuente": "Sistema Local",
             "mensaje": f"Código de función API: {path}",
+            "texto_semantico": resumen,  # 🔥 AGREGAR RESUMEN SEMÁNTICO
             "run_id": run_id
         }
     except Exception as e:
@@ -1726,14 +1741,18 @@ def handle_file_request_dict(params: dict, run_id: str) -> dict:
     if IS_AZURE:
         blob_result = leer_archivo_blob(ruta)
         if blob_result["exito"]:
+            contenido = blob_result["contenido"]
+            # 🧠 GENERAR RESUMEN SEMÁNTICO INTELIGENTE
+            resumen = generar_resumen_archivo(ruta, contenido)
             return {
                 "exito": True,
-                "contenido": blob_result["contenido"],
+                "contenido": contenido,
                 "tipo": "markdown" if ruta.endswith(".md") else "text",
                 "ruta": blob_result["ruta"],
                 "tamaño": blob_result["tamaño"],
                 "fuente": blob_result["fuente"],
                 "mensaje": f"Archivo leído desde Blob Storage: {ruta}",
+                "texto_semantico": resumen,  # 🔥 AGREGAR RESUMEN SEMÁNTICO
                 "run_id": run_id,
                 "metadata": blob_result.get("metadata", {})
             }
@@ -1747,6 +1766,8 @@ def handle_file_request_dict(params: dict, run_id: str) -> dict:
             contenido = f.read()
         
         tipo = "markdown" if ruta.endswith(".md") else "text"
+        # 🧠 GENERAR RESUMEN SEMÁNTICO INTELIGENTE
+        resumen = generar_resumen_archivo(ruta, contenido)
             
         return {
             "exito": True,
@@ -1756,6 +1777,7 @@ def handle_file_request_dict(params: dict, run_id: str) -> dict:
             "tamaño": len(contenido),
             "fuente": "Sistema Local",
             "mensaje": f"Archivo leído exitosamente: {ruta}",
+            "texto_semantico": resumen,  # 🔥 AGREGAR RESUMEN SEMÁNTICO
             "run_id": run_id
         }
     except Exception as e:
@@ -4549,8 +4571,13 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     def _as_dict(d):
         return d if isinstance(d, dict) else {}
 
+    # Importar memory_service al inicio para evitar "possibly unbound"
+    from services.memory_service import memory_service
+    
+    memoria_previa = {}
+    session_id = None
+    
     try:
-        from services.memory_service import memory_service
         session_id = req.headers.get("Session-ID") or "test_session"
         agent_id = req.headers.get("Agent-ID") or "TestAgent"
 
@@ -4587,11 +4614,10 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
     except Exception as e:
         logging.error(f"❌ COPILOTO Error cargando memoria: {e}")
-        memoria_previa = {}
-        session_id = None
 
     from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
     from semantic_helpers import generar_sugerencias_contextuales, interpretar_con_contexto_semantico
+    from semantic_query_builder import interpretar_intencion_agente, construir_query_dinamica, ejecutar_query_cosmos
 
     logging.info('🤖 Copiloto Semántico activado')
 
@@ -4601,6 +4627,82 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     
     body = req.get_json() or {}
     comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
+    
+    # 🔍 DETECCIÓN DE QUERIES DINÁMICAS PARA MEMORIA
+    params_agente = dict(req.params)
+    params_completos = {**params_agente, **body}
+    
+    # Detectar si el agente solicita consulta avanzada de memoria
+    usar_query_dinamica = any([
+        params_completos.get("tipo"),
+        params_completos.get("contiene"),
+        params_completos.get("endpoint"),
+        params_completos.get("exito") is not None,
+        params_completos.get("fecha_inicio"),
+        params_completos.get("fecha_fin"),
+        "historial" in comando.lower() and any(k in params_completos for k in ["tipo", "contiene", "endpoint"])
+    ])
+    
+    if usar_query_dinamica:
+        logging.info(f"🔍 COPILOTO: Query dinámica detectada, redirigiendo a query builder")
+        
+        # Interpretar intención del agente
+        intencion_params = interpretar_intencion_agente(
+            params_completos.get("query", params_completos.get("mensaje", "")),
+            dict(req.headers)
+        )
+        
+        # Sobrescribir con parámetros explícitos
+        for key in ["tipo", "contiene", "endpoint", "exito", "fecha_inicio", "fecha_fin", "orden", "limite"]:
+            if key in params_completos:
+                intencion_params[key] = params_completos[key]
+        
+        # Asegurar session_id
+        intencion_params["session_id"] = session_id or "unknown"
+        
+        try:
+            # Construir y ejecutar query SQL dinámica
+            query_sql = construir_query_dinamica(**intencion_params)
+            cosmos_container = memory_service.memory_container
+            resultados = ejecutar_query_cosmos(query_sql, cosmos_container)
+            
+            limit = int(intencion_params.get("limite", 10))
+            interacciones_formateadas = []
+            
+            for i, item in enumerate(resultados[:limit]):
+                interacciones_formateadas.append({
+                    "numero": i + 1,
+                    "timestamp": item.get("timestamp", ""),
+                    "endpoint": item.get("endpoint", ""),
+                    "texto_semantico": item.get("texto_semantico", ""),
+                    "exito": item.get("exito", True),
+                    "tipo": item.get("tipo", "interaccion_usuario")
+                })
+            
+            response_data = {
+                "exito": True,
+                "respuesta_usuario": f"Encontradas {len(interacciones_formateadas)} interacciones que coinciden con los filtros.",
+                "interacciones": interacciones_formateadas,
+                "total": len(resultados),
+                "query_dinamica_aplicada": True,
+                "filtros_aplicados": intencion_params,
+                "session_id": session_id,
+                "metadata": {
+                    "query_sql": query_sql[:200] + "...",
+                    "timestamp": datetime.now().isoformat(),
+                    "dispatcher": "copiloto"
+                }
+            }
+            
+            return func.HttpResponse(
+                json.dumps(response_data, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+        except Exception as e:
+            logging.error(f"❌ Error ejecutando query dinámica en copiloto: {e}")
+            # Continuar con flujo normal si falla
+    
     # Extraer consulta del request
     try:
         consulta = body.get("consulta") or body.get("query") or body.get("mensaje") or body.get("prompt") or ""

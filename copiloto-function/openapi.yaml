@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Copiloto Function Gateway",
-    "version": "3.4",
-    "description": "Sistema completo con memoria automática integrada, consulta previa y guardado automático de interacciones en Cosmos DB",
+    "version": "3.5",
+    "description": "Sistema completo con memoria automática integrada, queries dinámicas, consulta previa y guardado automático de interacciones en Cosmos DB",
     "license": {
       "name": "MIT",
       "url": "https://opensource.org/licenses/MIT"
@@ -2533,8 +2533,8 @@
     },
     "/api/historial-interacciones": {
       "get": {
-        "summary": "📜 HISTORIAL DE INTERACCIONES - Consulta memoria de sesión",
-        "description": "Consulta el historial de interacciones de una sesión específica desde Cosmos DB. Devuelve las últimas interacciones con endpoints correctos detectados automáticamente.",
+        "summary": "📜 HISTORIAL CON QUERIES DINÁMICAS - Consulta memoria con filtros avanzados",
+        "description": "Consulta el historial de interacciones con queries dinámicas. Soporta filtros avanzados: tipo, contiene, endpoint, exito, fecha_inicio, fecha_fin, orden, limite. Devuelve interacciones filtradas con endpoints correctos detectados automáticamente.",
         "operationId": "historialInteracciones",
         "tags": [
           "🧠 Memoria Integrada"
@@ -2578,6 +2578,66 @@
             "description": "ID de sesión como parámetro alternativo",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "description": "Filtrar por tipo de interacción (error, consulta, comando)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contiene",
+            "in": "query",
+            "description": "Buscar texto en texto_semantico",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endpoint",
+            "in": "query",
+            "description": "Filtrar por endpoint específico",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exito",
+            "in": "query",
+            "description": "Filtrar por éxito/fallo",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fecha_inicio",
+            "in": "query",
+            "description": "Fecha de inicio (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "fecha_fin",
+            "in": "query",
+            "description": "Fecha de fin (ISO 8601)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "description": "Orden de resultados",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
             }
           }
         ],
@@ -2700,8 +2760,8 @@
     },
     "/api/copiloto": {
       "get": {
-        "summary": "🧠 COPILOTO CON MEMORIA INTEGRADA - Endpoint principal con historial automático",
-        "description": "Endpoint principal del copiloto que incluye consulta automática de memoria, detección de intenciones de historial y respuesta directa con contexto de conversación. Integra automáticamente el sistema de memoria de Cosmos DB.",
+        "summary": "🧠 COPILOTO CON MEMORIA Y QUERIES DINÁMICAS - Endpoint principal con historial automático",
+        "description": "Endpoint principal del copiloto que incluye consulta automática de memoria, queries dinámicas para filtrado avanzado, detección de intenciones de historial y respuesta directa con contexto de conversación. Integra automáticamente el sistema de memoria de Cosmos DB. Soporta filtros: tipo, contiene, endpoint, exito, fecha_inicio, fecha_fin, orden, limite.",
         "operationId": "copiloto",
         "tags": [
           "🧠 Memoria Integrada"
@@ -3149,6 +3209,201 @@
         }
       }
     },
+    "/api/sugerencias": {
+      "get": {
+        "summary": "💡 SUGERENCIAS CONTEXTUALES - Genera sugerencias basadas en historial",
+        "description": "Genera sugerencias inteligentes basadas en el historial de interacciones de la sesión. Usa queries dinámicas para analizar patrones y recomendar acciones.",
+        "operationId": "sugerencias",
+        "tags": [
+          "🧠 Memoria Integrada"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "description": "ID de sesión para obtener sugerencias contextuales",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número máximo de sugerencias",
+            "schema": {
+              "type": "integer",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sugerencias generadas exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "sugerencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "basadas_en_historial": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contexto-inteligente": {
+      "get": {
+        "summary": "🧠 CONTEXTO INTELIGENTE - Devuelve contexto interpretado filtrado",
+        "description": "Devuelve contexto inteligente filtrado de la sesión usando queries dinámicas. Genera resumen semántico del contexto.",
+        "operationId": "contextoInteligente",
+        "tags": [
+          "🧠 Memoria Integrada"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Session-ID",
+            "in": "header",
+            "description": "ID de sesión",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contexto obtenido exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "contexto": {
+                      "type": "object"
+                    },
+                    "resumen_semantico": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memoria-global": {
+      "get": {
+        "summary": "💾 MEMORIA GLOBAL - Deduplicación multi-sesión",
+        "description": "Consulta interacciones de múltiples sesiones con deduplicación semántica. Usa queries dinámicas para filtrar y resumir.",
+        "operationId": "memoriaGlobal",
+        "tags": [
+          "🧠 Memoria Integrada"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número máximo de interacciones",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memoria global obtenida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "interacciones_globales": {
+                      "type": "array"
+                    },
+                    "deduplicadas": {
+                      "type": "boolean"
+                    },
+                    "total_sesiones": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/diagnostico": {
+      "get": {
+        "summary": "🔍 DIAGNÓSTICO DE SESIÓN - Analiza qué ocurrió en una sesión",
+        "description": "Analiza interacciones de una sesión específica, detecta patrones de errores y genera diagnóstico con métricas.",
+        "operationId": "diagnostico",
+        "tags": [
+          "🧠 Memoria Integrada"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "description": "ID de sesión a diagnosticar",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnóstico completado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "diagnostico": {
+                      "type": "object"
+                    },
+                    "metricas": {
+                      "type": "object"
+                    },
+                    "patrones_detectados": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/msearch": {
       "post": {
         "summary": "🔍 ANÁLISIS SEMÁNTICO AVANZADO - Detección de clases, funciones, duplicados y errores lógicos",
@@ -3542,62 +3797,186 @@
           }
         }
       }
+    },
+      "/api/buscar-memoria": {
+      "post": {
+        "operationId": "buscarMemoriaSematica",
+        "summary": "Buscar en memoria semántica usando Azure AI Search",
+        "description": "Busca documentos en el índice de memoria semántica usando Managed Identity. No requiere claves en el payload.",
+        "tags": ["🧠 Memoria Semántica"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Texto de búsqueda semántica",
+                    "example": "errores recientes en ejecutar_cli"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Filtrar por agente específico"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "Filtrar por sesión específica"
+                  },
+                  "top": {
+                    "type": "integer",
+                    "description": "Número máximo de resultados",
+                    "default": 10
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "description": "Filtrar por tipo de documento"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Búsqueda exitosa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {"type": "boolean"},
+                    "total": {"type": "integer"},
+                    "documentos": {"type": "array"},
+                    "metadata": {"type": "object"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/indexar-memoria": {
+      "post": {
+        "operationId": "indexarMemoriaSematica",
+        "summary": "Indexar documentos en memoria semántica",
+        "description": "Indexa documentos en Azure AI Search usando Managed Identity.",
+        "tags": ["🧠 Memoria Semántica"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["documentos"],
+                "properties": {
+                  "documentos": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["id", "agent_id", "texto_semantico"],
+                      "properties": {
+                        "id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                        "session_id": {"type": "string"},
+                        "endpoint": {"type": "string"},
+                        "timestamp": {"type": "string", "format": "date-time"},
+                        "tipo": {"type": "string"},
+                        "texto_semantico": {"type": "string"},
+                        "vector": {"type": "array", "items": {"type": "number"}},
+                        "exito": {"type": "boolean"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Indexación exitosa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {"type": "boolean"},
+                    "documentos_subidos": {"type": "integer"},
+                    "resultado": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
-  },
-  "tags": [
-    {
-      "name": "Azure Storage",
-      "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
-    },
-    {
-      "name": "🚀 Universal CLI Executor",
-      "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
-    },
-    {
-      "name": "Diagnóstico",
-      "description": "Diagnóstico y monitoreo de recursos"
-    },
-    {
-      "name": "Azure Deployment",
-      "description": "Deployment de recursos con ARM templates"
-    },
-    {
-      "name": "Azure Configuration",
-      "description": "Configuración de recursos Azure"
-    },
-    {
-      "name": "Testing",
-      "description": "Pruebas y validación de endpoints"
-    },
-    {
-      "name": "Internal",
-      "description": "Operaciones internas de la Function App"
-    },
-    {
-      "name": "🧠 Memoria Integrada",
-      "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
-    },
-    {
-      "name": "Local Storage",
-      "description": "Operaciones en el filesystem local del contenedor"
-    },
-    {
-      "name": "Autocorrección",
-      "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."
-    },
-    {
-      "name": "Bridge",
-      "description": "Endpoints tolerantes para agentes problemáticos"
-    },
-    {
-      "name": "🚀 Despliegues Robustos",
-      "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
-    },
-    {
-      "name": "🔍 Análisis Semántico",
-      "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
-    }
-  ],
+   },
+    "tags": [
+      {
+        "name": "Azure Storage",
+        "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
+      },
+      {
+        "name": "🚀 Universal CLI Executor",
+        "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
+      },
+      {
+        "name": "Diagnóstico",
+        "description": "Diagnóstico y monitoreo de recursos"
+      },
+      {
+        "name": "Azure Deployment",
+        "description": "Deployment de recursos con ARM templates"
+      },
+      {
+        "name": "Azure Configuration",
+        "description": "Configuración de recursos Azure"
+      },
+      {
+        "name": "Testing",
+        "description": "Pruebas y validación de endpoints"
+      },
+      {
+        "name": "Internal",
+        "description": "Operaciones internas de la Function App"
+      },
+      {
+        "name": "🧠 Memoria Integrada",
+        "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
+      },
+      {
+        "name": "🧠 Memoria Semántica",
+        "description": "Búsqueda e indexación semántica con Azure AI Search usando Managed Identity"
+      },
+      {
+        "name": "Local Storage",
+        "description": "Operaciones en el filesystem local del contenedor"
+      },
+      {
+        "name": "Autocorrección",
+        "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."
+      },
+      {
+        "name": "Bridge",
+        "description": "Endpoints tolerantes para agentes problemáticos"
+      },
+      {
+        "name": "🚀 Despliegues Robustos",
+        "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
+      },
+      {
+        "name": "🔍 Análisis Semántico",
+        "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
+      }
+      
+    ],
   "components": {
     "schemas": {
       "ErrorEnvelope": {
@@ -3861,4 +4240,5 @@
       }
     }
   }
+
 }

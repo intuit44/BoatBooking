@@ -1,1 +1,6 @@
+# Ignorar verificación de bundle
+.git*
+.vscode
+local.settings.json
+test
 .venv

@@ -1,0 +1,101 @@
+{
+  "name": "agent-memory-index",
+  "fields": [
+    {
+      "name": "id",
+      "type": "Edm.String",
+      "key": true,
+      "searchable": false,
+      "filterable": false
+    },
+    {
+      "name": "agent_id",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "facetable": true
+    },
+    {
+      "name": "session_id",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true
+    },
+    {
+      "name": "endpoint",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true,
+      "facetable": true
+    },
+    {
+      "name": "timestamp",
+      "type": "Edm.DateTimeOffset",
+      "searchable": false,
+      "filterable": true,
+      "sortable": true
+    },
+    {
+      "name": "tipo",
+      "type": "Edm.String",
+      "searchable": false,
+      "filterable": true,
+      "facetable": true
+    },
+    {
+      "name": "texto_semantico",
+      "type": "Edm.String",
+      "searchable": true,
+      "analyzer": "es.microsoft"
+    },
+    {
+      "name": "vector",
+      "type": "Collection(Edm.Single)",
+      "searchable": true,
+      "dimensions": 1536,
+      "vectorSearchProfile": "vector-profile"
+    },
+    {
+      "name": "exito",
+      "type": "Edm.Boolean",
+      "filterable": true
+    }
+  ],
+  "vectorSearch": {
+    "profiles": [
+      {
+        "name": "vector-profile",
+        "algorithm": "hnsw-config"
+      }
+    ],
+    "algorithms": [
+      {
+        "name": "hnsw-config",
+        "kind": "hnsw",
+        "hnswParameters": {
+          "metric": "cosine",
+          "m": 4,
+          "efConstruction": 400,
+          "efSearch": 500
+        }
+      }
+    ]
+  },
+  "semantic": {
+    "configurations": [
+      {
+        "name": "semantic-config",
+        "prioritizedFields": {
+          "titleField": {
+            "fieldName": "endpoint"
+          },
+          "prioritizedContentFields": [
+            {
+              "fieldName": "texto_semantico"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

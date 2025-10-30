@@ -144,6 +144,8 @@ $settings = @{
   # Bing Search
   "BING_SEARCH_KEY"                             = "7242cc4c0c9449f6989f14e21af9ff44"
   "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
+  # Azure Cognitive Search (added)
+  "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch.search.windows.net"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"

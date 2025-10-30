@@ -3,13 +3,14 @@
 Memory Route Wrapper - Envoltura automática para Azure Functions
 Aplica lectura y escritura de memoria semántica sin modificar los endpoints originales.
 """
-
+import os
 import logging
 import azure.functions as func
 import json
 import time
 from typing import Callable
-
+from datetime import datetime
+from azure.storage.queue import QueueClient
 
 def memory_route(app: func.FunctionApp) -> Callable:
     """Fábrica que envuelve app.route para aplicar memoria automáticamente."""
@@ -115,34 +116,109 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             else:
                                 output_data = {"raw_response": True}
 
-                            # Generar texto_semantico para la respuesta (limitado para evitar anidación)
-                            texto_semantico = f"Interacción en '{route_path}' ejecutada por {agent_id}. Éxito: ✅. Endpoint: {source_name}."
+                            # 🧠 EXTRACCIÓN COGNITIVA AGNÓSTICA - Prioriza voz del agente
+                            texto_semantico = None
+                            origen_semantico = "fallback"
+                            
                             if isinstance(output_data, dict):
-                                # Limpiar campos verbosos antes de guardar
-                                output_data_limpio = {
-                                    k: v for k, v in output_data.items() 
-                                    if k not in ["interacciones", "mensaje", "respuesta_usuario", "mensaje_original"]
-                                }
-                                # TRUNCAR texto_semantico si es muy largo (máximo 500 caracteres)
-                                if "texto_semantico" in output_data:
-                                    texto_original = str(output_data["texto_semantico"])
-                                    if len(texto_original) > 500:
-                                        output_data_limpio["texto_semantico"] = texto_original[:500] + "..."
-                                        logging.info(f"🔪 texto_semantico truncado de {len(texto_original)} a 500 caracteres")
+                                # 1️⃣ VOZ DEL AGENTE (máxima prioridad cognitiva)
+                                for campo in ["respuesta_usuario", "respuesta", "resultado", "output"]:
+                                    if output_data.get(campo):
+                                        valor = str(output_data[campo]).strip()
+                                        if len(valor) > 20:  # Mínimo semántico
+                                            texto_semantico = f"💬 {valor[:2000]}"
+                                            origen_semantico = "voz_agente"
+                                            break
+                                
+                                # 2️⃣ RESUMEN TÉCNICO/SEMÁNTICO (generado por endpoint)
+                                if not texto_semantico and output_data.get("texto_semantico"):
+                                    valor = str(output_data["texto_semantico"]).strip()
+                                    if len(valor) > 20:
+                                        texto_semantico = valor[:2000]
+                                        origen_semantico = "endpoint_semantico"
+                                
+                                # 3️⃣ MENSAJE INFORMATIVO (feedback del sistema)
+                                if not texto_semantico and output_data.get("mensaje"):
+                                    valor = str(output_data["mensaje"]).strip()
+                                    if len(valor) > 20 and "CONSULTA DE HISTORIAL" not in valor:
+                                        texto_semantico = f"📝 {valor[:2000]}"
+                                        origen_semantico = "mensaje_sistema"
+                                
+                                # 4️⃣ CONTENIDO PROCESADO (agnóstico - cualquier endpoint)
+                                if not texto_semantico and output_data.get("contenido"):
+                                    contenido = str(output_data["contenido"]).strip()
+                                    if len(contenido) > 50:
+                                        resumen = contenido[:300] + "..." if len(contenido) > 300 else contenido
+                                        ruta = output_data.get("ruta", output_data.get("archivo", "datos"))
+                                        texto_semantico = f"📄 Procesado '{ruta}' ({len(contenido)} chars): {resumen}"
+                                        origen_semantico = "contenido_procesado"
+                                
+                                # 5️⃣ FALLBACK TÉCNICO (última opción)
+                                if not texto_semantico:
+                                    if output_data.get("exito") or output_data.get("success"):
+                                        estado = "exitoso"
+                                    elif output_data.get("error"):
+                                        estado = f"error: {str(output_data['error'])[:100]}"
                                     else:
-                                        output_data_limpio["texto_semantico"] = texto_original
-                                else:
-                                    output_data_limpio["texto_semantico"] = texto_semantico
+                                        estado = "completado"
+                                    texto_semantico = f"⚙️ Operación técnica {estado}"
+                                    origen_semantico = "fallback_tecnico"
+                            
+                            # Validación final
+                            if not texto_semantico or len(texto_semantico.strip()) < 10:
+                                texto_semantico = f"⚙️ Interacción técnica en {route_path}"
+                                origen_semantico = "fallback_minimo"
+                            
+                            # Limpiar campos verbosos
+                            output_data_limpio = {
+                                k: v for k, v in output_data.items() 
+                                if k not in ["interacciones", "contenido", "mensaje_original"]
+                            } if isinstance(output_data, dict) else output_data
+                            
+                            if isinstance(output_data_limpio, dict):
+                                output_data_limpio["texto_semantico"] = texto_semantico
                                 output_data = output_data_limpio
                             
-                            memory_service.registrar_llamada(
-                                source=source_name,
-                                endpoint=route_path,
-                                method=req.method,
-                                params={"session_id": session_id, "agent_id": agent_id},
-                                response_data=output_data,
-                                success=True
-                            )
+                            logging.info(f"🧠 Semántica capturada [{origen_semantico}]: {texto_semantico[:100]}...")
+                            
+                            # Solo guardar si hay valor semántico real
+                            if origen_semantico not in ["fallback_minimo"] or len(texto_semantico) > 30:
+                                memory_service.registrar_llamada(
+                                    source=source_name,
+                                    endpoint=route_path,
+                                    method=req.method,
+                                    params={"session_id": session_id, "agent_id": agent_id},
+                                    response_data=output_data,
+                                    success=True
+                                )
+                                logging.info(f"💾 [{source_name}] Memoria cognitiva guardada ✅")
+                                
+                                # 🔥 Enviar a cola para indexación semántica
+                                try:
+                                    conn_str = os.environ.get("AzureWebJobsStorage")
+                                    if not conn_str:
+                                        logging.warning("⚠️ AzureWebJobsStorage no configurado: se omite envío a cola de indexación")
+                                    else:
+                                        queue_client = QueueClient.from_connection_string(
+                                            conn_str,
+                                            "memory-indexing-queue"
+                                        )
+                                        evento = {
+                                            "id": f"{session_id}_{int(time.time())}",
+                                            "agent_id": agent_id,
+                                            "session_id": session_id,
+                                            "endpoint": route_path,
+                                            "timestamp": datetime.now().isoformat(),
+                                            "event_type": "endpoint_call",
+                                            "texto_semantico": texto_semantico,
+                                            "data": {"success": True}
+                                        }
+                                        queue_client.send_message(json.dumps(evento))
+                                        logging.info(f"📤 Enviado a cola de indexación")
+                                except Exception as e:
+                                    logging.warning(f"⚠️ Error enviando a cola: {e}")
+                            else:
+                                logging.info(f"🚫 [{source_name}] Descartado: sin valor semántico suficiente")
 
                             logging.info(f"💾 [{source_name}] Interacción registrada en Cosmos ✅ - sesión {session_id}")
                         except Exception as e:
