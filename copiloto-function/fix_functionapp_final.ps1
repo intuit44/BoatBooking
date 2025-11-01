@@ -146,6 +146,9 @@ $settings = @{
   "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
   # Azure Cognitive Search (added)
   "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch.search.windows.net"
+  "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index"
+  "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
+  "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"

@@ -12,6 +12,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Endpoint: /api/buscar-memoria
     Busca en memoria semántica usando Azure AI Search
+    🔥 BÚSQUEDA UNIVERSAL: NO filtra por agent_id para encontrar todos los documentos relevantes
     """
     try:
         from services.azure_search_client import AzureSearchService
@@ -21,16 +22,14 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         if not query:
             return {"exito": False, "error": "Campo 'query' requerido"}
         
-        agent_id = req_body.get("agent_id")
         session_id = req_body.get("session_id")
         top = req_body.get("top", 10)
         tipo = req_body.get("tipo")
         
-        # Construir filtros
+        # 🔥 BÚSQUEDA UNIVERSAL: Solo filtrar por session_id si es específico, NO por agent_id
         filters = []
-        if agent_id:
-            filters.append(f"agent_id eq '{agent_id}'")
-        if session_id:
+        # Solo filtrar por session_id si NO es genérico (assistant, test_session, etc.)
+        if session_id and session_id not in ["assistant", "test_session", "unknown", None]:
             filters.append(f"session_id eq '{session_id}'")
         if tipo:
             filters.append(f"tipo eq '{tipo}'")
@@ -50,14 +49,16 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             resultado["metadata"] = {
                 "query_original": query,
                 "filtros_aplicados": {
-                    "agent_id": agent_id,
-                    "session_id": session_id,
-                    "tipo": tipo
+                    "session_id": session_id if session_id not in ["assistant", "test_session", "unknown"] else "UNIVERSAL",
+                    "tipo": tipo,
+                    "agent_id": "UNIVERSAL (sin filtro)"
                 },
+                "busqueda_universal": True,
+                "modo": "universal_search",
                 "tiempo_busqueda": datetime.utcnow().isoformat()
             }
         
-        logging.info(f"🔍 Búsqueda semántica: '{query}' → {resultado.get('total', 0)} resultados")
+        logging.info(f"🔍 Búsqueda UNIVERSAL: '{query}' → {resultado.get('total', 0)} resultados (sin filtro agent_id)")
         return resultado
         
     except Exception as e:
@@ -67,17 +68,19 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Endpoint: /api/indexar-memoria
-    Indexa documentos en Azure AI Search
+    Indexa documentos en Azure AI Search CON EMBEDDINGS REALES
     """
     try:
         from services.azure_search_client import AzureSearchService
+        from embedding_generator import generar_embedding
         
         # Validar payload
         documentos = req_body.get("documentos")
         if not documentos or not isinstance(documentos, list):
             return {"exito": False, "error": "Campo 'documentos' requerido (array)"}
         
-        # Validar campos requeridos
+        # Validar, normalizar y GENERAR EMBEDDINGS
+        documentos_con_vectores = []
         for doc in documentos:
             if not doc.get("id"):
                 return {"exito": False, "error": "Cada documento requiere campo 'id'"}
@@ -85,13 +88,41 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 return {"exito": False, "error": "Cada documento requiere campo 'agent_id'"}
             if not doc.get("texto_semantico"):
                 return {"exito": False, "error": "Cada documento requiere campo 'texto_semantico'"}
+            
+            # 🔥 GENERAR EMBEDDING REAL
+            texto = doc["texto_semantico"]
+            vector = generar_embedding(texto)
+            
+            if not vector:
+                logging.warning(f"⚠️ No se pudo generar embedding para doc {doc['id']}, omitiendo")
+                continue
+            
+            # Agregar vector al documento
+            doc["vector"] = vector
+            
+            # Normalizar timestamp a formato Edm.DateTimeOffset (YYYY-MM-DDTHH:MM:SS.sssZ)
+            if "timestamp" in doc:
+                ts = doc["timestamp"]
+                if isinstance(ts, str):
+                    # Remover microsegundos excesivos y agregar Z
+                    if '.' in ts:
+                        base, micro = ts.split('.')
+                        micro = micro[:3]  # Solo 3 dígitos de milisegundos
+                        doc["timestamp"] = f"{base}.{micro}Z"
+                    elif not ts.endswith('Z'):
+                        doc["timestamp"] = f"{ts}Z"
+            
+            documentos_con_vectores.append(doc)
         
-        # Indexar documentos
+        if not documentos_con_vectores:
+            return {"exito": False, "error": "No se pudieron generar embeddings para ningún documento"}
+        
+        # Indexar documentos CON VECTORES
         search_service = AzureSearchService()
-        resultado = search_service.indexar_documentos(documentos)
+        resultado = search_service.indexar_documentos(documentos_con_vectores)
         
         if resultado.get("exito"):
-            logging.info(f"📊 Indexados {len(documentos)} documentos en Azure Search")
+            logging.info(f"✅ Indexados {len(documentos_con_vectores)} documentos CON EMBEDDINGS en Azure Search")
         
         return resultado
         

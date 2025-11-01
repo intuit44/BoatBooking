@@ -55,6 +55,7 @@ import azure.functions as func
 import json
 from datetime import datetime
 from azure.functions import HttpRequest, HttpResponse
+from endpoints_search_memory import buscar_memoria_endpoint, indexar_memoria_endpoint
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "services"))
 
@@ -4011,6 +4012,30 @@ def revisar_correcciones_http(req):
 
 # Importar decorador de memoria
 
+
+def sintetizar(docs_search, docs_cosmos):
+    """Compone respuesta corta con lo último significativo"""
+    partes = []
+    if docs_search:
+        ult = docs_search[0]
+        partes.append(f"Último tema: {ult.get('endpoint','')} · {ult.get('texto_semantico','')[:240]}")
+    
+    # Agregar 2 recientes de cosmos sin basura
+    utiles = [d for d in docs_cosmos if d.get("texto_semantico") and not any([
+        "consulta de historial" in d.get("texto_semantico","").lower(),
+        "sin resumen" in d.get("texto_semantico","").lower()
+    ])][:2]
+    for d in utiles:
+        partes.append(f"- {d.get('texto_semantico','')[:240]}")
+    
+    if not partes:
+        return "No encuentro actividad significativa reciente. ¿Quieres que revise por tema o endpoint?"
+    return (
+        "🧠 Resumen de la última actividad\n"
+        + "\n".join(partes) +
+        "\n\n🎯 Próximas acciones: • buscar detalle • listar endpoints recientes • generar plan corto"
+    )
+
 @app.function_name(name="historial_interacciones")
 @app.route(route="historial-interacciones", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
@@ -4035,6 +4060,67 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             return ""
         s = str(text)
         return s if len(s) <= n else s[:n] + "..."
+
+    # === 🔍 CONSTRUCCIÓN DE QUERY UNIVERSAL (COMBINA TIPO + QUERY + MENSAJE) ===
+    session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+    
+    try:
+        body = req.get_json() or {}
+    except ValueError:
+        body = dict(req.params)
+    
+    # 🔥 CONSTRUIR QUERY UNIVERSAL que combine todos los parámetros
+    query_parts = []
+    
+    # 1. Query explícita del usuario
+    if body.get("query") or body.get("mensaje") or req.params.get("q"):
+        query_parts.append(body.get("query") or body.get("mensaje") or req.params.get("q"))
+    
+    # 2. Tipo de interacción (error, success, etc.)
+    if body.get("tipo") or req.params.get("tipo"):
+        tipo_val = body.get("tipo") or req.params.get("tipo")
+        query_parts.append(f"interacciones tipo {tipo_val}")
+    
+    # 3. Endpoint específico
+    if body.get("endpoint"):
+        query_parts.append(f"endpoint {body.get('endpoint')}")
+    
+    # 4. Fallback universal si no hay nada
+    if not query_parts:
+        query_parts.append("últimas interacciones recientes")
+    
+    # Combinar en query universal
+    query_universal = " ".join(query_parts)
+    
+    logging.info(f"🔍 HISTORIAL: Query universal construida: '{query_universal}'")
+    
+    # === 🔍 BÚSQUEDA AUTOMÁTICA EN AI SEARCH (SIEMPRE FORZADA) ===
+    docs_search = []
+    
+    try:
+        from endpoints_search_memory import buscar_memoria_endpoint
+        
+        logging.info(f"🔍 HISTORIAL: Búsqueda AUTOMÁTICA FORZADA en AI Search")
+        
+        # Buscar en memoria semántica con query universal
+        memoria_payload = {
+            "query": query_universal,
+            "session_id": session_id,
+            "top": 10
+        }
+        
+        memoria_result = buscar_memoria_endpoint(memoria_payload)
+        
+        if memoria_result.get("exito") and memoria_result.get("documentos"):
+            docs_search = memoria_result["documentos"]
+            logging.info(f"✅ HISTORIAL: AI Search encontró {len(docs_search)} documentos relevantes")
+            for i, doc in enumerate(docs_search[:3]):
+                logging.info(f"   Doc {i+1}: {doc.get('texto_semantico', '')[:100]}...")
+        else:
+            logging.info("ℹ️ HISTORIAL: No se encontraron documentos en AI Search")
+    except Exception as e:
+        logging.warning(f"⚠️ Error en búsqueda automática AI Search: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
 
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
     memoria_previa = consultar_memoria_cosmos_directo(req)
@@ -4210,6 +4296,9 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             "generated_fallbacks": 0
         }
         
+        # === 🔍 USAR DOCS DE AI SEARCH AUTOMÁTICO ===
+        docs_sem = docs_search  # Usar los docs ya encontrados en la búsqueda automática
+        
         # 🧠 SI HAY PARÁMETROS AVANZADOS, USAR QUERY BUILDER DINÁMICO
         usar_query_dinamica = any([
             params_completos.get("tipo"),
@@ -4231,10 +4320,17 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 cosmos_container = memory_service.memory_container
                 resultados = ejecutar_query_cosmos(query_sql, cosmos_container)
                 
-                # Formatear resultados
+                # Formatear resultados filtrando meta
                 interacciones_formateadas = []
                 for i, item in enumerate(resultados[:limit]):
-                    interacciones_formateadas.append({
+                    texto = item.get("texto_semantico", "")
+                    # Filtrar basura meta
+                    if texto and not any([
+                        "consulta de historial completada" in texto.lower(),
+                        "sin resumen de conversación" in texto.lower(),
+                        "interacciones recientes:" in texto.lower()
+                    ]):
+                        interacciones_formateadas.append({
                         "numero": i + 1,
                         "timestamp": item.get("timestamp", ""),
                         "endpoint": item.get("endpoint", ""),
@@ -4316,7 +4412,21 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
             for i, interaccion in enumerate(memoria_previa.get("interacciones_recientes", [])[:limit]):
                 validation_stats["checked"] += 1
-                # Unificar la estructura (compatibilidad entre versiones antiguas y nuevas)
+                
+                # Filtrar basura meta antes de procesar
+                texto_raw = (
+                    interaccion.get("texto_semantico") or
+                    interaccion.get("data", {}).get("texto_semantico") or
+                    ""
+                )
+                if texto_raw and any([
+                    "consulta de historial completada" in texto_raw.lower(),
+                    "sin resumen de conversación" in texto_raw.lower(),
+                    "interacciones recientes:" in texto_raw.lower()
+                ]):
+                    continue  # Saltar basura meta
+                
+                # Unificar la estructura
                 registro = interaccion.get("data", interaccion)
                 
                 # CORRECCIÓN: Buscar texto_semantico en el nivel raíz PRIMERO
@@ -4377,6 +4487,27 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             
             mensaje_enriquecido += f"\n\n🎯 CONTINUIDAD: Esta sesión tiene contexto previo. Puedes hacer referencia a interacciones anteriores."
             
+            # === 🧠 FUSIÓN COGNITIVA: AI Search + Cosmos ===
+            respuesta_sintetizada = None
+            try:
+                # Usar docs_search (de AI Search automático) si existe, sino docs_sem
+                docs_para_sintetizar = docs_search if docs_search else docs_sem
+                
+                logging.info(f"🧠 HISTORIAL: Aplicando sintetizador cognitivo con {len(docs_para_sintetizar)} docs...")
+                docs_cosmos = memoria_previa.get("interacciones_recientes", [])
+                logging.info(f"📊 HISTORIAL: docs_cosmos = {len(docs_cosmos)} interacciones")
+                respuesta_sintetizada = sintetizar(docs_para_sintetizar, docs_cosmos)
+                logging.info(f"✅ HISTORIAL: Sintetizador generó: {respuesta_sintetizada[:100]}...")
+                
+                # Enriquecer contexto inteligente con datos de AI Search
+                if docs_para_sintetizar:
+                    contexto_inteligente["documentos_relevantes"] = len(docs_para_sintetizar)
+                    contexto_inteligente["fuente_datos"] = "AISearch+CognitiveSynth"
+                    logging.info("🧠 HISTORIAL: Contexto enriquecido con memoria vectorial")
+            except Exception as e:
+                logging.error(f"❌ HISTORIAL: Sintetizador falló: {e}")
+                respuesta_sintetizada = mensaje_enriquecido
+            
             response_data = {
                 "exito": True,
                 "interacciones": interacciones_formateadas,
@@ -4384,7 +4515,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "session_id": memoria_previa.get("session_id"),
                 "resumen_conversacion": resumen,
                 "fuente": "wrapper_automatico",
-                "mensaje": mensaje_enriquecido,
+                "mensaje": respuesta_sintetizada,
                 # Required structured fields
                 "interpretacion_semantica": f"Historial consultado: {total_interacciones} interacciones. Se generaron {fallback_count} fallbacks semánticos.",
                 "contexto_inteligente": contexto_inteligente,
@@ -4398,8 +4529,13 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 }
             }
 
+            # 🔥 INYECTAR RESPUESTA SINTETIZADA SI HAY DOCS DE AI SEARCH
+            if (docs_search or docs_sem) and respuesta_sintetizada:
+                response_data["respuesta_usuario"] = respuesta_sintetizada
+                total_docs = len(docs_search) if docs_search else len(docs_sem)
+                logging.info(f"✅ HISTORIAL: Respuesta sintetizada inyectada ({total_docs} docs vectoriales)")
             # Asegurar que exista respuesta_usuario desde el inicio para evitar usar "mensaje" como fallback más tarde.
-            if not response_data.get("respuesta_usuario"):
+            elif not response_data.get("respuesta_usuario"):
                 # Preferir resumen semántico si existe, si no usar el mensaje enriquecido limitado.
                 fuente_para_respuesta = response_data.get("resumen_conversacion") or mensaje_enriquecido
                 # Truncar para respuesta_usuario para mantenerlo conciso
@@ -4597,8 +4733,20 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
         # 💾 REGISTRAR INTERACCIÓN EN MEMORIA
         try:
-            body = req.get_json() or {}
-            comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
+            # Tolerancia a GET sin JSON
+            try:
+                body = req.get_json()
+            except ValueError:
+                body = {}
+            
+            comando = (
+                (body or {}).get("mensaje") 
+                or (body or {}).get("comando") 
+                or (body or {}).get("consulta")
+                or req.params.get("q")
+                or req.params.get("mensaje")
+                or "resumen"
+            )
 
             memory_service.registrar_llamada(
                 source="copiloto",
@@ -4615,6 +4763,100 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"❌ COPILOTO Error cargando memoria: {e}")
 
+    # === 🔍 BÚSQUEDA AUTOMÁTICA EN MEMORIA SEMÁNTICA (SIEMPRE PRIMERO) ===
+    docs_sem = []
+    body = {}
+    agent_id = None
+    
+    # 🔥 EXTRAER CONSULTA DEL USUARIO PRIMERO
+    try:
+        body = req.get_json() or {}
+    except ValueError:
+        body = dict(req.params)
+    
+    consulta_usuario = (
+        body.get("mensaje") or
+        body.get("consulta") or
+        body.get("query") or
+        req.params.get("q") or
+        req.params.get("mensaje") or
+        "en qué quedamos"
+    )
+    
+    # 🧠 BUSCAR EN MEMORIA SEMÁNTICA SIEMPRE (OBLIGATORIO)
+    try:
+        from endpoints_search_memory import buscar_memoria_endpoint
+        
+        logging.info(f"🔍 COPILOTO: Búsqueda AUTOMÁTICA en memoria para: '{consulta_usuario}'")
+        
+        # Crear payload para buscar_memoria
+        memoria_payload = {
+            "query": consulta_usuario,
+            "session_id": session_id,
+            "top": 5
+        }
+        
+        # Ejecutar búsqueda en memoria
+        memoria_result = buscar_memoria_endpoint(memoria_payload)
+        
+        if memoria_result.get("exito") and memoria_result.get("documentos"):
+            docs_sem = memoria_result["documentos"]
+            logging.info(f"✅ COPILOTO: Memoria encontró {len(docs_sem)} documentos relevantes")
+        else:
+            logging.info("ℹ️ COPILOTO: No se encontraron documentos en memoria")
+    except Exception as e:
+        logging.warning(f"⚠️ Error en búsqueda automática de memoria: {e}")
+    
+    # === 🔍 INTEGRACIÓN ADICIONAL CON AZURE SEARCH (OPCIONAL) ===
+    try:
+        from services.azure_search_client import AzureSearchService
+        search = AzureSearchService()
+        
+        consulta_usuario = (
+            body.get("mensaje") or
+            body.get("consulta") or
+            body.get("query") or
+            req.params.get("q") or
+            req.params.get("mensaje") or
+            "en qué quedamos"
+        )
+
+        filtros = []
+        if session_id: filtros.append(f"session_id eq '{session_id}'")
+        filter_str = " and ".join(filtros) if filtros else None
+
+        logging.info(f"🔍 COPILOTO: Búsqueda semántica: '{consulta_usuario}'")
+        busqueda = search.search(query=consulta_usuario, top=5, filters=filter_str)
+        docs_sem = busqueda.get("documentos", []) if busqueda.get("exito") else []
+        logging.info(f"✅ Azure Search devolvió {len(docs_sem)} documentos semánticos")
+
+        # Si hay resultados vectoriales, aplicar sintetizador real
+        if docs_sem:
+            docs_cosmos = memoria_previa.get("interacciones_recientes", []) or []
+            respuesta_semantica = sintetizar(docs_sem, docs_cosmos)
+            
+            response_data = {
+                "exito": True,
+                "respuesta_usuario": respuesta_semantica,
+                "fuente_datos": "AzureSearch+CognitiveSynth",
+                "total_docs_semanticos": len(docs_sem),
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "metadata": {
+                    "timestamp": datetime.now().isoformat(),
+                    "consulta_original": consulta_usuario,
+                    "fuente": "azure_search_vectorial"
+                }
+            }
+
+            return func.HttpResponse(
+                json.dumps(response_data, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=200
+            )
+    except Exception as e:
+        logging.warning(f"⚠️ Error integrando búsqueda semántica: {e}")
+
     from intelligent_intent_detector import integrar_con_validador_semantico_inteligente
     from semantic_helpers import generar_sugerencias_contextuales, interpretar_con_contexto_semantico
     from semantic_query_builder import interpretar_intencion_agente, construir_query_dinamica, ejecutar_query_cosmos
@@ -4625,7 +4867,13 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     contexto_semantico = getattr(req, '_contexto_semantico', {}) or {}
     memoria_previa = getattr(req, '_memoria_contexto', {}) or {}
     
-    body = req.get_json() or {}
+    # 🔥 CORRECCIÓN 1: Tolerancia a GET sin JSON
+    try:
+        body = req.get_json() or {}
+    except ValueError:
+        logging.info("⚠️ GET sin JSON detectado, usando querystring como fallback")
+        body = dict(req.params)
+    
     comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
     
     # 🔍 DETECCIÓN DE QUERIES DINÁMICAS PARA MEMORIA
@@ -7229,8 +7477,20 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
         
         # 💾 REGISTRAR INTERACCIÓN EN MEMORIA
         try:
-            body = req.get_json() or {}
-            comando = body.get("mensaje") or body.get("comando") or body.get("consulta") or "sin_comando"
+            # Tolerancia a GET sin JSON
+            try:
+                body = req.get_json()
+            except ValueError:
+                body = {}
+            
+            comando = (
+                (body or {}).get("mensaje") 
+                or (body or {}).get("comando") 
+                or (body or {}).get("consulta")
+                or req.params.get("q")
+                or req.params.get("mensaje")
+                or "resumen"
+            )
             
             memory_service.registrar_llamada(
                 source="contexto_agente",
@@ -17798,5 +18058,43 @@ def historial_directo(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         charset='utf-8'  # Forzar UTF-8
     )
+
+@app.function_name(name="buscar_memoria_http")
+@app.route(route="buscar-memoria", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def buscar_memoria(req: func.HttpRequest) -> func.HttpResponse:
+    """Buscar en memoria semántica"""
+    try:
+        req_body = req.get_json()
+        resultado = buscar_memoria_endpoint(req_body)
+        return func.HttpResponse(
+            json.dumps(resultado, default=str),
+            mimetype="application/json",
+            status_code=200 if resultado.get("exito") else 400
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
+
+@app.function_name(name="indexar_memoria_http")
+@app.route(route="indexar-memoria", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def indexar_memoria(req: func.HttpRequest) -> func.HttpResponse:
+    """Indexar documentos en memoria semántica"""
+    try:
+        req_body = req.get_json()
+        resultado = indexar_memoria_endpoint(req_body)
+        return func.HttpResponse(
+            json.dumps(resultado, default=str),
+            mimetype="application/json",
+            status_code=200 if resultado.get("exito") else 400
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            json.dumps({"exito": False, "error": str(e)}),
+            mimetype="application/json",
+            status_code=500
+        )
 
 

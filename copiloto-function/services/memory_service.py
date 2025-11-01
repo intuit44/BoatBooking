@@ -109,12 +109,54 @@ class MemoryService:
             texto_en_data = event.get('data', {}).get('texto_semantico', '')
             if texto_en_data:
                 logging.info(f"📄 Texto semántico también en data: {texto_en_data[:100]}...")
+            
+            # 🔥 INDEXAR AUTOMÁTICAMENTE EN AI SEARCH
+            self._indexar_en_ai_search(event)
+            
             return True
         except Exception as e:
             logging.error(f"❌ Error escribiendo en Cosmos memory: {e}")
             logging.error(f"📄 Evento que falló: {json.dumps(event, ensure_ascii=False)[:500]}...")
             print(f"DEBUG Cosmos error: {e}")
             print(f"DEBUG Event keys: {list(event.keys()) if isinstance(event, dict) else 'not dict'}")
+            return False
+    
+    def _indexar_en_ai_search(self, event: Dict[str, Any]) -> bool:
+        """Indexa automáticamente en AI Search después de guardar en Cosmos"""
+        try:
+            from endpoints_search_memory import indexar_memoria_endpoint
+            
+            # Preparar documento para AI Search
+            documento = {
+                "id": event.get("id"),
+                "session_id": event.get("session_id", "unknown"),
+                "agent_id": event.get("agent_id") or event.get("data", {}).get("agent_id", "unknown"),
+                "endpoint": event.get("data", {}).get("endpoint", "unknown"),
+                "texto_semantico": event.get("texto_semantico", ""),
+                "exito": event.get("data", {}).get("success", True),
+                "tipo": event.get("event_type", "interaccion"),
+                "timestamp": event.get("timestamp", datetime.utcnow().isoformat())
+            }
+            
+            # Solo indexar si hay texto semántico válido
+            if not documento["texto_semantico"] or len(documento["texto_semantico"]) < 10:
+                logging.info("⏭️ Saltando indexación en AI Search: texto semántico vacío o muy corto")
+                return False
+            
+            # Llamar al indexador con formato correcto
+            payload = {"documentos": [documento]}
+            result = indexar_memoria_endpoint(payload)
+            
+            if result.get("exito"):
+                logging.info(f"🔍 Indexado automáticamente en AI Search: {documento['id']}")
+                return True
+            else:
+                logging.warning(f"⚠️ Error indexando en AI Search: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            logging.warning(f"⚠️ Error en indexación automática AI Search: {e}")
+            # No fallar el guardado en Cosmos si falla la indexación
             return False
     
     def save_pending_fix(self, fix_data: Dict[str, Any]) -> bool:

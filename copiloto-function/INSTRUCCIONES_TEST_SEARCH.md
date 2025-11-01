@@ -18,6 +18,7 @@ python test_azure_search_integration.py
 ```
 
 **Qué valida:**
+
 - ✅ Configuración de variables de entorno
 - ✅ Inicialización del cliente (MI o API Key)
 - ✅ Búsqueda de documentos existentes
@@ -40,6 +41,7 @@ python test_search_endpoints.py
 ```
 
 **Qué valida:**
+
 - ✅ POST `/api/buscar-memoria`
 - ✅ POST `/api/indexar-memoria`
 - ✅ Flujo completo: indexar → buscar
@@ -114,6 +116,7 @@ python test_azure_search_integration.py
 ```
 
 **Salida esperada:**
+
 ```
 ✅ TEST COMPLETADO EXITOSAMENTE
 📊 Resumen:
@@ -139,6 +142,7 @@ python test_search_endpoints.py
 ```
 
 **Salida esperada:**
+
 ```
 ✅ Búsqueda exitosa: 5 documentos
 ✅ Indexación exitosa: 1 documentos
