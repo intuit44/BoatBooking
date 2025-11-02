@@ -135,7 +135,7 @@ class MemoryService:
                 "texto_semantico": event.get("texto_semantico", ""),
                 "exito": event.get("data", {}).get("success", True),
                 "tipo": event.get("event_type", "interaccion"),
-                "timestamp": event.get("timestamp", datetime.utcnow().isoformat())
+                "timestacontainer =mp": event.get("timestamp", datetime.utcnow().isoformat())
             }
             
             # Solo indexar si hay texto semántico válido
@@ -255,6 +255,7 @@ class MemoryService:
                 cleaned_response["respuesta_usuario"] = respuesta_usuario_completa
         
         llamada_data = {
+            "event_type": source,
             "source": source,
             "endpoint": endpoint,
             "method": method,

@@ -393,6 +393,12 @@ try:
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint diagnostico: {e}")
 
+try:
+    import endpoints.introspection
+    logging.info("✅ Endpoint introspection registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint introspection: {e}")
+
 # --- Cerebro Semántico Autónomo ---
 try:
     from services.semantic_runtime import start_semantic_loop
@@ -2534,7 +2540,6 @@ def probar_endpoint_http(req: func.HttpRequest) -> func.HttpResponse:
                         "/api/escribir-archivo",
                         "/api/health",
                         "/api/hybrid",
-                        "/api/info-archivo",
                         "/api/invocar",
                         "/api/leer-archivo",
                         "/api/listar-blobs",
@@ -3280,7 +3285,6 @@ def invocar_endpoint_local(endpoint: str, method: str = "GET", body: Optional[di
             "/api/eliminar-archivo": eliminar_archivo_http,
             "/api/mover-archivo": mover_archivo_http,
             "/api/copiar-archivo": copiar_archivo_http,
-            "/api/info-archivo": info_archivo_http,
             "/api/descargar-archivo": descargar_archivo_http,
             "/api/ejecutar-script": ejecutar_script_http,
             "/api/crear-contenedor": crear_contenedor_http,
@@ -10966,406 +10970,6 @@ def _format_file_size(size_bytes: int) -> str:
 # ---------- info-archivo ----------
 
 
-@app.function_name(name="info_archivo_http")
-@app.route(route="info-archivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def info_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    endpoint = "/api/info-archivo"
-    method = "GET"
-    run_id = get_run_id(req)
-
-    # ✅ VALIDACIÓN TEMPRANA: Verificar parámetros y existencia física del archivo
-    validation_result = validate_info_archivo_params(
-        req, run_id, CONTAINER_NAME, IS_AZURE, get_blob_client,
-        PROJECT_ROOT, globals().get('COPILOT_ROOT'), Path, datetime,
-        json, func, logging, os
-    )
-    if validation_result is not None:
-        return validation_result
-
-    try:
-        # ✅ VALIDACIÓN PREVIA: Verificar que req y params no sean None
-        if not req:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": "Request object is None",
-                    "endpoint": endpoint,
-                    "method": method,
-                    "run_id": run_id
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ VALIDACIÓN DEFENSIVA: Verificar que req.params existe y es accesible
-        try:
-            params = req.params if hasattr(
-                req, 'params') and req.params else {}
-        except Exception as params_error:
-            logging.warning(f"Error accessing req.params: {params_error}")
-            params = {}
-
-        # ✅ EXTRACCIÓN SEGURA: Obtener parámetros con valores por defecto
-        ruta_raw = ""
-        container = CONTAINER_NAME
-
-        try:
-            ruta_raw = (params.get("ruta") or params.get("path") or
-                        params.get("archivo") or params.get("blob") or "").strip()
-            container = (params.get("container") or params.get(
-                "contenedor") or CONTAINER_NAME).strip()
-        except Exception as extract_error:
-            logging.warning(f"Error extracting parameters: {extract_error}")
-            # Usar valores por defecto seguros
-            ruta_raw = ""
-            container = CONTAINER_NAME
-
-        # ✅ VALIDACIÓN ESTRICTA: Verificar parámetros requeridos después de extracción
-        if not ruta_raw:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": "Parámetro 'ruta' es requerido y no puede estar vacío",
-                    "required_params": ["ruta"],
-                    "optional_params": ["container", "path", "archivo", "blob"],
-                    "received_params": {
-                        "ruta": ruta_raw,
-                        "container": container,
-                        "params_available": list(params.keys()) if params else []
-                    },
-                    "run_id": run_id,
-                    "examples": [
-                        "?ruta=README.md",
-                        "?ruta=scripts/setup.sh&container=mi-contenedor",
-                        "?path=docs/API.md"
-                    ]
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        if not container:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": "Parámetro 'container' no puede estar vacío",
-                    "container_default": CONTAINER_NAME,
-                    "received_container": container,
-                    "run_id": run_id
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ NORMALIZACIÓN SEGURA: Validar antes de normalizar
-        try:
-            ruta = _normalize_blob_path(container, ruta_raw)
-            if not ruta or len(ruta.strip()) == 0:
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": "Ruta normalizada está vacía o es inválida",
-                        "ruta_original": ruta_raw,
-                        "container": container,
-                        "run_id": run_id,
-                        "suggestion": "Verifica que la ruta no contenga caracteres inválidos"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=400
-                )
-        except Exception as normalize_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error normalizando ruta: {str(normalize_error)}",
-                    "ruta_original": ruta_raw,
-                    "container": container,
-                    "run_id": run_id
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # ✅ VERIFICACIÓN DE CLIENTE: Validar antes de usar
-        client = None
-        try:
-            client = get_blob_client()
-            if not client:
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": "Blob Storage no configurado correctamente",
-                        "details": "Cliente de Azure Blob Storage no disponible",
-                        "run_id": run_id,
-                        "suggestion": "Verificar AZURE_STORAGE_CONNECTION_STRING o configuración de Managed Identity"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=500
-                )
-        except Exception as client_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error inicializando cliente Blob Storage: {str(client_error)}",
-                    "run_id": run_id,
-                    "error_type": type(client_error).__name__
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # ✅ VERIFICACIÓN DE CONTENEDOR: Validar existencia antes de proceder
-        cc = None
-        try:
-            cc = client.get_container_client(container)
-            if not cc:
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": f"No se pudo obtener cliente para contenedor '{container}'",
-                        "container": container,
-                        "run_id": run_id
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=500
-                )
-
-            if not cc.exists():
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": f"El contenedor '{container}' no existe",
-                        "container": container,
-                        "run_id": run_id,
-                        "suggestion": "Verificar nombre del contenedor o crear el contenedor"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=404
-                )
-        except Exception as container_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error verificando contenedor: {str(container_error)}",
-                    "container": container,
-                    "run_id": run_id,
-                    "error_type": type(container_error).__name__
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # ✅ VERIFICACIÓN DE BLOB: Validar existencia del archivo
-        bc = None
-        try:
-            bc = cc.get_blob_client(ruta)
-            if not bc:
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": f"No se pudo obtener cliente para blob '{ruta}'",
-                        "path": ruta,
-                        "container": container,
-                        "run_id": run_id
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=500
-                )
-
-            if not bc.exists():
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": f"El archivo '{ruta}' no existe en contenedor '{container}'",
-                        "path": ruta,
-                        "container": container,
-                        "ruta_recibida": ruta_raw,
-                        "run_id": run_id,
-                        "suggestion": "Verificar que el archivo existe en la ubicación especificada"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=404
-                )
-        except Exception as blob_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error verificando archivo: {str(blob_error)}",
-                    "path": ruta,
-                    "container": container,
-                    "run_id": run_id,
-                    "error_type": type(blob_error).__name__
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-        # ✅ OBTENCIÓN DE PROPIEDADES: Manejo defensivo con múltiples validaciones
-        p = None
-        try:
-            p = bc.get_blob_properties()
-            if not p:
-                return func.HttpResponse(
-                    json.dumps({
-                        "ok": False,
-                        "error": "No se pudieron obtener las propiedades del archivo",
-                        "path": ruta,
-                        "container": container,
-                        "run_id": run_id
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=500
-                )
-        except Exception as props_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error obteniendo propiedades del archivo: {str(props_error)}",
-                    "path": ruta,
-                    "container": container,
-                    "run_id": run_id,
-                    "error_type": type(props_error).__name__
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=404
-            )
-
-        # ✅ EXTRACCIÓN DE INFORMACIÓN: Manejo defensivo de cada propiedad
-        info = {
-            "container": container,
-            "ruta_recibida": ruta_raw,
-            "ruta_efectiva": ruta,
-            "run_id": run_id
-        }
-
-        try:
-            # ✅ Tamaño del archivo con validación defensiva
-            size = 0
-            try:
-                size = getattr(p, "size", None)
-                if size is None:
-                    size = getattr(p, "content_length", None)
-                if size is None:
-                    size = 0
-                else:
-                    size = int(size) if size is not None else 0
-            except (ValueError, TypeError, AttributeError):
-                size = 0
-            info["size"] = size
-
-            # ✅ Fecha de modificación con manejo defensivo
-            last_modified = None
-            try:
-                if hasattr(p, "last_modified") and p.last_modified:
-                    if hasattr(p.last_modified, 'isoformat'):
-                        last_modified = p.last_modified.isoformat()
-                    else:
-                        last_modified = str(p.last_modified)
-            except Exception:
-                last_modified = None
-            info["last_modified"] = last_modified
-
-            # ✅ Content type con manejo defensivo
-            content_type = "application/octet-stream"  # Default seguro
-            try:
-                if hasattr(p, "content_settings") and p.content_settings:
-                    ct = getattr(p.content_settings, "content_type", None)
-                    if ct and isinstance(ct, str) and len(ct.strip()) > 0:
-                        content_type = ct.strip()
-            except Exception:
-                pass  # Usar default
-            info["content_type"] = content_type
-
-            # ✅ ETag con validación defensiva
-            etag = None
-            try:
-                etag = getattr(p, "etag", None)
-                if etag and not isinstance(etag, str):
-                    etag = str(etag)
-            except Exception:
-                etag = None
-            info["etag"] = etag
-
-            # ✅ MD5 con manejo defensivo
-            md5_b64 = None
-            try:
-                if hasattr(p, "content_settings") and p.content_settings:
-                    content_md5 = getattr(
-                        p.content_settings, "content_md5", None)
-                    if content_md5:
-                        md5_b64 = _md5_to_b64(content_md5)
-            except Exception:
-                md5_b64 = None
-            info["md5_b64"] = md5_b64
-
-            # ✅ Tipo de blob con validación defensiva
-            blob_type = None
-            try:
-                blob_type_raw = getattr(p, "blob_type", None)
-                if blob_type_raw:
-                    blob_type = str(blob_type_raw)
-            except Exception:
-                blob_type = None
-            info["blob_type"] = blob_type
-
-            # ✅ Información adicional útil
-            info.update({
-                "size_human": _format_file_size(size),
-                "is_empty": size == 0,
-                "has_content_type": content_type != "application/octet-stream",
-                "has_etag": etag is not None,
-                "has_md5": md5_b64 is not None
-            })
-
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": True,
-                    "endpoint": endpoint,
-                    "method": method,
-                    "status": 200,
-                    "message": f"Información del archivo '{ruta}' obtenida exitosamente",
-                    "data": info,
-                    "run_id": run_id,
-                    "timestamp": datetime.now().isoformat()
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        except Exception as info_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": False,
-                    "error": f"Error procesando información del archivo: {str(info_error)}",
-                    "path": ruta,
-                    "container": container,
-                    "run_id": run_id,
-                    "error_type": type(info_error).__name__
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=500
-            )
-
-    except Exception as e:
-        logging.exception(
-            f"info_archivo_http failed with unexpected error: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({
-                "ok": False,
-                "error": f"Error interno del servidor: {str(e)}",
-                "endpoint": endpoint,
-                "method": method,
-                "status": 500,
-                "run_id": run_id if 'run_id' in locals() else "unknown",
-                "error_type": type(e).__name__,
-                "timestamp": datetime.now().isoformat()
-            }, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=500
-        )
-
-
 def validate_info_archivo_params(req, run_id, CONTAINER_NAME, IS_AZURE, get_blob_client, PROJECT_ROOT, COPILOT_ROOT, Path, datetime, json, func, logging, os):
     """
     Validación robusta de parámetros y existencia física del archivo para info_archivo_http
@@ -16281,10 +15885,82 @@ def configurar_cors_http(req: func.HttpRequest) -> func.HttpResponse:
 
 
 @app.function_name(name="configurar_app_settings_http")
-@app.route(route="configurar-app-settings", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="configurar-app-settings", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def configurar_app_settings_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
-    """Configura app settings usando REST API con validación robusta"""
+    """Configura/consulta app settings usando REST API con validación robusta"""
+    
+    # === GET: LEER/VALIDAR CONFIGURACIÓN ===
+    if req.method == "GET":
+        function_app = req.params.get("function_app") or os.environ.get("WEBSITE_SITE_NAME") or "copiloto-semantico-func-us2"
+        resource_group = req.params.get("resource_group") or os.environ.get("RESOURCE_GROUP") or "boat-rental-app-group"
+        setting_name = req.params.get("setting")  # Opcional: validar un setting específico
+        
+        try:
+            # Leer configuración actual usando Azure CLI
+            path = f"/subscriptions/{_sub_id()}/resourceGroups/{resource_group}/providers/Microsoft.Web/sites/{function_app}/config/appsettings/list?api-version=2023-12-01"
+            
+            url = f"https://management.azure.com{path}"
+            response = requests.post(url, headers={
+                "Authorization": f"Bearer {_arm_token()}",
+                "Content-Type": "application/json"
+            }, timeout=30)
+            
+            if response.status_code == 200:
+                current_settings = response.json().get("properties", {})
+                
+                # Si se solicita un setting específico
+                if setting_name:
+                    value = current_settings.get(setting_name)
+                    return func.HttpResponse(
+                        json.dumps({
+                            "ok": True,
+                            "function_app": function_app,
+                            "resource_group": resource_group,
+                            "setting": setting_name,
+                            "value": value,
+                            "exists": value is not None,
+                            "mensaje": f"Setting '{setting_name}' = '{value}'" if value else f"Setting '{setting_name}' no existe"
+                        }, ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=200
+                    )
+                
+                # Devolver todas las configuraciones
+                return func.HttpResponse(
+                    json.dumps({
+                        "ok": True,
+                        "function_app": function_app,
+                        "resource_group": resource_group,
+                        "settings": current_settings,
+                        "total_settings": len(current_settings),
+                        "mensaje": f"Configuración actual de {function_app}"
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+            else:
+                return func.HttpResponse(
+                    json.dumps({
+                        "ok": False,
+                        "error": f"Error leyendo configuración: {response.status_code}",
+                        "details": response.text[:500]
+                    }, ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=response.status_code
+                )
+        except Exception as e:
+            return func.HttpResponse(
+                json.dumps({
+                    "ok": False,
+                    "error": f"Error consultando app settings: {str(e)}",
+                    "tipo_error": type(e).__name__
+                }, ensure_ascii=False),
+                mimetype="application/json",
+                status_code=500
+            )
+    
+    # === POST: CONFIGURAR/ACTUALIZAR ===
     try:
         body = req.get_json() if req.get_body() else {}
     except (ValueError, TypeError):

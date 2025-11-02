@@ -84,20 +84,51 @@ def detectar_necesidad_bing_inteligente(consulta: str, contexto: Optional[Dict] 
 
 
 def analizar_intencion_semantica(consulta: str) -> Dict:
-    """Analiza la intención semántica de la consulta"""
-    consulta_lower = consulta.lower().strip()
+    """Analiza la intención semántica usando búsqueda vectorial en memoria"""
+    try:
+        from endpoints_search_memory import buscar_memoria_endpoint
+        
+        # 🧠 BUSCAR INTENCIONES SIMILARES EN MEMORIA VECTORIAL
+        resultado = buscar_memoria_endpoint({
+            "query": f"intención: {consulta}",
+            "top": 3
+        })
+        
+        if resultado.get("exito") and resultado.get("documentos"):
+            docs = resultado["documentos"]
+            
+            # Analizar endpoints más relevantes
+            endpoints_encontrados = [d.get("endpoint", "") for d in docs]
+            
+            # Detectar patrón de introspección
+            if any("introspection" in ep or "diagnostico" in ep or "status" in ep for ep in endpoints_encontrados):
+                return {"tipo": "introspection", "confianza": 0.9, "endpoint_sugerido": "/api/introspection"}
+            
+            # Detectar patrón de búsqueda
+            if any("buscar" in ep or "search" in ep or "memoria" in ep for ep in endpoints_encontrados):
+                return {"tipo": "busqueda_informacion", "confianza": 0.8}
+            
+            # Detectar patrón de ejecución
+            if any("ejecutar" in ep or "cli" in ep or "script" in ep for ep in endpoints_encontrados):
+                return {"tipo": "comando_local", "confianza": 0.9}
     
-    # Detectar verbos de acción
-    verbos_busqueda = ["qué", "cuál", "cómo", "dónde", "cuándo", "por qué", "what", "how", "where", "when", "why"]
-    verbos_ejecucion = ["ejecutar", "correr", "instalar", "crear", "eliminar", "run", "install", "create", "delete"]
-    verbos_comparacion = ["comparar", "vs", "versus", "diferencia", "mejor", "compare", "difference", "better"]
+    except Exception as e:
+        logging.warning(f"⚠️ Búsqueda vectorial falló, usando análisis estructural: {e}")
     
-    if any(verbo in consulta_lower for verbo in verbos_busqueda):
-        return {"tipo": "busqueda_informacion", "confianza": 0.8}
-    elif any(verbo in consulta_lower for verbo in verbos_ejecucion):
-        return {"tipo": "comando_local", "confianza": 0.9}
-    elif any(verbo in consulta_lower for verbo in verbos_comparacion):
-        return {"tipo": "comparacion", "confianza": 0.7}
+    # FALLBACK: Análisis estructural básico (sin palabras clave)
+    return analizar_estructura_consulta(consulta)
+
+
+def analizar_estructura_consulta(consulta: str) -> Dict:
+    """Análisis estructural de la consulta sin palabras clave predefinidas"""
+    # Analizar estructura gramatical
+    tiene_interrogacion = "?" in consulta or consulta.lower().startswith(("qué", "cuál", "cómo", "dónde"))
+    tiene_imperativo = any(consulta.lower().startswith(v) for v in ["ejecuta", "corre", "instala", "crea"])
+    
+    if tiene_interrogacion:
+        return {"tipo": "busqueda_informacion", "confianza": 0.6}
+    elif tiene_imperativo:
+        return {"tipo": "comando_local", "confianza": 0.7}
     else:
         return {"tipo": "general", "confianza": 0.5}
 
@@ -196,7 +227,12 @@ def integrar_con_validador_semantico_inteligente(req, consulta: str, memoria_pre
     
     logging.info(f"🧠 Detección Inteligente: {deteccion['requiere_bing']} (confianza: {deteccion['confianza']:.2f}) - {deteccion['razon']}")
     
-    # 2. Si no requiere Bing, continuar normal
+    # 🧠 Si la intención detectada sugiere un endpoint específico, marcarlo
+    if deteccion["intencion_detectada"].get("endpoint_sugerido"):
+        logging.info(f"🎯 Endpoint sugerido por detección vectorial: {deteccion['intencion_detectada']['endpoint_sugerido']}")
+        # El agente usará este endpoint automáticamente a través de OpenAPI
+    
+    # 2. Si no requiere Bing ni introspección, continuar normal
     if not deteccion["requiere_bing"]:
         return {
             "usar_bing": False,

@@ -2987,33 +2987,81 @@
         }
       }
     },
-    "/api/info-archivo": {
+        "/api/configurar-app-settings": {
       "get": {
-        "summary": "Obtener metadatos de un archivo",
-        "operationId": "infoArchivo",
+        "summary": "Leer/Validar App Settings de Function App",
+        "description": "Consulta la configuración actual de una Function App. Permite validar un setting específico o listar todos.",
+        "operationId": "leerAppSettings",
         "tags": [
-          "Azure Storage"
+          "Azure Configuration"
         ],
         "security": [],
         "parameters": [
           {
-            "name": "ruta",
+            "name": "function_app",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string",
-              "description": "Ruta del archivo"
-            }
+              "description": "Nombre de la Function App (usa WEBSITE_SITE_NAME si no se proporciona)"
+            },
+            "example": "copiloto-semantico-func-us2"
+          },
+          {
+            "name": "resource_group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Resource group (usa RESOURCE_GROUP si no se proporciona)"
+            },
+            "example": "boat-rental-app-group"
+          },
+          {
+            "name": "setting",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Nombre de un setting específico a validar (opcional)"
+            },
+            "example": "SEMANTIC_TOP_K"
           }
         ],
         "responses": {
           "200": {
-            "description": "Metadatos del archivo",
+            "description": "Configuración leída correctamente",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "function_app": {
+                      "type": "string"
+                    },
+                    "resource_group": {
+                      "type": "string"
+                    },
+                    "settings": {
+                      "type": "object",
+                      "description": "Todos los settings (si no se especificó uno)"
+                    },
+                    "setting": {
+                      "type": "string",
+                      "description": "Nombre del setting consultado"
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "Valor del setting consultado"
+                    },
+                    "exists": {
+                      "type": "boolean",
+                      "description": "Si el setting existe"
+                    }
+                  }
                 }
               }
             }
@@ -3021,15 +3069,14 @@
           "400": {
             "description": "Solicitud inválida"
           },
-          "404": {
-            "description": "Archivo no encontrado"
+          "500": {
+            "description": "Error del servidor"
           }
         }
-      }
-    },
-    "/api/configurar-app-settings": {
+      },
       "post": {
-        "summary": "Configurar App Settings de Function App",
+        "summary": "Configurar/Actualizar App Settings de Function App",
+        "description": "Actualiza la configuración de una Function App con nuevos valores.",
         "operationId": "configurarAppSettings",
         "tags": [
           "Azure Configuration"
@@ -3200,6 +3247,72 @@
                     },
                     "error": {
                       "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/introspection": {
+      "get": {
+        "summary": "🧠 AUTOPERCEPCIÓN ESTRUCTURAL - Inventario completo del sistema",
+        "description": "ENDPOINT PRIORITARIO: Consultar PRIMERO antes de validaciones. Devuelve inventario completo de endpoints, capacidades, estructura semántica y componentes del sistema. Esencial para: validaciones de autosuficiencia, conocer endpoints disponibles, verificar capacidades de monitoreo/corrección/diagnóstico.",
+        "operationId": "introspection",
+        "x-priority": "high",
+        "tags": [
+          "System Intelligence"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["diagnostico", "monitoreo", "correccion", "memoria", "configuracion"],
+              "description": "Filtrar endpoints por categoría específica"
+            },
+            "example": "monitoreo"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Autopercepción completada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "estructura": {
+                      "type": "object",
+                      "properties": {
+                        "total_endpoints": {
+                          "type": "integer"
+                        },
+                        "categorias": {
+                          "type": "object"
+                        },
+                        "endpoints_por_categoria": {
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "capacidades": {
+                      "type": "object",
+                      "properties": {
+                        "diagnostico": {"type": "boolean"},
+                        "monitoreo": {"type": "boolean"},
+                        "correccion": {"type": "boolean"},
+                        "memoria": {"type": "boolean"},
+                        "configuracion": {"type": "boolean"}
+                      }
                     }
                   }
                 }

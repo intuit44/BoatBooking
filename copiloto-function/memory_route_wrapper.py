@@ -12,6 +12,45 @@ from typing import Callable
 from datetime import datetime
 from azure.storage.queue import QueueClient
 
+def recuperar_contexto_conversacional(session_id: str, endpoint_actual: str) -> str:
+    """
+    Recupera el contexto conversacional desde la última invocación de endpoint.
+    Retorna el bloque de conversación entre la última acción y esta.
+    """
+    try:
+        from services.memory_service import memory_service
+        
+        # Obtener historial de la sesión
+        interacciones = memory_service.get_session_history(session_id, limit=50)
+        
+        if not interacciones:
+            return ""
+        
+        # Buscar la última invocación de endpoint (excluyendo context_snapshot)
+        contexto_acumulado = []
+        
+        for interaccion in interacciones:
+            source = interaccion.get("data", {}).get("source", "")
+            
+            # Si encontramos otra invocación de endpoint, detenemos
+            if source != "context_snapshot" and source != "guardar_memoria":
+                break
+            
+            # Acumular texto semántico
+            texto = interaccion.get("texto_semantico", "")
+            if texto and len(texto) > 20:
+                contexto_acumulado.append(texto)
+        
+        # Retornar contexto concatenado
+        if contexto_acumulado:
+            return " | ".join(reversed(contexto_acumulado))  # Orden cronológico
+        
+        return ""
+    
+    except Exception as e:
+        logging.warning(f"⚠️ Error recuperando contexto: {e}")
+        return ""
+
 def memory_route(app: func.FunctionApp) -> Callable:
     """Fábrica que envuelve app.route para aplicar memoria automáticamente."""
     original_route = app.route
@@ -87,7 +126,37 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     except Exception as e:
                         logging.warning(f"⚠️ [{source_name}] Error procesando respuesta: {e}")
 
-                    # 4️⃣ REGISTRO DE NUEVA INTERACCIÓN EN COSMOS
+                    # 4️⃣ CAPTURA AUTOMÁTICA DE CONTEXTO CONVERSACIONAL
+                    # 📸 Guardar snapshot del contexto previo a la invocación
+                    try:
+                        session_id = (
+                            req.headers.get("Session-ID")
+                            or req.params.get("session_id")
+                            or "constant-session-id"
+                        )
+                        
+                        # Recuperar contexto conversacional desde la última invocación
+                        contexto_previo = recuperar_contexto_conversacional(session_id, route_path)
+                        
+                        if contexto_previo and len(contexto_previo) > 100:
+                            # Guardar snapshot de contexto
+                            memory_service.registrar_llamada(
+                                source="context_snapshot",
+                                endpoint=route_path,
+                                method="AUTO",
+                                params={"session_id": session_id, "trigger": route_path},
+                                response_data={
+                                    "texto_semantico": f"📸 Contexto previo a {route_path}: {contexto_previo[:4096]}",
+                                    "tipo": "context_snapshot",
+                                    "longitud": len(contexto_previo)
+                                },
+                                success=True
+                            )
+                            logging.info(f"📸 Context snapshot guardado: {len(contexto_previo)} chars")
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error capturando contexto: {e}")
+                    
+                    # 5️⃣ REGISTRO DE NUEVA INTERACCIÓN EN COSMOS
                     # ❌ EXCLUIR historial-interacciones para evitar recursión infinita
                     es_endpoint_historial = (
                         "historial" in route_path.lower() or 
