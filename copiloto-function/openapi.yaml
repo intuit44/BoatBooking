@@ -3916,64 +3916,222 @@
           }
         }
       }
+    },
+    "/api/guardar-memoria": {
+      "post": {
+      "summary": "🧠 GUARDAR EN MEMORIA - Almacenamiento intencional de contexto",
+      "description": "Permite al agente guardar contenido explícitamente en memoria vectorial. El agente decide QUÉ es importante basándose en intención semántica.\n\nCasos de uso:\n- Guardar resúmenes de conversaciones largas\n- Almacenar decisiones importantes del usuario\n- Registrar configuraciones aplicadas\n- Documentar soluciones a problemas complejos\n\nNO usa heurísticas automáticas - el agente tiene control total.",
+      "operationId": "guardarMemoria",
+      "tags": [
+        "🧠 Memoria Semántica"
+      ],
+      "security": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+        "application/json": {
+          "schema": {
+          "type": "object",
+          "required": [
+            "contenido"
+          ],
+          "properties": {
+            "contenido": {
+            "type": "string",
+            "description": "Contenido a guardar en memoria vectorial",
+            "example": "Resumen: El usuario configuró top_k=8 para mejorar búsqueda vectorial..."
+            },
+            "tipo": {
+            "type": "string",
+            "description": "Tipo de memoria",
+            "enum": [
+              "resumen_conversacion",
+              "decision_usuario",
+              "configuracion_aplicada",
+              "solucion_problema",
+              "memoria_manual"
+            ],
+            "default": "memoria_manual"
+            },
+            "session_id": {
+            "type": "string",
+            "description": "ID de sesión (opcional, se detecta automáticamente)"
+            },
+            "agent_id": {
+            "type": "string",
+            "description": "ID del agente (opcional, se detecta automáticamente)"
+            },
+            "metadata": {
+            "type": "object",
+            "description": "Metadata adicional",
+            "properties": {
+              "importancia": {
+              "type": "string",
+              "enum": [
+                "baja",
+                "media",
+                "alta"
+              ]
+              },
+              "fuente": {
+              "type": "string"
+              },
+              "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+              }
+            }
+            }
+          }
+          },
+          "examples": {
+          "resumen": {
+            "summary": "Guardar resumen de conversación",
+            "value": {
+            "contenido": "Resumen: Usuario solicitó configurar top_k=8 en copiloto-semantico-func-us2. Se aplicó exitosamente.",
+            "tipo": "resumen_conversacion",
+            "metadata": {
+              "importancia": "alta",
+              "fuente": "foundry"
+            }
+            }
+          },
+          "decision": {
+            "summary": "Guardar decisión del usuario",
+            "value": {
+            "contenido": "Decisión: Usuario prefiere usar Azure CLI en lugar de SDK para operaciones de storage",
+            "tipo": "decision_usuario",
+            "session_id": "assistant"
+            }
+          }
+          }
+        }
+        }
+      },
+      "responses": {
+        "200": {
+        "description": "Contenido guardado exitosamente en memoria",
+        "content": {
+          "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+            "exito": {
+              "type": "boolean",
+              "example": true
+            },
+            "mensaje": {
+              "type": "string",
+              "example": "Contenido guardado en memoria vectorial"
+            },
+            "detalles": {
+              "type": "object",
+              "properties": {
+              "longitud": {
+                "type": "integer",
+                "description": "Longitud del contenido guardado"
+              },
+              "tipo": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+              }
+            }
+            }
+          }
+          }
+        }
+        },
+        "400": {
+        "description": "Parámetros inválidos",
+        "content": {
+          "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+            "exito": {
+              "type": "boolean",
+              "example": false
+            },
+            "error": {
+              "type": "string"
+            },
+            "ejemplo": {
+              "type": "object"
+            }
+            }
+          }
+          }
+        }
+        }
+      }
+      }
     }
-   },
+     },
     "tags": [
       {
-        "name": "Azure Storage",
-        "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
+      "name": "Azure Storage",
+      "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
       },
       {
-        "name": "🚀 Universal CLI Executor",
-        "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
+      "name": "🚀 Universal CLI Executor",
+      "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
       },
       {
-        "name": "Diagnóstico",
-        "description": "Diagnóstico y monitoreo de recursos"
+      "name": "Diagnóstico",
+      "description": "Diagnóstico y monitoreo de recursos"
       },
       {
-        "name": "Azure Deployment",
-        "description": "Deployment de recursos con ARM templates"
+      "name": "Azure Deployment",
+      "description": "Deployment de recursos con ARM templates"
       },
       {
-        "name": "Azure Configuration",
-        "description": "Configuración de recursos Azure"
+      "name": "Azure Configuration",
+      "description": "Configuración de recursos Azure"
       },
       {
-        "name": "Testing",
-        "description": "Pruebas y validación de endpoints"
+      "name": "Testing",
+      "description": "Pruebas y validación de endpoints"
       },
       {
-        "name": "Internal",
-        "description": "Operaciones internas de la Function App"
+      "name": "Internal",
+      "description": "Operaciones internas de la Function App"
       },
       {
-        "name": "🧠 Memoria Integrada",
-        "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
+      "name": "🧠 Memoria Integrada",
+      "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
       },
       {
-        "name": "🧠 Memoria Semántica",
-        "description": "Búsqueda e indexación semántica con Azure AI Search usando Managed Identity"
+      "name": "🧠 Memoria Semántica",
+      "description": "Búsqueda e indexación semántica con Azure AI Search usando Managed Identity"
       },
       {
-        "name": "Local Storage",
-        "description": "Operaciones en el filesystem local del contenedor"
+      "name": "Local Storage",
+      "description": "Operaciones en el filesystem local del contenedor"
       },
       {
-        "name": "Autocorrección",
-        "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."
+      "name": "Autocorrección",
+      "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."
       },
       {
-        "name": "Bridge",
-        "description": "Endpoints tolerantes para agentes problemáticos"
+      "name": "Bridge",
+      "description": "Endpoints tolerantes para agentes problemáticos"
       },
       {
-        "name": "🚀 Despliegues Robustos",
-        "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
+      "name": "🚀 Despliegues Robustos",
+      "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
       },
       {
-        "name": "🔍 Análisis Semántico",
-        "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
+      "name": "🔍 Análisis Semántico",
+      "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
       }
       
     ],

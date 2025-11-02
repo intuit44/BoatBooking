@@ -352,6 +352,15 @@ except Exception as e:
     logging.error(f"Traceback: {traceback.format_exc()}")
 
 try:
+    import endpoints.guardar_memoria
+    logging.info("✅ Endpoint guardar_memoria registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint guardar_memoria: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando guardar_memoria: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
     import buscar_interacciones_endpoint
     logging.info("✅ Endpoint buscar-interacciones registrado correctamente")
 except ImportError as e:
