@@ -77,6 +77,8 @@ desktop.ini
 .turbo/
 
 # 📊 Logs
+semantic.log.json
+*.semantic.log.json
 lerna-debug.log*
 .pnpm-debug.log*
 logs/
