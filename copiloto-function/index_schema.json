@@ -1,0 +1,52 @@
+{
+  "name": "agent-memory-index",
+  "fields": [
+    {
+      "name": "id",
+      "type": "Edm.String",
+      "key": true,
+      "searchable": true,
+      "filterable": true
+    },
+    {
+      "name": "session_id",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true
+    },
+    {
+      "name": "agent_id",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true
+    },
+    {
+      "name": "endpoint",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true
+    },
+    {
+      "name": "texto_semantico",
+      "type": "Edm.String",
+      "searchable": true
+    },
+    {
+      "name": "exito",
+      "type": "Edm.Boolean",
+      "filterable": true
+    },
+    {
+      "name": "tipo",
+      "type": "Edm.String",
+      "searchable": true,
+      "filterable": true
+    },
+    {
+      "name": "timestamp",
+      "type": "Edm.DateTimeOffset",
+      "filterable": true,
+      "sortable": true
+    }
+  ]
+}

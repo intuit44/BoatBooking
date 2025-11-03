@@ -256,7 +256,7 @@
     "/api/hybrid": {
       "post": {
         "summary": "Router semántico (intenciones)",
-        "operationId": "processHybrid",
+        "operationId": "hybrid",
         "security": [],
         "parameters": [
           {

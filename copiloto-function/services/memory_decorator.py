@@ -335,9 +335,32 @@ def registrar_memoria(source_name: str):
                     success=success
                 )
                 
-                # 🧠 MEMORIA SEMÁNTICA AUTOMÁTICA
+                # 🧠 MEMORIA SEMÁNTICA AUTOMÁTICA CON CONTEXTO ENRIQUECIDO
                 try:
                     from services.semantic_memory import registrar_snapshot_semantico
+                    
+                    # 🔥 GENERAR TEXTO SEMÁNTICO RICO
+                    texto_semantico = f"Interacción en '{source_name}' ejecutada por {final_agent_id}. "
+                    texto_semantico += f"Éxito: {'✅' if success else '❌'}. "
+                    texto_semantico += f"Endpoint: {source_name}. "
+                    
+                    # Agregar contexto previo si está disponible
+                    if memoria_contexto and isinstance(memoria_contexto, dict):
+                        resumen = memoria_contexto.get('resumen_ultimo') or memoria_contexto.get('ultimo_tema')
+                        if resumen:
+                            texto_semantico += f"Contexto previo: {str(resumen)[:150]}. "
+                    
+                    # Agregar estado del sistema si está disponible
+                    if contexto_semantico and not contexto_semantico.get("error"):
+                        texto_semantico += f"Estado del sistema: {len(contexto_semantico)} fuentes activas. "
+                    
+                    # Agregar detalles del response
+                    if response_data and isinstance(response_data, dict):
+                        if "mensaje" in response_data:
+                            msg = str(response_data["mensaje"])[:200]
+                            texto_semantico += f"Resultado: {msg}. "
+                        if "error" in response_data:
+                            texto_semantico += f"Error: {str(response_data['error'])[:100]}. "
                     
                     snapshot_data = {
                         "endpoint": source_name,
@@ -345,7 +368,8 @@ def registrar_memoria(source_name: str):
                         "success": success,
                         "duration_ms": duration_ms,
                         "timestamp": datetime.now().isoformat(),
-                        "contexto_semantico_disponible": bool(contexto_semantico and not contexto_semantico.get("error"))
+                        "contexto_semantico_disponible": bool(contexto_semantico and not contexto_semantico.get("error")),
+                        "texto_semantico": texto_semantico  # ← CLAVE: Texto rico para búsqueda
                     }
                     
                     # Agregar datos específicos del response si están disponibles
@@ -358,7 +382,7 @@ def registrar_memoria(source_name: str):
                     registrar_snapshot_semantico(
                         session_id=final_session_id,
                         agent_id=final_agent_id,
-                        tipo="interaccion_automatica",
+                        tipo="context_snapshot",  # ← Tipo específico para snapshots de contexto
                         contenido=snapshot_data,
                         metadata={"endpoint": source_name, "wrapper": "automatico"}
                     )
