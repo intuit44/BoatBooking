@@ -37,8 +37,128 @@ def registrar_memoria(source: str):
                 logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria global: {e}")
                 setattr(req, "memoria_global", None)
 
+            # === 🔍 BÚSQUEDA SEMÁNTICA AUTOMÁTICA (sin depender del body) ===
+            try:
+                # Extraer session_id y agent_id de headers/params (Foundry envía body vacío)
+                session_id = (
+                    req.headers.get("Session-ID") or
+                    req.headers.get("X-Session-ID") or
+                    req.params.get("Session-ID") or
+                    req.params.get("session_id")
+                )
+                
+                agent_id = (
+                    req.headers.get("Agent-ID") or
+                    req.headers.get("X-Agent-ID") or
+                    req.params.get("Agent-ID") or
+                    req.params.get("agent_id") or
+                    "GlobalAgent"
+                )
+                
+                # Detectar endpoint desde URL
+                endpoint_detectado = url.split('/')[-1] if '/' in url else source
+                
+                # 🔥 BÚSQUEDA SEMÁNTICA: Basada en endpoint + session_id (sin body)
+                if session_id and agent_id:
+                    from azure.cosmos import CosmosClient
+                    import os
+                    
+                    cosmos_endpoint = os.environ.get("COSMOSDB_ENDPOINT")
+                    cosmos_key = os.environ.get("COSMOSDB_KEY")
+                    
+                    if cosmos_endpoint and cosmos_key:
+                        client = CosmosClient(cosmos_endpoint, cosmos_key)
+                        database = client.get_database_client(os.environ.get("COSMOSDB_DATABASE", "agentMemory"))
+                        container = database.get_container_client("memory")
+                        
+                        # Query semántica: buscar por endpoint + agent_id (sin depender del body)
+                        query = """
+                        SELECT TOP 10 c.texto_semantico, c.endpoint, c.timestamp, c.data.respuesta_resumen
+                        FROM c
+                        WHERE c.agent_id = @agent_id
+                          AND (c.endpoint = @endpoint OR CONTAINS(c.endpoint, @endpoint))
+                          AND IS_DEFINED(c.texto_semantico)
+                          AND LENGTH(c.texto_semantico) > 30
+                        ORDER BY c._ts DESC
+                        """
+                        
+                        items = list(container.query_items(
+                            query=query,
+                            parameters=[
+                                {"name": "@agent_id", "value": agent_id},
+                                {"name": "@endpoint", "value": endpoint_detectado}
+                            ],
+                            enable_cross_partition_query=True
+                        ))
+                        
+                        if items:
+                            # Construir contexto semántico enriquecido
+                            contexto_semantico = {
+                                "interacciones_similares": len(items),
+                                "endpoint": endpoint_detectado,
+                                "resumen": " | ".join([item.get("texto_semantico", "")[:100] for item in items[:3]]),
+                                "ultima_ejecucion": items[0].get("timestamp") if items else None
+                            }
+                            setattr(req, "contexto_semantico", contexto_semantico)
+                            logging.info(f"[wrapper] 🔍 Búsqueda semántica: {len(items)} interacciones similares en '{endpoint_detectado}' para {agent_id}")
+                        else:
+                            logging.info(f"[wrapper] 🔍 Sin memoria semántica previa para '{endpoint_detectado}'")
+                            setattr(req, "contexto_semantico", None)
+                    else:
+                        logging.warning("[wrapper] ⚠️ Cosmos DB no configurado para búsqueda semántica")
+                        setattr(req, "contexto_semantico", None)
+                else:
+                    logging.info("[wrapper] ⏭️ Sin session_id/agent_id válidos, búsqueda semántica omitida")
+                    setattr(req, "contexto_semantico", None)
+                    
+            except Exception as e:
+                logging.warning(f"[wrapper] ⚠️ Error en búsqueda semántica automática: {e}")
+                setattr(req, "contexto_semantico", None)
+
             # === 2️⃣ Ejecutar función original (con contexto disponible en req.contexto_prev) ===
             response = func(req)
+            
+            # === 🔥 ENRIQUECER RESPUESTA HTTP CON METADATA DE BÚSQUEDA ===
+            try:
+                contexto_semantico = getattr(req, "contexto_semantico", None)
+                memoria_global = getattr(req, "memoria_global", None)
+                
+                if response.get_body():
+                    response_data = json.loads(response.get_body().decode())
+                    
+                    # Agregar metadata de búsqueda semántica
+                    if "metadata" not in response_data:
+                        response_data["metadata"] = {}
+                    
+                    if contexto_semantico:
+                        response_data["metadata"]["busqueda_semantica"] = {
+                            "aplicada": True,
+                            "interacciones_encontradas": contexto_semantico.get("interacciones_similares", 0),
+                            "endpoint_buscado": contexto_semantico.get("endpoint"),
+                            "resumen_contexto": contexto_semantico.get("resumen", "")[:200]
+                        }
+                        response_data["metadata"]["memoria_aplicada"] = True
+                    else:
+                        response_data["metadata"]["busqueda_semantica"] = {
+                            "aplicada": False,
+                            "razon": "sin_session_id_o_sin_resultados"
+                        }
+                        response_data["metadata"]["memoria_aplicada"] = False
+                    
+                    # Agregar info de memoria global
+                    if memoria_global and memoria_global.get("tiene_historial"):
+                        response_data["metadata"]["memoria_global"] = True
+                        response_data["metadata"]["interacciones_previas"] = memoria_global.get("total_interacciones", 0)
+                    
+                    # Recrear response con metadata enriquecida
+                    response = azfunc.HttpResponse(
+                        json.dumps(response_data, ensure_ascii=False),
+                        status_code=response.status_code,
+                        mimetype="application/json"
+                    )
+                    logging.info(f"[wrapper] ✅ Metadata de búsqueda semántica agregada a respuesta")
+            except Exception as e:
+                logging.warning(f"[wrapper] ⚠️ Error enriqueciendo respuesta: {e}")
 
             # === 3️⃣ Registrar interacción en memoria (enriquecida) ===
             try:
@@ -60,6 +180,25 @@ def registrar_memoria(source: str):
                         output_data = {"status_code": response.status_code}
                 except Exception:
                     output_data = {"status_code": response.status_code, "raw": True}
+                
+                # 🔍 Agregar metadata de búsqueda semántica al output
+                contexto_semantico = getattr(req, "contexto_semantico", None)
+                if contexto_semantico:
+                    if "metadata" not in output_data:
+                        output_data["metadata"] = {}
+                    output_data["metadata"]["busqueda_semantica"] = {
+                        "aplicada": True,
+                        "interacciones_encontradas": contexto_semantico.get("interacciones_similares", 0),
+                        "endpoint_buscado": contexto_semantico.get("endpoint"),
+                        "resumen_contexto": contexto_semantico.get("resumen", "")[:200]
+                    }
+                else:
+                    if "metadata" not in output_data:
+                        output_data["metadata"] = {}
+                    output_data["metadata"]["busqueda_semantica"] = {
+                        "aplicada": False,
+                        "razon": "sin_session_id_o_sin_resultados"
+                    }
 
                 # 🌍 Extraer agent_id para memoria global
                 agent_id = (
@@ -78,6 +217,13 @@ def registrar_memoria(source: str):
                         f"Respuesta: {str(output_data.get('mensaje', output_data.get('resultado', 'procesado')))[:100]}..."
                     )
 
+                # 🔍 Enriquecer output con contexto semántico si existe
+                contexto_semantico = getattr(req, "contexto_semantico", None)
+                if contexto_semantico:
+                    output_data["contexto_semantico_aplicado"] = contexto_semantico
+                    output_data["memoria_semantica_activa"] = True
+                    logging.info(f"[wrapper] 🧠 Contexto semántico aplicado: {contexto_semantico['interacciones_similares']} interacciones")
+                
                 # Guardar en memoria semántica
                 memory_service.record_interaction(
                     agent_id=agent_id,

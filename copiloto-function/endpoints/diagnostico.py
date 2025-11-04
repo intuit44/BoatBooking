@@ -14,18 +14,36 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from function_app import app
 from semantic_query_builder import construir_query_dinamica, ejecutar_query_cosmos
 from services.memory_service import memory_service
+from memory_decorator import registrar_memoria
 
 @app.function_name(name="diagnostico")
 @app.route(route="diagnostico", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@registrar_memoria("diagnostico")
 def diagnostico_http(req: func.HttpRequest) -> func.HttpResponse:
         """Diagnóstico de sesión con análisis de errores y patrones"""
         try:
-            session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+            # Extraer session_id de múltiples fuentes
+            session_id = (
+                req.headers.get("Session-ID") or
+                req.headers.get("X-Session-ID") or
+                req.params.get("session_id") or
+                req.params.get("Session-ID")
+            )
             
+            # Si no hay session_id, retornar info del servicio disponible
             if not session_id:
                 return func.HttpResponse(
-                    json.dumps({"exito": False, "error": "Session-ID requerido"}),
-                    mimetype="application/json", status_code=400
+                    json.dumps({
+                        "ok": True,
+                        "message": "Servicio de diagnósticos disponible",
+                        "mgmt_sdk_available": True,
+                        "endpoints": {
+                            "POST": "Configurar diagnósticos para un recurso"
+                        },
+                        "uso": "Enviar Session-ID en headers o params para diagnóstico de sesión",
+                        "ejemplo": "GET /api/diagnostico?session_id=tu-session-id"
+                    }, ensure_ascii=False),
+                    mimetype="application/json", status_code=200
                 )
             
             try:
@@ -93,11 +111,26 @@ def diagnostico_http(req: func.HttpRequest) -> func.HttpResponse:
             if len(diagnostico["errores_detectados"]) > 5:
                 recomendaciones.append("Múltiples errores detectados - revisar logs")
             
+            # 🧠 Generar respuesta_usuario para memoria semántica
+            respuesta_usuario = f"""DIAGNÓSTICO DE SESIÓN {session_id[:8]}...
+
+📊 Resumen:
+- Total interacciones: {diagnostico['total_interacciones']}
+- Exitosas: {diagnostico['exitosas']} ({tasa_exito:.1f}%)
+- Fallidas: {diagnostico['fallidas']} ({(100-tasa_exito):.1f}%)
+- Endpoint más usado: {diagnostico['metricas']['endpoint_mas_usado']}
+
+{f'⚠️ Patrones detectados: ' + ', '.join(diagnostico['patrones']) if diagnostico['patrones'] else '✅ Sin patrones anómalos'}
+
+{f'💡 Recomendaciones: ' + ', '.join(recomendaciones) if recomendaciones else '✅ Sistema funcionando correctamente'}
+"""
+            
             return func.HttpResponse(
                 json.dumps({
                     "exito": True,
                     "diagnostico": diagnostico,
                     "recomendaciones": recomendaciones,
+                    "respuesta_usuario": respuesta_usuario,
                     "timestamp": datetime.now().isoformat()
                 }, ensure_ascii=False),
                 mimetype="application/json", status_code=200

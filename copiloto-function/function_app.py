@@ -15277,7 +15277,7 @@ def ejecutar_comando_azure_seguro(servicio: str, comando: str, params: dict) -> 
 
 
 @app.function_name(name="auditar_deploy_http")
-@app.route(route="auditar-deploy", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="auditar-deploy", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def auditar_deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     """
     Auditoría de deployments vía ARM usando Managed Identity.

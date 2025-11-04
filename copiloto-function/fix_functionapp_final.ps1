@@ -149,6 +149,8 @@ $settings = @{
   "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index"
   "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
   "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
+  # Embeddings model
+  "EMBEDDING_MODEL"                             = "text-embedding-3-large"
   # Dejarlo de último
   "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
   "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
