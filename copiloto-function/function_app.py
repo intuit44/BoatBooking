@@ -1107,6 +1107,50 @@ def leer_archivo_dinamico(ruta: str) -> dict:
     if ruta in CACHE:
         return CACHE[ruta]
 
+    # Regla explícita: si piden function_app.py en Azure y el blob es muy grande,
+    # devolver sugerencia de usar /api/ejecutar-cli en lugar de intentar leer completo.
+    try:
+        if ruta and ruta.lower().endswith("function_app.py") and IS_AZURE:
+            try:
+                client = get_blob_client()
+                if client:
+                    cc = client.get_container_client(CONTAINER_NAME)
+                    # Probar varias candidatas: la ruta tal cual y el nombre base
+                    candidates = [ruta, Path(ruta).name]
+                    for candidate in candidates:
+                        try:
+                            bc = cc.get_blob_client(candidate)
+                            if bc.exists():
+                                props = bc.get_blob_properties()
+                                size = getattr(props, "size", None) or getattr(
+                                    props, "content_length", None)
+                                try:
+                                    size_int = int(
+                                        size) if size is not None else None
+                                except Exception:
+                                    size_int = None
+                                # Umbral ~ 500 líneas -> ~40000 bytes
+                                if size_int and size_int > 40000:
+                                    return {
+                                        "exito": False,
+                                        "error": "Archivo demasiado extenso para /api/leer-archivo. Usa /api/ejecutar-cli.",
+                                        "endpoint_sugerido": "ejecutar-cli",
+                                        "sugerencias": [
+                                            "Usar /api/ejecutar-cli para ejecutar comandos sobre el archivo (p.ej. grep/head).",
+                                            "Ejemplo: POST /api/ejecutar-cli {\"comando\": \"grep -n 'def ' function_app.py | head -n 50\"}"
+                                        ],
+                                        "blob_path_checked": f"{CONTAINER_NAME}/{candidate}",
+                                        "size_bytes": size_int
+                                    }
+                        except Exception:
+                            # No detener la ejecución por errores puntuales de metadata
+                            continue
+            except Exception:
+                # Si falla la comprobación de blob metadata, seguir con el flujo normal
+                pass
+    except Exception:
+        pass
+
     # En Azure, intentar Blob primero
     if IS_AZURE:
         resultado = leer_archivo_blob(ruta)
@@ -4099,28 +4143,35 @@ def revisar_correcciones_http(req):
 
 
 def sintetizar(docs_search, docs_cosmos):
-    """Compone respuesta corta con lo último significativo"""
+    """Sintetiza memoria vectorial + secuencial en respuesta enriquecida"""
     partes = []
-    if docs_search:
-        ult = docs_search[0]
-        partes.append(
-            f"Último tema: {ult.get('endpoint','')} · {ult.get('texto_semantico','')[:240]}")
 
-    # Agregar 2 recientes de cosmos sin basura
+    # Usar hasta 5 docs vectoriales (más relevantes)
+    if docs_search:
+        partes.append("Actividad Relevante (búsqueda semántica):")
+        for i, doc in enumerate(docs_search[:5], 1):
+            texto = doc.get('texto_semantico', '')
+            endpoint = doc.get('endpoint', 'desconocido')
+            if texto and not any(x in texto.lower() for x in ['consulta de historial', 'sin resumen']):
+                partes.append(f"{i}. [{endpoint}] {texto[:400]}")
+
+    # Agregar hasta 5 interacciones recientes de Cosmos
     utiles = [d for d in docs_cosmos if d.get("texto_semantico") and not any([
         "consulta de historial" in d.get("texto_semantico", "").lower(),
         "sin resumen" in d.get("texto_semantico", "").lower()
-    ])][:2]
-    for d in utiles:
-        partes.append(f"- {d.get('texto_semantico','')[:240]}")
+    ])][:5]
+
+    if utiles:
+        partes.append("\nInteracciones Recientes (cronológicas):")
+        for i, d in enumerate(utiles, 1):
+            texto = d.get('texto_semantico', '')
+            endpoint = d.get('endpoint', 'desconocido')
+            partes.append(f"{i}. [{endpoint}] {texto[:400]}")
 
     if not partes:
-        return "No encuentro actividad significativa reciente. ¿Quieres que revise por tema o endpoint?"
-    return (
-        "🧠 Resumen de la última actividad\n"
-        + "\n".join(partes) +
-        "\n\n🎯 Próximas acciones: • buscar detalle • listar endpoints recientes • generar plan corto"
-    )
+        return "No encuentro actividad significativa reciente. ¿Quieres que revise por tema o endpoint específico?"
+
+    return "\n".join(partes) + "\n\nPuedo ayudarte con: análisis detallado, búsqueda por tema, o generar plan de acción."
 
 
 @app.function_name(name="historial_interacciones")
@@ -4200,6 +4251,13 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
         memoria_result = buscar_memoria_endpoint(memoria_payload)
 
+        # 🔥 LOG DETALLADO para debug
+        logging.info(
+            f"🔍 HISTORIAL: Resultado de AI Search: exito={memoria_result.get('exito')}, total={memoria_result.get('total', 0)}")
+        if not memoria_result.get("exito"):
+            logging.error(
+                f"❌ HISTORIAL: AI Search falló: {memoria_result.get('error', 'Sin error')}")
+
         if memoria_result.get("exito") and memoria_result.get("documentos"):
             docs_search = memoria_result["documentos"]
             logging.info(
@@ -4208,8 +4266,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 logging.info(
                     f"   Doc {i+1}: {doc.get('texto_semantico', '')[:100]}...")
         else:
-            logging.info(
-                "ℹ️ HISTORIAL: No se encontraron documentos en AI Search")
+            logging.warning(
+                f"⚠️ HISTORIAL: AI Search devolvió 0 documentos. Query: '{query_universal}', Session: {session_id}")
+            logging.warning(f"   Payload enviado: {memoria_payload}")
+            logging.warning(f"   Respuesta completa: {memoria_result}")
     except Exception as e:
         logging.warning(f"⚠️ Error en búsqueda automática AI Search: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
@@ -4934,31 +4994,38 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     )
 
     # 🧠 BUSCAR EN MEMORIA SEMÁNTICA SIEMPRE (OBLIGATORIO)
-    try:
-        from endpoints_search_memory import buscar_memoria_endpoint
-
+    # 🔥 PRIORIDAD 1: Usar docs vectoriales del wrapper si existen
+    if memoria_previa and memoria_previa.get("docs_vectoriales"):
+        docs_sem = memoria_previa["docs_vectoriales"]
         logging.info(
-            f"🔍 COPILOTO: Búsqueda AUTOMÁTICA en memoria para: '{consulta_usuario}'")
+            f"✅ COPILOTO: Usando {len(docs_sem)} docs vectoriales del wrapper")
+    else:
+        # PRIORIDAD 2: Buscar directamente si el wrapper no lo hizo
+        try:
+            from endpoints_search_memory import buscar_memoria_endpoint
 
-        # Crear payload para buscar_memoria
-        memoria_payload = {
-            "query": consulta_usuario,
-            "session_id": session_id,
-            "top": 5
-        }
-
-        # Ejecutar búsqueda en memoria
-        memoria_result = buscar_memoria_endpoint(memoria_payload)
-
-        if memoria_result.get("exito") and memoria_result.get("documentos"):
-            docs_sem = memoria_result["documentos"]
             logging.info(
-                f"✅ COPILOTO: Memoria encontró {len(docs_sem)} documentos relevantes")
-        else:
-            logging.info(
-                "ℹ️ COPILOTO: No se encontraron documentos en memoria")
-    except Exception as e:
-        logging.warning(f"⚠️ Error en búsqueda automática de memoria: {e}")
+                f"🔍 COPILOTO: Búsqueda AUTOMÁTICA en memoria para: '{consulta_usuario}'")
+
+            # Crear payload para buscar_memoria
+            memoria_payload = {
+                "query": consulta_usuario,
+                "session_id": session_id,
+                "top": 5
+            }
+
+            # Ejecutar búsqueda en memoria
+            memoria_result = buscar_memoria_endpoint(memoria_payload)
+
+            if memoria_result.get("exito") and memoria_result.get("documentos"):
+                docs_sem = memoria_result["documentos"]
+                logging.info(
+                    f"✅ COPILOTO: Memoria encontró {len(docs_sem)} documentos relevantes")
+            else:
+                logging.info(
+                    "ℹ️ COPILOTO: No se encontraron documentos en memoria")
+        except Exception as e:
+            logging.warning(f"⚠️ Error en búsqueda automática de memoria: {e}")
 
     # === 🔍 INTEGRACIÓN ADICIONAL CON AZURE SEARCH (OPCIONAL) ===
     try:
@@ -4987,31 +5054,10 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
         logging.info(
             f"✅ Azure Search devolvió {len(docs_sem)} documentos semánticos")
 
-        # Si hay resultados vectoriales, aplicar sintetizador real
-        if docs_sem:
-            docs_cosmos = memoria_previa.get(
-                "interacciones_recientes", []) or []
-            respuesta_semantica = sintetizar(docs_sem, docs_cosmos)
-
-            response_data = {
-                "exito": True,
-                "respuesta_usuario": respuesta_semantica,
-                "fuente_datos": "AzureSearch+CognitiveSynth",
-                "total_docs_semanticos": len(docs_sem),
-                "session_id": session_id,
-                "agent_id": agent_id,
-                "metadata": {
-                    "timestamp": datetime.now().isoformat(),
-                    "consulta_original": consulta_usuario,
-                    "fuente": "azure_search_vectorial"
-                }
-            }
-
-            return func.HttpResponse(
-                json.dumps(response_data, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
+        # 🔥 NO RETORNAR INMEDIATAMENTE - Hacer MERGE primero
+        # Guardar docs_sem para usar después del merge
+        logging.info(
+            f"🔥 COPILOTO: Docs vectoriales guardados para MERGE posterior")
     except Exception as e:
         logging.warning(f"⚠️ Error integrando búsqueda semántica: {e}")
 
@@ -5197,18 +5243,19 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 )
 
             # 🔍 DETECCIÓN INTELIGENTE DE BING GROUNDING (para otras consultas)
+            # 🔥 NO RETORNAR - Solo enriquecer contexto
             try:
                 bing_result = integrar_con_validador_semantico_inteligente(
                     req, consulta, memoria_previa) or {}
 
-                # Si Bing ya resolvió la consulta completamente
+                # 🔥 CAMBIO: No retornar inmediatamente, guardar para enriquecer después del MERGE
                 if isinstance(bing_result.get("respuesta_final"), (dict, list, str)):
-                    return func.HttpResponse(
-                        json.dumps(
-                            bing_result["respuesta_final"], ensure_ascii=False),
-                        mimetype="application/json",
-                        status_code=200
-                    )
+                    logging.info(
+                        "🔍 Bing Grounding ejecutado, guardando para MERGE posterior")
+                    # Guardar en variable para usar después del MERGE
+                    setattr(req, '_bing_enrichment',
+                            bing_result.get("respuesta_final"))
+                    # NO RETORNAR AQUÍ - continuar al MERGE
 
                 # Si se detectó necesidad de Bing pero falló, continuar con nota
                 if bing_result.get("bing_fallido"):
@@ -5222,8 +5269,19 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(f"Error en detección Bing: {e}")
         # Continuar con flujo normal si hay error
 
-    mensaje = req.params.get('mensaje', '') or (
-        body.get("mensaje") if isinstance(body, dict) else "")
+    # 🔥 EXTRAER MENSAJE DE BODY JSON (prioridad) O PARAMS (fallback)
+    mensaje = (
+        body.get("mensaje") or
+        body.get("consulta") or
+        body.get("query") or
+        req.params.get('mensaje') or
+        req.params.get('consulta') or
+        req.params.get('q') or
+        ""
+    )
+
+    logging.info(
+        f"🔍 COPILOTO: Mensaje extraído: '{mensaje}' (body={bool(body.get('mensaje'))}, params={bool(req.params.get('mensaje'))})")
 
     # 🎯 DETECCIÓN DE INTENCIONES Y ENRUTAMIENTO AUTOMÁTICO
     if mensaje and not mensaje.startswith(("leer:", "buscar:", "explorar:", "analizar:", "generar:", "diagnosticar:")):
@@ -5256,6 +5314,84 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             )
 
     if not mensaje:
+        # 🔥 PRIORIDAD: Usar docs del wrapper si existen (en memoria_previa)
+        logging.info(
+            f"🔍 COPILOTO: Sin mensaje. memoria_previa keys: {list(memoria_previa.keys()) if memoria_previa else 'None'}")
+        docs_vectoriales_wrapper = memoria_previa.get("docs_vectoriales", [])
+        logging.info(
+            f"🔍 COPILOTO: docs_vectoriales_wrapper = {len(docs_vectoriales_wrapper)} docs")
+
+        if docs_vectoriales_wrapper:
+            logging.info(
+                f"✅ WRAPPER dejó {len(docs_vectoriales_wrapper)} docs vectoriales, procesando sin mensaje...")
+            # Forzar mensaje para que continúe el flujo
+            mensaje = "resumen contexto"
+            docs_sem = docs_vectoriales_wrapper
+        else:
+            logging.info(
+                "🔍 COPILOTO: Sin mensaje ni docs del wrapper, buscando globalmente...")
+
+            try:
+                from endpoints_search_memory import buscar_memoria_endpoint
+
+                memoria_result = buscar_memoria_endpoint({
+                    "query": "últimas interacciones",
+                    "top": 10
+                })
+
+                logging.info(
+                    f"📊 Resultado búsqueda: exito={memoria_result.get('exito')}, docs={len(memoria_result.get('documentos', []))}")
+
+                if memoria_result.get("exito") and memoria_result.get("documentos"):
+                    docs_sem = memoria_result["documentos"]
+                    docs_cosmos = memoria_previa.get(
+                        "interacciones_recientes", [])
+
+                    logging.info(
+                        f"✅ Encontrados: {len(docs_sem)} vectoriales, {len(docs_cosmos)} cosmos")
+
+                    # MERGE sin duplicados
+                    docs_merged = []
+                    ids_vistos = set()
+                    for doc in docs_sem:
+                        doc_id = doc.get("id")
+                        if doc_id and doc_id not in ids_vistos:
+                            docs_merged.append(doc)
+                            ids_vistos.add(doc_id)
+                    for doc in docs_cosmos[:10]:
+                        doc_id = doc.get("id")
+                        if doc_id and doc_id not in ids_vistos:
+                            docs_merged.append(doc)
+                            ids_vistos.add(doc_id)
+
+                    respuesta_semantica = sintetizar(docs_sem, docs_cosmos)
+
+                    return func.HttpResponse(
+                        json.dumps({
+                            "exito": True,
+                            "respuesta_usuario": respuesta_semantica[:2000],
+                            "fuente_datos": "Cosmos+AISearch",
+                            "total_docs_semanticos": len(docs_sem),
+                            "total_docs_cosmos": len(docs_cosmos),
+                            "total_merged": len(docs_merged),
+                            "metadata": {
+                                "wrapper_aplicado": True,
+                                "memoria_aplicada": True,
+                                "auto_query": True,
+                                "sin_filtro_sesion": True,
+                                "interacciones_previas": len(docs_cosmos)
+                            }
+                        }, ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=200
+                    )
+                else:
+                    logging.warning(f"⚠️ Búsqueda no devolvió documentos")
+            except Exception as e:
+                logging.error(f"❌ Error en búsqueda automática: {e}")
+
+            logging.info(
+                "ℹ️ COPILOTO: Sin resultados, devolviendo panel inicial")
         # Panel inicial mejorado con capacidades semánticas Y CONTEXTO ENRIQUECIDO
         panel = {
             "tipo": "panel_inicial",
@@ -5312,6 +5448,28 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json"
         )
 
+    # === 🧠 FUSIONAR MEMORIA GLOBAL Y CONTEXTO SEMÁNTICO ===
+    try:
+        contexto_semantico = getattr(req, "contexto_semantico", None)
+        memoria_global = getattr(req, "memoria_global", None)
+
+        if contexto_semantico or memoria_global:
+            logging.info(
+                f"🧠 Copiloto: memoria detectada (semántica={bool(contexto_semantico)}, global={bool(memoria_global)})")
+
+            resumen_ctx = ""
+            if contexto_semantico and contexto_semantico.get("resumen"):
+                resumen_ctx += f"Contexto semántico: {contexto_semantico['resumen'][:200]} "
+            if memoria_global and memoria_global.get("tiene_historial"):
+                resumen_ctx += f"Interacciones previas: {memoria_global.get('total_interacciones', 0)} "
+
+            if resumen_ctx:
+                req.__dict__["_contexto_fusionado"] = resumen_ctx
+                logging.info(f"🧩 Contexto fusionado: {resumen_ctx[:150]}")
+    except Exception as e:
+        logging.warning(
+            f"⚠️ No se pudo aplicar contexto semántico en copiloto: {e}")
+
     # Procesar comandos con respuesta estructurada
     try:
         respuesta_base = {
@@ -5324,6 +5482,12 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 "version": "2.0"
             }
         }
+
+        # 🔥 Agregar contexto fusionado si existe
+        if "_contexto_fusionado" in req.__dict__:
+            respuesta_base["contexto"] = req.__dict__["_contexto_fusionado"]
+            respuesta_base["metadata"]["memoria_global"] = True
+            respuesta_base["metadata"]["memoria_aplicada"] = True
 
         # Comando: leer
         if mensaje.startswith("leer:"):
@@ -5407,7 +5571,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             resultado = procesar_intencion_semantica(
                 mensaje, parametros_enriquecidos) or {}
 
-            if contexto_semantico.get("conocimiento_cognitivo") and isinstance(resultado, dict):
+            if contexto_semantico is not None and isinstance(contexto_semantico, dict) and contexto_semantico.get("conocimiento_cognitivo") and isinstance(resultado, dict):
                 resultado["evaluacion_cognitiva"] = contexto_semantico["conocimiento_cognitivo"]
 
             respuesta_base.update({
@@ -5418,8 +5582,10 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
         # Comando: sugerir (CON CONTEXTO SEMÁNTICO)
         elif mensaje == "sugerir":
+            ctx_valido = contexto_semantico if isinstance(
+                contexto_semantico, dict) else {}
             sugerencias_contextuales = generar_sugerencias_contextuales(
-                contexto_semantico) or []
+                ctx_valido) or []
             resultado = procesar_intencion_semantica(
                 "sugerir", {"contexto_semantico": contexto_semantico}) or {}
 
@@ -5436,8 +5602,11 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
         # Comando no reconocido - interpretación semántica ENRIQUECIDA
         else:
+            # Validar que contexto_semantico sea dict
+            ctx_valido = contexto_semantico if isinstance(
+                contexto_semantico, dict) else {}
             interpretacion_enriquecida = interpretar_con_contexto_semantico(
-                mensaje, contexto_semantico) or {}
+                mensaje, ctx_valido) or {}
             respuesta_base.update({
                 "accion": "interpretacion_enriquecida",
                 "resultado": {
@@ -5604,6 +5773,80 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             logging.info(f"Registrado: {texto_semantico[:80]}")
         except Exception as e:
             logging.warning(f"Error registrando: {e}")
+
+        # 🔥 MERGE FINAL: Combinar docs vectoriales + cosmos
+        docs_vectoriales = docs_sem or memoria_previa.get(
+            "docs_vectoriales", [])
+        docs_cosmos = memoria_previa.get("interacciones_recientes", [])
+
+        docs_merged = []
+        ids_vistos = set()
+
+        # Prioridad 1: Docs vectoriales (más relevantes)
+        for doc in docs_vectoriales:
+            doc_id = doc.get("id")
+            if doc_id and doc_id not in ids_vistos:
+                docs_merged.append(doc)
+                ids_vistos.add(doc_id)
+
+        # Prioridad 2: Docs de Cosmos (cronológicos)
+        for doc in docs_cosmos[:10]:
+            doc_id = doc.get("id")
+            if doc_id and doc_id not in ids_vistos:
+                docs_merged.append(doc)
+                ids_vistos.add(doc_id)
+
+        logging.info(
+            f"🔥 MERGE: {len(docs_vectoriales)} vectorial + {len(docs_cosmos)} cosmos = {len(docs_merged)} total")
+
+        # 🧠 SINTETIZAR RESPUESTA SI HAY DOCS MERGED
+        if docs_merged:
+            respuesta_semantica = sintetizar(docs_vectoriales, docs_cosmos)
+
+            # 🔥 SANITIZAR respuesta_usuario
+            respuesta_sanitizada = respuesta_semantica[:
+                                                       2000] if respuesta_semantica else "Sin contexto disponible"
+
+            # Actualizar respuesta_base con datos merged
+            respuesta_base["respuesta_usuario"] = respuesta_sanitizada
+            respuesta_base["fuente_datos"] = "Cosmos+AISearch"
+            respuesta_base["total_docs_semanticos"] = len(docs_vectoriales)
+            respuesta_base["total_docs_cosmos"] = len(docs_cosmos)
+            respuesta_base["total_merged"] = len(docs_merged)
+
+            if "metadata" not in respuesta_base:
+                respuesta_base["metadata"] = {}
+
+            respuesta_base["metadata"].update({
+                "wrapper_aplicado": True,
+                "memoria_aplicada": True,
+                "interacciones_previas": len(docs_cosmos),
+                "fuente": "azure_search_vectorial"
+            })
+
+            respuesta_base["contexto_conversacion"] = {
+                "mensaje": f"Continuando conversación con {len(docs_cosmos)} interacciones previas",
+                "ultimas_consultas": memoria_previa.get("resumen_conversacion", "")[:500],
+                "session_id": session_id,
+                "ultima_actividad": memoria_previa.get("ultima_actividad")
+            }
+
+            logging.info(
+                f"✅ COPILOTO: Respuesta enriquecida con MERGE completo")
+
+        # 🔥 APLICAR ENRIQUECIMIENTO DE BING SI EXISTE (después del MERGE)
+        bing_enrichment = getattr(req, '_bing_enrichment', None)
+        if bing_enrichment and isinstance(bing_enrichment, dict):
+            logging.info(
+                "🔍 Aplicando enriquecimiento de Bing DESPUÉS del MERGE")
+            # Combinar Bing con MERGE (prioridad al MERGE)
+            if not respuesta_base.get("respuesta_usuario"):
+                respuesta_base["respuesta_usuario"] = bing_enrichment.get(
+                    "respuesta", "")
+            respuesta_base["bing_enrichment"] = {
+                "aplicado": True,
+                "fuente": bing_enrichment.get("fuente", "bing_grounding")
+            }
 
         return func.HttpResponse(
             json.dumps(respuesta_base, indent=2, ensure_ascii=False),
@@ -6950,8 +7193,8 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
         from memory_helpers import agregar_memoria_a_respuesta
         response = agregar_memoria_a_respuesta(response, req)
 
-        # Aplicar precheck y memoria manual
-        response = aplicar_precheck_memoria(req, response)
+        # ✅ MEMORIA AUTOMÁTICA: El wrapper ya inyectó memoria en req._memoria_contexto
+        # Solo aplicar memoria manual para enriquecimiento adicional
         response = aplicar_memoria_manual(req, response)
 
         return func.HttpResponse(json.dumps(response, ensure_ascii=False), mimetype="application/json", status_code=200)
@@ -8199,10 +8442,16 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
         if has_spaces_in_paths or has_quotes or has_pipes or shell:
             # Usar shell para comandos complejos
             execution_method = "shell"
-            logging.info(f"Ejecutando {tipo} con shell: {comando}")
+
+            # 🔥 LIMPIEZA FINAL: Eliminar comillas duplicadas/mal escapadas
+            from command_cleaner import limpiar_comillas_comando
+            comando_limpio = limpiar_comillas_comando(comando)
+            logging.info(f"Comando original: {comando}")
+            logging.info(f"Comando limpio: {comando_limpio}")
+            logging.info(f"Ejecutando {tipo} con shell")
 
             result = subprocess.run(
-                comando,
+                comando_limpio,
                 shell=True,
                 capture_output=True,
                 text=True,
@@ -13380,6 +13629,70 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
         return None
 
 
+def _auto_resolve_file_paths(comando: str) -> str:
+    """
+    Resuelve rutas de archivos en comandos de forma robusta.
+    Maneja correctamente comillas, escapes y paths con espacios.
+    """
+    if not comando:
+        return comando
+
+    import re
+    import shlex
+
+    # Detectar comandos que usan archivos
+    file_commands = ['grep', 'sed', 'findstr',
+                     'awk', 'cat', 'head', 'tail', 'Get-Content']
+    if not any(cmd in comando for cmd in file_commands):
+        return comando
+
+    # Extraer archivos con extensiones conocidas (incluso con paths parciales)
+    file_pattern = r'([\w\-\\/]+[\\/])?([\w\-\.]+\.(py|js|ts|md|json|txt|sh|ps1|yml|yaml))'
+    matches = re.findall(file_pattern, comando)
+
+    if not matches:
+        return comando
+
+    # Buscar y reemplazar cada archivo
+    for match in matches:
+        partial_path = match[0]  # Puede ser "copiloto-function/" o vacío
+        filename = match[1]      # "function_app.py"
+
+        # Buscar archivo recursivamente
+        found_path = None
+        try:
+            for root, dirs, files in os.walk(PROJECT_ROOT):
+                if filename in files:
+                    found_path = os.path.join(root, filename)
+                    break
+        except Exception as e:
+            logging.warning(f"⚠️ Error buscando {filename}: {e}")
+            continue
+
+        if found_path:
+            # Normalizar path para Windows
+            found_path = found_path.replace('/', '\\\\')
+
+            # Reemplazar todas las variantes posibles
+            old_patterns = [
+                f"{partial_path}{filename}",
+                f"copiloto-function\\\\{filename}",
+                f"copiloto-function/{filename}",
+                f"copilot-function\\\\{filename}",
+                f"copilot-function/{filename}",
+                filename
+            ]
+
+            for old_pattern in old_patterns:
+                if old_pattern in comando:
+                    comando = comando.replace(old_pattern, found_path)
+                    logging.info(
+                        f"✅ Ruta resuelta: {old_pattern} -> {found_path}")
+                    break
+
+    return comando
+
+
 @app.function_name(name="ejecutar_cli_http")
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -13434,6 +13747,19 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         comando = body.get("comando")
+        
+        # 🔥 NORMALIZAR COMANDOS AWK AUTOMÁTICAMENTE
+        if comando and 'awk' in comando.lower():
+            from validate_awk_command import suggest_awk_fix
+            comando_original = comando
+            comando = suggest_awk_fix(comando)
+            if comando != comando_original:
+                logging.info(f"✅ AWK normalizado: {comando_original} -> {comando}")
+
+        # 🔍 AUTO-RESOLVER RUTAS DE ARCHIVOS EN EL COMANDO
+        if comando:
+            comando = _auto_resolve_file_paths(comando)
+
         if not comando:
             if body.get("intencion"):
                 # ✅ CAMBIO: HTTP 200 con redirección sugerida
@@ -13682,6 +14008,91 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception as e:
             logging.warning(f"Falló resolver_placeholders_dinamico: {e}")
         # --- Fin bloque dinámico ---
+
+        # --- BLOQUE ADICIONAL: Ampliar contexto para cat/grep o extraer función completa con awk ---
+        try:
+            import shlex
+            import re
+
+            # Solo aplicar heurística para comandos que usan grep/cat y apuntan a archivos .py
+            lower_cmd = comando.lower()
+            if ("grep" in lower_cmd or "cat " in lower_cmd) and (".py" in comando or "function_app.py" in comando):
+                tokens = shlex.split(comando)
+                # intentar localizar archivo y patrón
+                file_token = None
+                pattern = None
+                # file token is likely the last token or explicit .py token
+                for t in reversed(tokens):
+                    if t.endswith(".py"):
+                        file_token = t
+                        break
+                # pattern: token after grep or quoted regex
+                if "grep" in tokens:
+                    try:
+                        idx = tokens.index("grep")
+                        if idx + 1 < len(tokens):
+                            pattern = tokens[idx + 1].strip("'\"")
+                    except ValueError:
+                        pattern = None
+                if not pattern:
+                    m = re.search(r"grep\s+(?:-n\s+)?['\"]([^'\"]+)['\"]", comando, re.IGNORECASE)
+                    if m:
+                        pattern = m.group(1)
+
+                # resolver ruta local si es relativa al proyecto
+                if file_token:
+                    fpath = file_token
+                    if not os.path.isabs(fpath):
+                        fpath = os.path.join(project_root, fpath)
+                    if os.path.exists(fpath) and pattern:
+                        # leer archivo y localizar coincidencia
+                        try:
+                            with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
+                                lines = fh.read().splitlines()
+                        except Exception:
+                            lines = []
+                        # buscar primer match por substring o regex
+                        match_index = None
+                        for i, ln in enumerate(lines):
+                            if pattern in ln or (re.search(pattern, ln) if re.search(pattern, ln) else False):
+                                match_index = i
+                                break
+                        if match_index is not None:
+                            line = lines[match_index]
+                            # si la línea es un decorator o contiene def, extraer nombre de la función completa usando awk
+                            if "@" in line or "def " in line or line.strip().startswith("def "):
+                                # si la línea contiene 'def', extraer nombre directamente; si es decorator, buscar siguiente def
+                                fname = None
+                                if "def " in line:
+                                    m2 = re.search(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", line)
+                                    if m2:
+                                        fname = m2.group(1)
+                                else:
+                                    # buscar la siguiente def en el archivo
+                                    for j in range(match_index, min(match_index + 200, len(lines))):
+                                        if "def " in lines[j]:
+                                            m3 = re.search(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", lines[j])
+                                            if m3:
+                                                fname = m3.group(1)
+                                                break
+                                if fname:
+                                    # construir awk para extraer desde def hasta línea en blanco siguiente (heurística)
+                                    awk_cmd = f"awk '/^def {fname}\\b/,/^$/' \"{fpath}\""
+                                    logging.info(f"🔧 Rewriting grep/cat pipeline to awk to extract full function: {awk_cmd}")
+                                    comando = awk_cmd
+                                else:
+                                    # fallback: ampliar contexto de grep agregando -A/-B si no existen
+                                    if "-A" not in comando and "-B" not in comando:
+                                        comando = comando.replace("grep ", "grep -A 40 -B 5 ", 1)
+                                        logging.info(f"🔧 Ampliado contexto grep: {comando}")
+                            else:
+                                # Si la línea encontrada no es decorator/def, ampliar contexto igualmente
+                                if "-A" not in comando and "-B" not in comando:
+                                    comando = comando.replace("grep ", "grep -A 40 -B 5 ", 1)
+                                    logging.info(f"🔧 Ampliado contexto grep (no def/decorator): {comando}")
+        except Exception as e:
+            logging.warning(f"Error optimizando grep/cat/awk extraction: {e}")
+        # --- FIN BLOQUE ADICIONAL ---
 
         # Manejar conflictos de output
         if "-o table" in comando and "--output json" not in comando:
@@ -15702,17 +16113,58 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
         try:
             logging.info(
                 f"diagnostico_recursos_http: Starting diagnostics for resource: {rid}")
-            # Lógica de diagnóstico POST para recurso específico
-            result = {
-                "ok": True,
-                "recurso": rid,
-                "profundidad": profundidad,
-                "timestamp": datetime.now().isoformat(),
-                "diagnostico": {
-                    "estado": "completado",
-                    "tipo": "recurso_especifico"
+
+            # 🔍 DETECTAR SI ES AZURE AI SEARCH
+            if "search" in rid.lower():
+                try:
+                    from services.azure_search_client import AzureSearchService
+                    search_service = AzureSearchService()
+
+                    # Hacer búsqueda de prueba para validar funcionamiento
+                    test_search = search_service.search("test", top=1)
+
+                    result = {
+                        "ok": True,
+                        "recurso": rid,
+                        "tipo": "Azure AI Search",
+                        "profundidad": profundidad,
+                        "timestamp": datetime.now().isoformat(),
+                        "metricas": {
+                            "servicio": "operativo",
+                            "busqueda_vectorial": test_search.get("exito", False),
+                            "documentos_indexados": test_search.get("total", 0)
+                        },
+                        "diagnostico": {
+                            "estado": "operativo" if test_search.get("exito") else "error",
+                            "tipo": "azure_search",
+                            "precision": "alta" if test_search.get("exito") else "desconocida"
+                        }
+                    }
+                except Exception as e:
+                    logging.warning(f"Error consultando Azure Search: {e}")
+                    result = {
+                        "ok": True,
+                        "recurso": rid,
+                        "tipo": "Azure AI Search",
+                        "profundidad": profundidad,
+                        "timestamp": datetime.now().isoformat(),
+                        "diagnostico": {
+                            "estado": "no_disponible",
+                            "error": str(e)
+                        }
+                    }
+            else:
+                # Lógica de diagnóstico POST para recurso específico
+                result = {
+                    "ok": True,
+                    "recurso": rid,
+                    "profundidad": profundidad,
+                    "timestamp": datetime.now().isoformat(),
+                    "diagnostico": {
+                        "estado": "completado",
+                        "tipo": "recurso_especifico"
+                    }
                 }
-            }
 
             # Registrar auditoría del diagnóstico específico
             memory_service.log_semantic_event({
@@ -16981,7 +17433,7 @@ def promover_http(req: func.HttpRequest) -> func.HttpResponse:
 
 
 @app.function_name(name="promocion_reporte_http")
-@app.route(route="promocion-reporte", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="promocion-reporte", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def promocion_reporte_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     try:

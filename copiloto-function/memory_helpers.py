@@ -82,7 +82,7 @@ def agregar_memoria_a_respuesta(response_data: Dict[str, Any], req: func.HttpReq
         
         # Agregar información de memoria si está disponible
         memoria = obtener_memoria_request(req)
-        if memoria and memoria.get("tiene_historial"):
+        if memoria is not None and isinstance(memoria, dict) and memoria.get("tiene_historial"):
             response_data["metadata"]["memoria_disponible"] = True
             response_data["metadata"]["memoria_sesion"] = {
                 "interacciones_previas": memoria.get("total_interacciones_sesion", 0),

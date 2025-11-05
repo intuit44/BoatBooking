@@ -84,6 +84,41 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         logging.warning(f"⚠️ [{source_name}] Error consultando memoria: {e}")
                         setattr(req, "_memoria_contexto", {"tiene_historial": False})
 
+                    # 1.5️⃣ BÚSQUEDA VECTORIAL EN AI SEARCH (LECTURA)
+                    docs_vectoriales = []
+                    try:
+                        from endpoints_search_memory import buscar_memoria_endpoint
+                        
+                        # Extraer query del usuario
+                        query_usuario = ""
+                        try:
+                            body = req.get_json() or {}
+                            query_usuario = body.get("mensaje") or body.get("query") or body.get("consulta") or ""
+                        except:
+                            query_usuario = req.params.get("q") or req.params.get("mensaje") or ""
+                        
+                        if query_usuario and len(query_usuario) > 3:
+                            session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+                            
+                            memoria_payload = {
+                                "query": query_usuario,
+                                "session_id": session_id,
+                                "top": 5
+                            }
+                            
+                            resultado_vectorial = buscar_memoria_endpoint(memoria_payload)
+                            
+                            if resultado_vectorial.get("exito") and resultado_vectorial.get("documentos"):
+                                docs_vectoriales = resultado_vectorial["documentos"]
+                                logging.info(f"🔍 [{source_name}] AI Search: {len(docs_vectoriales)} docs vectoriales encontrados")
+                                
+                                # Inyectar en memoria_previa
+                                if memoria_previa:
+                                    memoria_previa["docs_vectoriales"] = docs_vectoriales
+                                    memoria_previa["fuente_datos"] = "Cosmos+AISearch"
+                    except Exception as e:
+                        logging.warning(f"⚠️ [{source_name}] Error en búsqueda vectorial: {e}")
+
                     # 2️⃣ EJECUTAR ENDPOINT ORIGINAL
                     response = func_ref(req)
                     
