@@ -1,0 +1,21 @@
+8770: 
+8771:             if not stdout_limpio:
+8772:                 logging.info(
+8773:                     "PowerShell: stdout vacío, re-ejecutando con | Out-String")
+8774:                 comando_retry = f"{comando} | Out-String" if '| Out-String' not in comando else comando
+8775: 
+8776:                 try:
+8777:                     result_retry = subprocess.run(
+8778:                         cmd_args[:-1] + [comando_retry],
+8779:                         capture_output=True,
+8780:                         text=True,
+8781:                         timeout=60,
+8782:                         encoding='utf-8',
+8783:                         errors='replace',
+8784:                         env=env
+8785:                     )
+8786: 
+8787:                     if result_retry.returncode == 0 and result_retry.stdout.strip():
+8788:                         logging.info(
+8789:                             f"PowerShell: Re-ejecución exitosa, {len(result_retry.stdout)} chars")
+8790:                         object.__setattr__(

@@ -1,0 +1,32 @@
+ vacío, re-ejecutando con | Out-String")
+                comando_retry = f"{comando} | Out-String" if '| Out-String' not in comando else comando
+
+                try:
+                    result_retry = subprocess.run(
+                        cmd_args[:-1] + [comando_retry],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding='utf-8',
+                        errors='replace',
+                        env=env
+                    )
+
+                    if result_retry.returncode == 0 and result_retry.stdout.strip():
+                        logging.info(
+                            f"PowerShell: Re-ejecución exitosa, {len(result_retry.stdout)} chars")
+                        object.__setattr__(
+                            result, 'stdout', result_retry.stdout)
+                    else:
+                        decoded = f"⚠️ PowerShell sin salida visible. Comando: {comando[:100]}..."
+                        object.__setattr__(result, 'stdout', decoded)
+                except Exception as e:
+                    logging.warning(f"PowerShell re-ejecución falló: {e}")
+                    object.__setattr__(result, 'stdout', f"⚠️ Error: {str(e)}")
+        # --- FIN NORMALIZADOR ---
+
+        # ✅ MEJORADO: Más información de debugging
+        resultado = {
+            "exito": result.returncode == 0,
+            "output": result.stdout,
+            "error": result.stderr if result.stderr else 

@@ -1,0 +1,15 @@
+8796:                 except Exception as e:
+8797:                     logging.warning(f"PowerShell re-ejecución falló: {e}")
+8798:                     object.__setattr__(result, 'stdout', f"⚠️ Error: {str(e)}")
+8799:         # --- FIN NORMALIZADOR ---
+8800: 
+8801:         # ✅ MEJORADO: Más información de debugging
+8802:         resultado = {
+8803:             "exito": result.returncode == 0,
+8804:             "output": result.stdout,
+8805:             "error": result.stderr if result.stderr else None,
+8806:             "return_code": result.returncode,
+8807:             "duration": f"{duration:.2f}s",
+8808:             "comando_ejecutado": comando,
+8809:             "tipo_comando": tipo,
+8810:             "metodo_ejecucion": execution_method,

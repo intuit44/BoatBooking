@@ -1,0 +1,4 @@
+Linea 8618:                     f"PowerShell: Auto-agregado | Out-String para convertir objetos a texto")
+Linea 8773:                     "PowerShell: stdout vacío, re-ejecutando con | Out-String")
+Linea 8774:                 comando_retry = f"{comando} | Out-String" if '| Out-String' not in comando else comando
+Linea 8778:                         cmd_args[:-1] + [comando_retry],

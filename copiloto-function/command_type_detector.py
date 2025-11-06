@@ -60,8 +60,8 @@ class CommandTypeDetector:
                 "needs_prefix": False
             }
         
-        # Usar la nueva lógica dinámica para normalizar
-        normalized_command = self._detect_and_prefix_command(command)
+        # NO normalizar - mantener comando original
+        normalized_command = command
         
         # Determinar tipo basado en el comando normalizado
         cmd_type = "generic"

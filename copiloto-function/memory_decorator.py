@@ -20,21 +20,24 @@ def registrar_memoria(source: str):
 
             # 🧩 Bypass SOLO para verificar-cosmos (mantener historial-interacciones activo)
             if "/api/verificar-cosmos" in url:
-                logging.info(f"[wrapper] 🧩 Bypass registrar_memoria para {url}")
+                logging.info(
+                    f"[wrapper] 🧩 Bypass registrar_memoria para {url}")
                 return func(req)
-            
+
             # === 1️⃣ Consultar contexto previo GLOBAL antes de ejecutar ===
             try:
                 from cosmos_memory_direct import consultar_memoria_cosmos_directo
                 memoria_global = consultar_memoria_cosmos_directo(req)
                 setattr(req, "memoria_global", memoria_global)
-                
+
                 if memoria_global and memoria_global.get("tiene_historial"):
-                    logging.info(f"[wrapper] 🌍 Memoria global: {memoria_global['total_interacciones']} interacciones para {memoria_global.get('agent_id')}")
+                    logging.info(
+                        f"[wrapper] 🌍 Memoria global: {memoria_global['total_interacciones']} interacciones para {memoria_global.get('agent_id')}")
                 else:
                     logging.info("[wrapper] 📝 Sin memoria global previa")
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ No se pudo consultar memoria global: {e}")
+                logging.warning(
+                    f"[wrapper] ⚠️ No se pudo consultar memoria global: {e}")
                 setattr(req, "memoria_global", None)
 
             # === 🔍 BÚSQUEDA SEMÁNTICA AUTOMÁTICA (sin depender del body) ===
@@ -46,7 +49,7 @@ def registrar_memoria(source: str):
                     req.params.get("Session-ID") or
                     req.params.get("session_id")
                 )
-                
+
                 agent_id = (
                     req.headers.get("Agent-ID") or
                     req.headers.get("X-Agent-ID") or
@@ -54,23 +57,25 @@ def registrar_memoria(source: str):
                     req.params.get("agent_id") or
                     "GlobalAgent"
                 )
-                
+
                 # Detectar endpoint desde URL
-                endpoint_detectado = url.split('/')[-1] if '/' in url else source
-                
+                endpoint_detectado = url.split(
+                    '/')[-1] if '/' in url else source
+
                 # 🔥 BÚSQUEDA SEMÁNTICA: Basada en endpoint + session_id (sin body)
                 if session_id and agent_id:
                     from azure.cosmos import CosmosClient
                     import os
-                    
+
                     cosmos_endpoint = os.environ.get("COSMOSDB_ENDPOINT")
                     cosmos_key = os.environ.get("COSMOSDB_KEY")
-                    
+
                     if cosmos_endpoint and cosmos_key:
                         client = CosmosClient(cosmos_endpoint, cosmos_key)
-                        database = client.get_database_client(os.environ.get("COSMOSDB_DATABASE", "agentMemory"))
+                        database = client.get_database_client(
+                            os.environ.get("COSMOSDB_DATABASE", "agentMemory"))
                         container = database.get_container_client("memory")
-                        
+
                         # Query semántica: buscar por endpoint + agent_id (sin depender del body)
                         query = """
                         SELECT TOP 10 c.texto_semantico, c.endpoint, c.timestamp, c.data.respuesta_resumen
@@ -81,7 +86,7 @@ def registrar_memoria(source: str):
                           AND LENGTH(c.texto_semantico) > 30
                         ORDER BY c._ts DESC
                         """
-                        
+
                         items = list(container.query_items(
                             query=query,
                             parameters=[
@@ -90,7 +95,7 @@ def registrar_memoria(source: str):
                             ],
                             enable_cross_partition_query=True
                         ))
-                        
+
                         if items:
                             # Construir contexto semántico enriquecido
                             contexto_semantico = {
@@ -99,37 +104,43 @@ def registrar_memoria(source: str):
                                 "resumen": " | ".join([item.get("texto_semantico", "")[:100] for item in items[:3]]),
                                 "ultima_ejecucion": items[0].get("timestamp") if items else None
                             }
-                            setattr(req, "contexto_semantico", contexto_semantico)
-                            logging.info(f"[wrapper] 🔍 Búsqueda semántica: {len(items)} interacciones similares en '{endpoint_detectado}' para {agent_id}")
+                            setattr(req, "contexto_semantico",
+                                    contexto_semantico)
+                            logging.info(
+                                f"[wrapper] 🔍 Búsqueda semántica: {len(items)} interacciones similares en '{endpoint_detectado}' para {agent_id}")
                         else:
-                            logging.info(f"[wrapper] 🔍 Sin memoria semántica previa para '{endpoint_detectado}'")
+                            logging.info(
+                                f"[wrapper] 🔍 Sin memoria semántica previa para '{endpoint_detectado}'")
                             setattr(req, "contexto_semantico", None)
                     else:
-                        logging.warning("[wrapper] ⚠️ Cosmos DB no configurado para búsqueda semántica")
+                        logging.warning(
+                            "[wrapper] ⚠️ Cosmos DB no configurado para búsqueda semántica")
                         setattr(req, "contexto_semantico", None)
                 else:
-                    logging.info("[wrapper] ⏭️ Sin session_id/agent_id válidos, búsqueda semántica omitida")
+                    logging.info(
+                        "[wrapper] ⏭️ Sin session_id/agent_id válidos, búsqueda semántica omitida")
                     setattr(req, "contexto_semantico", None)
-                    
+
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ Error en búsqueda semántica automática: {e}")
+                logging.warning(
+                    f"[wrapper] ⚠️ Error en búsqueda semántica automática: {e}")
                 setattr(req, "contexto_semantico", None)
 
             # === 2️⃣ Ejecutar función original (con contexto disponible en req.contexto_prev) ===
             response = func(req)
-            
+
             # === 🔥 ENRIQUECER RESPUESTA HTTP CON METADATA DE BÚSQUEDA ===
             try:
                 contexto_semantico = getattr(req, "contexto_semantico", None)
                 memoria_global = getattr(req, "memoria_global", None)
-                
+
                 if response.get_body():
                     response_data = json.loads(response.get_body().decode())
-                    
+
                     # Agregar metadata de búsqueda semántica
                     if "metadata" not in response_data:
                         response_data["metadata"] = {}
-                    
+
                     if contexto_semantico:
                         response_data["metadata"]["busqueda_semantica"] = {
                             "aplicada": True,
@@ -144,21 +155,24 @@ def registrar_memoria(source: str):
                             "razon": "sin_session_id_o_sin_resultados"
                         }
                         response_data["metadata"]["memoria_aplicada"] = False
-                    
+
                     # Agregar info de memoria global
                     if memoria_global and memoria_global.get("tiene_historial"):
                         response_data["metadata"]["memoria_global"] = True
-                        response_data["metadata"]["interacciones_previas"] = memoria_global.get("total_interacciones", 0)
-                    
+                        response_data["metadata"]["interacciones_previas"] = memoria_global.get(
+                            "total_interacciones", 0)
+
                     # Recrear response con metadata enriquecida
                     response = azfunc.HttpResponse(
                         json.dumps(response_data, ensure_ascii=False),
                         status_code=response.status_code,
                         mimetype="application/json"
                     )
-                    logging.info(f"[wrapper] ✅ Metadata de búsqueda semántica agregada a respuesta")
+                    logging.info(
+                        f"[wrapper] ✅ Metadata de búsqueda semántica agregada a respuesta")
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ Error enriqueciendo respuesta: {e}")
+                logging.warning(
+                    f"[wrapper] ⚠️ Error enriqueciendo respuesta: {e}")
 
             # === 3️⃣ Registrar interacción en memoria (enriquecida) ===
             try:
@@ -179,8 +193,9 @@ def registrar_memoria(source: str):
                     else:
                         output_data = {"status_code": response.status_code}
                 except Exception:
-                    output_data = {"status_code": response.status_code, "raw": True}
-                
+                    output_data = {
+                        "status_code": response.status_code, "raw": True}
+
                 # 🔍 Agregar metadata de búsqueda semántica al output
                 contexto_semantico = getattr(req, "contexto_semantico", None)
                 if contexto_semantico:
@@ -210,8 +225,10 @@ def registrar_memoria(source: str):
                 )
 
                 # 🧠 Generar texto semántico enriquecido para memoria global
-                if not output_data.get("texto_semantico", "").strip():
-                    endpoint_name = url.split('/')[-1] if '/' in url else source
+                texto_sem = output_data.get("texto_semantico", "")
+                if not str(texto_sem).strip():
+                    endpoint_name = url.split(
+                        '/')[-1] if '/' in url else source
                     output_data["texto_semantico"] = (
                         f"[{agent_id}] Ejecutó '{endpoint_name}' con éxito: {'✅' if response.status_code == 200 else '❌'}. "
                         f"Respuesta: {str(output_data.get('mensaje', output_data.get('resultado', 'procesado')))[:100]}..."
@@ -222,8 +239,9 @@ def registrar_memoria(source: str):
                 if contexto_semantico:
                     output_data["contexto_semantico_aplicado"] = contexto_semantico
                     output_data["memoria_semantica_activa"] = True
-                    logging.info(f"[wrapper] 🧠 Contexto semántico aplicado: {contexto_semantico['interacciones_similares']} interacciones")
-                
+                    logging.info(
+                        f"[wrapper] 🧠 Contexto semántico aplicado: {contexto_semantico['interacciones_similares']} interacciones")
+
                 # Guardar en memoria semántica
                 memory_service.record_interaction(
                     agent_id=agent_id,
@@ -231,9 +249,11 @@ def registrar_memoria(source: str):
                     input_data=input_data,
                     output_data=output_data
                 )
-                logging.info(f"[wrapper] 💾 Interacción registrada en memoria global para agente {agent_id}")
+                logging.info(
+                    f"[wrapper] 💾 Interacción registrada en memoria global para agente {agent_id}")
             except Exception as e:
-                logging.warning(f"[wrapper] ⚠️ Fallo al registrar en memoria global {source}: {e}")
+                logging.warning(
+                    f"[wrapper] ⚠️ Fallo al registrar en memoria global {source}: {e}")
 
             return response
         return wrapper
@@ -243,22 +263,22 @@ def registrar_memoria(source: str):
 # Wrapper para app.route que aplica automáticamente el decorador
 def create_memory_wrapper(original_app):
     """Crea wrapper que aplica automáticamente registro de memoria"""
-    
+
     original_route = original_app.route
-    
+
     def route_with_memory(route: str, methods=None, auth_level=None, **kwargs):
         def decorator(func: Callable) -> Callable:
             # Generar source name desde la ruta
             source_name = route.replace("/", "_").replace("-", "_").strip("_")
             if source_name.startswith("api_"):
                 source_name = source_name[4:]  # Remover "api_"
-            
+
             # Aplicar decorador de memoria
             wrapped_func = registrar_memoria(source_name)(func)
-            
+
             # Aplicar decorador original de Azure Functions
             return original_route(route=route, methods=methods, auth_level=auth_level, **kwargs)(wrapped_func)
-        
+
         return decorator
-    
+
     return route_with_memory

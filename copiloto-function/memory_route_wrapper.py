@@ -63,64 +63,101 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                 def wrapper(req: func.HttpRequest) -> func.HttpResponse:
                     """Lectura y escritura de memoria automática."""
+                    print(f"\n>>> WRAPPER EJECUTANDOSE para: {source_name} <<<\n", flush=True)
                     logging.warning(f"🚨 Wrapper ACTIVADO en endpoint: {source_name}")
                     from services.memory_service import memory_service
 
-                    # 1️⃣ CONSULTAR MEMORIA COSMOS DIRECTAMENTE
+                    # 1️⃣ CONSULTAR MEMORIA: Todas las sesiones del endpoint
                     memoria_previa = {}
                     try:
-                        from cosmos_memory_direct import consultar_memoria_cosmos_directo
-                        memoria = consultar_memoria_cosmos_directo(req)
+                        # Obtener session_id si existe, sino usar "global"
+                        session_id = req.headers.get("Session-ID") or req.params.get("session_id") or "global"
                         
-                        if memoria and memoria.get("tiene_historial"):
-                            memoria_previa = memoria
-                            logging.info(f"🧠 [{source_name}] Memoria cargada: {memoria['total_interacciones']} interacciones con texto_semantico")
+                        # Recuperar historial de la sesión (incluye todas las interacciones)
+                        historial_completo = memory_service.get_session_history(session_id, limit=100)
+                        
+                        # Filtrar por endpoint actual para contexto específico
+                        historial_endpoint = [h for h in historial_completo if h.get("data", {}).get("endpoint") == route_path]
+                        
+                        if historial_completo and len(historial_completo) > 0:
+                            memoria_previa = {
+                                "tiene_historial": True,
+                                "total_interacciones": len(historial_completo),
+                                "interacciones_endpoint": len(historial_endpoint),
+                                "interacciones": historial_completo,  # TODAS las interacciones
+                                "interacciones_este_endpoint": historial_endpoint,
+                                "endpoint": route_path,
+                                "session_id": session_id
+                            }
+                            logging.info(f"🧠 [{source_name}] Memoria: {len(historial_completo)} total, {len(historial_endpoint)} de este endpoint")
                         else:
-                            memoria_previa = {"tiene_historial": False, "nueva_sesion": True}
+                            memoria_previa = {"tiene_historial": False, "endpoint": route_path}
                             logging.info(f"🧠 [{source_name}] Sin memoria previa")
                             
                         setattr(req, "_memoria_contexto", memoria_previa)
                     except Exception as e:
                         logging.warning(f"⚠️ [{source_name}] Error consultando memoria: {e}")
+                        import traceback
+                        logging.warning(traceback.format_exc())
                         setattr(req, "_memoria_contexto", {"tiene_historial": False})
 
-                    # 1.5️⃣ BÚSQUEDA VECTORIAL EN AI SEARCH (LECTURA)
+                    # 1.5️⃣ BÚSQUEDA VECTORIAL EN AI SEARCH POR ENDPOINT
                     docs_vectoriales = []
                     try:
                         from endpoints_search_memory import buscar_memoria_endpoint
                         
-                        # Extraer query del usuario
-                        query_usuario = ""
+                        # Buscar por endpoint + contenido del request
+                        query_busqueda = f"{route_path}"
                         try:
                             body = req.get_json() or {}
-                            query_usuario = body.get("mensaje") or body.get("query") or body.get("consulta") or ""
+                            if body.get("mensaje"):
+                                query_busqueda += f" {body['mensaje']}"
+                            elif body.get("query"):
+                                query_busqueda += f" {body['query']}"
                         except:
-                            query_usuario = req.params.get("q") or req.params.get("mensaje") or ""
+                            pass
                         
-                        if query_usuario and len(query_usuario) > 3:
-                            session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+                        memoria_payload = {
+                            "query": query_busqueda,
+                            "top": 20  # Más resultados
+                        }
+                        
+                        resultado_vectorial = buscar_memoria_endpoint(memoria_payload)
+                        
+                        if resultado_vectorial.get("exito") and resultado_vectorial.get("documentos"):
+                            docs_vectoriales = resultado_vectorial["documentos"]
+                            logging.info(f"🔍 [{source_name}] AI Search: {len(docs_vectoriales)} docs vectoriales para endpoint {route_path}")
                             
-                            memoria_payload = {
-                                "query": query_usuario,
-                                "session_id": session_id,
-                                "top": 5
-                            }
-                            
-                            resultado_vectorial = buscar_memoria_endpoint(memoria_payload)
-                            
-                            if resultado_vectorial.get("exito") and resultado_vectorial.get("documentos"):
-                                docs_vectoriales = resultado_vectorial["documentos"]
-                                logging.info(f"🔍 [{source_name}] AI Search: {len(docs_vectoriales)} docs vectoriales encontrados")
-                                
-                                # Inyectar en memoria_previa
-                                if memoria_previa:
-                                    memoria_previa["docs_vectoriales"] = docs_vectoriales
-                                    memoria_previa["fuente_datos"] = "Cosmos+AISearch"
+                            # Inyectar en memoria_previa
+                            if memoria_previa:
+                                memoria_previa["docs_vectoriales"] = docs_vectoriales
+                                memoria_previa["fuente_datos"] = "Endpoint+AISearch"
                     except Exception as e:
                         logging.warning(f"⚠️ [{source_name}] Error en búsqueda vectorial: {e}")
 
                     # 2️⃣ EJECUTAR ENDPOINT ORIGINAL
-                    response = func_ref(req)
+                    try:
+                        response = func_ref(req)
+                        if response is None:
+                            logging.error(f"❌ [{source_name}] Endpoint devolvió None - esto no debería ocurrir")
+                            return func.HttpResponse(
+                                json.dumps({"ok": False, "error": "Endpoint devolvió None"}, ensure_ascii=False),
+                                mimetype="application/json",
+                                status_code=500
+                            )
+                    except Exception as endpoint_error:
+                        logging.error(f"❌ [{source_name}] Excepción en endpoint: {endpoint_error}")
+                        import traceback
+                        logging.error(f"Traceback: {traceback.format_exc()}")
+                        return func.HttpResponse(
+                            json.dumps({
+                                "ok": False,
+                                "error": f"Error en endpoint: {str(endpoint_error)}",
+                                "tipo_error": type(endpoint_error).__name__
+                            }, ensure_ascii=False),
+                            mimetype="application/json",
+                            status_code=500
+                        )
                     
                     # 3️⃣ INYECTAR CONTEXTO DE MEMORIA EN RESPUESTA
                     try:
@@ -135,19 +172,21 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                         response_data["metadata"] = {}
                                     response_data["metadata"]["wrapper_aplicado"] = True
                                     
-                                    # Si hay memoria, inyectar contexto
+                                    # Si hay memoria, inyectar contexto COMPLETO
                                     if memoria_previa.get("tiene_historial"):
                                         response_data["contexto_conversacion"] = {
-                                            "mensaje": f"Continuando conversación con {memoria_previa['total_interacciones']} interacciones previas",
-                                            "ultimas_consultas": memoria_previa.get("resumen_conversacion", ""),
-                                            "session_id": memoria_previa["session_id"],
-                                            "ultima_actividad": memoria_previa.get("ultima_actividad")
+                                            "mensaje": f"Recuperadas {memoria_previa['total_interacciones']} interacciones previas del endpoint {route_path}",
+                                            "interacciones_previas": memoria_previa.get("interacciones", []),
+                                            "docs_vectoriales": memoria_previa.get("docs_vectoriales", []),
+                                            "endpoint": route_path,
+                                            "fuente_datos": memoria_previa.get("fuente_datos", "Endpoint")
                                         }
                                         response_data["metadata"]["memoria_aplicada"] = True
                                         response_data["metadata"]["interacciones_previas"] = memoria_previa["total_interacciones"]
-                                        logging.info(f"🧠 [{source_name}] Contexto inyectado: {memoria_previa['total_interacciones']} interacciones")
+                                        response_data["metadata"]["docs_vectoriales"] = len(memoria_previa.get("docs_vectoriales", []))
+                                        logging.info(f"🧠 [{source_name}] Contexto inyectado: {memoria_previa['total_interacciones']} interacciones + {len(memoria_previa.get('docs_vectoriales', []))} docs vectoriales")
                                     else:
-                                        response_data["metadata"]["nueva_sesion"] = True
+                                        response_data["metadata"]["primera_invocacion"] = True
                                         response_data["metadata"]["memoria_aplicada"] = False
                                     
                                     # Crear nueva respuesta

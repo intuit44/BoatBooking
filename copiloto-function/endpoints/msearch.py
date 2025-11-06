@@ -249,8 +249,27 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
     
     # Leer archivo si se proporciona ruta
     if file_path and not content:
+        # FALLBACK LOCAL: Si existe localmente, delegar a ejecutar-cli
+        if os.path.exists(file_path):
+            logging.info(f"msearch: ruta local detectada, delegando a ejecutar-cli")
+            try:
+                cmd = f'findstr "{pattern or ""}" "{file_path}"' if pattern else f'type "{file_path}"'
+                
+                # Invocar ejecutar-cli internamente
+                from function_app import ejecutar_cli_http
+                mock_req = func.HttpRequest(
+                    method="POST",
+                    url="http://localhost/api/ejecutar-cli",
+                    body=json.dumps({"comando": cmd}).encode(),
+                    headers={"Content-Type": "application/json"}
+                )
+                response = ejecutar_cli_http(mock_req)
+                return json.loads(response.get_body().decode())
+            except Exception as e:
+                logging.error(f"Error delegando a ejecutar-cli: {e}")
+        
+        # Si no existe localmente, intentar Azure Blob
         try:
-            # Intentar leer desde Azure Blob o local
             from utils_helpers import get_blob_client, PROJECT_ROOT, IS_AZURE, CONTAINER_NAME
             
             if IS_AZURE:
@@ -429,8 +448,8 @@ def msearch_http(req: func.HttpRequest) -> func.HttpResponse:
         result["run_id"] = run_id
         result["timestamp"] = datetime.now().isoformat()
         
-        # Determinar código de estado
-        status_code = 200 if result.get("exito") else 400
+        # Determinar código de estado (siempre 200 para evitar errores en agente)
+        status_code = 200
         
         return func.HttpResponse(
             json.dumps(result, ensure_ascii=False, indent=2),

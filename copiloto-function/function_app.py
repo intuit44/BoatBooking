@@ -1,4 +1,4 @@
-# --- Imports mínimos requeridos ---
+﻿# --- Imports mínimos requeridos ---
 import os
 from typing import cast
 from typing import Optional
@@ -9,6 +9,7 @@ from azure.mgmt.resource.resources.models import (
     TemplateLink,
     DeploymentMode
 )
+from command_fixers.auto_fixers import apply_auto_fixes
 from services.memory_service import memory_service
 from azure.monitor.query import LogsQueryClient, LogsTable
 from azure.monitor.query._models import LogsQueryResult
@@ -30,6 +31,8 @@ from pathlib import Path
 from datetime import timedelta
 from collections.abc import Iterator
 
+
+import subprocess
 import platform
 import subprocess
 import traceback
@@ -399,6 +402,18 @@ try:
     logging.info("✅ Endpoint diagnostico registrado correctamente")
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint diagnostico: {e}")
+
+try:
+    import endpoints.diagnostico_recursos
+    logging.info("✅ Endpoint diagnostico_recursos registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint diagnostico_recursos: {e}")
+
+try:
+    import endpoints.escribir_archivo
+    logging.info("✅ Endpoint escribir_archivo registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint escribir_archivo: {e}")
 
 try:
     import endpoints.introspection
@@ -3030,6 +3045,7 @@ def procesar_intencion_semantica(intencion: str, parametros: Optional[Dict[str, 
         recurso = parametros.get("recurso", "")
 
         # Llamar al diagnóstico de recursos
+        from endpoints.diagnostico_recursos import diagnostico_recursos_http
         resultado = diagnostico_recursos_http(
             func.HttpRequest(
                 method="GET",
@@ -3390,6 +3406,8 @@ def invocar_endpoint_local(endpoint: str, method: str = "GET", body: Optional[di
     """
     try:
         # Mapear endpoints a funciones
+        from endpoints.diagnostico_recursos import diagnostico_recursos_http
+        from endpoints.escribir_archivo import escribir_archivo_http
         endpoint_map = {
             "/api/status": status,
             "/api/health": health,
@@ -4142,36 +4160,211 @@ def revisar_correcciones_http(req):
 # Importar decorador de memoria
 
 
-def sintetizar(docs_search, docs_cosmos):
-    """Sintetiza memoria vectorial + secuencial en respuesta enriquecida"""
+def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item: int = 1200):
+    """Sintetiza memoria vectorial + secuencial en respuesta enriquecida.
+
+    Reglas:
+      - Filtra docs_cosmos por texto semántico y longitud mínima (>80).
+      - Prioriza docs vectoriales con score > score_threshold.
+      - Muestra hasta max_items (pero nunca más de 7).
+      - Trunca por item hasta max_chars_per_item preservando, si es posible, el final de una oración.
+    """
+    def _score(doc):
+        # Varias claves posibles para score/relevance
+        for k in ("score", "relevancia", "similarity", "similaridad"):
+            v = doc.get(k)
+            try:
+                return float(v)
+            except Exception:
+                continue
+        return 0.0
+
+    def _preserve_sentence_cut(text: str, limit: int) -> str:
+        text = text.strip()
+        if len(text) <= limit:
+            return text
+        # Buscar último punto/signo de cierre antes del límite (preferible)
+        cutoff = text[:limit]
+        last_punct = max(cutoff.rfind(
+            '.'), cutoff.rfind('!'), cutoff.rfind('?'))
+        # si el punto está suficientemente cercano al límite (no demasiado corto), usarlo
+        if last_punct and last_punct > int(limit * 0.4):
+            return cutoff[: last_punct + 1].strip()
+        # fallback: devolver hasta límite sin cortar palabras finales bruscamente
+        if ' ' in cutoff:
+            # intentar cortar en último espacio para no partir palabra
+            last_space = cutoff.rfind(' ')
+            return cutoff[:last_space].strip()
+        return cutoff
+
+    # defensivas
+    docs_search = docs_search or []
+    docs_cosmos = docs_cosmos or []
+
+    # normalizar límites
+    try:
+        max_items = int(max_items)
+    except Exception:
+        max_items = 7
+    if max_items <= 0:
+        max_items = 7
+    # permitir hasta 7 como máximo según guideline
+    max_items = min(max_items, 7)
+
+    try:
+        max_chars_per_item = int(max_chars_per_item)
+    except Exception:
+        max_chars_per_item = 1200
+    if max_chars_per_item <= 0:
+        max_chars_per_item = 1200
+
+    # umbral recomendado (ajustable)
+    score_threshold = 0.65
+
     partes = []
 
-    # Usar hasta 5 docs vectoriales (más relevantes)
-    if docs_search:
-        partes.append("Actividad Relevante (búsqueda semántica):")
-        for i, doc in enumerate(docs_search[:5], 1):
-            texto = doc.get('texto_semantico', '')
-            endpoint = doc.get('endpoint', 'desconocido')
-            if texto and not any(x in texto.lower() for x in ['consulta de historial', 'sin resumen']):
-                partes.append(f"{i}. [{endpoint}] {texto[:400]}")
+    # Pre-filtrar cosmos: texto_semantico no vacío y longitud mínima (80)
+    filtered_cosmos = [
+        d for d in docs_cosmos
+        if d and isinstance(d.get("texto_semantico", ""), str) and len(d["texto_semantico"].strip()) > 80
+    ]
 
-    # Agregar hasta 5 interacciones recientes de Cosmos
-    utiles = [d for d in docs_cosmos if d.get("texto_semantico") and not any([
-        "consulta de historial" in d.get("texto_semantico", "").lower(),
-        "sin resumen" in d.get("texto_semantico", "").lower()
-    ])][:5]
+    # 1) Vectoriales prioritarios (ordenados por score desc)
+    vectorials_sorted = sorted(docs_search or [], key=_score, reverse=True)
+    high_score_vecs = [
+        d for d in vectorials_sorted if _score(d) > score_threshold]
 
-    if utiles:
-        partes.append("\nInteracciones Recientes (cronológicas):")
-        for i, d in enumerate(utiles, 1):
-            texto = d.get('texto_semantico', '')
-            endpoint = d.get('endpoint', 'desconocido')
-            partes.append(f"{i}. [{endpoint}] {texto[:400]}")
+    # Inicializar variables que se usan en logging/fallback
+    used = 0
+    cosmos_events = []
+    enriched = []
+
+    # Fallback inteligente si no hay contexto alguno
+    if not vectorials_sorted and not filtered_cosmos:
+        logging.info(f"[SINTETIZAR] Total usado: {used}. "
+                     f"Vecs relevantes: {len(high_score_vecs)}, "
+                     f"Otros vecs: {len(vectorials_sorted)}, "
+                     f"Events: {len(cosmos_events)}, "
+                     f"Enriquecidos: {len(enriched)}, "
+                     f"Cosmos total filtrado: {len(filtered_cosmos)}")
+        return (
+            "No se encontró contexto previo ni registros semánticos recientes.\n"
+            "Puedes intentar: `buscar:tema`, `listar:endpoints recientes` o `diagnosticar:sistema`."
+        )
+
+    if high_score_vecs:
+        partes.append(
+            f"🔹 Actividad relevante (vectores, score>{score_threshold}):")
+        for doc in high_score_vecs:
+            if used >= max_items:
+                break
+            texto = str(doc.get("texto_semantico") or doc.get("texto") or "")
+            if not texto:
+                continue
+            endpoint = doc.get("endpoint") or doc.get(
+                "source") or doc.get("id") or "desconocido"
+            header = f"• [{endpoint}] (score={_score(doc):.2f})"
+            body = _preserve_sentence_cut(texto, max_chars_per_item)
+            partes.append(f"{header}\n{body}")
+            used += 1
+
+    # 2) Si no se llenó, añadir vectoriales restantes (ordenados por score)
+    if used < max_items and vectorials_sorted:
+        remaining_vecs = [d for d in vectorials_sorted if (
+            d not in high_score_vecs)]
+        if remaining_vecs:
+            partes.append("🔸 Otros resultados vectoriales:")
+            for doc in remaining_vecs:
+                if used >= max_items:
+                    break
+                texto = str(doc.get("texto_semantico")
+                            or doc.get("texto") or "")
+                if not texto or len(texto.strip()) < 40:
+                    continue
+                endpoint = doc.get("endpoint") or doc.get(
+                    "source") or doc.get("id") or "desconocido"
+                header = f"• [{endpoint}] (score={_score(doc):.2f})"
+                body = _preserve_sentence_cut(texto, max_chars_per_item)
+                partes.append(f"{header}\n{body}")
+                used += 1
+
+    # 3) Cosmos: eventos tipo endpoint_call (cronológicos preferidos)
+    if used < max_items and filtered_cosmos:
+        cosmos_events = [
+            d for d in filtered_cosmos
+            if str(d.get("tipo", "")).lower() in ("endpoint_call", "endpoint", "api_call", "call", "invocation")
+        ]
+        if cosmos_events:
+            partes.append(
+                "\n📡 Interacciones tipo endpoint_call (Cosmos, cronológicas):")
+            for d in cosmos_events:
+                if used >= max_items:
+                    break
+                texto = d.get("texto_semantico", "")
+                endpoint = d.get("endpoint") or d.get(
+                    "source") or d.get("id") or "desconocido"
+                ts = d.get("timestamp")
+                header = f"• [{endpoint}]" + (f" @ {ts}" if ts else "")
+                body = _preserve_sentence_cut(texto, max_chars_per_item)
+                partes.append(f"{header}\n{body}")
+                used += 1
+
+    # 4) Cosmos: resúmenes enriquecidos / análisis completos (cerrar con ellos)
+    if used < max_items and filtered_cosmos:
+        enriched = []
+        for d in filtered_cosmos:
+            txt = (d.get("texto_semantico") or "").lower()
+            if any(kw in txt for kw in ("completo", "análisis contextual", "análisis contextual completo", "análisis completo", "resumen enriquecido", "resumen completo")):
+                enriched.append(d)
+        if enriched:
+            partes.append("\n📘 Resúmenes enriquecidos (Cosmos):")
+            for d in enriched:
+                if used >= max_items:
+                    break
+                texto = d.get("texto_semantico", "")
+                endpoint = d.get("endpoint") or d.get("id") or "resumen"
+                header = f"• [{endpoint}] (resumen enriquecido)"
+                body = _preserve_sentence_cut(texto, max_chars_per_item)
+                partes.append(f"{header}\n{body}")
+                used += 1
+
+    # 5) Cosmos: otros (cronológicos) hasta completar
+    if used < max_items and filtered_cosmos:
+        # garantizar que cosmos_events/enriched estén definidos
+        others = [
+            d for d in filtered_cosmos if d not in (cosmos_events or []) and d not in (enriched or [])
+        ]
+        if others:
+            partes.append("\n🗂️ Otras interacciones recientes (Cosmos):")
+            for d in others:
+                if used >= max_items:
+                    break
+                texto = d.get("texto_semantico", "")
+                endpoint = d.get("endpoint") or d.get("id") or "desconocido"
+                ts = d.get("timestamp")
+                header = f"• [{endpoint}]" + (f" @ {ts}" if ts else "")
+                body = _preserve_sentence_cut(texto, max_chars_per_item)
+                partes.append(f"{header}\n{body}")
+                used += 1
 
     if not partes:
-        return "No encuentro actividad significativa reciente. ¿Quieres que revise por tema o endpoint específico?"
+        logging.info(f"[SINTETIZAR] Total usado: {used}. "
+                     f"Vecs relevantes: {len(high_score_vecs)}, "
+                     f"Otros vecs: {len(vectorials_sorted)}, "
+                     f"Events: {len(cosmos_events)}, "
+                     f"Enriquecidos: {len(enriched)}, "
+                     f"Cosmos total filtrado: {len(filtered_cosmos)}")
+        return "No encuentro actividad significativa reciente. ¿Quieres que busque por endpoint, agente o intervalo de fechas?"
 
-    return "\n".join(partes) + "\n\nPuedo ayudarte con: análisis detallado, búsqueda por tema, o generar plan de acción."
+    # Mensaje final con acciones sugeridas
+    acciones = "Puedo ayudarte con: análisis detallado por item, búsqueda por tema/endpoint/agent, o generar un plan de acción."
+    logging.info(f"[SINTETIZAR] Total usado: {used}. "
+                 f"Vecs relevantes: {len(high_score_vecs)}, "
+                 f"Otros vecs: {len(vectorials_sorted)}, "
+                 f"Events: {len(cosmos_events)}, "
+                 f"Enriquecidos: {len(enriched)}, "
+                 f"Cosmos total filtrado: {len(filtered_cosmos)}")
+    return "\n\n".join(partes) + "\n\n" + acciones
 
 
 @app.function_name(name="historial_interacciones")
@@ -5041,6 +5234,32 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             "en qué quedamos"
         )
 
+        # ROUTER SEMANTICO DINAMICO - EJECUTAR PRIMERO
+        from intelligent_intent_detector import analizar_intencion_semantica
+        clasificacion_router = analizar_intencion_semantica(
+            consulta_usuario) or {}
+        endpoint_sugerido_router = clasificacion_router.get(
+            "endpoint_sugerido")
+
+        if endpoint_sugerido_router:
+            logging.info(
+                f"ROUTER EARLY: Redirigiendo a {endpoint_sugerido_router}")
+
+            resultado_router = invocar_endpoint_directo_seguro(
+                endpoint=endpoint_sugerido_router,
+                method="GET",
+                params={"query": consulta_usuario, "session_id": session_id}
+            )
+
+            if resultado_router.get("exito"):
+                logging.info(f"ROUTER EARLY: Redireccion exitosa")
+                return func.HttpResponse(
+                    json.dumps(resultado_router.get(
+                        "data", resultado_router), ensure_ascii=False),
+                    mimetype="application/json",
+                    status_code=200
+                )
+
         filtros = []
         if session_id:
             filtros.append(f"session_id eq '{session_id}'")
@@ -5170,8 +5389,53 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             from intelligent_intent_detector import analizar_intencion_semantica
 
             clasificacion = analizar_intencion_semantica(consulta) or {}
+
+            # 🎯 ROUTER SEMÁNTICO DINÁMICO
+            endpoint_sugerido = clasificacion.get("endpoint_sugerido")
+            if endpoint_sugerido:
+                logging.info(f"🔀 Redirigiendo a {endpoint_sugerido}")
+
+                resultado = invocar_endpoint_directo_seguro(
+                    endpoint=endpoint_sugerido,
+                    method="GET",
+                    params={"query": consulta,
+                            "session_id": session_id}
+                )
+
+                if resultado.get("exito"):
+                    return func.HttpResponse(
+                        json.dumps(resultado.get("data", resultado),
+                                   ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=200
+                    )
+
             tipo_intencion = clasificacion.get("tipo", "")
             confianza = clasificacion.get("confianza", 0)
+
+            logging.info(
+                f"🎯 ROUTER: Intención={tipo_intencion}, Confianza={confianza}")
+
+            # 🔥 ROUTER SEMANTICO DINAMICO
+            if tipo_intencion and confianza > 0.5:
+                endpoint_map = {
+                    "ejecutar_comando_cli": ("/api/ejecutar-cli", "POST", {"comando": consulta}),
+                    "listar_storage": ("/api/listar-blobs", "GET", None),
+                    "buscar_memoria": ("/api/buscar-memoria", "POST", {"query": consulta}),
+                    "diagnostico_sistema": ("/api/diagnostico-recursos-completo", "GET", None),
+                    "crear_recurso": ("/api/crear-contenedor", "POST", {"nombre": consulta}),
+                    "leer_archivo": ("/api/leer-archivo", "GET", {"ruta": consulta}),
+                }
+
+                if tipo_intencion in endpoint_map:
+                    endpoint, method, payload = endpoint_map[tipo_intencion]
+                    logging.info(f"🔄 ROUTER: Redirigiendo a {endpoint}")
+                    return func.HttpResponse(
+                        json.dumps(invocar_endpoint_directo_seguro(
+                            endpoint, method, body=payload), ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=200
+                    )
 
             # Detectar patrones específicos de consultas de contexto/memoria
             es_consulta_contexto = detectar_consulta_contexto_semantica(consulta) or {
@@ -8330,13 +8594,18 @@ def generar_sugerencias_locales(query: str) -> list:
 
 def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
     """Ejecuta comando del sistema según su tipo de manera dinámica y adaptable"""
-    import subprocess
-    import time
-    import shutil
 
     start_time = time.time()
 
     try:
+        # 🔥 APLICAR AUTO-FIXES ANTES DE CUALQUIER EJECUCIÓN
+        try:
+            from command_fixers.auto_fixers import apply_auto_fixes
+            comando = apply_auto_fixes(comando, tipo)
+            logging.info(f"Auto-fixes aplicados: {comando}")
+        except ImportError:
+            logging.warning("auto_fixers no disponible")
+
         # Configurar entorno
         env = os.environ.copy()
         shell = False
@@ -8366,14 +8635,24 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
             env['PYTHONUNBUFFERED'] = '1'
 
         elif tipo == "powershell":
+            # 🔥 AUTO-FIX: Agregar | Out-String si hay pipes pero no está presente
+            if '|' in comando and '| Out-String' not in comando and '| out-string' not in comando.lower():
+                comando = f"{comando} | Out-String"
+                logging.info(
+                    f"PowerShell: Auto-agregado | Out-String para convertir objetos a texto")
+
+            # 🔥 SOLUCIÓN: Envolver comando en & { } para ejecutar dentro de PowerShell
+            comando_wrapped = f"& {{ {comando} }}"
+
             # PowerShell con detección de cmdlets
             if any(comando.startswith(prefix) for prefix in ["Get-", "Set-", "New-", "Remove-", "Invoke-"]):
                 # Cmdlet nativo
-                cmd_args = ["powershell", "-NoProfile", "-Command", comando]
+                cmd_args = ["powershell", "-NoProfile",
+                            "-Command", comando_wrapped]
             else:
                 # Comando o script PowerShell
                 cmd_args = ["powershell", "-NoProfile",
-                            "-ExecutionPolicy", "Bypass", "-Command", comando]
+                            "-ExecutionPolicy", "Bypass", "-Command", comando_wrapped]
 
             env['POWERSHELL_TELEMETRY_OPTOUT'] = '1'
             shell = False
@@ -8507,6 +8786,73 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
                 )
 
         duration = time.time() - start_time
+
+        # --- NORMALIZADOR DE SALIDA POWERSHELL CON RE-EJECUCIÓN AUTOMÁTICA ---
+        if tipo == "powershell" and result.returncode == 0:
+            stdout_limpio = result.stdout.strip()
+            if stdout_limpio and "Perfil de PowerShell cargado" in stdout_limpio:
+                stdout_limpio = ""
+
+            if not stdout_limpio:
+                logging.info(
+                    "PowerShell: stdout vacío, re-ejecutando con | Out-String")
+                comando_con_outstring = f"{comando} | Out-String" if '| Out-String' not in comando else comando
+                comando_retry_wrapped = f"& {{ {comando_con_outstring} }}"
+
+                try:
+                    result_retry = subprocess.run(
+                        cmd_args[:-1] + [comando_retry_wrapped],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding='utf-8',
+                        errors='replace',
+                        env=env
+                    )
+
+                    if result_retry.returncode == 0 and result_retry.stdout.strip():
+                        logging.info(
+                            f"PowerShell: Re-ejecución exitosa, {len(result_retry.stdout)} chars")
+                        object.__setattr__(
+                            result, 'stdout', result_retry.stdout)
+                    else:
+                        decoded = f"⚠️ PowerShell sin salida visible. Comando: {comando[:100]}..."
+                        object.__setattr__(result, 'stdout', decoded)
+                except Exception as e:
+                    logging.warning(f"PowerShell re-ejecución falló: {e}")
+                    object.__setattr__(result, 'stdout', f"⚠️ Error: {str(e)}")
+
+            # 🔥 DETECCIÓN DE VARIABLES: Si hay $ y stdout vacío, forzar salida
+            if "$" in comando and result.returncode == 0 and not result.stdout.strip():
+                logging.info(
+                    "PowerShell: Variable detectada sin salida, aplicando auto-fixes")
+
+                # 🧠 APLICAR AUTO-FIXES INTELIGENTES
+                try:
+                    from command_fixers.auto_fixers import apply_auto_fixes
+                    comando = apply_auto_fixes(comando, tipo)
+                except ImportError:
+                    logging.warning(
+                        "auto_fixers no disponible, usando fallback")
+
+                comando_con_variable = f"& {{ {comando} | Out-String }}"
+                try:
+                    result_var = subprocess.run(
+                        cmd_args[:-1] + [comando_con_variable],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                        encoding='utf-8',
+                        errors='replace',
+                        env=env
+                    )
+                    if result_var.returncode == 0 and result_var.stdout.strip():
+                        logging.info(
+                            f"PowerShell: Variable forzada exitosa, {len(result_var.stdout)} chars")
+                        object.__setattr__(result, 'stdout', result_var.stdout)
+                except Exception as e:
+                    logging.warning(f"PowerShell variable forzada falló: {e}")
+        # --- FIN NORMALIZADOR ---
 
         # ✅ MEJORADO: Más información de debugging
         resultado = {
@@ -8972,567 +9318,6 @@ def modificar_archivo(
 
 
 # --------- HTTP WRAPPERS (columna 0) ----------
-@app.function_name(name="escribir_archivo_http")
-@app.route(route="escribir-archivo", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def escribir_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(
-            f"🧠 Escribir-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(
-            f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-
-    """Endpoint ULTRA-ROBUSTO para crear/escribir archivos - nunca falla por formato"""
-    advertencias = []
-
-    try:
-        # PARSER ULTRA-RESILIENTE - igual que modificar_archivo_http
-        body = {}
-        try:
-            body = req.get_json() or {}
-        except Exception:
-            try:
-                raw_body = req.get_body()
-                if raw_body:
-                    body_str = raw_body.decode(errors="ignore")
-                    body = json.loads(body_str)
-            except Exception:
-                try:
-                    raw_body = req.get_body()
-                    if raw_body:
-                        body_str = raw_body.decode(errors="ignore")
-                        ruta_match = re.search(
-                            r'"ruta"\s*:\s*"([^"]*)', body_str, re.IGNORECASE)
-                        if not ruta_match:
-                            ruta_match = re.search(
-                                r'"path"\s*:\s*"([^"]*)', body_str, re.IGNORECASE)
-
-                        contenido_match = re.search(
-                            r'"contenido"\s*:\s*"([^"]*)', body_str, re.IGNORECASE)
-                        if not contenido_match:
-                            contenido_match = re.search(
-                                r'"content"\s*:\s*"([^"]*)', body_str, re.IGNORECASE)
-
-                        if ruta_match:
-                            body["ruta"] = ruta_match.group(1)
-                        if contenido_match:
-                            body["contenido"] = contenido_match.group(1)
-
-                        if body:
-                            advertencias.append(
-                                "JSON roto - extraído con regex")
-                except Exception:
-                    body = {}
-                    advertencias.append(
-                        "Request body no parseable - usando defaults")
-
-        # NORMALIZACIÓN ULTRA-FLEXIBLE
-        ruta = (body.get("path") or body.get("ruta") or body.get(
-            "file") or body.get("filename") or "").strip()
-        contenido = body.get("content") or body.get(
-            "contenido") or body.get("data") or body.get("text") or ""
-
-        # DEFAULTS INTELIGENTES
-        if not ruta:
-            import uuid
-            ruta = f"tmp_write_{uuid.uuid4().hex[:8]}.txt"
-            advertencias.append(
-                f"Ruta no especificada - generada automáticamente: {ruta}")
-
-        if not contenido:
-            contenido = "# Archivo creado automáticamente por AI Foundry\n"
-            advertencias.append(
-                "Contenido vacío - agregado contenido por defecto")
-
-        # DETECCIÓN INTELIGENTE DEL TIPO DE ALMACENAMIENTO
-        usar_local = (
-            ruta.startswith(("C:/", "/tmp/", "/home/")) or
-            "local" in str(body).lower() or
-            ruta.startswith("tmp_") or
-            any(keyword in str(body).lower()
-                for keyword in ["local", "filesystem"])
-        )
-
-        # 🔧 AUTOREPARACIÓN PARA PYTHON
-        if ruta.endswith('.py'):
-            try:
-                from escribir_archivo_fix import procesar_escribir_archivo_robusto
-                resultado_procesado = procesar_escribir_archivo_robusto(
-                    ruta, contenido)
-                contenido = resultado_procesado["contenido_procesado"]
-                advertencias.extend(resultado_procesado["advertencias"])
-            except Exception as e:
-                advertencias.append(f"⚠️ Error en autoreparación: {str(e)}")
-
-        # 🔍 VALIDACIÓN UTF-8 (no fallar)
-        try:
-            contenido.encode("utf-8")
-        except UnicodeEncodeError as e:
-            contenido = contenido.encode(
-                'utf-8', errors='replace').decode('utf-8')
-            advertencias.append(
-                f"🔧 Caracteres inválidos reparados: {str(e)[:50]}")
-
-        # 🧹 DESERIALIZACIÓN ULTRA-AGRESIVA - INDEPENDIENTE DE AGENTES
-        if contenido:
-            contenido_original = contenido
-
-            # PASO 1: Múltiples capas de deserialización
-            # Limpiar HTML entities comunes
-            html_entities = {
-                "&quot;": '"',
-                "&#39;": "'",
-                "&lt;": "<",
-                "&gt;": ">",
-                "&amp;": "&"
-            }
-
-            for entity, char in html_entities.items():
-                if entity in contenido:
-                    contenido = contenido.replace(entity, char)
-                    advertencias.append(
-                        f"🔧 HTML entity reparada: {entity} → {char}")
-
-            try:
-                # Capa 1: HTML entities primero
-                html_entities = {
-                    "&quot;": '"', "&#39;": "'", "&lt;": "<", "&gt;": ">", "&amp;": "&"
-                }
-                for entity, char in html_entities.items():
-                    if entity in contenido:
-                        contenido = contenido.replace(entity, char)
-                        advertencias.append(f"🔧 HTML: {entity} → {char}")
-
-                # Capa 2: Escapes múltiples iterativos
-                for i in range(3):  # Hasta 3 niveles de escape
-                    if "\\" in contenido:
-                        old_contenido = contenido
-                        contenido = contenido.replace("\\\\", "\\")
-                        contenido = contenido.replace("\\'", "'")
-                        contenido = contenido.replace('\\"', '"')
-                        contenido = contenido.replace("\\n", "\n")
-                        contenido = contenido.replace("\\t", "\t")
-                        if contenido != old_contenido:
-                            advertencias.append(
-                                f"🔧 Escape nivel {i+1} procesado")
-                        else:
-                            break
-            except Exception as e:
-                advertencias.append(f"⚠️ Error deserialización: {str(e)}")
-
-            # PASO 2: Reparación f-strings automática
-            if ruta.endswith('.py') and ("f'" in contenido or 'f"' in contenido):
-                def fix_fstring(match):
-                    quote = match.group(1)
-                    content = match.group(2)
-                    if ("'" in content and quote == "'") or ('"' in content and quote == '"'):
-                        vars_found = re.findall(r'\{([^}]+)\}', content)
-                        format_content = content
-                        for i, var in enumerate(vars_found):
-                            format_content = format_content.replace(
-                                f'{{{var}}}', f'{{{i}}}')
-                        vars_str = ', '.join(vars_found)
-                        return f"'{format_content}'.format({vars_str})"
-                    return match.group(0)
-
-                old_contenido = contenido
-                contenido = re.sub(
-                    r"f(['\"])([^'\"]*?)\1", fix_fstring, contenido)
-                if contenido != old_contenido:
-                    advertencias.append("🔧 F-strings → .format()")
-
-            # PASO 3: Reparación específica de f-strings (solo para Python)
-            if ruta.endswith('.py'):
-
-                # Reparar f-strings con comillas anidadas problemáticas usando método seguro
-                if "f'" in contenido and "[" in contenido and "'" in contenido:
-                    # Método seguro: buscar y reemplazar patrones específicos sin regex compleja
-                    lines = contenido.split('\n')
-                    fixed_lines = []
-
-                    for line in lines:
-                        if "f'" in line and "['" in line and "']" in line:
-                            # Reemplazar memoria['key'] con memoria["key"] dentro de f-strings
-                            line = re.sub(
-                                r"(f'[^']*)(\w+)\['([^']+)'\]([^']*')", r"\1\2[\"\3\"]\4", line)
-                            advertencias.append(
-                                f"🔧 F-string reparada: comillas internas convertidas")
-                        fixed_lines.append(line)
-
-                    contenido = '\n'.join(fixed_lines)
-
-                # Reparar patrón específico memoria['key'] dentro de f-strings
-                if "memoria[" in contenido and "f'" in contenido:
-                    # Buscar y reparar memoria['key'] → memoria["key"]
-                    contenido = re.sub(
-                        r"(memoria\[)'([^']+)'(\])", r'\1"\2"\3', contenido)
-                    advertencias.append(
-                        "🔧 F-string: memoria['key'] → memoria[\"key\"]")
-
-                # Fallback: convertir f-strings problemáticas a format()
-                if "f'" in contenido and "[" in contenido and "'" in contenido:
-                    # Si aún hay problemas, convertir a .format()
-                    fstring_matches = re.findall(
-                        r"f'([^']*\{[^}]*\}[^']*)'", contenido)
-                    for fmatch in fstring_matches:
-                        if "[" in fmatch and "'" in fmatch:
-                            # Extraer variables dentro de {}
-                            vars_in_braces = re.findall(r"\{([^}]+)\}", fmatch)
-                            format_str = fmatch
-                            for i, var in enumerate(vars_in_braces):
-                                format_str = format_str.replace(
-                                    f"{{{var}}}", f"{{{i}}}")
-
-                            new_format = f"'{format_str}'.format({', '.join(vars_in_braces)})"
-                            old_fstring = f"f'{fmatch}'"
-                            contenido = contenido.replace(
-                                old_fstring, new_format)
-                            advertencias.append(
-                                f"🔧 F-string convertida a .format(): {old_fstring} → {new_format}")
-
-            if contenido != contenido_original:
-                advertencias.append("✅ Contenido deserializado y reparado")
-
-        # Validación sintáctica Python
-        if ruta.endswith('.py') and contenido:
-            try:
-                import ast
-                if ruta.endswith('.py') and contenido:
-                    # 👇 Primero intenta deserializar los escapes comunes
-                    contenido = bytes(
-                        contenido, "utf-8").decode("unicode_escape")
-
-                    # 👇 Luego intenta balancear comillas internas en f-strings
-                    contenido = re.sub(
-                        r"(f[\"'])({?.*?\[)'(.*?\]}?.*?)([\"'])", r"\1\2\"\3\4", contenido)
-                ast.parse(contenido)
-                advertencias.append("✅ Validación sintáctica Python exitosa")
-            except SyntaxError as e:
-                return func.HttpResponse(
-                    json.dumps({
-                        "exito": False,
-                        "error": f"Error de sintaxis Python: {e}",
-                        "linea": e.lineno,
-                        "columna": e.offset,
-                        "sugerencia": "Corrige la sintaxis antes de guardar"
-                    }, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=400
-                )
-
-        # Detección de imports recursivos
-        if "import" in contenido and ruta.endswith('.py'):
-            module_name = ruta.split("/")[-1].replace(".py", "")
-            if module_name in contenido:
-                advertencias.append("⚠️ Posible import recursivo detectado")
-
-        # 🔧 BLOQUES DELIMITADOS DE INYECCIÓN
-        if "from error_handler import ErrorHandler" in contenido and ruta.endswith('.py'):
-            if "# ===BEGIN AUTO-INJECT: ErrorHandler===" not in contenido:
-                lines = contenido.split('\n')
-                new_lines = []
-                import_inserted = False
-
-                for i, line in enumerate(lines):
-                    new_lines.append(line)
-                    if not import_inserted and line.strip() == "" and i > 0:
-                        new_lines.insert(-1,
-                                         "# ===BEGIN AUTO-INJECT: ErrorHandler===")
-                        new_lines.insert(-1,
-                                         "from error_handler import ErrorHandler")
-                        new_lines.insert(-1,
-                                         "# ===END AUTO-INJECT: ErrorHandler===")
-                        import_inserted = True
-                        break
-
-                if not import_inserted:
-                    new_lines = [
-                        "# ===BEGIN AUTO-INJECT: ErrorHandler===",
-                        "from error_handler import ErrorHandler",
-                        "# ===END AUTO-INJECT: ErrorHandler===",
-                        ""
-                    ] + new_lines
-
-                contenido = '\n'.join(new_lines)
-                advertencias.append(
-                    "🔧 Bloque de inyección ErrorHandler aplicado")
-
-        # 💾 RESPALDO AUTOMÁTICO ANTES DE MODIFICAR
-        backup_created = False
-        if usar_local:
-            import shutil
-            archivo_path = Path(ruta) if Path(
-                ruta).is_absolute() else PROJECT_ROOT / ruta
-            if archivo_path.exists():
-                try:
-                    backup_path = archivo_path.with_suffix(
-                        archivo_path.suffix + '.bak')
-                    shutil.copyfile(archivo_path, backup_path)
-                    backup_created = True
-                    advertencias.append(
-                        f"💾 Respaldo creado: {backup_path.name}")
-                except Exception as e:
-                    advertencias.append(
-                        f"⚠️ No se pudo crear respaldo: {str(e)}")
-
-        # 🎯 LÓGICA DE 3 NIVELES: RUTA INTELIGENTE
-        ruta_autocorregida = None
-        nivel_aplicado = None
-
-        # Nivel 1: Ruta absoluta → CONVERTIR A RELATIVA (evita error 500)
-        if ruta and Path(ruta).is_absolute():
-            filename = Path(ruta).name
-            ruta_autocorregida = f"scripts/{filename}"
-            advertencias.append(
-                f"🔧 Ruta absoluta convertida: {ruta} → {ruta_autocorregida}")
-            ruta = ruta_autocorregida
-            nivel_aplicado = "1_absoluta_convertida"
-        # Nivel 2: Ruta relativa válida o autocorregir
-        elif ruta and not ruta.startswith("scripts/"):
-            filename = Path(ruta).name
-            ruta_autocorregida = f"scripts/{filename}"
-            advertencias.append(
-                f"🔧 Ruta autocorregida: {ruta} → {ruta_autocorregida}")
-            ruta = ruta_autocorregida
-            nivel_aplicado = "2_ruta_autocorregida"
-        elif ruta and ruta.startswith("scripts/"):
-            nivel_aplicado = "2_ruta_relativa_valida"
-        # Nivel 3: Ruta ausente → mensaje cognitivo
-        else:
-            nivel_aplicado = "3_ruta_ausente"
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "mensaje_usuario": "No se indicó una ruta válida. ¿Dónde desea guardar el archivo?",
-                    "sugerencias": [
-                        "scripts/mi_script.py",
-                        "C:\\ProyectosSimbolicos\\boat-rental-app\\scripts\\mi_script.py"
-                    ],
-                    "nivel_aplicado": nivel_aplicado,
-                    "advertencias": advertencias
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        # EJECUCIÓN ULTRA-TOLERANTE CON CAPTURA DE HOST DISPOSED
-        res = {"exito": False}
-        archivo_creado_verificado = False
-
-        try:
-            if usar_local:
-                res = crear_archivo_local(ruta, contenido)
-                # 🔍 Verificar que el archivo realmente se creó
-                archivo_path = Path(ruta) if Path(
-                    ruta).is_absolute() else PROJECT_ROOT / ruta
-                if archivo_path.exists():
-                    archivo_creado_verificado = True
-                    advertencias.append("✅ Archivo verificado en disco")
-            else:
-                # BLOB STORAGE CON FALLBACKS
-                res = crear_archivo(ruta, contenido)
-                archivo_creado_verificado = res.get("exito", False)
-
-                # FALLBACK SI BLOB FALLA
-                if not res.get("exito"):
-                    advertencias.append(
-                        f"Blob falló: {res.get('error', 'Error desconocido')}")
-                    try:
-                        # Intentar crear en local como fallback
-                        safe_ruta = f"fallback_{ruta.replace('/', '_').replace(':', '_')}"
-                        res_fallback = crear_archivo_local(
-                            safe_ruta, contenido)
-                        if res_fallback.get("exito"):
-                            res = res_fallback
-                            res["mensaje"] = f"Archivo creado como fallback local: {safe_ruta}"
-                            advertencias.append(
-                                "Blob falló - creado archivo local como fallback")
-                        else:
-                            # Fallback sintético
-                            res = {
-                                "exito": True,
-                                "mensaje": "Operación procesada con limitaciones",
-                                "ubicacion": f"synthetic://{ruta}",
-                                "tipo_operacion": "fallback_sintetico"
-                            }
-                            advertencias.append(
-                                "Todos los métodos fallaron - respuesta sintética")
-                    except Exception as e:
-                        res = {
-                            "exito": True,
-                            "mensaje": "Operación completada con advertencias",
-                            "ubicacion": f"synthetic://{ruta}",
-                            "tipo_operacion": "fallback_total"
-                        }
-                        advertencias.append(
-                            f"Error en fallback: {str(e)} - respuesta sintética")
-        except Exception as e:
-            error_msg = str(e)
-            # 🔥 CAPTURA ESPECÍFICA: Host Disposed Error
-            if "disposed" in error_msg.lower() or "loggerFactory" in error_msg:
-                advertencias.append(
-                    "⚠️ Host disposed detectado - operación completada antes del cierre")
-                res = {
-                    "exito": True,
-                    "mensaje": "Archivo procesado exitosamente (host en reinicio)",
-                    "ubicacion": ruta,
-                    "tipo_operacion": "host_disposed_recovery",
-                    "nota": "El archivo se procesó correctamente antes del cierre del host"
-                }
-            else:
-                advertencias.append(
-                    f"Error en ejecución principal: {error_msg}")
-                res = {
-                    "exito": True,
-                    "mensaje": "Operación procesada con limitaciones",
-                    "ubicacion": f"synthetic://{ruta}",
-                    "tipo_operacion": "fallback_exception"
-                }
-
-        # ACTIVAR BING FALLBACK GUARD SI FALLA LA CREACIÓN
-        if not ruta or not contenido or not res.get("exito"):
-            try:
-                from bing_fallback_guard import ejecutar_grounding_fallback
-                contexto_dict = {
-                    "operacion": "escritura de archivo",
-                    "ruta_original": ruta,
-                    "contenido_vacio": not contenido,
-                    "error_creacion": res.get("error", "Sin error específico"),
-                    "tipo_almacenamiento": "local" if usar_local else "blob"
-                }
-
-                fallback = ejecutar_grounding_fallback(
-                    prompt=f"Sugerir ruta válida y estrategia para escribir archivo: {ruta} con contenido: {contenido[:100]}...",
-                    # ← esto es lo importante
-                    contexto=json.dumps(contexto_dict, ensure_ascii=False),
-                    error_info={"tipo_error": "escritura_archivo_fallida"}
-                )
-                if fallback.get("exito"):
-                    # Aplicar sugerencias del fallback
-                    ruta_sugerida = fallback.get("ruta_sugerida", ruta)
-                    estrategia = fallback.get("estrategia", "default")
-                    if ruta_sugerida != ruta:
-                        advertencias.append(
-                            f"Ruta corregida por Bing: {ruta} -> {ruta_sugerida}")
-                        ruta = str(ruta_sugerida)
-                        # Reintentar con la ruta sugerida
-                        if usar_local:
-                            res = crear_archivo_local(ruta, contenido)
-                        else:
-                            res = crear_archivo(ruta, contenido)
-                    if estrategia == "crear_directorios":
-                        # Implementar creación de directorios si es necesario
-                        os.makedirs(os.path.dirname(ruta), exist_ok=True)
-                        advertencias.append(
-                            "Directorios creados según sugerencia de Bing")
-                    elif estrategia == "verificar_existencia":
-                        # Verificar si el archivo existe y manejar
-                        if os.path.exists(ruta):
-                            advertencias.append(
-                                "Archivo ya existe - sobrescribiendo según sugerencia")
-                        else:
-                            advertencias.append(
-                                "Archivo no existe - creando nuevo según sugerencia")
-                    # Marcar que se aplicó el fallback
-                    res["bing_fallback_aplicado"] = True
-                    res["sugerencias_bing"] = fallback.get("sugerencias", [])
-            except Exception as bing_error:
-                advertencias.append(
-                    f"Error en Bing Fallback: {str(bing_error)}")
-
-        # RESPUESTA SIEMPRE EXITOSA CON METADATA
-        if not res.get("exito"):
-            res = {
-                "exito": True,
-                "mensaje": "Operación procesada con limitaciones",
-                "ubicacion": f"synthetic://{ruta}",
-                "tipo_operacion": "fallback_final"
-            }
-            advertencias.append("Forzado éxito para evitar error 400")
-
-        # Enriquecer respuesta con metadata
-        res.update({
-            "tipo_almacenamiento": "local" if usar_local else "blob",
-            "timestamp": datetime.now().isoformat(),
-            "tamaño_contenido": len(contenido) if contenido else 0,
-            "advertencias": advertencias,
-            "ruta_procesada": ruta,
-            "ruta_autocorregida": ruta_autocorregida,
-            "nivel_logica_aplicado": nivel_aplicado,
-            "archivo_verificado": archivo_creado_verificado,
-            "validacion_sintactica": ruta.endswith('.py'),
-            "respaldo_creado": backup_created if 'backup_created' in locals() else False,
-            "bloques_inyeccion": "ErrorHandler" in contenido
-        })
-
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-        # Registrar llamada en memoria después de construir la respuesta final
-        try:
-            logging.info(
-                f"💾 Registering call for escribir_archivo: success={res.get('exito', False)}, endpoint=/api/escribir-archivo")
-            memory_service.registrar_llamada(
-                source="escribir_archivo",
-                endpoint="/api/escribir-archivo",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-        except Exception as log_error:
-            # 🔥 Suprimir errores de logging si el host está disposed
-            if "disposed" not in str(log_error).lower():
-                logging.warning(f"⚠️ Error en logging final: {log_error}")
-
-        # NOTA: El guardado automático se maneja por memory_route_wrapper + @registrar_memoria
-
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=200  # SIEMPRE 200 para evitar errores en AI Foundry
-        )
-
-    except Exception as e:
-        error_msg = str(e)
-        # 🔥 CAPTURA CRÍTICA: Host Disposed en nivel superior
-        if "disposed" in error_msg.lower() or "loggerFactory" in error_msg.lower():
-            logging.warning(
-                "⚠️ Host disposed detectado en nivel superior - operación completada")
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": True,
-                    "mensaje": "Archivo procesado exitosamente (host en reinicio)",
-                    "ruta_procesada": ruta if 'ruta' in locals() else "unknown",
-                    "tipo_operacion": "host_disposed_recovery_top_level",
-                    "nota": "El archivo se procesó correctamente antes del cierre del host",
-                    "timestamp": datetime.now().isoformat()
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        logging.exception("escribir_archivo_http failed")
-        # FALLBACK FINAL - NUNCA FALLA
-        return func.HttpResponse(
-            json.dumps({
-                "exito": True,
-                "mensaje": "Operación completada con limitaciones críticas",
-                "error_original": str(e),
-                "tipo_error": type(e).__name__,
-                "endpoint": "escribir-archivo",
-                "fallback_critico": True,
-                "timestamp": datetime.now().isoformat()
-            }),
-            mimetype="application/json",
-            status_code=200  # SIEMPRE 200
-        )
 
 
 # arriba del módulo
@@ -13747,14 +13532,15 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         comando = body.get("comando")
-        
+
         # 🔥 NORMALIZAR COMANDOS AWK AUTOMÁTICAMENTE
         if comando and 'awk' in comando.lower():
             from validate_awk_command import suggest_awk_fix
             comando_original = comando
             comando = suggest_awk_fix(comando)
             if comando != comando_original:
-                logging.info(f"✅ AWK normalizado: {comando_original} -> {comando}")
+                logging.info(
+                    f"✅ AWK normalizado: {comando_original} -> {comando}")
 
         # 🔍 AUTO-RESOLVER RUTAS DE ARCHIVOS EN EL COMANDO
         if comando:
@@ -13923,7 +13709,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     f"Redirigiendo comando {command_type} a ejecutor genérico")
 
                 # 🔧 NORMALIZACIÓN ROBUSTA para comandos no-Azure CLI
-                comando_normalizado = _normalizar_comando_robusto(comando)
+                comando_normalizado = comando  # NO normalizar
                 logging.info(f"Comando normalizado: {comando_normalizado}")
 
                 # Usar la función ejecutar_comando_sistema directamente
@@ -13961,7 +13747,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 logging.info(
                     "Ejecutando comando no-Azure con fallback genérico")
                 # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
-                comando_normalizado = _normalizar_comando_robusto(comando)
+                comando_normalizado = comando  # NO normalizar
                 logging.info(
                     f"Comando fallback normalizado: {comando_normalizado}")
                 # Usar la función ejecutar_comando_sistema directamente
@@ -13994,7 +13780,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 comando = f"az {comando}"
 
         # 🔧 NORMALIZACIÓN ROBUSTA: Manejar rutas con espacios y caracteres especiales
-        comando = _normalizar_comando_robusto(comando)
+        comando = comando  # NO normalizar
 
         # --- Nuevo bloque dinámico: reemplazo automático de placeholders ---
         # Recuperar memoria del agente (si ya tienes contexto cargado)
@@ -14035,7 +13821,8 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     except ValueError:
                         pattern = None
                 if not pattern:
-                    m = re.search(r"grep\s+(?:-n\s+)?['\"]([^'\"]+)['\"]", comando, re.IGNORECASE)
+                    m = re.search(
+                        r"grep\s+(?:-n\s+)?['\"]([^'\"]+)['\"]", comando, re.IGNORECASE)
                     if m:
                         pattern = m.group(1)
 
@@ -14064,32 +13851,39 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                                 # si la línea contiene 'def', extraer nombre directamente; si es decorator, buscar siguiente def
                                 fname = None
                                 if "def " in line:
-                                    m2 = re.search(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", line)
+                                    m2 = re.search(
+                                        r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", line)
                                     if m2:
                                         fname = m2.group(1)
                                 else:
                                     # buscar la siguiente def en el archivo
                                     for j in range(match_index, min(match_index + 200, len(lines))):
                                         if "def " in lines[j]:
-                                            m3 = re.search(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", lines[j])
+                                            m3 = re.search(
+                                                r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", lines[j])
                                             if m3:
                                                 fname = m3.group(1)
                                                 break
                                 if fname:
                                     # construir awk para extraer desde def hasta línea en blanco siguiente (heurística)
                                     awk_cmd = f"awk '/^def {fname}\\b/,/^$/' \"{fpath}\""
-                                    logging.info(f"🔧 Rewriting grep/cat pipeline to awk to extract full function: {awk_cmd}")
+                                    logging.info(
+                                        f"🔧 Rewriting grep/cat pipeline to awk to extract full function: {awk_cmd}")
                                     comando = awk_cmd
                                 else:
                                     # fallback: ampliar contexto de grep agregando -A/-B si no existen
                                     if "-A" not in comando and "-B" not in comando:
-                                        comando = comando.replace("grep ", "grep -A 40 -B 5 ", 1)
-                                        logging.info(f"🔧 Ampliado contexto grep: {comando}")
+                                        comando = comando.replace(
+                                            "grep ", "grep -A 40 -B 5 ", 1)
+                                        logging.info(
+                                            f"🔧 Ampliado contexto grep: {comando}")
                             else:
                                 # Si la línea encontrada no es decorator/def, ampliar contexto igualmente
                                 if "-A" not in comando and "-B" not in comando:
-                                    comando = comando.replace("grep ", "grep -A 40 -B 5 ", 1)
-                                    logging.info(f"🔧 Ampliado contexto grep (no def/decorator): {comando}")
+                                    comando = comando.replace(
+                                        "grep ", "grep -A 40 -B 5 ", 1)
+                                    logging.info(
+                                        f"🔧 Ampliado contexto grep (no def/decorator): {comando}")
         except Exception as e:
             logging.warning(f"Error optimizando grep/cat/awk extraction: {e}")
         # --- FIN BLOQUE ADICIONAL ---
@@ -14621,55 +14415,33 @@ def _verificar_archivos_en_comando(comando: str) -> dict:
         return {"exito": True, "mensaje": "Verificación de archivos omitida por error"}
 
 
-def _normalizar_comando_robusto(comando: str) -> str:
-    """
-    Normaliza comandos de forma robusta para manejar rutas con espacios,
-    caracteres especiales y diferentes tipos de comandos.
-    """
-    try:
-        # Casos especiales para comandos comunes primero
-        if 'findstr' in comando.lower():
-            return _normalizar_findstr(comando)
-        elif 'type' in comando.lower():
-            return _normalizar_type(comando)
-
-        # Para otros comandos, detectar rutas con espacios no entrecomilladas
-        # Patrón mejorado: buscar rutas que NO estén ya entre comillas
-        path_pattern = r'(?<!")((?:[A-Za-z]:\\|\./|/)[^"\s]*\s[^"\s]*(?:\.[a-zA-Z0-9]+)?)(?!")'
-
-        def quote_path(match):
-            path = match.group(1)
-            return f'"{path}"'
-
-        comando_normalizado = re.sub(path_pattern, quote_path, comando)
-
-        return comando_normalizado
-
-    except Exception as e:
-        logging.warning(f"Error normalizando comando: {e}")
-        return comando  # Devolver original si falla
-
-
 def _normalizar_findstr(comando: str) -> str:
     """
-    Normaliza comandos findstr para manejar rutas con espacios correctamente.
+    Convierte comandos findstr con múltiples /C: a forma segura usando pipe con type.
+    Evita el error 'No se puede abrir /C:return' y conserva las comillas correctamente.
     """
+    import re
+
     try:
-        # Enfoque simple: buscar el último token que contenga espacios y no esté entrecomillado
-        parts = comando.split()
-        if len(parts) >= 3:  # findstr + opciones + archivo
-            # Reconstruir el comando buscando el último argumento
-            last_part = parts[-1]
-            # Si el último argumento contiene espacios y no está entrecomillado
-            if ' ' in ' '.join(parts[2:]) and not (last_part.startswith('"') and last_part.endswith('"')):
-                # Reconstruir: primeras partes + última parte entrecomillada
-                file_part = ' '.join(parts[2:])
-                if not (file_part.startswith('"') and file_part.endswith('"')):
-                    return f'{parts[0]} {parts[1]} "{file_part}"'
+        if comando.lower().startswith("findstr") and comando.count("/C:") > 1:
+            # Captura archivo con o sin comillas
+            match = re.search(
+                r'([\w]:[\\/].+?\.(?:py|txt|json|yml|yaml))', comando)
+            if not match:
+                return comando  # no se encontró archivo
 
+            archivo = match.group(1).strip('"')
+            # Extraer todo lo que no sea el archivo (los patrones)
+            patrones = comando.split("findstr", 1)[
+                1].replace(archivo, "").strip()
+
+            # Construir comando final
+            nuevo = f'type "{archivo}" | findstr {patrones}'
+            return nuevo
         return comando
-
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"_normalizar_findstr error: {e}")
         return comando
 
 
@@ -15994,212 +15766,6 @@ def bateria_endpoints_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
         return func.HttpResponse(json.dumps(err, ensure_ascii=False), mimetype="application/json", status_code=500)
-
-
-@app.function_name(name="diagnostico_recursos_http")
-@app.route(route="diagnostico-recursos", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    """Endpoint para configurar diagnósticos de recursos Azure"""
-    try:
-        # Verificar si se solicitan métricas
-        metricas_param = req.params.get("metricas", "false").lower() == "true"
-
-        if req.method == "GET" and metricas_param:
-            # Delegar a la función completa para métricas
-            logging.info(
-                "diagnostico_recursos_http: Delegating to diagnostico_recursos_completo_http for metrics")
-            return diagnostico_recursos_completo_http(req)
-
-        if req.method == "GET":
-            # Retornar información sobre el servicio
-            logging.info("diagnostico_recursos_http: GET request received")
-            return func.HttpResponse(
-                json.dumps({
-                    "ok": True,
-                    "message": "Servicio de diagnósticos disponible",
-                    "mgmt_sdk_available": MGMT_SDK,
-                    "endpoints": {
-                        "POST": "Configurar diagnósticos para un recurso"
-                    }
-                }, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        # POST request handling with proper body validation
-        logging.info("diagnostico_recursos_http: POST request received")
-
-        body = {}
-        if req.method == "POST":
-            try:
-                body_text = req.get_body().decode('utf-8')
-                if body_text:
-                    body = json.loads(body_text)
-                else:
-                    body = {}
-
-                # Verificar si se solicitan métricas en el body
-                if _to_bool(body.get("metricas")):
-                    logging.info(
-                        "🔁 Redirigiendo POST con metricas=True hacia diagnostico_recursos_completo_http")
-                    # Crear un nuevo request con parámetros GET para obtener métricas generales
-                    from urllib.parse import urlencode
-                    new_req = func.HttpRequest(
-                        method="GET",
-                        url=f"{req.url}?metricas=true",
-                        headers=req.headers,
-                        params={"metricas": "true"},
-                        body=b""
-                    )
-                    return diagnostico_recursos_completo_http(new_req)
-
-            except Exception as e:
-                logging.error(
-                    f"diagnostico_recursos_http: JSON parsing error: {str(e)}")
-                # Continuar con el flujo normal si no se puede parsear el JSON
-                body = {}
-
-        rid = _s(body.get("recurso")) if body else ""
-        profundidad = _s(body.get("profundidad")
-                         or "basico") if body else "basico"
-
-        logging.info(
-            f"diagnostico_recursos_http: Processing recurso='{rid}', profundidad='{profundidad}'")
-
-        # If no specific resource is provided, return general diagnostics
-        if not rid:
-            logging.info(
-                "diagnostico_recursos_http: No specific resource provided, returning general diagnostics")
-
-            # Return general system diagnostics instead of an error
-            general_diagnostics = {
-                "ok": True,
-                "tipo": "diagnostico_general",
-                "timestamp": datetime.now().isoformat(),
-                "ambiente": "Azure" if IS_AZURE else "Local",
-                "sistema": {
-                    "mgmt_sdk_available": MGMT_SDK,
-                    "blob_storage_configured": bool(STORAGE_CONNECTION_STRING),
-                    "cache_entries": len(CACHE),
-                    "function_app": os.environ.get("WEBSITE_SITE_NAME", "local")
-                },
-                "profundidad": profundidad,
-                "mensaje": "Diagnóstico general del sistema completado"
-            }
-
-            # Registrar evento de auditoría en memoria
-            memory_service.log_semantic_event({
-                "tipo": "auditoria_event",
-                "fuente": "diagnostico_recursos_http",
-                "nivel": profundidad,
-                "mensaje": "Diagnóstico general completado correctamente",
-                "timestamp": datetime.utcnow().isoformat()
-            })
-
-            return func.HttpResponse(
-                json.dumps(general_diagnostics, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        logging.info(
-            "diagnostico_recursos_http: Attempting to get default credentials")
-        if not _try_default_credential():
-            logging.error(
-                "diagnostico_recursos_http: Failed to obtain default credentials")
-            return _error("AZURE_AUTH_MISSING", 401, "No se pudieron obtener credenciales para ARM")
-
-        try:
-            logging.info(
-                f"diagnostico_recursos_http: Starting diagnostics for resource: {rid}")
-
-            # 🔍 DETECTAR SI ES AZURE AI SEARCH
-            if "search" in rid.lower():
-                try:
-                    from services.azure_search_client import AzureSearchService
-                    search_service = AzureSearchService()
-
-                    # Hacer búsqueda de prueba para validar funcionamiento
-                    test_search = search_service.search("test", top=1)
-
-                    result = {
-                        "ok": True,
-                        "recurso": rid,
-                        "tipo": "Azure AI Search",
-                        "profundidad": profundidad,
-                        "timestamp": datetime.now().isoformat(),
-                        "metricas": {
-                            "servicio": "operativo",
-                            "busqueda_vectorial": test_search.get("exito", False),
-                            "documentos_indexados": test_search.get("total", 0)
-                        },
-                        "diagnostico": {
-                            "estado": "operativo" if test_search.get("exito") else "error",
-                            "tipo": "azure_search",
-                            "precision": "alta" if test_search.get("exito") else "desconocida"
-                        }
-                    }
-                except Exception as e:
-                    logging.warning(f"Error consultando Azure Search: {e}")
-                    result = {
-                        "ok": True,
-                        "recurso": rid,
-                        "tipo": "Azure AI Search",
-                        "profundidad": profundidad,
-                        "timestamp": datetime.now().isoformat(),
-                        "diagnostico": {
-                            "estado": "no_disponible",
-                            "error": str(e)
-                        }
-                    }
-            else:
-                # Lógica de diagnóstico POST para recurso específico
-                result = {
-                    "ok": True,
-                    "recurso": rid,
-                    "profundidad": profundidad,
-                    "timestamp": datetime.now().isoformat(),
-                    "diagnostico": {
-                        "estado": "completado",
-                        "tipo": "recurso_especifico"
-                    }
-                }
-
-            # Registrar auditoría del diagnóstico específico
-            memory_service.log_semantic_event({
-                "tipo": "auditoria_event",
-                "fuente": "diagnostico_recursos_http",
-                "recurso": rid,
-                "nivel": profundidad,
-                "resultado": "completado",
-                "timestamp": datetime.utcnow().isoformat()
-            })
-
-            logging.info(
-                "diagnostico_recursos_http: Diagnostics completed successfully")
-            return _json(result)
-        except PermissionError as e:
-            error_type = e.__class__.__name__
-            error_msg = str(e)
-            logging.error(
-                f"diagnostico_recursos_http: PermissionError ({error_type}): {error_msg}")
-            return _error("AZURE_AUTH_FORBIDDEN", 403, f"{error_type}: {error_msg}")
-        except Exception as e:
-            error_type = e.__class__.__name__
-            error_msg = str(e)
-            logging.error(
-                f"diagnostico_recursos_http: Exception in diagnostics logic ({error_type}): {error_msg}")
-            return _error("DiagError", 500, f"{error_type}: {error_msg}")
-
-    except Exception as e:
-        error_type = e.__class__.__name__
-        error_msg = str(e)
-        logging.error(
-            f"diagnostico_recursos_http: Unexpected exception ({error_type}): {error_msg}")
-        logging.exception(
-            "diagnostico_recursos_http failed with full traceback")
-        return _error("UnexpectedError", 500, f"{error_type}: {error_msg}")
 
 
 def procesar_intencion_crear_contenedor(parametros: dict) -> dict:

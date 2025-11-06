@@ -88,29 +88,42 @@ def analizar_intencion_semantica(consulta: str) -> Dict:
     try:
         from endpoints_search_memory import buscar_memoria_endpoint
         
-        # 🧠 BUSCAR INTENCIONES SIMILARES EN MEMORIA VECTORIAL
+        # 🧠 BUSCAR ENDPOINTS SIMILARES EN MEMORIA VECTORIAL (SIN FILTRO DE SESIÓN)
         resultado = buscar_memoria_endpoint({
-            "query": f"intención: {consulta}",
-            "top": 3
+            "query": consulta,  # Buscar directamente la consulta, no "intención:"
+            "top": 5,
+            "session_id": "UNIVERSAL"  # Forzar búsqueda sin filtro de sesión
         })
         
         if resultado.get("exito") and resultado.get("documentos"):
             docs = resultado["documentos"]
             
-            # Analizar endpoints más relevantes
-            endpoints_encontrados = [d.get("endpoint", "") for d in docs]
+            # Analizar endpoints más relevantes y sus scores
+            endpoint_scores = {}
+            for doc in docs:
+                ep = doc.get("endpoint", "")
+                score = doc.get("score", 0)
+                if ep:
+                    endpoint_scores[ep] = endpoint_scores.get(ep, 0) + score
             
-            # Detectar patrón de introspección
-            if any("introspection" in ep or "diagnostico" in ep or "status" in ep for ep in endpoints_encontrados):
-                return {"tipo": "introspection", "confianza": 0.9, "endpoint_sugerido": "/api/introspection"}
-            
-            # Detectar patrón de búsqueda
-            if any("buscar" in ep or "search" in ep or "memoria" in ep for ep in endpoints_encontrados):
-                return {"tipo": "busqueda_informacion", "confianza": 0.8}
-            
-            # Detectar patrón de ejecución
-            if any("ejecutar" in ep or "cli" in ep or "script" in ep for ep in endpoints_encontrados):
-                return {"tipo": "comando_local", "confianza": 0.9}
+            # Ordenar por score acumulado
+            if endpoint_scores:
+                mejor_endpoint = max(endpoint_scores.items(), key=lambda x: x[1])[0]
+                confianza = min(endpoint_scores[mejor_endpoint] / len(docs), 1.0)
+                
+                logging.info(f"🎯 Endpoint sugerido por memoria vectorial: {mejor_endpoint} (confianza: {confianza:.2f})")
+                
+                # Determinar tipo basado en el endpoint
+                if "introspection" in mejor_endpoint or "historial" in mejor_endpoint:
+                    return {"tipo": "introspection", "confianza": confianza, "endpoint_sugerido": mejor_endpoint}
+                elif "diagnostico" in mejor_endpoint or "recursos" in mejor_endpoint:
+                    return {"tipo": "diagnostico", "confianza": confianza, "endpoint_sugerido": mejor_endpoint}
+                elif "ejecutar" in mejor_endpoint or "cli" in mejor_endpoint:
+                    return {"tipo": "comando_local", "confianza": confianza, "endpoint_sugerido": mejor_endpoint}
+                elif "buscar" in mejor_endpoint or "memoria" in mejor_endpoint:
+                    return {"tipo": "busqueda_informacion", "confianza": confianza, "endpoint_sugerido": mejor_endpoint}
+                else:
+                    return {"tipo": "general", "confianza": confianza, "endpoint_sugerido": mejor_endpoint}
     
     except Exception as e:
         logging.warning(f"⚠️ Búsqueda vectorial falló, usando análisis estructural: {e}")
@@ -121,16 +134,26 @@ def analizar_intencion_semantica(consulta: str) -> Dict:
 
 def analizar_estructura_consulta(consulta: str) -> Dict:
     """Análisis estructural de la consulta sin palabras clave predefinidas"""
-    # Analizar estructura gramatical
-    tiene_interrogacion = "?" in consulta or consulta.lower().startswith(("qué", "cuál", "cómo", "dónde"))
-    tiene_imperativo = any(consulta.lower().startswith(v) for v in ["ejecuta", "corre", "instala", "crea"])
+    consulta_lower = consulta.lower()
     
-    if tiene_interrogacion:
-        return {"tipo": "busqueda_informacion", "confianza": 0.6}
-    elif tiene_imperativo:
-        return {"tipo": "comando_local", "confianza": 0.7}
-    else:
-        return {"tipo": "general", "confianza": 0.5}
+    # Detectar patrones de introspección/memoria
+    if any(p in consulta_lower for p in ["estábamos", "estabamos", "trabajando", "quedamos", "última", "ultima", "anterior", "historial"]):
+        return {"tipo": "introspection", "confianza": 0.8, "endpoint_sugerido": "/api/historial-interacciones"}
+    
+    # Detectar diagnóstico
+    if any(p in consulta_lower for p in ["estado", "recursos", "diagnostico", "status", "health"]):
+        return {"tipo": "diagnostico", "confianza": 0.7, "endpoint_sugerido": "/api/diagnostico-recursos"}
+    
+    # Detectar ejecución
+    if any(consulta_lower.startswith(v) for v in ["ejecuta", "corre", "instala", "crea", "az ", "python "]):
+        return {"tipo": "comando_local", "confianza": 0.9, "endpoint_sugerido": "/api/ejecutar-cli"}
+    
+    # Detectar búsqueda en memoria
+    if any(p in consulta_lower for p in ["busca", "encuentra", "muestra", "lista"]):
+        return {"tipo": "busqueda_informacion", "confianza": 0.6, "endpoint_sugerido": "/api/buscar-memoria"}
+    
+    # Fallback genérico
+    return {"tipo": "general", "confianza": 0.5}
 
 
 def detectar_info_externa_requerida(consulta: str, contexto: Optional[Dict]) -> Dict:
