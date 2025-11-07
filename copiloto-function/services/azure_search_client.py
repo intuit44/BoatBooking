@@ -35,14 +35,21 @@ class AzureSearchService:
             index_name=self.index_name,
             credential=credential
         )
-        
+
         # Cliente OpenAI para generar embeddings
+        openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+        if not openai_endpoint:
+            raise ValueError(
+                "AZURE_OPENAI_ENDPOINT no está definido en las variables de entorno")
+
         self.openai_client = AzureOpenAI(
             api_key=os.environ.get("AZURE_OPENAI_KEY"),
             api_version="2024-02-01",
-            azure_endpoint=os.environ.get("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint=openai_endpoint
         )
-        self.embedding_model = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+
+        self.embedding_model = os.environ.get(
+            "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
 
     def _generar_embedding(self, texto: str) -> List[float]:
         """Genera embedding vectorial para el texto usando Azure OpenAI"""
@@ -62,31 +69,35 @@ class AzureSearchService:
             # 1. Generar embedding de la consulta
             query_vector = self._generar_embedding(query)
             if not query_vector:
-                logging.warning("⚠️ No se pudo generar embedding, usando búsqueda de texto")
-                results = self.client.search(search_text=query, top=top, filter=filters)
+                logging.warning(
+                    "⚠️ No se pudo generar embedding, usando búsqueda de texto")
+                results = self.client.search(
+                    search_text=query, top=top, filter=filters)
                 documentos = [doc for doc in results]
                 return {"exito": True, "total": len(documentos), "documentos": documentos}
-            
+
             # 2. Crear consulta vectorial
             vector_query = VectorizedQuery(
                 vector=query_vector,
                 k_nearest_neighbors=top,
                 fields="vector"
             )
-            
+
             # 3. Ejecutar búsqueda vectorial
-            logging.info(f"🔍 Búsqueda vectorial: '{query}' (dim={len(query_vector)})")
+            logging.info(
+                f"🔍 Búsqueda vectorial: '{query}' (dim={len(query_vector)})")
             results = self.client.search(
                 search_text=None,  # Solo búsqueda vectorial
                 vector_queries=[vector_query],
                 filter=filters,
                 top=top
             )
-            
+
             documentos = [doc for doc in results]
-            logging.info(f"✅ Encontrados {len(documentos)} documentos por similitud semántica")
+            logging.info(
+                f"✅ Encontrados {len(documentos)} documentos por similitud semántica")
             return {"exito": True, "total": len(documentos), "documentos": documentos}
-            
+
         except Exception as e:
             logging.error(f"Error en búsqueda vectorial: {e}")
             return {"exito": False, "error": str(e)}
@@ -127,7 +138,7 @@ class AzureSearchService:
         except Exception as e:
             logging.error(f"Error eliminando documentos: {e}")
             return {"exito": False, "error": str(e)}
-    
+
     def eliminar_documentos(self, docs: List[Dict[str, str]]) -> Dict[str, Any]:
         """Alias que acepta lista de dicts con 'id'"""
         doc_ids = [doc["id"] for doc in docs if "id" in doc]
