@@ -36,10 +36,29 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             "limite": int(body.get("limite", req.params.get("limite", 50)))
         }
 
+        # 1. Consultar Cosmos DB (cronológico)
         query = construir_query_dinamica(
             **{k: v for k, v in params.items() if v is not None})
         resultados = ejecutar_query_cosmos(
             query, memory_service.memory_container)
+
+        # 2. Consultar AI Search (vectorial semántico)
+        docs_vectoriales = []
+        try:
+            from endpoints_search_memory import buscar_memoria_endpoint
+            query_busqueda = body.get("query") or body.get(
+                "contiene") or "actividad reciente"
+            resultado_vectorial = buscar_memoria_endpoint({
+                "query": query_busqueda,
+                "top": 20,
+                "session_id": params["session_id"]
+            })
+            if resultado_vectorial.get("exito"):
+                docs_vectoriales = resultado_vectorial.get("documentos", [])
+                logging.info(
+                    f"🔍 AI Search: {len(docs_vectoriales)} docs vectoriales")
+        except Exception as e:
+            logging.warning(f"⚠️ Error en búsqueda vectorial: {e}")
 
         # Deduplicación por hash completo (solo duplicados exactos)
         import hashlib
@@ -49,7 +68,8 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
         for item in resultados:
             texto = item.get("texto_semantico", "")
             # Hash completo: solo elimina duplicados 100% idénticos
-            clave = hashlib.sha256(texto.strip().lower().encode('utf-8')).hexdigest()
+            clave = hashlib.sha256(
+                texto.strip().lower().encode('utf-8')).hexdigest()
 
             if clave and clave not in vistos:
                 vistos.add(clave)
@@ -73,42 +93,60 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             "tasa_deduplicacion": f"{((len(resultados) - len(deduplicados)) / len(resultados) * 100):.1f}%" if resultados else "0%"
         }
 
-        # Devolver texto_semantico REAL sin resúmenes artificiales
+        # 3. Usar sintetizar() solo para poblar respuesta_usuario (mantener resumen y por_sesion propios)
         top_interacciones = deduplicados[:params['limite']]
+        sintetizador_usado = False
+        respuesta_usuario = "No hay interacciones disponibles."
 
-        # Filtrar basura inteligente: solo si es corto Y contiene patrón
-        patrones_basura = [
-            "resumen de la ultima actividad",
-            "consulta de historial completada",
-            "ultimo tema:",
-            "sin resumen de conversacion"
-        ]
-        
-        textos_reales = []
-        for item in top_interacciones:
-            texto = item.get('texto_semantico', '').strip()
-            if not texto or len(texto) < 50:
-                continue
-            
-            # Solo descartar si es corto (<100) Y contiene patrón basura
-            es_basura = any(p in texto.lower() for p in patrones_basura) and len(texto) < 100
-            
-            if not es_basura:
-                textos_reales.append(texto)
-            else:
-                logging.debug(f"[FILTRADO BASURA] {texto[:80]}... (len={len(texto)})")
+        try:
+            # Importar sintetizar desde el módulo dedicado
+            from function_app import sintetizar
 
-        respuesta_sintetizada = "\n\n---\n\n".join(
-            textos_reales) if textos_reales else "No hay interacciones con contenido semántico disponible."
+            # Sintetizar combinando vectorial + cronológico
+            respuesta_sintetizada = sintetizar(
+                docs_search=docs_vectoriales,
+                docs_cosmos=top_interacciones,
+                max_items=7,
+                max_chars_per_item=1200
+            )
+            respuesta_usuario = respuesta_sintetizada
+            sintetizador_usado = True
+            logging.info(
+                f"✅ Sintetizado: {len(docs_vectoriales)} vectoriales + {len(top_interacciones)} cosmos")
+        except Exception as e:
+            logging.warning(f"⚠️ Error en sintetizar, usando fallback: {e}")
+            # Fallback: lógica anterior (solo para respuesta_usuario)
+            patrones_basura = [
+                "resumen de la ultima actividad",
+                "consulta de historial completada",
+                "ultimo tema:",
+                "sin resumen de conversacion"
+            ]
+            textos_reales = []
+            for item in top_interacciones:
+                texto = item.get('texto_semantico', '').strip()
+                if texto and len(texto) >= 50:
+                    es_basura = any(p in texto.lower()
+                                    for p in patrones_basura) and len(texto) < 100
+                    if not es_basura:
+                        textos_reales.append(texto)
+            respuesta_usuario = "\n\n---\n\n".join(
+                textos_reales) if textos_reales else respuesta_usuario
+            sintetizador_usado = False
 
         return func.HttpResponse(
             json.dumps({
                 "exito": True,
                 "resumen": resumen,
-                "respuesta_usuario": respuesta_sintetizada,
+                "respuesta_usuario": respuesta_usuario,
                 "interacciones": top_interacciones,
                 "por_sesion": {k: len(v) for k, v in por_sesion.items()},
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "metadata": {
+                    "docs_vectoriales": len(docs_vectoriales),
+                    "docs_cosmos": len(top_interacciones),
+                    "sintetizador_usado": sintetizador_usado
+                }
             }, ensure_ascii=False),
             mimetype="application/json", status_code=200
         )
