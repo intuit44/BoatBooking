@@ -55,7 +55,7 @@ def test_deduplicacion_logica():
     print("="*80)
 
     # 1. DEDUPLICACION (logica actual)
-    print("\n1. DEDUPLICACION POR PRIMEROS 100 CARACTERES:")
+    print("\n1. DEDUPLICACION POR HASH COMPLETO (SHA256):")
     vistos = set()
     deduplicados = []
 
