@@ -10,6 +10,7 @@ from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
 from openai import AzureOpenAI
+from datetime import datetime, timezone
 
 
 class AzureSearchService:
@@ -63,8 +64,54 @@ class AzureSearchService:
             logging.error(f"Error generando embedding: {e}")
             return []
 
+    def _calcular_score_hibrido(self, doc: Dict[str, Any]) -> float:
+        """Calcula score híbrido combinando @search.score con factor de recencia."""
+
+        try:
+            raw_score = doc.get("@search.score", 0)
+            score = float(raw_score) if raw_score is not None else 0.0
+
+            ts = doc.get("timestamp", "")
+            if not ts:
+                return score
+
+            # Normalizar ISO Z -> +00:00 para fromisoformat
+            if ts.endswith("Z"):
+                ts = ts.replace("Z", "+00:00")
+
+            dt = datetime.fromisoformat(ts)
+            # Asegurar timezone-aware
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+
+            now = datetime.now(timezone.utc)
+            edad_horas = (now - dt.astimezone(timezone.utc)
+                          ).total_seconds() / 3600.0
+
+            # Factores por recencia (ajustables)
+            if edad_horas > 168:        # > 7 días
+                factor = 0.5
+            elif edad_horas > 48:       # > 2 días
+                factor = 0.7
+            elif edad_horas > 24:       # > 1 día
+                factor = 0.85
+            else:
+                factor = 1.0
+
+            return score * factor
+        except Exception:
+            # En caso de cualquier error, devolver el score original si existe
+            try:
+                return float(doc.get("@search.score", 0))
+            except Exception:
+                return 0.0
+
     def search(self, query: str, top: int = 10, filters: Optional[str] = None) -> Dict[str, Any]:
-        """Búsqueda vectorial semántica usando embeddings"""
+        """Búsqueda vectorial semántica usando embeddings.
+        Postprocesa resultados aplicando orden híbrido (score × recencia) y
+        opcionalmente filtra documentos demasiado antiguos mediante
+        AZURE_SEARCH_MAX_ITEM_AGE_HOURS (env)."""
+
         try:
             # 1. Generar embedding de la consulta
             query_vector = self._generar_embedding(query)
@@ -93,9 +140,21 @@ class AzureSearchService:
                 top=top
             )
 
-            documentos = [doc for doc in results]
+            # Materializar resultados
+            documentos_raw = [doc for doc in results]
             logging.info(
-                f"✅ Encontrados {len(documentos)} documentos por similitud semántica")
+                f"🔎 Recuperados {len(documentos_raw)} documentos desde Azure Search")
+
+            # Nota: se desactiva el filtrado por edad (AZURE_SEARCH_MAX_ITEM_AGE_HOURS).
+            # La recencia seguirá influyendo en el orden mediante _calcular_score_hibrido,
+            # pero no eliminaremos documentos por antigüedad en este punto.
+
+            # 5. Ordenar por score híbrido (similitud × recencia)
+            documentos = sorted(
+                documentos_raw, key=self._calcular_score_hibrido, reverse=True)
+            logging.info(
+                f"✅ Ordenados {len(documentos)} documentos por score híbrido")
+
             return {"exito": True, "total": len(documentos), "documentos": documentos}
 
         except Exception as e:

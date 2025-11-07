@@ -16,51 +16,60 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         from services.azure_search_client import AzureSearchService
-        
+
         # Validar payload
         query = req_body.get("query")
         if not query:
             return {"exito": False, "error": "Campo 'query' requerido"}
-        
+
         session_id = req_body.get("session_id")
-        top = req_body.get("top", 10)
+        agent_id = req_body.get("agent_id")
+        top = int(req_body.get("top", 10))
         tipo = req_body.get("tipo")
-        
-        # 🔥 BÚSQUEDA UNIVERSAL: Solo filtrar por session_id si es específico, NO por agent_id
+
+        # Valores considerados genéricos que NO deben filtrar
+        GENERIC_SESSIONS = {"assistant", "test_session", "unknown", None, ""}
+
+        # Construir filtros: se aplica session_id solo si NO es genérica.
+        # IMPORTANTE: Nunca filtrar por agent_id — búsqueda universal.
         filters = []
-        # Solo filtrar por session_id si NO es genérico (assistant, test_session, etc.)
-        if session_id and session_id not in ["assistant", "test_session", "unknown", None]:
-            filters.append(f"session_id eq '{session_id}'")
+        if session_id and session_id not in GENERIC_SESSIONS:
+            # Escapar comillas simples si existen
+            safe_sid = str(session_id).replace("'", "''")
+            filters.append(f"session_id eq '{safe_sid}'")
+
         if tipo:
-            filters.append(f"tipo eq '{tipo}'")
-        
+            safe_tipo = str(tipo).replace("'", "''")
+            filters.append(f"tipo eq '{safe_tipo}'")
+
         filter_str = " and ".join(filters) if filters else None
-        
-        # Ejecutar búsqueda
+
+        # Ejecutar búsqueda (UNIVERSAL: sin filtro por agent_id)
         search_service = AzureSearchService()
         resultado = search_service.search(
             query=query,
             top=top,
             filters=filter_str
         )
-        
-        # Agregar metadata
+
+        # Agregar metadata explicativa
         if resultado.get("exito"):
             resultado["metadata"] = {
                 "query_original": query,
                 "filtros_aplicados": {
-                    "session_id": session_id if session_id not in ["assistant", "test_session", "unknown"] else "UNIVERSAL",
+                    "session_id": session_id if session_id and session_id not in GENERIC_SESSIONS else "UNIVERSAL",
                     "tipo": tipo,
                     "agent_id": "UNIVERSAL (sin filtro)"
                 },
                 "busqueda_universal": True,
                 "modo": "universal_search",
+                "filtros_odata": filter_str,
                 "tiempo_busqueda": datetime.utcnow().isoformat()
             }
-        
-        logging.info(f"🔍 Búsqueda UNIVERSAL: '{query}' → {resultado.get('total', 0)} resultados (sin filtro agent_id)")
+
+        logging.info(f"🔍 Búsqueda UNIVERSAL: '{query}' → {resultado.get('total', 0)} resultados; filtros: {filter_str or 'NINGUNO (universal)'}")
         return resultado
-        
+
     except Exception as e:
         logging.error(f"Error en buscar_memoria: {e}")
         return {"exito": False, "error": str(e)}

@@ -136,8 +136,6 @@ $settings = @{
   "COSMOSDB_CONTAINER"                          = "memory"
   # Autopilot
   "SEMANTIC_AUTOPILOT"                          = "on"
-  "SEMANTIC_PERIOD_SEC"                         = "300"
-  "SEMANTIC_MAX_ACTIONS_PER_HOUR"               = "6"
   # App Insights
   "APPINSIGHTS_WORKSPACE_ID"                    = "3e355ae8-3dd7-44ad-be64-fa332dc93c96"
   "APPLICATIONINSIGHTS_CONNECTION_STRING"       = "InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53"

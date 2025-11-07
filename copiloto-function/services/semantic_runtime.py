@@ -12,11 +12,27 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 # Configuración
-BASE_URL = os.getenv("FUNCTION_BASE_URL",
-                     "") or "https://copiloto-semantico-func-us2.azurewebsites.net"
-PERIOD = int(os.getenv("SEMANTIC_PERIOD_SEC", "300"))  # 5 minutos
-MAX_HOURLY = int(os.getenv("SEMANTIC_MAX_ACTIONS_PER_HOUR", "6"))
-AUTOPILOT_ENABLED = os.getenv("SEMANTIC_AUTOPILOT", "off").lower() == "on"
+BASE_URL = os.getenv(
+    "FUNCTION_BASE_URL", ""
+) or "https://copiloto-semantico-func-us2.azurewebsites.net"
+
+# PERIOD: allow configuring via env. Default 0 => continuous loop (no delay).
+PERIOD = int(os.getenv("SEMANTIC_PERIOD_SEC", "0"))
+
+# MAX_HOURLY: by default unlimited. If env provides a positive integer, use it.
+_max_hourly_env = os.getenv("SEMANTIC_MAX_ACTIONS_PER_HOUR", "").strip()
+if _max_hourly_env:
+    try:
+        MAX_HOURLY = int(_max_hourly_env)
+        if MAX_HOURLY <= 0:
+            MAX_HOURLY = float("inf")
+    except Exception:
+        MAX_HOURLY = float("inf")
+else:
+    MAX_HOURLY = float("inf")
+
+# AUTOPILOT_ENABLED: enabled by default unless explicitly set to "off"
+AUTOPILOT_ENABLED = os.getenv("SEMANTIC_AUTOPILOT", "on").lower() != "off"
 
 
 class SemanticRuntime:

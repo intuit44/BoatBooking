@@ -435,12 +435,22 @@ except Exception as e:
 STORAGE_CONNECTION_STRING = os.getenv("AzureWebJobsStorage", "")
 
 # --- Configuración Semántica ---
-SEMANTIC_AUTOPILOT = os.getenv("SEMANTIC_AUTOPILOT", "off")
-SEMANTIC_PERIOD_SEC = os.getenv("SEMANTIC_PERIOD_SEC", "300")
-SEMANTIC_MAX_ACTIONS_PER_HOUR = os.getenv("SEMANTIC_MAX_ACTIONS_PER_HOUR", "6")
+# Forcing semantic autopilot ON and disabling any semantic rate/period limits.
+# This ensures semantic logic runs without periodic or hourly action constraints.
+SEMANTIC_AUTOPILOT = "on"
+# Use None to indicate "no limit" / always-available for period and max actions.
+SEMANTIC_PERIOD_SEC = None
+SEMANTIC_MAX_ACTIONS_PER_HOUR = None
+
+# Persist environment flag for compatibility with other modules that read env vars.
+os.environ["SEMANTIC_AUTOPILOT"] = "on"
+# Remove or unset limiting env vars if present to avoid accidental enforcement.
+os.environ.pop("SEMANTIC_PERIOD_SEC", None)
+os.environ.pop("SEMANTIC_MAX_ACTIONS_PER_HOUR", None)
 
 logging.info(
-    f"🧠 Configuración semántica: AUTOPILOT={SEMANTIC_AUTOPILOT}, PERIOD={SEMANTIC_PERIOD_SEC}s, MAX_HOURLY={SEMANTIC_MAX_ACTIONS_PER_HOUR}")
+    f"🧠 Configuración semántica: AUTOPILOT={SEMANTIC_AUTOPILOT}, PERIOD={'UNLIMITED' if SEMANTIC_PERIOD_SEC is None else SEMANTIC_PERIOD_SEC}, MAX_HOURLY={'UNLIMITED' if SEMANTIC_MAX_ACTIONS_PER_HOUR is None else SEMANTIC_MAX_ACTIONS_PER_HOUR}"
+)
 
 
 def _json_body(req):
