@@ -67,39 +67,45 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     logging.warning(f"🚨 Wrapper ACTIVADO en endpoint: {source_name}")
                     from services.memory_service import memory_service
 
-                    # 1️⃣ CONSULTAR MEMORIA: Todas las sesiones del endpoint
+                    # 1️⃣ CONSULTAR MEMORIA COMPLETA: Cosmos DB + Conversación Rica
                     memoria_previa = {}
                     try:
-                        # Obtener session_id si existe, sino usar "global"
+                        from cosmos_memory_direct import consultar_memoria_cosmos_directo
+                        
+                        # Obtener session_id y agent_id
                         session_id = req.headers.get("Session-ID") or req.params.get("session_id") or "global"
+                        agent_id = req.headers.get("Agent-ID") or req.params.get("agent_id") or "unknown_agent"
                         
-                        # Recuperar historial de la sesión (incluye todas las interacciones)
-                        historial_completo = memory_service.get_session_history(session_id, limit=100)
+                        # 🔥 CONSULTA COMPLETA: Recupera TODA la conversación rica desde Cosmos DB
+                        memoria_previa = consultar_memoria_cosmos_directo(req)
                         
-                        # Filtrar por endpoint actual para contexto específico
-                        historial_endpoint = [h for h in historial_completo if h.get("data", {}).get("endpoint") == route_path]
-                        
-                        if historial_completo and len(historial_completo) > 0:
-                            memoria_previa = {
-                                "tiene_historial": True,
-                                "total_interacciones": len(historial_completo),
-                                "interacciones_endpoint": len(historial_endpoint),
-                                "interacciones": historial_completo,  # TODAS las interacciones
-                                "interacciones_este_endpoint": historial_endpoint,
-                                "endpoint": route_path,
-                                "session_id": session_id
-                            }
-                            logging.info(f"🧠 [{source_name}] Memoria: {len(historial_completo)} total, {len(historial_endpoint)} de este endpoint")
+                        if memoria_previa and memoria_previa.get("tiene_historial"):
+                            total = memoria_previa.get("total_interacciones", 0)
+                            logging.info(f"🧠 [{source_name}] Memoria COMPLETA: {total} interacciones, sesión={session_id}, agente={agent_id}")
+                            logging.info(f"📝 Resumen: {memoria_previa.get('resumen_conversacion', '')[:200]}...")
                         else:
-                            memoria_previa = {"tiene_historial": False, "endpoint": route_path}
-                            logging.info(f"🧠 [{source_name}] Sin memoria previa")
+                            memoria_previa = {"tiene_historial": False, "endpoint": route_path, "session_id": session_id}
+                            logging.info(f"🧠 [{source_name}] Sin memoria previa para sesión {session_id}")
                             
                         setattr(req, "_memoria_contexto", memoria_previa)
                     except Exception as e:
-                        logging.warning(f"⚠️ [{source_name}] Error consultando memoria: {e}")
+                        logging.warning(f"⚠️ [{source_name}] Error consultando memoria completa: {e}")
                         import traceback
                         logging.warning(traceback.format_exc())
-                        setattr(req, "_memoria_contexto", {"tiene_historial": False})
+                        # Fallback: intentar con memory_service local
+                        try:
+                            session_id = req.headers.get("Session-ID") or "global"
+                            historial = memory_service.get_session_history(session_id, limit=100)
+                            memoria_previa = {
+                                "tiene_historial": len(historial) > 0,
+                                "interacciones_recientes": historial,
+                                "total_interacciones": len(historial),
+                                "session_id": session_id
+                            }
+                            setattr(req, "_memoria_contexto", memoria_previa)
+                            logging.info(f"🧠 [{source_name}] Fallback local: {len(historial)} interacciones")
+                        except:
+                            setattr(req, "_memoria_contexto", {"tiene_historial": False})
 
                     # 1.5️⃣ BÚSQUEDA VECTORIAL EN AI SEARCH POR ENDPOINT
                     docs_vectoriales = []
@@ -159,49 +165,40 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             status_code=500
                         )
                     
-                    # 3️⃣ INYECTAR CONTEXTO DE MEMORIA EN RESPUESTA
+                    # 3️⃣ INYECTAR METADATA SIN PERDER CONTENIDO
                     try:
-                        if isinstance(response, func.HttpResponse):
+                        if isinstance(response, func.HttpResponse) and response.get_body():
                             body = response.get_body()
-                            if body:
-                                response_data = json.loads(body.decode("utf-8"))
+                            response_data = json.loads(body.decode("utf-8"))
+                            
+                            if isinstance(response_data, dict):
+                                # Inyectar metadata SIN tocar campos principales
+                                if "metadata" not in response_data:
+                                    response_data["metadata"] = {}
                                 
-                                if isinstance(response_data, dict):
-                                    # SIEMPRE inyectar metadata del wrapper
-                                    if "metadata" not in response_data:
-                                        response_data["metadata"] = {}
-                                    response_data["metadata"]["wrapper_aplicado"] = True
-                                    
-                                    # Si hay memoria, inyectar contexto COMPLETO
-                                    if memoria_previa.get("tiene_historial"):
-                                        response_data["contexto_conversacion"] = {
-                                            "mensaje": f"Recuperadas {memoria_previa['total_interacciones']} interacciones previas del endpoint {route_path}",
-                                            "interacciones_previas": memoria_previa.get("interacciones", []),
-                                            "docs_vectoriales": memoria_previa.get("docs_vectoriales", []),
-                                            "endpoint": route_path,
-                                            "fuente_datos": memoria_previa.get("fuente_datos", "Endpoint")
-                                        }
-                                        response_data["metadata"]["memoria_aplicada"] = True
-                                        response_data["metadata"]["interacciones_previas"] = memoria_previa["total_interacciones"]
-                                        response_data["metadata"]["docs_vectoriales"] = len(memoria_previa.get("docs_vectoriales", []))
-                                        logging.info(f"🧠 [{source_name}] Contexto inyectado: {memoria_previa['total_interacciones']} interacciones + {len(memoria_previa.get('docs_vectoriales', []))} docs vectoriales")
-                                    else:
-                                        response_data["metadata"]["primera_invocacion"] = True
-                                        response_data["metadata"]["memoria_aplicada"] = False
-                                    
-                                    # Crear nueva respuesta
-                                    new_body = json.dumps(response_data, ensure_ascii=False)
-                                    response = func.HttpResponse(
-                                        new_body,
-                                        mimetype="application/json",
-                                        status_code=response.status_code,
-                                        headers={k: v for k, v in response.headers.items()} if response.headers else {}
-                                    )
+                                response_data["metadata"]["wrapper_aplicado"] = True
+                                
+                                if memoria_previa.get("tiene_historial"):
+                                    response_data["metadata"]["memoria_aplicada"] = True
+                                    response_data["metadata"]["interacciones_previas"] = memoria_previa["total_interacciones"]
+                                    response_data["metadata"]["docs_vectoriales"] = len(memoria_previa.get("docs_vectoriales", []))
+                                    logging.info(f"🧠 [{source_name}] Metadata inyectada: {memoria_previa['total_interacciones']} interacciones")
+                                
+                                # Recrear HttpResponse preservando TODO
+                                new_body = json.dumps(response_data, ensure_ascii=False)
+                                response = func.HttpResponse(
+                                    new_body,
+                                    status_code=response.status_code,
+                                    mimetype="application/json; charset=utf-8"
+                                )
+                                logging.info(f"📊 [{source_name}] Response recreado: {len(new_body)} bytes, respuesta_usuario={'respuesta_usuario' in response_data}")
                     except Exception as e:
-                        logging.warning(f"⚠️ [{source_name}] Error procesando respuesta: {e}")
+                        logging.error(f"❌ [{source_name}] Error inyectando metadata: {e}")
+                        import traceback
+                        logging.error(traceback.format_exc())
 
-                    # 4️⃣ CAPTURA AUTOMÁTICA DE CONTEXTO CONVERSACIONAL
-                    # 📸 Guardar snapshot del contexto previo a la invocación
+                    # 4️⃣ CAPTURA AUTOMÁTICA DE CONVERSACIÓN RICA COMPLETA
+                    # 📸 Guardar snapshot de TODA la conversación previa
                     try:
                         session_id = (
                             req.headers.get("Session-ID")
@@ -209,26 +206,29 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             or "constant-session-id"
                         )
                         
-                        # Recuperar contexto conversacional desde la última invocación
-                        contexto_previo = recuperar_contexto_conversacional(session_id, route_path)
-                        
-                        if contexto_previo and len(contexto_previo) > 100:
-                            # Guardar snapshot de contexto
-                            memory_service.registrar_llamada(
-                                source="context_snapshot",
-                                endpoint=route_path,
-                                method="AUTO",
-                                params={"session_id": session_id, "trigger": route_path},
-                                response_data={
-                                    "texto_semantico": f"📸 Contexto previo a {route_path}: {contexto_previo[:4096]}",
-                                    "tipo": "context_snapshot",
-                                    "longitud": len(contexto_previo)
-                                },
-                                success=True
-                            )
-                            logging.info(f"📸 Context snapshot guardado: {len(contexto_previo)} chars")
+                        # 🔥 CAPTURAR CONVERSACIÓN RICA COMPLETA desde memoria_previa
+                        if memoria_previa and memoria_previa.get("tiene_historial"):
+                            resumen_completo = memoria_previa.get("resumen_conversacion", "")
+                            total_interacciones = memoria_previa.get("total_interacciones", 0)
+                            
+                            if resumen_completo and len(resumen_completo) > 100:
+                                # Guardar snapshot de conversación rica
+                                memory_service.registrar_llamada(
+                                    source="conversation_snapshot",
+                                    endpoint=route_path,
+                                    method="AUTO",
+                                    params={"session_id": session_id, "trigger": route_path, "agent_id": req.headers.get("Agent-ID", "unknown")},
+                                    response_data={
+                                        "texto_semantico": f"📸 Conversación rica previa a {route_path} ({total_interacciones} interacciones): {resumen_completo[:4096]}",
+                                        "tipo": "conversation_snapshot",
+                                        "total_interacciones": total_interacciones,
+                                        "longitud": len(resumen_completo)
+                                    },
+                                    success=True
+                                )
+                                logging.info(f"📸 Conversación rica guardada: {total_interacciones} interacciones, {len(resumen_completo)} chars")
                     except Exception as e:
-                        logging.warning(f"⚠️ Error capturando contexto: {e}")
+                        logging.warning(f"⚠️ Error capturando conversación rica: {e}")
                     
                     # 5️⃣ REGISTRO DE NUEVA INTERACCIÓN EN COSMOS
                     # ❌ EXCLUIR historial-interacciones para evitar recursión infinita
@@ -324,17 +324,29 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             
                             logging.info(f"🧠 Semántica capturada [{origen_semantico}]: {texto_semantico[:100]}...")
                             
+                            # 🔥 ENRIQUECER CON CONTEXTO PREVIO ANTES DE GUARDAR
+                            if memoria_previa and memoria_previa.get("tiene_historial"):
+                                # Agregar resumen de conversación previa al output
+                                if isinstance(output_data, dict):
+                                    output_data["contexto_previo"] = {
+                                        "total_interacciones": memoria_previa.get("total_interacciones", 0),
+                                        "resumen": memoria_previa.get("resumen_conversacion", "")[:500],
+                                        "ultimo_tema": memoria_previa.get("ultimo_tema", ""),
+                                        "tiene_contexto": True
+                                    }
+                                    logging.info(f"🧠 [{source_name}] Contexto previo enriquecido: {memoria_previa.get('total_interacciones', 0)} interacciones")
+                            
                             # Solo guardar si hay valor semántico real
                             if origen_semantico not in ["fallback_minimo"] or len(texto_semantico) > 30:
                                 memory_service.registrar_llamada(
                                     source=source_name,
                                     endpoint=route_path,
                                     method=req.method,
-                                    params={"session_id": session_id, "agent_id": agent_id},
+                                    params={"session_id": session_id, "agent_id": agent_id, "headers": dict(req.headers)},
                                     response_data=output_data,
                                     success=True
                                 )
-                                logging.info(f"💾 [{source_name}] Memoria cognitiva guardada ✅")
+                                logging.info(f"💾 [{source_name}] Memoria cognitiva COMPLETA guardada ✅ (con contexto previo)")
                                 
                                 # 🔥 Enviar a cola para indexación semántica
                                 try:

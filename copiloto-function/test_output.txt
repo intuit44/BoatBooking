@@ -1,98 +1,42 @@
+WARNING:root:\u26a0\ufe0f No se pudo inicializar Azure Monitor OTel: No module named 'azure.monitor.opentelemetry'
+WARNING:root:\u26a0\ufe0f No se pudo iniciar cerebro sem�ntico: 'charmap' codec can't encode character '\U0001f9e0' in position 0: character maps to <undefined>
+[*] Autopilot activado
 
-============================================================
-VALIDACION LOCAL DE HISTORIAL_INTERACCIONES
-============================================================
+================================================================================
+TEST: Simulacion Foundry - Memoria Completa
+================================================================================
 
-🧪 TEST 1: Detección de intención
-============================================================
-Query: '¿de qué estábamos hablando?' → Intent: historical_inquiry
-Query: '¿qué hicimos antes?' → Intent: historical_inquiry
-Query: '¿en qué quedamos?' → Intent: historical_inquiry
-Query: 'dame el contexto' → Intent: context_request
-Query: 'continuar' → Intent: continuation
-✅ TEST 1 PASSED
+[1] historial-interacciones
 
-🧪 TEST 2: Generación de respuesta histórica
-============================================================
+>>> WRAPPER EJECUTANDOSE para: historial_interacciones <<<
 
-📊 RESPUESTA GENERADA:
-------------------------------------------------------------
-📊 **ANÁLISIS CONTEXTUAL COMPLETO**
+WARNING:root:\U0001f6a8 Wrapper ACTIVADO en endpoint: historial_interacciones
+Status: 200
+Exito: True
+Total: 1
+Tiene respuesta_usuario: True
+Longitud respuesta: 5743
+Memoria aplicada: True
+Interacciones previas: 161
+Docs vectoriales: 20
 
-🔍 **Patrón de Actividad Detectado**: Flujo de diagnóstico y verificación
+[2] memoria-global
 
-📈 **Métricas de Sesión**:
-- Total de interacciones analizadas: 3
-- Tasa de éxito: 100.0%
-- Modo de operación: general
+>>> WRAPPER EJECUTANDOSE para: memoria_global <<<
 
-🧠 **Interpretación Semántica**: Patrón: diagnostico en api | Intención: diagnosticar_sistema (87%)
+WARNING:root:\U0001f6a8 Wrapper ACTIVADO en endpoint: memoria_global
+WARNING:root:\U0001f9e9 DEBUG registrar_llamada - params keys: ['session_id', 'agent_id']
+WARNING:root:\U0001f9e9 DEBUG registrar_llamada - headers en memoria: None
+Status: 200
+Total interacciones: 3
 
-🎯 **Últimas Actividades Significativas**:
-1. [23:10] Hybrid ✅
-2. [23:10] Verificar App Insights ✅
-3. [23:10] Verificar Sistema ✅
-
-💡 **Recomendación**: Basándome en este patrón, sugiero continuar con la verificación de componentes restantes o proceder con la corrección de issues detectados.
-------------------------------------------------------------
-
-✅ TEST 2 PASSED
-
-🧪 TEST 3: Mejora completa de respuesta
-============================================================
-
-📊 RESPUESTA ENRIQUECIDA:
-------------------------------------------------------------
-📊 **ANÁLISIS CONTEXTUAL COMPLETO**
-
-🔍 **Patrón de Actividad Detectado**: Flujo de diagnóstico y verificación
-
-📈 **Métricas de Sesión**:
-- Total de interacciones analizadas: 3
-- Tasa de éxito: 100.0%
-- Modo de operación: general
-
-🧠 **Interpretación Semántica**: 
-
-🎯 **Últimas Actividades Significativas**:
-1. [23:10] Hybrid ✅
-2. [23:10] Verificar App Insights ✅
-3. [23:10] Verificar Sistema ✅
-
-💡 **Recomendación**: Basándome en este patrón, sugiero continuar con la verificación de componentes restantes o proceder con la corrección de issues detectados.
-------------------------------------------------------------
-
-✅ TEST 3 PASSED
-
-🧪 TEST 4: Estructura de respuesta final
-============================================================
-
-📦 ESTRUCTURA FINAL:
-{
-  "exito": true,
-  "respuesta_usuario": "📊 **ANÁLISIS CONTEXTUAL COMPLETO**\n\n🔍 **Patrón de Actividad Detectado**: Flujo de diagnóstico y verificación\n\n📈 **Métricas de Sesión**:\n- Total de interacciones analizadas: 3\n- Tasa de éxito: 100.0%\n- Modo de operación: general\n\n🧠 **Interpretación Semántica**: \n\n🎯 **Últimas Actividades Significativas**:\n1. [23:10] Hybrid ✅\n2. [23:10] Verificar App Insights ✅\n3. [23:10] Verificar Sistema ✅\n\n💡 **Recomendación**: Basándome en este patrón, sugiero continuar con la verificación de componentes restantes o proceder con la corrección de issues detectados.",
-  "intencion_detectada": "historical_inquiry",
-  "tipo": "respuesta_enriquecida_semantica",
-  "interacciones": [
-    {
-      "numero": 1,
-      "timestamp": "2025-10-27T23:10:25.341900",
-      "endpoint": "hybrid",
-      "consulta": "",
-      "exito": true,
-      "texto_semantico": "Interacción en 'hybrid' ejecutada por unknown_agent. Éxito: ✅. Endpoint: hybrid."
-    },
-    {
-      ...
-
-✅ TEST 4 PASSED
-
-🎯 CAMPO PRINCIPAL: respuesta_usuario (553 chars)
-🎯 INTENCIÓN: historical_inquiry
-
-============================================================
-📊 RESULTADOS: 4/4 tests passed
-============================================================
-
-✅ TODOS LOS TESTS PASARON - El flujo está correcto
-🚀 Puedes hacer 'func start' con confianza
+Analisis texto_semantico:
+  [1] Longitud: 496, Tipo: RICO
+Traceback (most recent call last):
+  File "c:\ProyectosSimbolicos\boat-rental-app\copiloto-function\test_foundry_simple.py", line 66, in <module>
+    print(f"      Preview: {texto[:100]}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f4ca' in position 15: character maps to <undefined>

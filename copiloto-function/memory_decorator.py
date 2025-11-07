@@ -129,50 +129,21 @@ def registrar_memoria(source: str):
             # === 2️⃣ Ejecutar función original (con contexto disponible en req.contexto_prev) ===
             response = func(req)
 
-            # === 🔥 ENRIQUECER RESPUESTA HTTP CON METADATA DE BÚSQUEDA ===
+            # === 🔥 ENRIQUECER RESPUESTA (sin romper formato de Foundry) ===
             try:
-                contexto_semantico = getattr(req, "contexto_semantico", None)
-                memoria_global = getattr(req, "memoria_global", None)
-
-                if response.get_body():
+                if response and response.get_body():
                     response_data = json.loads(response.get_body().decode())
-
-                    # Agregar metadata de búsqueda semántica
-                    if "metadata" not in response_data:
-                        response_data["metadata"] = {}
-
-                    if contexto_semantico:
-                        response_data["metadata"]["busqueda_semantica"] = {
-                            "aplicada": True,
-                            "interacciones_encontradas": contexto_semantico.get("interacciones_similares", 0),
-                            "endpoint_buscado": contexto_semantico.get("endpoint"),
-                            "resumen_contexto": contexto_semantico.get("resumen", "")[:200]
-                        }
-                        response_data["metadata"]["memoria_aplicada"] = True
-                    else:
-                        response_data["metadata"]["busqueda_semantica"] = {
-                            "aplicada": False,
-                            "razon": "sin_session_id_o_sin_resultados"
-                        }
-                        response_data["metadata"]["memoria_aplicada"] = False
-
-                    # Agregar info de memoria global
-                    if memoria_global and memoria_global.get("tiene_historial"):
-                        response_data["metadata"]["memoria_global"] = True
-                        response_data["metadata"]["interacciones_previas"] = memoria_global.get(
-                            "total_interacciones", 0)
-
-                    # Recrear response con metadata enriquecida
-                    response = azfunc.HttpResponse(
-                        json.dumps(response_data, ensure_ascii=False),
-                        status_code=response.status_code,
-                        mimetype="application/json"
-                    )
-                    logging.info(
-                        f"[wrapper] ✅ Metadata de búsqueda semántica agregada a respuesta")
+                    
+                    # Solo loguear, NO modificar la respuesta
+                    tiene_respuesta_usuario = "respuesta_usuario" in response_data
+                    tiene_mensaje = "mensaje" in response_data
+                    
+                    logging.info(f"[wrapper] 📊 Respuesta: respuesta_usuario={tiene_respuesta_usuario}, mensaje={tiene_mensaje}, status={response.status_code}")
+                    
+                    if not tiene_respuesta_usuario and not tiene_mensaje:
+                        logging.warning(f"[wrapper] ⚠️ Respuesta sin campos esperados por Foundry")
             except Exception as e:
-                logging.warning(
-                    f"[wrapper] ⚠️ Error enriqueciendo respuesta: {e}")
+                logging.warning(f"[wrapper] ⚠️ Error analizando respuesta: {e}")
 
             # === 3️⃣ Registrar interacción en memoria (enriquecida) ===
             try:
