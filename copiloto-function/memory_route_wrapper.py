@@ -496,23 +496,26 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 try:
                                     from registrar_respuesta_semantica import registrar_respuesta_semantica
 
-                                    # Extraer texto de respuesta del agente
+                                    # Extraer texto de respuesta del agente (priorizar respuesta_usuario)
                                     respuesta_texto = None
                                     if isinstance(output_data, dict):
                                         respuesta_texto = (
+                                            output_data.get("respuesta_usuario") or
                                             output_data.get("respuesta") or
-                                            output_data.get("mensaje") or
                                             output_data.get("resultado") or
+                                            output_data.get("mensaje") or
                                             output_data.get("contenido")
                                         )
 
-                                    if respuesta_texto and isinstance(respuesta_texto, str):
+                                    if respuesta_texto and isinstance(respuesta_texto, str) and len(respuesta_texto.strip()) > 50:
                                         registrar_respuesta_semantica(
                                             respuesta_texto,
                                             session_id,
                                             agent_id,
                                             route_path
                                         )
+                                        logging.info(
+                                            f"🤖 Respuesta del agente capturada: {len(respuesta_texto)} chars")
                                 except Exception as e:
                                     logging.warning(
                                         f"⚠️ Error registrando respuesta semántica: {e}")
@@ -558,6 +561,35 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     else:
                         logging.info(
                             f"⏭️ [{source_name}] Endpoint de historial excluido del registro")
+
+                    # 6️⃣ CAPTURA DE RESPUESTA COMPLETA FOUNDRY UI
+                    try:
+                        session_id = req.headers.get(
+                            "Session-ID") or "universal_session"
+                        agent_id = req.headers.get(
+                            "Agent-ID") or "foundry_user"
+
+                        if isinstance(response, func.HttpResponse):
+                            body = response.get_body()
+                            if body:
+                                body_text = body.decode(
+                                    "utf-8", errors="ignore").strip()
+                                if len(body_text) > 50:
+                                    from registrar_respuesta_semantica import registrar_respuesta_semantica
+                                    registrar_respuesta_semantica(
+                                        body_text,
+                                        session_id,
+                                        agent_id,
+                                        route_path
+                                    )
+                                    logging.info(
+                                        f"🤖 [Foundry UI] Respuesta capturada: {len(body_text)} chars")
+                        else:
+                            logging.info(
+                                "⏭️ No se pudo leer cuerpo de respuesta Foundry UI (no es HttpResponse).")
+                    except Exception as e:
+                        logging.warning(
+                            f"⚠️ Error capturando respuesta Foundry UI: {e}")
 
                     return response
 
