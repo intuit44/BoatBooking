@@ -102,14 +102,18 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 "data": {"origen": "foundry_ui", "tipo": "user_input"}
                             }
 
-                            # Guardar en Cosmos + AI Search (flujo completo automático)
-                            ok_cosmos = memory_service._log_cosmos(evento)
-                            if ok_cosmos:
+                            # Validar duplicados ANTES de generar embeddings
+                            if memory_service.evento_ya_existe(evento["texto_semantico"]):
                                 logging.info(
-                                    f"✅ Guardado e indexado: {evento['id']} ({len(user_message)} chars)")
+                                    "⏭️ Evento duplicado detectado, se omite guardado")
                             else:
-                                logging.warning(
-                                    "⚠️ No se pudo guardar el input del usuario.")
+                                ok_cosmos = memory_service._log_cosmos(evento)
+                                if ok_cosmos:
+                                    logging.info(
+                                        f"✅ Guardado e indexado: {evento['id']} ({len(user_message)} chars)")
+                                else:
+                                    logging.warning(
+                                        "⚠️ No se pudo guardar el input del usuario.")
                     except Exception as e:
                         logging.warning(
                             f"⚠️ Error capturando input del usuario: {e}")
@@ -236,8 +240,10 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         if isinstance(response, func.HttpResponse) and response.get_body():
                             body = response.get_body()
                             response_data = json.loads(body.decode("utf-8"))
-                            response_data_for_semantic = response_data.copy() if isinstance(response_data, dict) else None
-                            logging.info(f"[BLOQUE 3] Capturado response_data_for_semantic: {bool(response_data_for_semantic)}")
+                            response_data_for_semantic = response_data.copy(
+                            ) if isinstance(response_data, dict) else None
+                            logging.info(
+                                f"[BLOQUE 3] Capturado response_data_for_semantic: {bool(response_data_for_semantic)}")
 
                             if isinstance(response_data, dict):
                                 # Inyectar metadata SIN tocar campos principales
@@ -378,7 +384,8 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     )
 
                     if not es_endpoint_historial:
-                        logging.info(f"[WRAPPER] Entrando a bloque 5 para {route_path}")
+                        logging.info(
+                            f"[WRAPPER] Entrando a bloque 5 para {route_path}")
                         try:
                             from services.memory_service import memory_service
                             session_id = (
@@ -456,11 +463,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             if not texto_semantico or len(texto_semantico.strip()) < 10:
                                 texto_semantico = "Interacción procesada"
                                 origen_semantico = "fallback_minimo"
-                            
+
                             # Limpiar TODOS los emojis del texto_semantico
                             import re
-                            texto_semantico = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto_semantico)
-                            texto_semantico = texto_semantico.replace("endpoint", "consulta").replace("**", "").strip()
+                            texto_semantico = re.sub(
+                                r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto_semantico)
+                            texto_semantico = texto_semantico.replace(
+                                "endpoint", "consulta").replace("**", "").strip()
 
                             # Limpiar campos verbosos
                             output_data_limpio = {
@@ -490,19 +499,24 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                             # Solo guardar si hay valor semántico real
                             if origen_semantico not in ["fallback_minimo"] or len(texto_semantico) > 30:
-                                memory_service.registrar_llamada(
-                                    source=source_name,
-                                    endpoint=route_path,
-                                    method=req.method,
-                                    params={
-                                        "session_id": session_id, "agent_id": agent_id, "headers": dict(req.headers)},
-                                    response_data=output_data,
-                                    success=True
-                                )
-                                logging.info(
-                                    f"💾 [{source_name}] Memoria cognitiva COMPLETA guardada ✅ (con contexto previo)")
+                                # Validar duplicados antes de guardar
+                                if memory_service.evento_ya_existe(texto_semantico):
+                                    logging.info(
+                                        f"⏭️ [{source_name}] Evento duplicado, se omite guardado")
+                                else:
+                                    memory_service.registrar_llamada(
+                                        source=source_name,
+                                        endpoint=route_path,
+                                        method=req.method,
+                                        params={
+                                            "session_id": session_id, "agent_id": agent_id, "headers": dict(req.headers)},
+                                        response_data=output_data,
+                                        success=True
+                                    )
+                                    logging.info(
+                                        f"💾 [{source_name}] Memoria cognitiva COMPLETA guardada ✅ (con contexto previo)")
 
-                                # 🔥 REGISTRAR RESPUESTA SEMÁNTICA DEL AGENTE
+                                    # 🔥 REGISTRAR RESPUESTA SEMÁNTICA DEL AGENTE
                                 try:
                                     from registrar_respuesta_semantica import registrar_respuesta_semantica
 
@@ -516,37 +530,53 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                             output_data.get("mensaje") or
                                             output_data.get("contenido")
                                         )
-                                        
+
                                         if respuesta_texto and isinstance(respuesta_texto, str):
-                                            respuesta_texto = respuesta_texto.replace("🔧", "").replace("✅", "").replace("📊", "")
-                                            respuesta_texto = respuesta_texto.replace("📝", "").replace("📄", "").replace("⚙️", "")
-                                            respuesta_texto = respuesta_texto.replace("endpoint", "consulta")
+                                            respuesta_texto = respuesta_texto.replace(
+                                                "🔧", "").replace("✅", "").replace("📊", "")
+                                            respuesta_texto = respuesta_texto.replace(
+                                                "📝", "").replace("📄", "").replace("⚙️", "")
+                                            respuesta_texto = respuesta_texto.replace(
+                                                "endpoint", "consulta")
 
                                         if not respuesta_texto and output_data.get("interacciones"):
-                                            interacciones = output_data.get("interacciones", [])
+                                            interacciones = output_data.get(
+                                                "interacciones", [])
                                             if interacciones:
                                                 resumen_partes = []
                                                 for i in interacciones[:5]:
-                                                    texto = i.get("texto_semantico", "")
-                                                    texto_limpio = texto.replace("🔧", "").replace("✅", "").replace("📊", "")
-                                                    texto_limpio = texto_limpio.replace("endpoint", "consulta")
+                                                    texto = i.get(
+                                                        "texto_semantico", "")
+                                                    texto_limpio = texto.replace(
+                                                        "🔧", "").replace("✅", "").replace("📊", "")
+                                                    texto_limpio = texto_limpio.replace(
+                                                        "endpoint", "consulta")
                                                     if len(texto_limpio.strip()) > 20:
-                                                        resumen_partes.append(texto_limpio.strip()[:200])
-                                                respuesta_texto = " | ".join(resumen_partes) if resumen_partes else None
+                                                        resumen_partes.append(
+                                                            texto_limpio.strip()[:200])
+                                                respuesta_texto = " | ".join(
+                                                    resumen_partes) if resumen_partes else None
 
                                     if respuesta_texto and isinstance(respuesta_texto, str) and len(respuesta_texto.strip()) > 50:
-                                        logging.info(f"Intentando registrar: {len(respuesta_texto)} chars")
+                                        logging.info(
+                                            f"Intentando registrar: {len(respuesta_texto)} chars")
                                         registrar_respuesta_semantica(
                                             respuesta_texto,
                                             session_id,
                                             agent_id,
                                             route_path
                                         )
-                                        logging.info(f"Respuesta capturada: {len(respuesta_texto)} chars")
+                                        logging.info(
+                                            f"Respuesta capturada: {len(respuesta_texto)} chars")
                                     else:
-                                        logging.info(f"No registra: texto={bool(respuesta_texto)}, len={len(respuesta_texto.strip()) if respuesta_texto else 0}")
+                                        # Ajuste: manejar str o list sin llamar strip() en listas
+                                        length = len(respuesta_texto.strip()) if isinstance(respuesta_texto, str) else len(
+                                            respuesta_texto) if isinstance(respuesta_texto, list) else 0
+                                        logging.info(
+                                            f"No registra: texto={bool(respuesta_texto)}, len={length}")
                                 except Exception as e:
-                                    logging.warning(f"Error registrando respuesta semantica: {e}")
+                                    logging.warning(
+                                        f"Error registrando respuesta semantica: {e}")
                                     import traceback
                                     logging.warning(traceback.format_exc())
 
@@ -579,6 +609,9 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 except Exception as e:
                                     logging.warning(
                                         f"⚠️ Error enviando a cola: {e}")
+                                else:
+                                    logging.info(
+                                        f"🚫 [{source_name}] Descartado: sin valor semántico suficiente")
                             else:
                                 logging.info(
                                     f"🚫 [{source_name}] Descartado: sin valor semántico suficiente")
@@ -598,48 +631,64 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             "Session-ID") or "universal_session"
                         agent_id = req.headers.get(
                             "Agent-ID") or "foundry_user"
-                        
+
                         logging.info(f"[BLOQUE 6] Iniciando para {route_path}")
-                        
-                        logging.info(f"[BLOQUE 6] response_data_for_semantic disponible: {bool(response_data_for_semantic)}")
+
+                        logging.info(
+                            f"[BLOQUE 6] response_data_for_semantic disponible: {bool(response_data_for_semantic)}")
                         if response_data_for_semantic and isinstance(response_data_for_semantic, dict):
-                            logging.info(f"[BLOQUE 6] Usando response_data capturado, keys: {list(response_data_for_semantic.keys())[:5]}")
+                            logging.info(
+                                f"[BLOQUE 6] Usando response_data capturado, keys: {list(response_data_for_semantic.keys())[:5]}")
                             try:
                                 from registrar_respuesta_semantica import registrar_respuesta_semantica
-                                
+
                                 respuesta_texto = (
                                     response_data_for_semantic.get("respuesta_usuario") or
                                     response_data_for_semantic.get("respuesta") or
                                     response_data_for_semantic.get("resultado") or
                                     response_data_for_semantic.get("mensaje")
                                 )
-                                
-                                logging.info(f"[BLOQUE 6] respuesta_texto encontrado: {bool(respuesta_texto)}, len={len(str(respuesta_texto)) if respuesta_texto else 0}")
+
+                                logging.info(
+                                    f"[BLOQUE 6] respuesta_texto encontrado: {bool(respuesta_texto)}, len={len(str(respuesta_texto)) if respuesta_texto else 0}")
                                 if respuesta_texto and isinstance(respuesta_texto, str):
                                     import re
-                                    texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', respuesta_texto)
-                                    texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "")
-                                    logging.info(f"[BLOQUE 6] texto_limpio len={len(texto_limpio.strip())}")
-                                    
+                                    texto_limpio = re.sub(
+                                        r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', respuesta_texto)
+                                    texto_limpio = texto_limpio.replace(
+                                        "endpoint", "consulta").replace("**", "")
+                                    logging.info(
+                                        f"[BLOQUE 6] texto_limpio len={len(texto_limpio.strip())}")
+
                                     if len(texto_limpio.strip()) > 50:
-                                        logging.info(f"[BLOQUE 6] Llamando registrar_respuesta_semantica...")
-                                        registrar_respuesta_semantica(texto_limpio, session_id, agent_id, route_path)
-                                        logging.info(f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars")
-                                
+                                        logging.info(
+                                            f"[BLOQUE 6] Llamando registrar_respuesta_semantica...")
+                                        registrar_respuesta_semantica(
+                                            texto_limpio, session_id, agent_id, route_path)
+                                        logging.info(
+                                            f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars")
+
                                 elif response_data_for_semantic.get("interacciones"):
                                     import re
-                                    interacciones = response_data_for_semantic.get("interacciones", [])
+                                    interacciones = response_data_for_semantic.get(
+                                        "interacciones", [])
                                     resumen_partes = []
                                     for i in interacciones[:5]:
                                         texto = i.get("texto_semantico", "")
-                                        texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
-                                        texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "")
+                                        texto_limpio = re.sub(
+                                            r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                                        texto_limpio = texto_limpio.replace(
+                                            "endpoint", "consulta").replace("**", "")
                                         if len(texto_limpio.strip()) > 20:
-                                            resumen_partes.append(texto_limpio.strip()[:200])
+                                            resumen_partes.append(
+                                                texto_limpio.strip()[:200])
                                     if resumen_partes:
-                                        texto_sintetizado = " | ".join(resumen_partes)
-                                        registrar_respuesta_semantica(texto_sintetizado, session_id, agent_id, route_path)
-                                        logging.info(f"[Foundry] Sintetizado: {len(texto_sintetizado)} chars")
+                                        texto_sintetizado = " | ".join(
+                                            resumen_partes)
+                                        registrar_respuesta_semantica(
+                                            texto_sintetizado, session_id, agent_id, route_path)
+                                        logging.info(
+                                            f"[Foundry] Sintetizado: {len(texto_sintetizado)} chars")
                             except Exception as e:
                                 logging.error(f"[BLOQUE 6] Error: {e}")
                                 import traceback

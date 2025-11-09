@@ -538,6 +538,24 @@ class MemoryService:
             logging.error(f"Error limpiando memoria: {e}")
             return False
 
+    def evento_ya_existe(self, texto_semantico: str) -> bool:
+        """Verifica si un evento con texto similar ya existe en AI Search."""
+        try:
+            from services.azure_search_client import AzureSearchService
+            search_service = AzureSearchService()
+
+            resultados = search_service.search(
+                query=texto_semantico, top=1).get("documentos", [])
+            if resultados and len(resultados) > 0:
+                score = resultados[0].get("@search.score", 0)
+                if score > 0.95:
+                    logging.info(f"Duplicado detectado: score={score:.3f}")
+                    return True
+            return False
+        except Exception as e:
+            logging.warning(f"Error verificando duplicados: {e}")
+            return False
+
 
 # Instancia global
 memory_service = MemoryService()
