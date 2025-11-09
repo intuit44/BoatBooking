@@ -9,9 +9,10 @@ import logging
 import azure.functions as func
 from openai import AzureOpenAI
 from typing import Optional, List
-from services.azure_search_client import AzureSearchService  # Cliente centralizado con MSI
+# Cliente centralizado con MSI
+from services.azure_search_client import AzureSearchService
 from datetime import datetime
-
+from services.memory_service import memory_service
 # Cliente de OpenAI con Managed Identity
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
@@ -53,8 +54,8 @@ def generar_embedding(texto: str) -> Optional[List[float]]:
         return None
 
 
-@func.function_name(name="indexador_semantico")  # type: ignore
-@func.queue_trigger(arg_name="msg", queue_name="memory-indexing-queue", connection="AzureWebJobsStorage")  # type: ignore
+@func.function_name(name="indexador_semantico")
+@func.queue_trigger(arg_name="msg", queue_name="memory-indexing-queue", connection="AzureWebJobsStorage")
 def indexador_semantico(msg: func.QueueMessage) -> None:
     """Procesa eventos de Cosmos DB y los indexa en Azure AI Search"""
     try:
@@ -70,7 +71,16 @@ def indexador_semantico(msg: func.QueueMessage) -> None:
 
         # Validar texto semántico
         if not texto_semantico or len(texto_semantico.strip()) < 20:
-            logging.info(f"⏭️ Evento {doc_id} sin texto semántico suficiente, omitido")
+            palabras = texto_semantico.strip().split()
+            if len(palabras) < 3:
+                logging.info(
+                    f"⏭️ Evento {doc_id} demasiado corto o vacío, omitido")
+                return
+
+        # 👇 NUEVO: Verificar duplicado ANTES de generar embedding
+        if memory_service.evento_ya_existe(texto_semantico):
+            logging.info(
+                f"⏭️ Embedding duplicado detectado, se omite generación e indexación para {doc_id}")
             return
 
         # Generar embedding
@@ -84,8 +94,9 @@ def indexador_semantico(msg: func.QueueMessage) -> None:
         if isinstance(timestamp, str):
             timestamp_str = timestamp
         else:
-            timestamp_str = timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-        
+            timestamp_str = timestamp.strftime(
+                '%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
         search_doc = {
             "id": doc_id.replace("/", "_"),
             "agent_id": agent_id,

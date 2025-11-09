@@ -155,6 +155,12 @@ class MemoryService:
                     "⏭️ Saltando indexación en AI Search: texto semántico vacío o muy corto")
                 return False
 
+            # Validar duplicados ANTES de generar embedding
+            if self.evento_ya_existe(documento["texto_semantico"]):
+                logging.info(
+                    f"⏭️ Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
+                return False
+
             # Llamar al indexador con formato correcto
             payload = {"documentos": [documento]}
             result = indexar_memoria_endpoint(payload)

@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any
 
+
 def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Endpoint: /api/buscar-memoria
@@ -67,12 +68,14 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 "tiempo_busqueda": datetime.utcnow().isoformat()
             }
 
-        logging.info(f"🔍 Búsqueda UNIVERSAL: '{query}' → {resultado.get('total', 0)} resultados; filtros: {filter_str or 'NINGUNO (universal)'}")
+        logging.info(
+            f"🔍 Búsqueda UNIVERSAL: '{query}' → {resultado.get('total', 0)} resultados; filtros: {filter_str or 'NINGUNO (universal)'}")
         return resultado
 
     except Exception as e:
         logging.error(f"Error en buscar_memoria: {e}")
         return {"exito": False, "error": str(e)}
+
 
 def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -82,59 +85,88 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     try:
         from services.azure_search_client import AzureSearchService
         from embedding_generator import generar_embedding
-        
+        from services.memory_service import MemoryService
+
+        memory_service = MemoryService()
+
         # Validar payload
         documentos = req_body.get("documentos")
         if not documentos or not isinstance(documentos, list):
             return {"exito": False, "error": "Campo 'documentos' requerido (array)"}
-        
-        # Validar, normalizar y GENERAR EMBEDDINGS
+
         documentos_con_vectores = []
+        duplicados = 0
+        indexados = 0
+
         for doc in documentos:
             if not doc.get("id"):
-                return {"exito": False, "error": "Cada documento requiere campo 'id'"}
-            if not doc.get("agent_id"):
-                return {"exito": False, "error": "Cada documento requiere campo 'agent_id'"}
-            if not doc.get("texto_semantico"):
-                return {"exito": False, "error": "Cada documento requiere campo 'texto_semantico'"}
-            
-            # 🔥 GENERAR EMBEDDING REAL
-            texto = doc["texto_semantico"]
-            vector = generar_embedding(texto)
-            
-            if not vector:
-                logging.warning(f"⚠️ No se pudo generar embedding para doc {doc['id']}, omitiendo")
+                logging.warning("Documento omitido: falta 'id'")
                 continue
-            
-            # Agregar vector al documento
+            if not doc.get("agent_id"):
+                logging.warning(
+                    f"Documento {doc.get('id')} omitido: falta 'agent_id'")
+                continue
+            if not doc.get("texto_semantico"):
+                logging.warning(
+                    f"Documento {doc.get('id')} omitido: falta 'texto_semantico'")
+                continue
+
+            texto = doc["texto_semantico"]
+
+            try:
+                if memory_service.evento_ya_existe(texto):
+                    duplicados += 1
+                    logging.info(
+                        f"⏭️ Duplicado detectado: {doc['id']} — omitido")
+                    continue
+            except Exception as mem_err:
+                logging.warning(
+                    f"Error verificando duplicado en {doc['id']}: {mem_err} — se continúa")
+
+            vector = generar_embedding(texto)
+            if not vector:
+                logging.warning(
+                    f"⚠️ No se pudo generar embedding para {doc['id']}, omitido")
+                continue
+
             doc["vector"] = vector
-            
-            # Normalizar timestamp a formato Edm.DateTimeOffset (YYYY-MM-DDTHH:MM:SS.sssZ)
+
             if "timestamp" in doc:
                 ts = doc["timestamp"]
                 if isinstance(ts, str):
-                    # Remover microsegundos excesivos y agregar Z
                     if '.' in ts:
                         base, micro = ts.split('.')
-                        micro = micro[:3]  # Solo 3 dígitos de milisegundos
+                        micro = micro[:3]
                         doc["timestamp"] = f"{base}.{micro}Z"
                     elif not ts.endswith('Z'):
                         doc["timestamp"] = f"{ts}Z"
-            
+
             documentos_con_vectores.append(doc)
-        
+
         if not documentos_con_vectores:
-            return {"exito": False, "error": "No se pudieron generar embeddings para ningún documento"}
-        
-        # Indexar documentos CON VECTORES
+            return {
+                "exito": True,
+                "indexados": 0,
+                "duplicados": duplicados,
+                "mensaje": "Todos los documentos eran duplicados o inválidos"
+            }
+
         search_service = AzureSearchService()
         resultado = search_service.indexar_documentos(documentos_con_vectores)
-        
+
+        indexados = len(documentos_con_vectores)
+
         if resultado.get("exito"):
-            logging.info(f"✅ Indexados {len(documentos_con_vectores)} documentos CON EMBEDDINGS en Azure Search")
-        
-        return resultado
-        
+            logging.info(
+                f"✅ Indexados {indexados} documentos CON EMBEDDINGS en Azure Search")
+
+        return {
+            "exito": resultado.get("exito", False),
+            "indexados": indexados,
+            "duplicados": duplicados,
+            "error": resultado.get("error") if not resultado.get("exito") else None
+        }
+
     except Exception as e:
         logging.error(f"Error en indexar_memoria: {e}")
         return {"exito": False, "error": str(e)}

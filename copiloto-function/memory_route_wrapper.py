@@ -102,18 +102,14 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 "data": {"origen": "foundry_ui", "tipo": "user_input"}
                             }
 
-                            # Validar duplicados ANTES de generar embeddings
-                            if memory_service.evento_ya_existe(evento["texto_semantico"]):
+                            # Guardar en Cosmos + AI Search (flujo completo automático)
+                            ok_cosmos = memory_service._log_cosmos(evento)
+                            if ok_cosmos:
                                 logging.info(
-                                    "⏭️ Evento duplicado detectado, se omite guardado")
+                                    f"✅ Guardado e indexado: {evento['id']} ({len(user_message)} chars)")
                             else:
-                                ok_cosmos = memory_service._log_cosmos(evento)
-                                if ok_cosmos:
-                                    logging.info(
-                                        f"✅ Guardado e indexado: {evento['id']} ({len(user_message)} chars)")
-                                else:
-                                    logging.warning(
-                                        "⚠️ No se pudo guardar el input del usuario.")
+                                logging.warning(
+                                    "⚠️ No se pudo guardar el input del usuario.")
                     except Exception as e:
                         logging.warning(
                             f"⚠️ Error capturando input del usuario: {e}")
@@ -499,12 +495,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                             # Solo guardar si hay valor semántico real
                             if origen_semantico not in ["fallback_minimo"] or len(texto_semantico) > 30:
-                                # Validar duplicados antes de guardar
-                                if memory_service.evento_ya_existe(texto_semantico):
-                                    logging.info(
-                                        f"⏭️ [{source_name}] Evento duplicado, se omite guardado")
-                                else:
-                                    memory_service.registrar_llamada(
+                                memory_service.registrar_llamada(
                                         source=source_name,
                                         endpoint=route_path,
                                         method=req.method,
@@ -512,11 +503,11 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                             "session_id": session_id, "agent_id": agent_id, "headers": dict(req.headers)},
                                         response_data=output_data,
                                         success=True
-                                    )
-                                    logging.info(
-                                        f"💾 [{source_name}] Memoria cognitiva COMPLETA guardada ✅ (con contexto previo)")
+                                )
+                                logging.info(
+                                    f"💾 [{source_name}] Memoria cognitiva COMPLETA guardada ✅ (con contexto previo)")
 
-                                    # 🔥 REGISTRAR RESPUESTA SEMÁNTICA DEL AGENTE
+                                # 🔥 REGISTRAR RESPUESTA SEMÁNTICA DEL AGENTE
                                 try:
                                     from registrar_respuesta_semantica import registrar_respuesta_semantica
 
@@ -609,9 +600,6 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 except Exception as e:
                                     logging.warning(
                                         f"⚠️ Error enviando a cola: {e}")
-                                else:
-                                    logging.info(
-                                        f"🚫 [{source_name}] Descartado: sin valor semántico suficiente")
                             else:
                                 logging.info(
                                     f"🚫 [{source_name}] Descartado: sin valor semántico suficiente")
