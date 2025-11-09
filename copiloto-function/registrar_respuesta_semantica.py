@@ -57,6 +57,11 @@ def registrar_respuesta_semantica(
         if isinstance(response_text, (dict, list)):
             import json
             response_text = json.dumps(response_text, ensure_ascii=False)
+        
+        # Limpiar emojis y referencias técnicas
+        import re
+        response_text = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', response_text)
+        response_text = response_text.replace("endpoint", "consulta").replace("**", "").strip()
 
         # Sintetizar texto antes de vectorizar
         texto_sintetizado = sintetizar_texto(response_text, max_chars=1200)

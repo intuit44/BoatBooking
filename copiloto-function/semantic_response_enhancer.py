@@ -83,24 +83,24 @@ def generate_historical_response(
     # Detectar patrones de actividad
     patron_detectado = analyze_activity_pattern(endpoints_recientes)
     
-    response = f"""📊 **ANÁLISIS CONTEXTUAL COMPLETO**
+    response = f"""ANALISIS CONTEXTUAL COMPLETO
 
-🔍 **Patrón de Actividad Detectado**: {patron_detectado}
+Patron de Actividad Detectado: {patron_detectado}
 
-📈 **Métricas de Sesión**:
+Metricas de Sesion:
 - Total de interacciones analizadas: {total_acciones}
-- Tasa de éxito: {(acciones_exitosas/total_acciones)*100:.1f}%
-- Modo de operación: {contexto_inteligente.get('modo_operacion', 'general')}
+- Tasa de exito: {(acciones_exitosas/total_acciones)*100:.1f}%
+- Modo de operacion: {contexto_inteligente.get('modo_operacion', 'general')}
 
-🧠 **Interpretación Semántica**: {interpretacion}
+Interpretacion Semantica: {interpretacion}
 
-🎯 **Últimas Actividades Significativas**:"""
+Ultimas Actividades Significativas:"""
 
     # Agregar detalles de las últimas interacciones
     for i, interaccion in enumerate(interacciones[:3], 1):
         endpoint = interaccion.get("endpoint", "unknown")
         timestamp = interaccion.get("timestamp", "")
-        exito = "✅" if interaccion.get("exito", True) else "❌"
+        exito = "OK" if interaccion.get("exito", True) else "ERROR"
         
         # Formatear timestamp
         try:
@@ -112,7 +112,7 @@ def generate_historical_response(
         
         response += f"\n{i}. [{tiempo}] {endpoint.replace('_', ' ').title()} {exito}"
     
-    response += f"\n\n💡 **Recomendación**: Basándome en este patrón, sugiero {generate_smart_recommendation(patron_detectado, endpoints_recientes)}"
+    response += f"\n\nRecomendacion: Basandome en este patron, sugiero {generate_smart_recommendation(patron_detectado, endpoints_recientes)}"
     
     return response
 
@@ -127,26 +127,26 @@ def generate_contextual_response(
     contexto_seleccionado = contexto_inteligente.get('contexto_seleccionado', 0)
     total_analizado = contexto_inteligente.get('total_analizado', 0)
     
-    response = f"""🧠 **CONTEXTO SEMÁNTICO ENRIQUECIDO**
+    response = f"""CONTEXTO SEMANTICO ENRIQUECIDO
 
-🎯 **Estado Actual del Sistema**:
-- Modo de operación: **{modo_operacion.replace('_', ' ').title()}**
+Estado Actual del Sistema:
+- Modo de operacion: {modo_operacion.replace('_', ' ').title()}
 - Contexto procesado: {contexto_seleccionado}/{total_analizado} interacciones
-- Interpretación: {interpretacion}
+- Interpretacion: {interpretacion}
 
-🔄 **Flujo de Procesamiento Aplicado**:
-1. ✅ Recuperación de memoria universal (50 interacciones)
-2. ✅ Clasificación semántica multi-patrón
-3. ✅ Validación y optimización de contexto
-4. ✅ Generación de respuesta enriquecida
+Flujo de Procesamiento Aplicado:
+1. Recuperacion de memoria universal (50 interacciones)
+2. Clasificacion semantica multi-patron
+3. Validacion y optimizacion de contexto
+4. Generacion de respuesta enriquecida
 
-📊 **Análisis de Calidad**:"""
+Analisis de Calidad:"""
 
     if interacciones:
         # Analizar calidad de las interacciones
         endpoints_unicos = len(set(i.get("endpoint", "") for i in interacciones))
         response += f"""
-- Diversidad de endpoints: {endpoints_unicos} tipos diferentes
+- Diversidad de consultas: {endpoints_unicos} tipos diferentes
 - Cobertura temporal: {len(interacciones)} interacciones recientes
 - Consistencia: {"Alta" if all(i.get("exito", True) for i in interacciones[:3]) else "Media"}"""
     
@@ -167,15 +167,15 @@ def generate_continuation_response(
     ultimo_endpoint = interacciones[0].get("endpoint", "unknown") if interacciones else "unknown"
     ultimo_exito = interacciones[0].get("exito", True) if interacciones else True
     
-    response = f"""🔄 **CONTINUANDO DESDE CONTEXTO PREVIO**
+    response = f"""CONTINUANDO DESDE CONTEXTO PREVIO
 
-📍 **Punto de Continuación**: 
-- Última acción: {ultimo_endpoint.replace('_', ' ').title()}
-- Estado: {"Completada exitosamente" if ultimo_exito else "Requiere atención"}
+Punto de Continuacion: 
+- Ultima accion: {ultimo_endpoint.replace('_', ' ').title()}
+- Estado: {"Completada exitosamente" if ultimo_exito else "Requiere atencion"}
 
 {interpretacion}
 
-🎯 **Opciones de Continuación**:"""
+Opciones de Continuacion:"""
 
     # Sugerir acciones basadas en el contexto
     suggestions = generate_continuation_suggestions(ultimo_endpoint, interacciones)
@@ -195,7 +195,7 @@ def enhance_general_response(
         return original_response
     
     # Agregar contexto semántico al final
-    context_note = f"\n\n---\n🧠 **Contexto**: {interpretacion}"
+    context_note = f"\n\n---\nContexto: {interpretacion}"
     
     return original_response + context_note
 

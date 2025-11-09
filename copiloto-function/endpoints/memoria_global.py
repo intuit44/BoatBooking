@@ -55,6 +55,14 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             })
             if resultado_vectorial.get("exito"):
                 docs_vectoriales = resultado_vectorial.get("documentos", [])
+                # Limpiar emojis de documentos vectoriales
+                import re
+                for doc in docs_vectoriales:
+                    if "texto_semantico" in doc:
+                        texto = doc["texto_semantico"]
+                        texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                        texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
+                        doc["texto_semantico"] = texto_limpio
                 logging.info(
                     f"🔍 AI Search: {len(docs_vectoriales)} docs vectoriales")
         except Exception as e:
@@ -62,6 +70,7 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Deduplicación por hash completo (solo duplicados exactos)
         import hashlib
+        import re
         vistos = set()
         deduplicados = []
 
@@ -73,6 +82,10 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
 
             if clave and clave not in vistos:
                 vistos.add(clave)
+                # Limpiar emojis y referencias técnicas del texto
+                texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
+                item["texto_semantico"] = texto_limpio
                 deduplicados.append(item)
             else:
                 logging.debug(f"[DUPLICADO EXACTO] {texto[:80]}...")
@@ -115,23 +128,34 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
                 f"✅ Sintetizado: {len(docs_vectoriales)} vectoriales + {len(top_interacciones)} cosmos")
         except Exception as e:
             logging.warning(f"⚠️ Error en sintetizar, usando fallback: {e}")
-            # Fallback: lógica anterior (solo para respuesta_usuario)
-            patrones_basura = [
-                "resumen de la ultima actividad",
-                "consulta de historial completada",
-                "ultimo tema:",
-                "sin resumen de conversacion"
-            ]
-            textos_reales = []
+            # Fallback mejorado (misma data, solo formato humano)
+            items = []
             for item in top_interacciones:
-                texto = item.get('texto_semantico', '').strip()
-                if texto and len(texto) >= 50:
-                    es_basura = any(p in texto.lower()
-                                    for p in patrones_basura) and len(texto) < 100
-                    if not es_basura:
-                        textos_reales.append(texto)
-            respuesta_usuario = "\n\n---\n\n".join(
-                textos_reales) if textos_reales else respuesta_usuario
+                t = (item.get('texto_semantico') or '').strip()
+                # Requerir mínimo razonable para mostrar como "clave"
+                if t and len(t) >= 40:
+                    primera = t.splitlines()[0][:260]  # primera línea/idea
+                    items.append(primera)
+
+            # Títulos resumidos de documentos vectoriales (si existen)
+            vec_titulos = []
+            for d in docs_vectoriales:
+                # Intentar extraer un título/encabezado representativo
+                title = d.get('title') or d.get('titulo') or d.get('nombre') or d.get('texto') or ''
+                if title:
+                    vec_titulos.append(title.splitlines()[0][:140])
+
+            if items or vec_titulos:
+                cabecera = (f"🧠 Memoria global: {len(top_interacciones)} interacciones únicas. "
+                           f"Sesiones activas: {len(por_sesion)}.")
+                max_bullets = 7
+                bullets = "\n".join(f"• {s}" for s in items[:max_bullets])
+                if vec_titulos:
+                    bullets += ("\n\nDocumentos relevantes:\n" +
+                                "\n".join(f"• {t}" for t in vec_titulos[:3]))
+                respuesta_usuario = f"{cabecera}\n\n{bullets}"
+            else:
+                respuesta_usuario = "No hay interacciones útiles para mostrar."
             sintetizador_usado = False
 
         return func.HttpResponse(

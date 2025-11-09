@@ -78,7 +78,8 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     try:
                         body = req.get_json() if req.method in [
                             "POST", "PUT", "PATCH"] else {}
-                        user_message = body.get("mensaje") or body.get(
+                        # Priorizar 'input' (Foundry real) sobre 'mensaje' (legacy)
+                        user_message = body.get("input") or body.get("mensaje") or body.get(
                             "query") or body.get("prompt")
 
                         if user_message and len(user_message.strip()) > 3:
@@ -230,10 +231,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         )
 
                     # 3️⃣ INYECTAR METADATA SIN PERDER CONTENIDO
+                    response_data_for_semantic = None
                     try:
                         if isinstance(response, func.HttpResponse) and response.get_body():
                             body = response.get_body()
                             response_data = json.loads(body.decode("utf-8"))
+                            response_data_for_semantic = response_data.copy() if isinstance(response_data, dict) else None
+                            logging.info(f"[BLOQUE 3] Capturado response_data_for_semantic: {bool(response_data_for_semantic)}")
 
                             if isinstance(response_data, dict):
                                 # Inyectar metadata SIN tocar campos principales
@@ -345,7 +349,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                         "snapshot_scope": "global_semantic"
                                     },
                                     response_data={
-                                        "texto_semantico": f"📸 Conversación consolidada antes de {route_path}: {resumen_completo[:1500]}",
+                                        "texto_semantico": f"Conversacion consolidada: {resumen_completo[:1500]}",
                                         "tipo": "conversation_snapshot",
                                         "ultimo_tema": ultimo_tema,
                                         "total_interacciones": total_interacciones,
@@ -374,6 +378,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     )
 
                     if not es_endpoint_historial:
+                        logging.info(f"[WRAPPER] Entrando a bloque 5 para {route_path}")
                         try:
                             from services.memory_service import memory_service
                             session_id = (
@@ -400,16 +405,17 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             origen_semantico = "fallback"
 
                             if isinstance(output_data, dict):
-                                # 1️⃣ VOZ DEL AGENTE (máxima prioridad cognitiva)
+                                # 1️⃣ VOZ DEL AGENTE (máxima prioridad cognitiva) - SIN EMOJIS
                                 for campo in ["respuesta_usuario", "respuesta", "resultado", "output"]:
                                     if output_data.get(campo):
                                         valor = str(output_data[campo]).strip()
                                         if len(valor) > 20:  # Mínimo semántico
-                                            texto_semantico = f"💬 {valor[:2000]}"
+                                            # SIN emoji 💬
+                                            texto_semantico = valor[:2000]
                                             origen_semantico = "voz_agente"
                                             break
 
-                                # 2️⃣ RESUMEN TÉCNICO/SEMÁNTICO (generado por endpoint)
+                                # 2️⃣ RESUMEN TÉCNICO/SEMÁNTICO (generado por endpoint) - SIN EMOJIS
                                 if not texto_semantico and output_data.get("texto_semantico"):
                                     valor = str(
                                         output_data["texto_semantico"]).strip()
@@ -417,40 +423,44 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                         texto_semantico = valor[:2000]
                                         origen_semantico = "endpoint_semantico"
 
-                                # 3️⃣ MENSAJE INFORMATIVO (feedback del sistema)
+                                # 3️⃣ MENSAJE INFORMATIVO (feedback del sistema) - SIN EMOJIS
                                 if not texto_semantico and output_data.get("mensaje"):
                                     valor = str(output_data["mensaje"]).strip()
                                     if len(valor) > 20 and "CONSULTA DE HISTORIAL" not in valor:
-                                        texto_semantico = f"📝 {valor[:2000]}"
+                                        # SIN emoji 📝
+                                        texto_semantico = valor[:2000]
                                         origen_semantico = "mensaje_sistema"
 
-                                # 4️⃣ CONTENIDO PROCESADO (agnóstico - cualquier endpoint)
+                                # 4️⃣ CONTENIDO PROCESADO (agnóstico - cualquier endpoint) - SIN EMOJIS
                                 if not texto_semantico and output_data.get("contenido"):
                                     contenido = str(
                                         output_data["contenido"]).strip()
                                     if len(contenido) > 50:
                                         resumen = contenido[:300] + "..." if len(
                                             contenido) > 300 else contenido
-                                        ruta = output_data.get(
-                                            "ruta", output_data.get("archivo", "datos"))
-                                        texto_semantico = f"📄 Procesado '{ruta}' ({len(contenido)} chars): {resumen}"
+                                        # SIN emoji 📄 ni detalles técnicos
+                                        texto_semantico = f"Contenido procesado: {resumen}"
                                         origen_semantico = "contenido_procesado"
 
-                                # 5️⃣ FALLBACK TÉCNICO (última opción)
+                                # 5️⃣ FALLBACK TÉCNICO (última opción) - limpiar texto para evitar emojis/endpoint
                                 if not texto_semantico:
                                     if output_data.get("exito") or output_data.get("success"):
-                                        estado = "exitoso"
+                                        texto_semantico = "Consulta procesada exitosamente"
                                     elif output_data.get("error"):
-                                        estado = f"error: {str(output_data['error'])[:100]}"
+                                        texto_semantico = f"Consulta procesada con error: {str(output_data['error'])[:100]}"
                                     else:
-                                        estado = "completado"
-                                    texto_semantico = f"⚙️ Operación técnica {estado}"
+                                        texto_semantico = "Consulta procesada"
                                     origen_semantico = "fallback_tecnico"
 
-                            # Validación final
+                            # Validación final - SIN EMOJIS
                             if not texto_semantico or len(texto_semantico.strip()) < 10:
-                                texto_semantico = f"⚙️ Interacción técnica en {route_path}"
+                                texto_semantico = "Interacción procesada"
                                 origen_semantico = "fallback_minimo"
+                            
+                            # Limpiar TODOS los emojis del texto_semantico
+                            import re
+                            texto_semantico = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto_semantico)
+                            texto_semantico = texto_semantico.replace("endpoint", "consulta").replace("**", "").strip()
 
                             # Limpiar campos verbosos
                             output_data_limpio = {
@@ -506,19 +516,39 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                             output_data.get("mensaje") or
                                             output_data.get("contenido")
                                         )
+                                        
+                                        if respuesta_texto and isinstance(respuesta_texto, str):
+                                            respuesta_texto = respuesta_texto.replace("🔧", "").replace("✅", "").replace("📊", "")
+                                            respuesta_texto = respuesta_texto.replace("📝", "").replace("📄", "").replace("⚙️", "")
+                                            respuesta_texto = respuesta_texto.replace("endpoint", "consulta")
+
+                                        if not respuesta_texto and output_data.get("interacciones"):
+                                            interacciones = output_data.get("interacciones", [])
+                                            if interacciones:
+                                                resumen_partes = []
+                                                for i in interacciones[:5]:
+                                                    texto = i.get("texto_semantico", "")
+                                                    texto_limpio = texto.replace("🔧", "").replace("✅", "").replace("📊", "")
+                                                    texto_limpio = texto_limpio.replace("endpoint", "consulta")
+                                                    if len(texto_limpio.strip()) > 20:
+                                                        resumen_partes.append(texto_limpio.strip()[:200])
+                                                respuesta_texto = " | ".join(resumen_partes) if resumen_partes else None
 
                                     if respuesta_texto and isinstance(respuesta_texto, str) and len(respuesta_texto.strip()) > 50:
+                                        logging.info(f"Intentando registrar: {len(respuesta_texto)} chars")
                                         registrar_respuesta_semantica(
                                             respuesta_texto,
                                             session_id,
                                             agent_id,
                                             route_path
                                         )
-                                        logging.info(
-                                            f"🤖 Respuesta del agente capturada: {len(respuesta_texto)} chars")
+                                        logging.info(f"Respuesta capturada: {len(respuesta_texto)} chars")
+                                    else:
+                                        logging.info(f"No registra: texto={bool(respuesta_texto)}, len={len(respuesta_texto.strip()) if respuesta_texto else 0}")
                                 except Exception as e:
-                                    logging.warning(
-                                        f"⚠️ Error registrando respuesta semántica: {e}")
+                                    logging.warning(f"Error registrando respuesta semantica: {e}")
+                                    import traceback
+                                    logging.warning(traceback.format_exc())
 
                                 # 🔥 Enviar a cola para indexación semántica
                                 try:
@@ -568,22 +598,52 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             "Session-ID") or "universal_session"
                         agent_id = req.headers.get(
                             "Agent-ID") or "foundry_user"
-
-                        if isinstance(response, func.HttpResponse):
-                            body = response.get_body()
-                            if body:
-                                body_text = body.decode(
-                                    "utf-8", errors="ignore").strip()
-                                if len(body_text) > 50:
-                                    from registrar_respuesta_semantica import registrar_respuesta_semantica
-                                    registrar_respuesta_semantica(
-                                        body_text,
-                                        session_id,
-                                        agent_id,
-                                        route_path
-                                    )
-                                    logging.info(
-                                        f"🤖 [Foundry UI] Respuesta capturada: {len(body_text)} chars")
+                        
+                        logging.info(f"[BLOQUE 6] Iniciando para {route_path}")
+                        
+                        logging.info(f"[BLOQUE 6] response_data_for_semantic disponible: {bool(response_data_for_semantic)}")
+                        if response_data_for_semantic and isinstance(response_data_for_semantic, dict):
+                            logging.info(f"[BLOQUE 6] Usando response_data capturado, keys: {list(response_data_for_semantic.keys())[:5]}")
+                            try:
+                                from registrar_respuesta_semantica import registrar_respuesta_semantica
+                                
+                                respuesta_texto = (
+                                    response_data_for_semantic.get("respuesta_usuario") or
+                                    response_data_for_semantic.get("respuesta") or
+                                    response_data_for_semantic.get("resultado") or
+                                    response_data_for_semantic.get("mensaje")
+                                )
+                                
+                                logging.info(f"[BLOQUE 6] respuesta_texto encontrado: {bool(respuesta_texto)}, len={len(str(respuesta_texto)) if respuesta_texto else 0}")
+                                if respuesta_texto and isinstance(respuesta_texto, str):
+                                    import re
+                                    texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', respuesta_texto)
+                                    texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "")
+                                    logging.info(f"[BLOQUE 6] texto_limpio len={len(texto_limpio.strip())}")
+                                    
+                                    if len(texto_limpio.strip()) > 50:
+                                        logging.info(f"[BLOQUE 6] Llamando registrar_respuesta_semantica...")
+                                        registrar_respuesta_semantica(texto_limpio, session_id, agent_id, route_path)
+                                        logging.info(f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars")
+                                
+                                elif response_data_for_semantic.get("interacciones"):
+                                    import re
+                                    interacciones = response_data_for_semantic.get("interacciones", [])
+                                    resumen_partes = []
+                                    for i in interacciones[:5]:
+                                        texto = i.get("texto_semantico", "")
+                                        texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                                        texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "")
+                                        if len(texto_limpio.strip()) > 20:
+                                            resumen_partes.append(texto_limpio.strip()[:200])
+                                    if resumen_partes:
+                                        texto_sintetizado = " | ".join(resumen_partes)
+                                        registrar_respuesta_semantica(texto_sintetizado, session_id, agent_id, route_path)
+                                        logging.info(f"[Foundry] Sintetizado: {len(texto_sintetizado)} chars")
+                            except Exception as e:
+                                logging.error(f"[BLOQUE 6] Error: {e}")
+                                import traceback
+                                logging.error(traceback.format_exc())
                         else:
                             logging.info(
                                 "⏭️ No se pudo leer cuerpo de respuesta Foundry UI (no es HttpResponse).")

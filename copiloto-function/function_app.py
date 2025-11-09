@@ -4172,18 +4172,18 @@ def revisar_correcciones_http(req):
 
 
 def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item: int = 1200):
-    """Sintetiza memoria vectorial + secuencial en respuesta enriquecida.
+    """Sintetiza memoria vectorial + secuencial en respuesta conversacional.
 
-    Reglas:
-      - Filtra docs_cosmos por texto semántico y longitud mínima (>80).
-      - Prioriza docs vectoriales con score > score_threshold.
-      - Muestra hasta max_items (pero nunca más de 7).
-      - Trunca por item hasta max_chars_per_item preservando, si es posible, el final de una oración.
-      - Evita duplicados estrictos usando hash SHA256 del texto (solo elimina duplicados 100% idénticos).
-      - Evita filtrar como "basura" contenido útil: patrón basura solo descarta si el texto es corto (<100).
+    Cambios:
+      - Salida en lenguaje natural (no encabezados técnicos ni emojis).
+      - En "otros resultados vectoriales" devuelve un resumen conversacional top-3.
+      - Agrupa por endpoint/tema y sintetiza en lugar de listar crudo.
+      - Logs añadidos y variables enriched/cosmos_events inicializadas.
     """
+    logging.info("sintetizar: inicio - entradas docs_search=%d, docs_cosmos=%d",
+                 len(docs_search or []), len(docs_cosmos or []))
+
     def _score(doc):
-        # Varias claves posibles para score/relevance
         for k in ("score", "relevancia", "similarity", "similaridad"):
             v = doc.get(k)
             try:
@@ -4196,15 +4196,12 @@ def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item:
         text = text.strip()
         if len(text) <= limit:
             return text
-        # Buscar último punto/signo de cierre antes del límite (preferible)
         cutoff = text[:limit]
-        last_punct = max(cutoff.rfind('.'), cutoff.rfind('!'), cutoff.rfind('?'))
-        # si el punto está suficientemente cercano al límite (no demasiado corto), usarlo
+        last_punct = max(cutoff.rfind(
+            '.'), cutoff.rfind('!'), cutoff.rfind('?'))
         if last_punct and last_punct > int(limit * 0.4):
             return cutoff[: last_punct + 1].strip()
-        # fallback: devolver hasta límite sin cortar palabras finales bruscamente
         if ' ' in cutoff:
-            # intentar cortar en último espacio para no partir palabra
             last_space = cutoff.rfind(' ')
             return cutoff[:last_space].strip()
         return cutoff
@@ -4213,14 +4210,12 @@ def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item:
     docs_search = docs_search or []
     docs_cosmos = docs_cosmos or []
 
-    # normalizar límites
     try:
         max_items = int(max_items)
     except Exception:
         max_items = 7
     if max_items <= 0:
         max_items = 7
-    # permitir hasta 7 como máximo según guideline
     max_items = min(max_items, 7)
 
     try:
@@ -4230,27 +4225,25 @@ def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item:
     if max_chars_per_item <= 0:
         max_chars_per_item = 1200
 
-    # umbral recomendado (ajustable)
+    logging.debug("sintetizar: max_items=%d, max_chars_per_item=%d",
+                  max_items, max_chars_per_item)
+
     score_threshold = 0.65
 
-    partes = []
-
-    # Patrones de "basura" (heurística). Solo aplicarán si el texto es corto.
+    # heurística basura (aplica solo a textos cortos)
     patrones_basura = ("todo", "fixme", "placeholder",
                        "lorem ipsum", "sin resumen", "n/a", "no aplica")
 
-    # 0) Pre-filtrar cosmos: eliminar entradas sin texto semántico y marcar basura inteligente
+    # Pre-filtrar cosmos
     filtered_cosmos = []
     for d in docs_cosmos:
         try:
             texto = (d.get("texto_semantico") or d.get("texto") or "")
             if not isinstance(texto, str) or len(texto.strip()) == 0:
-                logging.debug("[SINTETIZAR] Skipping cosmos doc - empty texto_semantico or texto")
                 continue
             texto_strip = texto.strip()
             lower = texto_strip.lower()
 
-            # Nueva heurística: excepción si el patrón aparece al inicio pero el resto contiene detalles concretos
             def inicio_con_detalle(texto_l, patron):
                 if texto_l.startswith(patron):
                     resto = texto_l[len(patron):].strip()
@@ -4263,102 +4256,113 @@ def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item:
                 return False
 
             aparece_patron = any(p in lower for p in patrones_basura)
-            es_inicio_excepcion = any(inicio_con_detalle(lower, p) for p in patrones_basura)
+            es_inicio_excepcion = any(inicio_con_detalle(lower, p)
+                                      for p in patrones_basura)
             es_basura = False
             if len(lower) < 100 and aparece_patron:
-                # Si no cumple la excepción por inicio+detalles y tampoco contiene palabras clave útiles, es basura
                 if not es_inicio_excepcion and not any(kw in lower for kw in ("diagnosticado", "encontrado", "procesado", "ejecutado", "analizado")):
                     es_basura = True
 
             if es_basura:
-                logging.debug(f"[FILTRADO BASURA] Skipping heurístico: {texto_strip[:80]}... (len={len(texto_strip)})")
+                logging.debug(
+                    "sintetizar: descartando item de cosmos por heuristica basura: id=%s", d.get("id"))
                 continue
 
-            # mínimo 80 caracteres para consideración
             if len(texto_strip) <= 80:
-                logging.debug(f"[SINTETIZAR] Skipping cosmos doc - too short ({len(texto_strip)} chars): {texto_strip[:80]}...")
+                logging.debug("sintetizar: descartando item de cosmos por longitud corta: id=%s, len=%d", d.get(
+                    "id"), len(texto_strip))
                 continue
 
             filtered_cosmos.append(d)
-        except Exception as e:
-            logging.debug(f"[SINTETIZAR] Exception prefiltering cosmos doc: {e}")
+        except Exception:
+            logging.exception("sintetizar: error procesando doc cosmos, skip")
             continue
 
-    # 1) Vectoriales prioritarios (ordenados por score desc)
-    vectorials_sorted = sorted(docs_search or [], key=_score, reverse=True)
-    high_score_vecs = [d for d in vectorials_sorted if _score(d) > score_threshold]
+    logging.info("sintetizar: filtered_cosmos=%d", len(filtered_cosmos))
 
-    # Deduplicación estricta con SHA256 de texto (solo elimina duplicados 100% idénticos)
+    # Vectoriales priorizados
+    vectorials_sorted = sorted(docs_search or [], key=_score, reverse=True)
+    high_score_vecs = [
+        d for d in vectorials_sorted if _score(d) > score_threshold]
+    logging.info("sintetizar: vectorials_sorted=%d, high_score_vecs=%d", len(
+        vectorials_sorted), len(high_score_vecs))
+
+    # Deduplicación estricta
     seen_hashes = set()
 
     def _text_hash(s: str) -> str:
         try:
             return hashlib.sha256(s.strip().lower().encode('utf-8')).hexdigest()
         except Exception:
-            return "No se encontró información contextual para sintetizar."
+            return ""
 
     used = 0
-    cosmos_events = []
-    enriched = []
+    collected_docs = []  # docs que realmente usaremos para sintetizar
 
-    # Fallback inteligente si no hay contexto alguno
-    if not vectorials_sorted and not filtered_cosmos:
-        logging.info(
-            f"[SINTETIZAR] Total usado: {used}. Vecs relevant: {len(high_score_vecs)}, Vecs total: {len(vectorials_sorted)}, Events: {len(cosmos_events)}, Enriched: {len(enriched)}, Cosmos filtered: {len(filtered_cosmos)}")
-        return (
-            "No se encontró contexto previo ni registros semánticos recientes.\n"
-            "Puedes intentar: `buscar:tema`, `listar:endpoints recientes` o `diagnosticar:sistema`."
-        )
-
-    # Helper para añadir doc respetando dedup y límite
-    def _append_doc(doc, label=None):
+    def _collect_doc(doc):
         nonlocal used
         if used >= max_items:
             return False
-        texto = str(doc.get("texto_semantico") or doc.get("texto") or "").strip()
+        texto = str(doc.get("texto_semantico")
+                    or doc.get("texto") or "").strip()
         if not texto:
-            logging.debug("[SINTETIZAR] skip doc without texto")
             return False
         h = _text_hash(texto)
+        if h and h in seen_hashes:
+            logging.debug(
+                "sintetizar: doc duplicado saltado (hash): id=%s", doc.get("id"))
+            return False
         if h:
-            if h in seen_hashes:
-                logging.debug(f"[DUPLICADO EXACTO] Skipping duplicate doc: {texto[:80]}...")
-                return False
             seen_hashes.add(h)
-        endpoint = doc.get("endpoint") or doc.get("source") or doc.get("id") or "desconocido"
-        score_val = _score(doc)
-        header = f"• [{endpoint}]" + (f" (score={score_val:.2f})" if score_val else "")
-        if label:
-            header = f"{label}\n{header}"
-        body = _preserve_sentence_cut(texto, max_chars_per_item)
-        partes.append(f"{header}\n{body}")
+        collected_docs.append(doc)
         used += 1
+        logging.debug("sintetizar: colectado doc id=%s, used=%d",
+                      doc.get("id"), used)
         return True
 
-    # Procesar vectoriales de alto score
-    if high_score_vecs:
-        partes.append(f"🔹 Actividad relevante (vectores, score>{score_threshold}):")
-        for doc in high_score_vecs:
+    logging.debug("sintetizar: comenzando coleccion de docs")
+
+    # 1) Añadir vectoriales de alto score (pero sin encabezados técnicos)
+    for d in high_score_vecs:
+        if used >= max_items:
+            break
+        _collect_doc(d)
+
+    # 2) Si queda espacio, procesar "otros vectoriales".
+    if used < max_items and vectorials_sorted:
+        remaining_vecs = [
+            d for d in vectorials_sorted if d not in high_score_vecs]
+        logging.debug("sintetizar: remaining_vecs=%d", len(remaining_vecs))
+        # Cambio 1: generar respuesta conversacional natural para "otros vectoriales"
+        items_texto = []
+        for doc in remaining_vecs[:3]:  # Solo top 3
+            texto = doc.get("texto_semantico") or doc.get("texto") or ""
+            if texto and len(texto.strip()) > 40:
+                first_line = texto.splitlines()[0].strip()
+                items_texto.append(first_line[:260])
+        if items_texto:
+            cabecera = f"He revisado el historial y encontré {len(docs_search or [])} interacciones relevantes."
+            bullets = "\n".join(f"• {s}" for s in items_texto)
+            logging.info(
+                "sintetizar: retornando resumen conversacional temprano por otros vectoriales (top-3)")
+            logging.debug(
+                "sintetizar: otros_vectoriales_snippets=%s", items_texto)
+            # Devolver respuesta conversacional temprana tal como pide la especificación
+            return f"{cabecera}\n\n{bullets}"
+
+        # Si no devolvimos, intentar colectar algunos remaining_vecs para síntesis posterior
+        for d in remaining_vecs:
             if used >= max_items:
                 break
-            _append_doc(doc)
+            texto = str(d.get("texto_semantico") or d.get("texto") or "")
+            if not texto or len(texto.strip()) < 40:
+                logging.debug(
+                    "sintetizar: skipping remaining_vec short text id=%s", d.get("id"))
+                continue
+            _collect_doc(d)
 
-    # 2) Si no se llenó, añadir vectoriales restantes (ordenados por score)
-    if used < max_items and vectorials_sorted:
-        remaining_vecs = [d for d in vectorials_sorted if d not in high_score_vecs]
-        if remaining_vecs:
-            partes.append("🔸 Otros resultados vectoriales:")
-            for doc in remaining_vecs:
-                if used >= max_items:
-                    break
-                # ignorar textos demasiado cortos
-                texto = str(doc.get("texto_semantico") or doc.get("texto") or "")
-                if not texto or len(texto.strip()) < 40:
-                    logging.debug(f"[SINTETIZAR] Skipping short vector doc ({len(texto.strip()) if texto else 0}): {texto[:80]}")
-                    continue
-                _append_doc(doc)
-
-    # 3) Cosmos: eventos tipo endpoint_call (cronológicos preferidos)
+    # 3) Cosmos events tipo endpoint_call (cronológicos preferidos)
+    cosmos_events = []
     if used < max_items and filtered_cosmos:
         try:
             cosmos_events = [
@@ -4366,51 +4370,88 @@ def sintetizar(docs_search, docs_cosmos, max_items: int = 7, max_chars_per_item:
                 if str(d.get("tipo", "")).lower() in ("endpoint_call", "endpoint", "api_call", "call", "invocation")
             ]
         except Exception:
+            logging.exception("sintetizar: error filtrando cosmos_events")
             cosmos_events = []
-        if cosmos_events:
-            partes.append("\n📡 Interacciones tipo endpoint_call (Cosmos, cronológicas):")
-            for d in cosmos_events:
-                if used >= max_items:
-                    break
-                _append_doc(d)
+        logging.info("sintetizar: cosmos_events=%d", len(cosmos_events))
+        for d in cosmos_events:
+            if used >= max_items:
+                break
+            _collect_doc(d)
 
-    # 4) Cosmos: resúmenes enriquecidos / análisis completos (cerrar con ellos)
+    # 4) Cosmos: resúmenes enriquecidos
+    enriched = []
     if used < max_items and filtered_cosmos:
-        enriched = []
-        for d in filtered_cosmos:
-            try:
-                txt = (d.get("texto_semantico") or "").lower()
-                if any(kw in txt for kw in ("completo", "análisis contextual", "análisis completo", "resumen enriquecido", "resumen completo")):
-                    enriched.append(d)
-            except Exception:
-                continue
-        if enriched:
-            partes.append("\n📘 Resúmenes enriquecidos (Cosmos):")
-            for d in enriched:
-                if used >= max_items:
-                    break
-                _append_doc(d)
+        try:
+            for d in filtered_cosmos:
+                try:
+                    txt = (d.get("texto_semantico") or "").lower()
+                    if any(kw in txt for kw in ("completo", "análisis contextual", "análisis completo", "resumen enriquecido", "resumen completo")):
+                        enriched.append(d)
+                except Exception:
+                    continue
+        except Exception:
+            logging.exception("sintetizar: error construyendo enriched list")
+            enriched = []
+        logging.info("sintetizar: enriched=%d", len(enriched))
+        for d in enriched:
+            if used >= max_items:
+                break
+            _collect_doc(d)
 
-    # 5) Cosmos: otros (cronológicos) hasta completar
+    # 5) Cosmos: otros cronológicos
     if used < max_items and filtered_cosmos:
-        others = [d for d in filtered_cosmos if d not in (cosmos_events or []) and d not in (enriched or [])]
-        if others:
-            partes.append("\n🗂️ Otras interacciones recientes (Cosmos):")
-            for d in others:
-                if used >= max_items:
-                    break
-                _append_doc(d)
+        others = [d for d in filtered_cosmos if d not in (
+            enriched if enriched else []) and d not in (cosmos_events if cosmos_events else [])]
+        logging.debug("sintetizar: otros_cosmos=%d", len(others))
+        for d in others:
+            if used >= max_items:
+                break
+            _collect_doc(d)
 
-    if not partes:
-        logging.info(
-            f"[SINTETIZAR] Total usado: {used}. Vecs relevant: {len(high_score_vecs)}, Vecs total: {len(vectorials_sorted)}, Events: {len(cosmos_events)}, Enriched: {len(enriched)}, Cosmos filtered: {len(filtered_cosmos)}")
-        return "No encuentro actividad significativa reciente. ¿Quieres que busque por endpoint, agente o intervalo de fechas?"
-
-    # Mensaje final con acciones sugeridas
-    acciones = "Puedo ayudarte con: análisis detallado por item, búsqueda por tema/endpoint/agent, o generar un plan de acción."
     logging.info(
-        f"[SINTETIZAR] Total usado: {used}. Vecs relevant: {len(high_score_vecs)}, Vecs total: {len(vectorials_sorted)}, Events: {len(cosmos_events)}, Enriched: {len(enriched)}, Cosmos filtered: {len(filtered_cosmos)}")
-    return "\n\n".join(partes) + "\n\n" + acciones
+        "sintetizar: coleccion completa, total_colectados=%d", len(collected_docs))
+
+    # Si no hay nada colectado, fallback conversacional
+    if not collected_docs:
+        logging.info(
+            "sintetizar: no se colectaron docs - fallback conversacional")
+        return (
+            "No se encontró contexto previo ni registros semánticos recientes. "
+            "Puedes pedirme que busque por un tema, por endpoint o que haga un diagnóstico del sistema."
+        )
+
+    # Cambio 3: sintetizar en lugar de listar - agrupar por endpoint/tema y resumir
+    temas = {}
+    for d in collected_docs:
+        endpoint = d.get("endpoint") or d.get(
+            "source") or d.get("id") or "general"
+        texto = str(d.get("texto_semantico") or d.get("texto") or "").strip()
+        if not texto:
+            continue
+        temas.setdefault(endpoint, []).append(texto)
+
+    logging.debug("sintetizar: temas_identificados=%d", len(temas))
+
+    resumen_partes = []
+    # Limitar a 3 temas principales para mantener la respuesta conversacional
+    for tema, textos in list(temas.items())[:3]:
+        primer = textos[0]
+        # Truncar preservando corte de oracion si es posible
+        primer_snippet = _preserve_sentence_cut(
+            primer, min(250, max_chars_per_item))
+        # Normalizar espacios y quitar saltos largos
+        primer_snippet = re.sub(r'\s+', ' ', primer_snippet).strip()
+        resumen_partes.append(f"En {tema}: {primer_snippet}...")
+        logging.debug("sintetizar: tema=%s snippet=%s",
+                      tema, primer_snippet[:100])
+
+    # Construir texto final conversacional
+    header = f"He encontrado {len(collected_docs)} elementos relevantes agrupados por tema."
+    body = "\n\n".join(resumen_partes)
+    acciones = "Puedo ampliar cualquiera de estos temas, listar las interacciones completas o generar un plan de acción detallado."
+    final_text = f"{header}\n\n{body}\n\n{acciones}"
+    logging.info("sintetizar: salida generada, longitud=%d", len(final_text))
+    return final_text
 
 
 @app.function_name(name="historial_interacciones")
@@ -5076,7 +5117,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             # Fallback seguro: mantener respuesta_usuario actual (no sobrescribir)
 
         # mensaje es solo metadata decorativa (NO debe ser leído por el agente)
-        response_data["mensaje"] = f"🧠 RESUMEN DE ACTIVIDAD ANTERIOR\n\n{response_data['respuesta_usuario']}\n\n---\n💡 Contexto disponible: Puedes hacer referencia a estas actividades anteriores en futuras consultas."
+        response_data["mensaje"] = f"RESUMEN DE ACTIVIDAD ANTERIOR\n\n{response_data['respuesta_usuario']}\n\n---\nContexto disponible: Puedes hacer referencia a estas actividades anteriores en futuras consultas."
 
         logging.info(
             f"✅ CAMPO PRINCIPAL: respuesta_usuario = '{_preview(response_data['respuesta_usuario'], 500)}'")
