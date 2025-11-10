@@ -72,7 +72,7 @@ class MemoryService:
             return False
 
     def _log_cosmos(self, event: Dict[str, Any]) -> bool:
-        """Escribe en Cosmos DB contenedor memory"""
+        """Escribe en Cosmos DB contenedor memory con clasificación semántica"""
         if not self.cosmos_available or not self.memory_container:
             logging.warning("Cosmos DB no disponible para escritura")
             return False
@@ -80,11 +80,25 @@ class MemoryService:
         try:
             # Asegurar que el evento tiene partition key (session_id)
             if "session_id" not in event:
-                event["session_id"] = f"fallback_{int(datetime.utcnow().timestamp())}"
+                event["session_id"] = "fallback_session"
 
             # Asegurar que el ID es único
             if "id" not in event or not event["id"]:
                 event["id"] = f"{event['session_id']}_{event.get('event_type', 'unknown')}_{int(datetime.utcnow().timestamp())}"
+            
+            # 🔥 CLASIFICACIÓN SEMÁNTICA DE ERRORES
+            texto = str(event.get("texto_semantico", "")).lower()
+            if "no such file" in texto or "no se pudo leer" in texto or "archivo no encontrado" in texto:
+                event["tipo_error"] = "archivo_no_encontrado"
+                event["categoria"] = "error_filesystem"
+            elif "estado: desconocido" in texto or "tipo: desconocido" in texto:
+                event["tipo_error"] = "recurso_sin_metrica"
+                event["categoria"] = "diagnostico_incompleto"
+            elif "error" in texto or "fallo" in texto or "failed" in texto:
+                event["tipo_error"] = "error_generico"
+                event["categoria"] = "error"
+            else:
+                event["categoria"] = event.get("event_type", "interaccion")
 
             logging.info(
                 f"💾 Guardando en Cosmos: {event.get('id', 'N/A')} - Session: {event.get('session_id', 'N/A')}")
@@ -155,10 +169,14 @@ class MemoryService:
                     "⏭️ Saltando indexación en AI Search: texto semántico vacío o muy corto")
                 return False
 
-            # Validar duplicados ANTES de generar embedding
-            if self.evento_ya_existe(documento["texto_semantico"]):
-                logging.info(
-                    f"⏭️ Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
+            # Validar duplicados y calidad ANTES de generar embedding
+            texto_sem = documento["texto_semantico"]
+            if len(texto_sem) < 40:
+                logging.info(f"⏭️ Texto muy corto, se omite indexación: {len(texto_sem)} chars")
+                return False
+            
+            if self.evento_ya_existe(texto_sem):
+                logging.info(f"⏭️ Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
                 return False
 
             # Llamar al indexador con formato correcto
@@ -295,13 +313,17 @@ class MemoryService:
 
         # ❌ FILTRAR EVENTOS BASURA: No guardar eventos genéricos sin valor
         if endpoint == "unknown" and not params.get("respuesta_usuario"):
-            # Evento genérico sin contenido útil
             if isinstance(response_data, dict):
                 msg = str(response_data.get("mensaje", ""))
                 if "Evento semantic" in msg or not msg.strip():
-                    logging.info(
-                        "🚫 Evento basura filtrado: sin contenido útil")
-                    return False  # No guardar
+                    logging.info("🚫 Evento basura filtrado: sin contenido útil")
+                    return False
+        
+        # 🔥 DETECTAR EVENTOS REPETITIVOS
+        if self._es_evento_repetitivo(endpoint, response_data, session_id):
+            llamada_data["es_repetido"] = True
+            llamada_data["categoria"] = "repetitivo"
+            logging.info(f"🔁 Evento repetitivo detectado: {endpoint}")
 
         # ✅ ENRIQUECER respuesta_resumen con información valiosa
         respuesta_resumen = None
@@ -544,6 +566,28 @@ class MemoryService:
             logging.error(f"Error limpiando memoria: {e}")
             return False
 
+    def _es_evento_repetitivo(self, endpoint: str, response_data: Any, session_id: str, ventana: int = 5) -> bool:
+        """Detecta si el mismo endpoint se ejecutó recientemente con respuesta similar"""
+        try:
+            if not self.cosmos_available or not self.memory_container:
+                return False
+            
+            query = f"SELECT TOP {ventana} * FROM c WHERE c.session_id = @session_id AND c.data.endpoint = @endpoint ORDER BY c.timestamp DESC"
+            items = list(self.memory_container.query_items(
+                query,
+                parameters=[
+                    {"name": "@session_id", "value": session_id},
+                    {"name": "@endpoint", "value": endpoint}
+                ],
+                enable_cross_partition_query=True
+            ))
+            
+            if len(items) >= 3:
+                return True
+            return False
+        except:
+            return False
+    
     def evento_ya_existe(self, texto_semantico: str) -> bool:
         """Verifica si un evento con texto similar ya existe en AI Search."""
         try:

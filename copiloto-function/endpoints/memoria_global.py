@@ -86,10 +86,24 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
                 texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
                 texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
                 
-                # Filtrar eventos pobres
-                if len(texto_limpio) < 40 or texto_limpio.startswith(("Evento", "Consulta procesada", "Interaccion procesada")):
-                    logging.debug(f"[FILTRADO] Evento pobre descartado: {texto_limpio[:50]}...")
+                # 🔥 FILTRADO MEJORADO: Eventos pobres + clasificación
+                if len(texto_limpio) < 40:
+                    logging.debug(f"[FILTRADO] Texto muy corto: {texto_limpio[:50]}...")
                     continue
+                
+                if texto_limpio.startswith(("Evento", "Consulta procesada", "Interaccion procesada", "Registro de")):
+                    logging.debug(f"[FILTRADO] Evento genérico: {texto_limpio[:50]}...")
+                    continue
+                
+                # 🔥 ENRIQUECER CON CATEGORÍA Y RESULTADO
+                if "tipo_error" in item:
+                    item["categoria"] = item.get("categoria", "error")
+                    item["resultado"] = "fallido"
+                elif "es_repetido" in item and item["es_repetido"]:
+                    item["categoria"] = "repetitivo"
+                else:
+                    item["categoria"] = item.get("categoria", "normal")
+                    item["resultado"] = "exitoso" if item.get("exito", True) else "fallido"
                 
                 item["texto_semantico"] = texto_limpio
                 deduplicados.append(item)
