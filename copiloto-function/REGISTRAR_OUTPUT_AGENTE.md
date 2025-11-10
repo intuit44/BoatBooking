@@ -102,11 +102,28 @@ curl "https://copiloto-semantico-func-us2.azurewebsites.net/api/historial-intera
 - La captura debe hacerse **en el runtime de Foundry**, donde se genera la respuesta final
 - Si Foundry no permite hooks, usar la Opción A (HTTP POST)
 
-## 🛠️ Próximos Pasos
+## ✅ Implementación Completada
 
-1. **Localizar el código de Foundry** donde se genera `respuesta_final`
-2. **Agregar 1 línea** usando Opción A o B según el caso
-3. **Verificar** con el comando de verificación arriba
+**Archivo**: `copiloto-function/agent_client.py`
+
+### Ejecución en Azure
+
+```bash
+# Desplegar a Azure Function con Managed Identity
+func azure functionapp publish copiloto-semantico-func-us2
+
+# O ejecutar directamente en Azure con az cli
+az functionapp run --name copiloto-semantico-func-us2 --resource-group <rg> --script agent_client.py
+```
+
+### Variables de Entorno Requeridas
+
+```bash
+FOUNDRY_ENDPOINT=https://AgenteOpenAi.services.ai.azure.com/api/projects/AgenteOpenAi-project
+AGENT_ID=asst_MjPrm7kpfPODo2ntofJ1oys0
+AZURE_OPENAI_ENDPOINT=https://...
+COSMOS_ENDPOINT=https://...
+```
 
 ## ❓ ¿Dónde está el código de Foundry?
 
