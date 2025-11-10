@@ -72,7 +72,7 @@ class MemoryService:
             return False
 
     def _log_cosmos(self, event: Dict[str, Any]) -> bool:
-        """Escribe en Cosmos DB contenedor memory con clasificación semántica"""
+        """Escribe en Cosmos DB contenedor memory con clasificación semántica y anti-duplicados"""
         if not self.cosmos_available or not self.memory_container:
             logging.warning("Cosmos DB no disponible para escritura")
             return False
@@ -86,8 +86,20 @@ class MemoryService:
             if "id" not in event or not event["id"]:
                 event["id"] = f"{event['session_id']}_{event.get('event_type', 'unknown')}_{int(datetime.utcnow().timestamp())}"
             
+            # 🔥 BARRERA ANTI-DUPLICADOS: Calcular hash y verificar antes de guardar
+            texto_semantico = event.get("texto_semantico", "")
+            if texto_semantico:
+                import hashlib
+                texto_hash = hashlib.sha256(texto_semantico.strip().lower().encode('utf-8')).hexdigest()
+                event["texto_hash"] = texto_hash
+                
+                # Verificar si ya existe
+                if self.existe_texto_en_sesion(event["session_id"], texto_hash):
+                    logging.info(f"⏭️ Texto duplicado detectado en sesión; se omite registro: {event['id']}")
+                    return False
+            
             # 🔥 CLASIFICACIÓN SEMÁNTICA DE ERRORES
-            texto = str(event.get("texto_semantico", "")).lower()
+            texto = str(texto_semantico).lower()
             if "no such file" in texto or "no se pudo leer" in texto or "archivo no encontrado" in texto:
                 event["tipo_error"] = "archivo_no_encontrado"
                 event["categoria"] = "error_filesystem"
@@ -566,6 +578,27 @@ class MemoryService:
             logging.error(f"Error limpiando memoria: {e}")
             return False
 
+    def existe_texto_en_sesion(self, session_id: str, texto_hash: str) -> bool:
+        """Verifica si un texto_hash ya existe en la sesión (barrera anti-duplicados)"""
+        try:
+            if not self.cosmos_available or not self.memory_container:
+                return False
+            
+            query = "SELECT TOP 1 c.id FROM c WHERE c.session_id = @session_id AND c.texto_hash = @hash"
+            items = list(self.memory_container.query_items(
+                query,
+                parameters=[
+                    {"name": "@session_id", "value": session_id},
+                    {"name": "@hash", "value": texto_hash}
+                ],
+                enable_cross_partition_query=True
+            ))
+            
+            return len(items) > 0
+        except Exception as e:
+            logging.warning(f"Error verificando duplicado por hash: {e}")
+            return False
+    
     def _es_evento_repetitivo(self, endpoint: str, response_data: Any, session_id: str, ventana: int = 5) -> bool:
         """Detecta si el mismo endpoint se ejecutó recientemente con respuesta similar"""
         try:

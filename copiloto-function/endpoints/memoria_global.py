@@ -60,8 +60,10 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
                 for doc in docs_vectoriales:
                     if "texto_semantico" in doc:
                         texto = doc["texto_semantico"]
-                        texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
-                        texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
+                        texto_limpio = re.sub(
+                            r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                        texto_limpio = texto_limpio.replace(
+                            "endpoint", "consulta").replace("**", "").strip()
                         doc["texto_semantico"] = texto_limpio
                 logging.info(
                     f"🔍 AI Search: {len(docs_vectoriales)} docs vectoriales")
@@ -83,28 +85,35 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             if clave and clave not in vistos:
                 vistos.add(clave)
                 # Limpiar emojis y referencias técnicas del texto
-                texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
-                texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
-                
+                texto_limpio = re.sub(
+                    r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                texto_limpio = texto_limpio.replace(
+                    "endpoint", "consulta").replace("**", "").strip()
+
                 # 🔥 FILTRADO MEJORADO: Eventos pobres + clasificación
                 if len(texto_limpio) < 40:
-                    logging.debug(f"[FILTRADO] Texto muy corto: {texto_limpio[:50]}...")
+                    logging.debug(
+                        f"[FILTRADO] Texto muy corto: {texto_limpio[:50]}...")
                     continue
-                
+
                 if texto_limpio.startswith(("Evento", "Consulta procesada", "Interaccion procesada", "Registro de")):
-                    logging.debug(f"[FILTRADO] Evento genérico: {texto_limpio[:50]}...")
+                    logging.debug(
+                        f"[FILTRADO] Evento genérico: {texto_limpio[:50]}...")
                     continue
-                
+
                 # 🔥 ENRIQUECER CON CATEGORÍA Y RESULTADO
                 if "tipo_error" in item:
                     item["categoria"] = item.get("categoria", "error")
                     item["resultado"] = "fallido"
-                elif "es_repetido" in item and item["es_repetido"]:
+                elif item.get("es_repetido"):
                     item["categoria"] = "repetitivo"
+                    item["resultado"] = "exitoso" if item.get(
+                        "exito", True) else "fallido"
                 else:
                     item["categoria"] = item.get("categoria", "normal")
-                    item["resultado"] = "exitoso" if item.get("exito", True) else "fallido"
-                
+                    item["resultado"] = "exitoso" if item.get(
+                        "exito", True) else "fallido"
+
                 item["texto_semantico"] = texto_limpio
                 deduplicados.append(item)
             else:
@@ -161,13 +170,14 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             vec_titulos = []
             for d in docs_vectoriales:
                 # Intentar extraer un título/encabezado representativo
-                title = d.get('title') or d.get('titulo') or d.get('nombre') or d.get('texto') or ''
+                title = d.get('title') or d.get('titulo') or d.get(
+                    'nombre') or d.get('texto') or ''
                 if title:
                     vec_titulos.append(title.splitlines()[0][:140])
 
             if items or vec_titulos:
                 cabecera = (f"🧠 Memoria global: {len(top_interacciones)} interacciones únicas. "
-                           f"Sesiones activas: {len(por_sesion)}.")
+                            f"Sesiones activas: {len(por_sesion)}.")
                 max_bullets = 7
                 bullets = "\n".join(f"• {s}" for s in items[:max_bullets])
                 if vec_titulos:

@@ -412,7 +412,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                     logging.info(
                                         f"[BLOQUE 6] texto_limpio len={len(texto_limpio.strip())}")
 
-                                    if len(texto_limpio.strip()) > 50:
+                                    if len(texto_limpio.strip()) > 20:
                                         logging.info(
                                             f"[BLOQUE 6] Llamando registrar_respuesta_semantica...")
                                         registrar_respuesta_semantica(

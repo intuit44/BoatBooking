@@ -48,9 +48,9 @@ def registrar_respuesta_semantica(
         True si se guardó exitosamente, False en caso contrario
     """
     try:
-        # Validar entrada
-        if not response_text or len(str(response_text).strip()) < 50:
-            logging.info("⏭️ Respuesta muy corta, no se vectoriza")
+        # Validar entrada (umbral reducido de 50 a 20 para capturar más respuestas)
+        if not response_text or len(str(response_text).strip()) < 20:
+            logging.info("⏭️ Respuesta muy corta (<20 chars), no se vectoriza")
             return False
 
         # 🧩 Normalizar: convertir dict/list a cadena JSON
@@ -67,8 +67,18 @@ def registrar_respuesta_semantica(
         texto_sintetizado = sintetizar_texto(response_text, max_chars=1200)
         logging.info(
             f"📝 Texto sintetizado: {len(response_text)} → {len(texto_sintetizado)} chars")
+        
+        # 🔥 VERIFICACIÓN PREVIA: Calcular hash y verificar duplicados ANTES de generar embedding
+        import hashlib
+        from services.memory_service import memory_service
+        
+        texto_hash = hashlib.sha256(texto_sintetizado.strip().lower().encode('utf-8')).hexdigest()
+        
+        if memory_service.existe_texto_en_sesion(session_id, texto_hash):
+            logging.info(f"⏭️ Respuesta duplicada en sesión {session_id}; se omite guardado y embedding")
+            return False
 
-        # Generar embedding
+        # Generar embedding solo si no es duplicado
         from embedding_generator import generar_embedding
         vector = generar_embedding(texto_sintetizado)
         if not vector:
@@ -76,8 +86,6 @@ def registrar_respuesta_semantica(
             return False
 
         # Crear evento para usar flujo unificado de _log_cosmos
-        from services.memory_service import memory_service
-        
         evento = {
             "id": f"{session_id}_semantic_{int(datetime.utcnow().timestamp())}",
             "session_id": session_id,
@@ -85,6 +93,7 @@ def registrar_respuesta_semantica(
             "endpoint": endpoint,
             "event_type": "respuesta_semantica",
             "texto_semantico": texto_sintetizado,
+            "texto_hash": texto_hash,
             "tipo": "respuesta_semantica",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "exito": True,

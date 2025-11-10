@@ -4487,75 +4487,70 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     except ValueError:
         body = dict(req.params)
 
-    # 🔥 CONSTRUIR QUERY UNIVERSAL que combine todos los parámetros
-    query_parts = []
+    # 🧠 INTERPRETAR INTENCIÓN PRIMERO
+    query_texto = body.get("query") or body.get("mensaje") or body.get("tipo") or req.params.get("q") or ""
+    intencion_params = interpretar_intencion_agente(query_texto, dict(req.headers))
+    
+    # 🔥 FUSIONAR CON PARÁMETROS EXPLÍCITOS (overrides)
+    params_completos = {**intencion_params}
+    for key in ["tipo", "contiene", "endpoint", "exito", "fecha_inicio", "fecha_fin", "orden", "limite"]:
+        if body.get(key) is not None:
+            params_completos[key] = body.get(key)
+        elif req.params.get(key) is not None:
+            params_completos[key] = req.params.get(key)
+    
+    params_completos["session_id"] = session_id or "unknown"
+    params_completos["intencion_detectada"] = query_texto
+    
+    logging.info(f"🧠 HISTORIAL: Parámetros interpretados: {params_completos}")
+    
+    query_universal = query_texto or "últimas interacciones recientes"
+    logging.info(f"🔍 HISTORIAL: Query vectorial: '{query_universal}'")
 
-    # 1. Query explícita del usuario
-    if body.get("query") or body.get("mensaje") or req.params.get("q"):
-        query_parts.append(body.get("query") or body.get(
-            "mensaje") or req.params.get("q"))
-
-    # 2. Tipo de interacción (error, success, etc.)
-    if body.get("tipo") or req.params.get("tipo"):
-        tipo_val = body.get("tipo") or req.params.get("tipo")
-        query_parts.append(f"interacciones tipo {tipo_val}")
-
-    # 3. Endpoint específico
-    if body.get("endpoint"):
-        query_parts.append(f"endpoint {body.get('endpoint')}")
-
-    # 4. Fallback universal si no hay nada
-    if not query_parts:
-        query_parts.append("últimas interacciones recientes")
-
-    # Combinar en query universal
-    query_universal = " ".join(query_parts)
-
-    logging.info(
-        f"🔍 HISTORIAL: Query universal construida: '{query_universal}'")
-
-    # === 🔍 BÚSQUEDA AUTOMÁTICA EN AI SEARCH (SIEMPRE FORZADA) ===
+    # === 🔍 BÚSQUEDA HÍBRIDA: AI Search (vectorial) + Cosmos (estructurado) ===
     docs_search = []
-
+    
+    # 1️⃣ AI Search: Búsqueda vectorial semántica
     try:
         from endpoints_search_memory import buscar_memoria_endpoint
-
-        logging.info(f"🔍 HISTORIAL: Búsqueda AUTOMÁTICA FORZADA en AI Search")
-
-        # Buscar en memoria semántica con query universal
-        memoria_payload = {
+        memoria_result = buscar_memoria_endpoint({
             "query": query_universal,
             "session_id": session_id,
-            "top": 10
-        }
-
-        memoria_result = buscar_memoria_endpoint(memoria_payload)
-
-        # 🔥 LOG DETALLADO para debug
-        logging.info(
-            f"🔍 HISTORIAL: Resultado de AI Search: exito={memoria_result.get('exito')}, total={memoria_result.get('total', 0)}")
-        if not memoria_result.get("exito"):
-            logging.error(
-                f"❌ HISTORIAL: AI Search falló: {memoria_result.get('error', 'Sin error')}")
-
+            "top": 20
+        })
         if memoria_result.get("exito") and memoria_result.get("documentos"):
             docs_search = memoria_result["documentos"]
-            logging.info(
-                f"✅ HISTORIAL: AI Search encontró {len(docs_search)} documentos relevantes")
-            for i, doc in enumerate(docs_search[:3]):
-                logging.info(
-                    f"   Doc {i+1}: {doc.get('texto_semantico', '')[:100]}...")
-        else:
-            logging.warning(
-                f"⚠️ HISTORIAL: AI Search devolvió 0 documentos. Query: '{query_universal}', Session: {session_id}")
-            logging.warning(f"   Payload enviado: {memoria_payload}")
-            logging.warning(f"   Respuesta completa: {memoria_result}")
+            logging.info(f"✅ AI Search: {len(docs_search)} docs vectoriales")
     except Exception as e:
-        logging.warning(f"⚠️ Error en búsqueda automática AI Search: {e}")
-        logging.error(f"Traceback: {traceback.format_exc()}")
+        logging.warning(f"⚠️ AI Search falló: {e}")
+    
+    # 2️⃣ Cosmos: Filtro estructurado por event_type derivado de intención
+    usar_query_cosmos = params_completos.get("tipo") or params_completos.get("endpoint") or params_completos.get("exito") is not None
+    
+    if usar_query_cosmos:
+        try:
+            query_sql = construir_query_dinamica(**params_completos)
+            resultados_cosmos = ejecutar_query_cosmos(query_sql, memory_service.memory_container)
+            logging.info(f"✅ Cosmos: {len(resultados_cosmos)} docs estructurados (event_type filtrado)")
+            
+            # 3️⃣ INTERSECCIÓN: Combinar resultados vectoriales + estructurados
+            if docs_search and resultados_cosmos:
+                ids_cosmos = {d.get("id") for d in resultados_cosmos}
+                docs_search = [d for d in docs_search if d.get("id") in ids_cosmos]
+                logging.info(f"🎯 Intersección: {len(docs_search)} docs (vectorial ∩ estructurado)")
+            elif resultados_cosmos and not docs_search:
+                docs_search = resultados_cosmos[:10]
+                logging.info(f"📊 Usando solo resultados estructurados de Cosmos")
+        except Exception as e:
+            logging.error(f"❌ Query Cosmos falló: {e}")
 
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
+    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE (para contexto general)
     memoria_previa = consultar_memoria_cosmos_directo(req)
+    
+    # 🔥 ENRIQUECER memoria_previa con resultados de búsqueda híbrida
+    if docs_search and memoria_previa:
+        memoria_previa["docs_hibridos"] = docs_search
+        memoria_previa["busqueda_hibrida_aplicada"] = True
 
     # 🔍 DETECCIÓN AUTOMÁTICA DE RECURSIÓN
     recursion_detectada = False

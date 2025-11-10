@@ -76,9 +76,9 @@ def construir_query_dinamica(
     if agent_id and agent_id not in ["unknown", "unknown_agent", None]:
         condiciones.append(f"c.agent_id = '{agent_id}'")
 
-    # Filtro por tipo
+    # Filtro por tipo/event_type (buscar en ambos campos)
     if tipo:
-        condiciones.append(f"c.tipo = '{tipo}'")
+        condiciones.append(f"(c.tipo = '{tipo}' OR c.event_type = '{tipo}')")
 
     # Filtro por endpoint
     if endpoint:
@@ -129,7 +129,7 @@ def construir_query_dinamica(
     ORDER BY c._ts {orden_sql}
     """.strip()
 
-    logging.info(f"🔍 Query generada: {query[:200]}...")
+    logging.info(f"🔍 Query generada con event_type: {query[:200]}...")
     return query
 
 
@@ -182,9 +182,15 @@ def interpretar_intencion_agente(mensaje_agente: str, headers: Dict[str, str]) -
     elif any(x in msg_lower for x in ["exitoso", "éxito", "correcto"]):
         params["exito"] = True
 
-    # Detectar tipo de interacción
-    if "usuario" in msg_lower or "comandos" in msg_lower:
+    # 🔥 DERIVAR event_type DESDE INTENCIÓN SEMÁNTICA
+    if any(x in msg_lower for x in ["análisis", "resumen", "contextual", "semántico"]):
+        params["tipo"] = "respuesta_semantica"
+    elif any(x in msg_lower for x in ["diagnóstico", "diagnostico", "recursos"]):
+        params["tipo"] = "diagnostico"
+    elif "usuario" in msg_lower or "comandos" in msg_lower:
         params["tipo"] = "interaccion_usuario"
+    elif any(x in msg_lower for x in ["error", "fallo", "falló"]):
+        params["tipo"] = "error"
 
     # Detectar límite
     match = re.search(r"(\d+)\s+(últimos?|primeros?|resultados?)", msg_lower)
