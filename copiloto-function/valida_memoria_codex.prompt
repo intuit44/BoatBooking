@@ -1,0 +1,83 @@
+Tengo una Function App en Azure llamada 'CopilotoFunctionApp' integrada con Foundry.
+
+He implementado lo siguiente:
+- Un wrapper llamado `memory_route_wrapper` que intercepta cada endpoint.
+- Una función `registrar_respuesta_semantica(evento)` que guarda en Cosmos DB y opcionalmente en Azure AI Search.
+- Una función `guardar_memoria(evento)` usada manualmente desde el agente para persistir contenido específico.
+- Un endpoint `/api/memoria-global` que recupera historial semántico y sintetiza una respuesta.
+
+Cada evento tiene esta estructura:
+
+{
+  "id": "...",
+  "session_id": "...",
+  "agent_id": "...",
+  "endpoint": "...",
+  "event_type": "...",  # puede ser "respuesta_semantica", "endpoint_call", etc.
+  "texto_semantico": "...",
+  "data": {
+    "input": "...",
+    "output": "...",
+    "success": true
+  }
+}
+
+Tengo dudas sobre si:
+1. Se están generando duplicados innecesarios.
+2. `session_id` se respeta correctamente entre invocaciones.
+3. `texto_semantico` tiene valor real o a veces es fallback.
+4. Embeddings se generan incluso cuando no hay valor.
+5. La recuperación en `/api/memoria-global` da datos útiles o ruido.
+
+Dado este flujo, revisa si la arquitectura está completa y optimizada. Indica si:
+- Se están registrando correctamente los eventos (sin duplicación semántica).
+- El `session_id` se mantiene consistente entre eventos consecutivos.
+- `registrar_respuesta_semantica()` es suficiente como punto de registro para toda la conversación Foundry ↔ agente.
+- El wrapper actual garantiza persistencia de cada input/output.
+- El endpoint `memoria-global` recupera eventos útiles y debería filtrar eventos pobres (ej: "Evento semantic en sesión ...").
+- Debo usar solo `guardar_memoria()` o ambos (manual + wrapper).
+- Qué ajustes mínimos harías para consolidar todo el flujo sin perder trazabilidad, evitar duplicación ni romper la inyección de contexto.
+
+Devuelve una validación o sugerencia precisa, sin generalidades, sobre si la lógica cumple su objetivo.
+^U
+Tengo una Function App en Azure llamada 'CopilotoFunctionApp' integrada con Foundry.
+
+He implementado lo siguiente:
+- Un wrapper llamado `memory_route_wrapper` que intercepta cada endpoint.
+- Una función `registrar_respuesta_semantica(evento)` que guarda en Cosmos DB y opcionalmente en Azure AI Search.
+- Una función `guardar_memoria(evento)` usada manualmente desde el agente para persistir contenido específico.
+- Un endpoint `/api/memoria-global` que recupera historial semántico y sintetiza una respuesta.
+
+Cada evento tiene esta estructura:
+
+{
+  "id": "...",
+  "session_id": "...",
+  "agent_id": "...",
+  "endpoint": "...",
+  "event_type": "...",  # puede ser "respuesta_semantica", "endpoint_call", etc.
+  "texto_semantico": "...",
+  "data": {
+    "input": "...",
+    "output": "...",
+    "success": true
+  }
+}
+
+Tengo dudas sobre si:
+1. Se están generando duplicados innecesarios.
+2. `session_id` se respeta correctamente entre invocaciones.
+3. `texto_semantico` tiene valor real o a veces es fallback.
+4. Embeddings se generan incluso cuando no hay valor.
+5. La recuperación en `/api/memoria-global` da datos útiles o ruido.
+
+Dado este flujo, revisa si la arquitectura está completa y optimizada. Indica si:
+- Se están registrando correctamente los eventos (sin duplicación semántica).
+- El `session_id` se mantiene consistente entre eventos consecutivos.
+- `registrar_respuesta_semantica()` es suficiente como punto de registro para toda la conversación Foundry ↔ agente.
+- El wrapper actual garantiza persistencia de cada input/output.
+- El endpoint `memoria-global` recupera eventos útiles y debería filtrar eventos pobres (ej: "Evento semantic en sesión ...").
+- Debo usar solo `guardar_memoria()` o ambos (manual + wrapper).
+- Qué ajustes mínimos harías para consolidar todo el flujo sin perder trazabilidad, evitar duplicación ni romper la inyección de contexto.
+
+Devuelve una validación o sugerencia precisa, sin generalidades, sobre si la lógica cumple su objetivo.

@@ -7,6 +7,7 @@ El sistema de memoria automática **YA ESTÁ FUNCIONANDO** en todos los endpoint
 ### 🔧 Implementación Existente
 
 **Wrapper Automático Aplicado**:
+
 ```python
 # En function_app.py línea 275
 from memory_route_wrapper import apply_memory_wrapper
@@ -14,6 +15,7 @@ apply_memory_wrapper(app)
 ```
 
 **Decorador con Consulta Automática**:
+
 ```python
 # En services/memory_decorator.py
 def registrar_memoria(source_name: str):
@@ -57,6 +59,7 @@ Para usar la memoria automática, el agente debe enviar:
 ```
 
 O via headers:
+
 ```
 X-Session-ID: supervisor_session_001
 X-Agent-ID: AzureSupervisor
@@ -65,12 +68,14 @@ X-Agent-ID: AzureSupervisor
 ### 🧪 Verificación Inmediata
 
 **Script de verificación completa**:
+
 ```bash
 cd copiloto-function
 python test_memoria_automatica.py
 ```
 
 **Prueba manual rápida**:
+
 ```bash
 curl -X POST http://localhost:7071/api/ejecutar-cli \
   -H 'Content-Type: application/json' \
@@ -115,11 +120,13 @@ curl -X POST http://localhost:7071/api/ejecutar-cli \
 ### 🚀 Para el Agente AzureSupervisor
 
 **Configuración requerida en Foundry**:
+
 - ✅ Incluir `session_id` persistente en todas las llamadas
-- ✅ Incluir `agent_id: "AzureSupervisor"` 
+- ✅ Incluir `agent_id: "AzureSupervisor"`
 - ✅ Usar cualquier endpoint - todos tienen memoria automática
 
 **Resultado esperado**:
+
 - ✅ El agente **recordará** automáticamente interacciones previas
 - ✅ **Contexto acumulativo** mejorará las respuestas
 - ✅ **Continuidad de sesión** funcionará transparentemente

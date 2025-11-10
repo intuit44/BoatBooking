@@ -9066,31 +9066,6 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
         }
 
 
-@app.function_name(name="cognitive_supervisor_timer")
-@app.timer_trigger(schedule="0 */10 * * * *", arg_name="timer", run_on_startup=False)
-def cognitive_supervisor_timer(timer: func.TimerRequest) -> None:
-    """Supervisor cognitivo que analiza memoria cada 10 minutos"""
-    try:
-        from services.cognitive_supervisor import CognitiveSupervisor
-        from services.memory_service import memory_service  # ✅ import correcto
-
-        supervisor = CognitiveSupervisor()
-        resultado = supervisor.analyze_and_learn()
-
-        if resultado.get("exito"):
-            logging.info(
-                f"✅ Supervisor cognitivo completado: {resultado['snapshot_id']}")
-            logging.info(
-                f"📊 Evaluación: {resultado['conocimiento']['evaluacion_sistema']}")
-            memory_service.log_semantic_event({"tipo": "cognitive_snapshot"})
-        else:
-            logging.error(
-                f"❌ Error en supervisor cognitivo: {resultado.get('error')}")
-
-    except Exception as e:
-        logging.error(f"💥 Error crítico en supervisor cognitivo: {e}")
-
-
 @app.function_name(name="health")
 @app.route(route="health", auth_level=func.AuthLevel.ANONYMOUS)
 def health(req: func.HttpRequest) -> func.HttpResponse:

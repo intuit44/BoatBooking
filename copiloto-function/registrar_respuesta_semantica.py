@@ -75,8 +75,10 @@ def registrar_respuesta_semantica(
             logging.warning("⚠️ No se pudo generar embedding para respuesta")
             return False
 
-        # Crear documento para Cosmos (con estructura completa)
-        documento_cosmos = {
+        # Crear evento para usar flujo unificado de _log_cosmos
+        from services.memory_service import memory_service
+        
+        evento = {
             "id": f"{session_id}_semantic_{int(datetime.utcnow().timestamp())}",
             "session_id": session_id,
             "agent_id": agent_id,
@@ -85,46 +87,24 @@ def registrar_respuesta_semantica(
             "texto_semantico": texto_sintetizado,
             "tipo": "respuesta_semantica",
             "timestamp": datetime.utcnow().isoformat() + "Z",
-            "vector": vector,
             "exito": True,
             "data": {
                 "origen": "agent_output",
                 "tipo": "respuesta_semantica",
                 "longitud_original": len(response_text),
-                "longitud_sintetizada": len(texto_sintetizado)
+                "longitud_sintetizada": len(texto_sintetizado),
+                "success": True
             }
         }
+        
+        # Usar flujo unificado que incluye validación de duplicados e indexación
+        ok = memory_service._log_cosmos(evento)
+        if ok:
+            logging.info(f"✅ Respuesta guardada e indexada: {evento['id']}")
+        else:
+            logging.warning(f"⚠️ No se pudo guardar respuesta (posible duplicado): {evento['id']}")
 
-        # Guardar en Cosmos
-        from services.memory_service import memory_service
-        memory_service.memory_container.upsert_item(documento_cosmos)
-        logging.info(
-            f"✅ Respuesta guardada en Cosmos: {documento_cosmos['id']}")
-
-        # Crear documento aplanado para AI Search (sin campos anidados)
-        documento_search = {
-            "id": documento_cosmos["id"],
-            "session_id": session_id,
-            "agent_id": agent_id,
-            "endpoint": endpoint,
-            "event_type": "respuesta_semantica",
-            "texto_semantico": texto_sintetizado,
-            "tipo": "respuesta_semantica",
-            "timestamp": documento_cosmos["timestamp"],
-            "vector": vector,
-            "exito": True,
-            "origen": "agent_output",
-            "longitud_original": len(response_text),
-            "longitud_sintetizada": len(texto_sintetizado)
-        }
-
-        # Indexar en AI Search
-        from services.azure_search_client import AzureSearchService
-        AzureSearchService().indexar_documentos([documento_search])
-        logging.info(
-            f"🔍 Respuesta indexada en AI Search: {documento_cosmos['id']}")
-
-        return True
+        return ok
 
     except Exception as e:
         logging.error(f"❌ Error registrando respuesta semántica: {e}")

@@ -85,6 +85,12 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
                 # Limpiar emojis y referencias técnicas del texto
                 texto_limpio = re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
                 texto_limpio = texto_limpio.replace("endpoint", "consulta").replace("**", "").strip()
+                
+                # Filtrar eventos pobres
+                if len(texto_limpio) < 40 or texto_limpio.startswith(("Evento", "Consulta procesada", "Interaccion procesada")):
+                    logging.debug(f"[FILTRADO] Evento pobre descartado: {texto_limpio[:50]}...")
+                    continue
+                
                 item["texto_semantico"] = texto_limpio
                 deduplicados.append(item)
             else:

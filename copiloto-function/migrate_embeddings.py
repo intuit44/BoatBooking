@@ -3,6 +3,8 @@
 Genera embeddings con text-embedding-3-large y reindexar memoria completa
 """
 
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from openai import AzureOpenAI
 import os
 import logging
 from datetime import datetime
@@ -11,14 +13,18 @@ from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 from azure.identity import DefaultAzureCredential
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configuración
 # Cosmos DB - preferir COSMOSDB_* sobre alias heredados
-COSMOS_ENDPOINT = os.getenv("COSMOSDB_ENDPOINT") or os.getenv("COSMOS_ENDPOINT")
+COSMOS_ENDPOINT = os.getenv(
+    "COSMOSDB_ENDPOINT") or os.getenv("COSMOS_ENDPOINT")
 COSMOS_KEY = os.getenv("COSMOSDB_KEY") or os.getenv("COSMOS_KEY")
-COSMOS_DATABASE = os.getenv("COSMOSDB_DATABASE") or os.getenv("COSMOS_DATABASE") or os.getenv("COSMOS_DATABASE_NAME", "agentMemory")
-COSMOS_CONTAINER = os.getenv("COSMOSDB_CONTAINER") or os.getenv("COSMOS_CONTAINER") or os.getenv("COSMOS_CONTAINER_NAME", "memory")
+COSMOS_DATABASE = os.getenv("COSMOSDB_DATABASE") or os.getenv(
+    "COSMOS_DATABASE") or os.getenv("COSMOS_DATABASE_NAME", "agentMemory")
+COSMOS_CONTAINER = os.getenv("COSMOSDB_CONTAINER") or os.getenv(
+    "COSMOS_CONTAINER") or os.getenv("COSMOS_CONTAINER_NAME", "memory")
 
 if not COSMOS_ENDPOINT:
     logging.error("❌ COSMOSDB_ENDPOINT no configurada")
@@ -30,7 +36,8 @@ if not COSMOS_KEY:
 
 # Guardrail: rechazar DB/Container incorrectos
 if COSMOS_DATABASE != "agentMemory" or COSMOS_CONTAINER != "memory":
-    logging.error(f"❌ DB/Container inesperados: {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
+    logging.error(
+        f"❌ DB/Container inesperados: {COSMOS_DATABASE}/{COSMOS_CONTAINER}")
     logging.error("Esperado: agentMemory/memory")
     exit(1)
 
@@ -39,8 +46,6 @@ SEARCH_KEY = os.getenv("AZURE_SEARCH_KEY")
 SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX_NAME", "agent-memory-index")
 
 # Cliente Azure OpenAI con Managed Identity
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 if not os.getenv("AZURE_OPENAI_ENDPOINT"):
     logging.error("❌ AZURE_OPENAI_ENDPOINT requerido")
@@ -68,6 +73,7 @@ else:
 
 EMBEDDING_MODEL = "text-embedding-3-large"
 
+
 def generar_embedding(texto: str) -> list:
     """Genera embedding real con OpenAI"""
     try:
@@ -80,14 +86,16 @@ def generar_embedding(texto: str) -> list:
         logging.error(f"❌ Error generando embedding: {e}")
         return None
 
+
 def migrar_desde_cosmos():
     """Lee Cosmos DB, genera embeddings y sube a Azure Search"""
-    
+
     logging.info("🚀 Iniciando migración de embeddings...")
     logging.info(f"📊 Cosmos: {COSMOS_ENDPOINT}")
-    logging.info(f"📊 Database: {COSMOS_DATABASE}, Container: {COSMOS_CONTAINER}")
+    logging.info(
+        f"📊 Database: {COSMOS_DATABASE}, Container: {COSMOS_CONTAINER}")
     logging.info(f"🔍 Search: {SEARCH_ENDPOINT}, Index: {SEARCH_INDEX}")
-    
+
     # Conectar a Cosmos DB
     try:
         cosmos_client = CosmosClient(COSMOS_ENDPOINT, credential=COSMOS_KEY)
@@ -96,7 +104,7 @@ def migrar_desde_cosmos():
         return
     database = cosmos_client.get_database_client(COSMOS_DATABASE)
     container = database.get_container_client(COSMOS_CONTAINER)
-    
+
     # Conectar a Azure Search
     if SEARCH_KEY:
         search_client = SearchClient(
@@ -110,7 +118,7 @@ def migrar_desde_cosmos():
             index_name=SEARCH_INDEX,
             credential=DefaultAzureCredential()
         )
-    
+
     # Obtener IDs ya indexados en Azure Search
     try:
         existing_ids = set()
@@ -121,17 +129,18 @@ def migrar_desde_cosmos():
     except Exception as e:
         logging.warning(f"⚠️ No se pudo obtener IDs existentes: {e}")
         existing_ids = set()
-    
+
     # Leer todos los documentos de Cosmos
     query = "SELECT * FROM c ORDER BY c._ts DESC"
-    items = list(container.query_items(query=query, enable_cross_partition_query=True))
-    
+    items = list(container.query_items(
+        query=query, enable_cross_partition_query=True))
+
     logging.info(f"📊 Total documentos en Cosmos: {len(items)}")
-    
+
     documentos_indexados = 0
     documentos_omitidos = 0
     errores = 0
-    
+
     for item in items:
         # Saltar si ya está indexado
         if item.get("id") in existing_ids:
@@ -141,28 +150,30 @@ def migrar_desde_cosmos():
             continue
         try:
             doc_id = item.get("id")
-            
+
             # Extraer texto semántico
             texto_semantico = (
-                item.get("texto_semantico") 
-                or item.get("comando") 
+                item.get("texto_semantico")
+                or item.get("comando")
                 or item.get("mensaje")
                 or f"{item.get('endpoint', '')} {item.get('tipo', '')}"
             )
-            
+
             if not texto_semantico or len(texto_semantico.strip()) < 5:
-                logging.warning(f"⚠️ Documento {item.get('id')} sin texto válido, omitiendo")
+                logging.warning(
+                    f"⚠️ Documento {item.get('id')} sin texto válido, omitiendo")
                 continue
-            
+
             # Generar embedding real
             logging.info(f"🔄 Generando embedding para: {item.get('id')}")
             vector = generar_embedding(texto_semantico)
-            
+
             if not vector:
-                logging.error(f"❌ No se pudo generar embedding para {item.get('id')}")
+                logging.error(
+                    f"❌ No se pudo generar embedding para {item.get('id')}")
                 errores += 1
                 continue
-            
+
             # Preparar documento para Azure Search
             timestamp = item.get("timestamp")
             if isinstance(timestamp, str):
@@ -171,7 +182,7 @@ def migrar_desde_cosmos():
                     timestamp = timestamp.split('.')[0] + 'Z'
             else:
                 timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-            
+
             doc = {
                 "id": item.get("id"),
                 "agent_id": item.get("agent_id", "unknown"),
@@ -183,21 +194,22 @@ def migrar_desde_cosmos():
                 "vector": vector,
                 "exito": item.get("exito", True)
             }
-            
+
             # Subir a Azure Search
             result = search_client.upload_documents(documents=[doc])
-            
+
             if result[0].succeeded:
                 documentos_indexados += 1
                 logging.info(f"✅ Indexado: {item.get('id')}")
             else:
                 logging.error(f"❌ Fallo indexación: {item.get('id')}")
                 errores += 1
-                
+
         except Exception as e:
-            logging.error(f"❌ Error procesando {item.get('id', 'unknown')}: {e}")
+            logging.error(
+                f"❌ Error procesando {item.get('id', 'unknown')}: {e}")
             errores += 1
-    
+
     logging.info(f"""
     ✅ Migración completada
     📊 Documentos indexados: {documentos_indexados}
@@ -205,6 +217,7 @@ def migrar_desde_cosmos():
     ❌ Errores: {errores}
     📈 Total procesados: {len(items)}
     """)
+
 
 if __name__ == "__main__":
     migrar_desde_cosmos()
