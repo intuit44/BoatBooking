@@ -452,46 +452,6 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         logging.warning(
                             f"⚠️ Error capturando respuesta Foundry UI: {e}")
 
-                    # Registrar output del agente justo antes de devolver respuesta al usuario
-                    try:
-                        try:
-                            from services.agent_output_logger import registrar_output_agente
-                        except Exception:
-                            registrar_output_agente = None
-
-                        # Asegurar session_id / agent_id
-                        session_id = req.headers.get(
-                            "Session-ID") or req.params.get("session_id") or "global"
-                        agent_id = req.headers.get(
-                            "Agent-ID") or req.params.get("agent_id") or "unknown_agent"
-
-                        respuesta_final = None
-                        # Preferir response_data_for_semantic si está disponible
-                        if response_data_for_semantic:
-                            respuesta_final = response_data_for_semantic
-                        else:
-                            # Intentar parsear cuerpo de HttpResponse
-                            try:
-                                if isinstance(response, func.HttpResponse):
-                                    b = response.get_body() or b""
-                                    respuesta_final = json.loads(
-                                        b.decode("utf-8")) if b else {}
-                            except Exception:
-                                respuesta_final = None
-
-                        if registrar_output_agente:
-                            try:
-                                registrar_output_agente(
-                                    respuesta_final, session_id, agent_id)
-                                logging.info(
-                                    f"🧾 Output agente registrado para session={session_id}, agent={agent_id}")
-                            except Exception as e:
-                                logging.warning(
-                                    f"⚠️ Error registrando output agente: {e}")
-                    except Exception as e:
-                        logging.warning(
-                            f"⚠️ Error preparando registro de output agente: {e}")
-
                     return response
 
                 if "historial" not in route_path.lower():

@@ -18,5 +18,8 @@
     "azureFunctions.preDeployTask": "npm prune (functions)",
     "azureFunctions.projectSubpath": "copiloto-function",
     "github.copilot.nextEditSuggestions.enabled": true,
-    "typescript.format.insertSpaceBeforeFunctionParenthesis": false
+    "typescript.format.insertSpaceBeforeFunctionParenthesis": false,
+    "python.analysis.extraPaths": [
+        "./copiloto-function"
+    ]
 }
