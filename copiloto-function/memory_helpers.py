@@ -6,6 +6,7 @@ Memory Helpers - Utilidades para acceder a memoria desde endpoints
 import logging
 from typing import Dict, Any, Optional
 import azure.functions as func
+from foundry_thread_extractor import obtener_thread_desde_foundry, extraer_thread_de_contexto
 
 def obtener_memoria_request(req: func.HttpRequest) -> Optional[Dict[str, Any]]:
     """
@@ -29,33 +30,48 @@ def obtener_prompt_memoria(req: func.HttpRequest) -> str:
         pass
     return ""
 
-def extraer_session_info(req: func.HttpRequest) -> Dict[str, Optional[str]]:
+def extraer_session_info(req: func.HttpRequest, skip_api_call: bool = False) -> Dict[str, Optional[str]]:
     """
-    Extrae session_id y agent_id del request
+    Extrae session_id y agent_id del request - NORMALIZA AUTOMÁTICAMENTE
+    Si Foundry no envía thread, lo captura desde la API
+    
+    Args:
+        skip_api_call: Si True, no consulta Foundry API (para tests)
     """
     session_id = None
     agent_id = None
+    body = None
     
     try:
-        # Intentar desde parámetros de query
-        session_id = req.params.get("session_id")
-        agent_id = req.params.get("agent_id")
+        # 1. Headers (prioridad alta - Foundry usa headers)
+        session_id = req.headers.get("X-Thread-ID") or req.headers.get("Thread-ID") or req.headers.get("X-Session-ID")
+        agent_id = req.headers.get("X-Agent-ID") or req.headers.get("Agent-ID")
         
-        # Intentar desde body JSON
+        # 2. Query params
+        if not session_id:
+            session_id = req.params.get("thread_id") or req.params.get("session_id")
+        if not agent_id:
+            agent_id = req.params.get("agent_id")
+        
+        # 3. Body JSON
         if not session_id or not agent_id:
             try:
                 body = req.get_json()
                 if body:
-                    session_id = session_id or body.get("session_id")
+                    session_id = session_id or body.get("thread_id") or body.get("session_id")
                     agent_id = agent_id or body.get("agent_id")
             except:
                 pass
         
-        # Intentar desde headers
-        if not session_id:
-            session_id = req.headers.get("X-Session-ID")
-        if not agent_id:
-            agent_id = req.headers.get("X-Agent-ID")
+        # 4. Extraer de contexto en payload (Foundry puede enviarlo aquí)
+        if not session_id and body:
+            session_id = extraer_thread_de_contexto(body)
+        
+        # 5. ÚLTIMO RECURSO: Consultar Foundry API directamente (solo en producción)
+        if not session_id and not skip_api_call:
+            session_id = obtener_thread_desde_foundry(agent_id)
+            if session_id:
+                logging.info(f"Thread capturado desde Foundry API: {session_id}")
             
     except Exception as e:
         logging.warning(f"Error extrayendo session info: {e}")

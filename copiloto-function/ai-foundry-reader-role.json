@@ -1,0 +1,15 @@
+{
+  "Name": "AI Foundry Agents Reader",
+  "Description": "Can read agents and threads from AI Foundry",
+  "Actions": [],
+  "NotActions": [],
+  "DataActions": [
+    "Microsoft.CognitiveServices/accounts/AIServices/agents/read",
+    "Microsoft.CognitiveServices/accounts/AIServices/agents/threads/read",
+    "Microsoft.CognitiveServices/accounts/AIServices/agents/threads/messages/read"
+  ],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/380fa841-83f3-42fe-adc4-582a5ebe139b"
+  ]
+}

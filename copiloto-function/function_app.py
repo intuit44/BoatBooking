@@ -422,6 +422,12 @@ try:
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint introspection: {e}")
 
+try:
+    import endpoints.logs
+    logging.info("✅ Endpoint logs registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint logs: {e}")
+
 # --- Cerebro Semántico Autónomo ---
 try:
     from services.semantic_runtime import start_semantic_loop

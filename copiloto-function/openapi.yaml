@@ -2636,7 +2636,10 @@
             "description": "Orden de resultados",
             "schema": {
               "type": "string",
-              "enum": ["asc", "desc"],
+              "enum": [
+                "asc",
+                "desc"
+              ],
               "default": "desc"
             }
           }
@@ -2987,7 +2990,7 @@
         }
       }
     },
-        "/api/configurar-app-settings": {
+    "/api/configurar-app-settings": {
       "get": {
         "summary": "Leer/Validar App Settings de Function App",
         "description": "Consulta la configuración actual de una Function App. Permite validar un setting específico o listar todos.",
@@ -3273,7 +3276,13 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["diagnostico", "monitoreo", "correccion", "memoria", "configuracion"],
+              "enum": [
+                "diagnostico",
+                "monitoreo",
+                "correccion",
+                "memoria",
+                "configuracion"
+              ],
               "description": "Filtrar endpoints por categoría específica"
             },
             "example": "monitoreo"
@@ -3307,11 +3316,21 @@
                     "capacidades": {
                       "type": "object",
                       "properties": {
-                        "diagnostico": {"type": "boolean"},
-                        "monitoreo": {"type": "boolean"},
-                        "correccion": {"type": "boolean"},
-                        "memoria": {"type": "boolean"},
-                        "configuracion": {"type": "boolean"}
+                        "diagnostico": {
+                          "type": "boolean"
+                        },
+                        "monitoreo": {
+                          "type": "boolean"
+                        },
+                        "correccion": {
+                          "type": "boolean"
+                        },
+                        "memoria": {
+                          "type": "boolean"
+                        },
+                        "configuracion": {
+                          "type": "boolean"
+                        }
                       }
                     }
                   }
@@ -3911,12 +3930,14 @@
         }
       }
     },
-      "/api/buscar-memoria": {
+    "/api/buscar-memoria": {
       "post": {
         "operationId": "buscarMemoriaSematica",
         "summary": "Buscar en memoria semántica usando Azure AI Search",
         "description": "Busca documentos en el índice de memoria semántica usando Managed Identity. No requiere claves en el payload.",
-        "tags": ["🧠 Memoria Semántica"],
+        "tags": [
+          "🧠 Memoria Semántica"
+        ],
         "security": [],
         "requestBody": {
           "required": true,
@@ -3924,7 +3945,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["query"],
+                "required": [
+                  "query"
+                ],
                 "properties": {
                   "query": {
                     "type": "string",
@@ -3961,10 +3984,18 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "exito": {"type": "boolean"},
-                    "total": {"type": "integer"},
-                    "documentos": {"type": "array"},
-                    "metadata": {"type": "object"}
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "documentos": {
+                      "type": "array"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    }
                   }
                 }
               }
@@ -3978,7 +4009,9 @@
         "operationId": "indexarMemoriaSematica",
         "summary": "Indexar documentos en memoria semántica",
         "description": "Indexa documentos en Azure AI Search usando Managed Identity.",
-        "tags": ["🧠 Memoria Semántica"],
+        "tags": [
+          "🧠 Memoria Semántica"
+        ],
         "security": [],
         "requestBody": {
           "required": true,
@@ -3986,23 +4019,51 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["documentos"],
+                "required": [
+                  "documentos"
+                ],
                 "properties": {
                   "documentos": {
                     "type": "array",
                     "items": {
                       "type": "object",
-                      "required": ["id", "agent_id", "texto_semantico"],
+                      "required": [
+                        "id",
+                        "agent_id",
+                        "texto_semantico"
+                      ],
                       "properties": {
-                        "id": {"type": "string"},
-                        "agent_id": {"type": "string"},
-                        "session_id": {"type": "string"},
-                        "endpoint": {"type": "string"},
-                        "timestamp": {"type": "string", "format": "date-time"},
-                        "tipo": {"type": "string"},
-                        "texto_semantico": {"type": "string"},
-                        "vector": {"type": "array", "items": {"type": "number"}},
-                        "exito": {"type": "boolean"}
+                        "id": {
+                          "type": "string"
+                        },
+                        "agent_id": {
+                          "type": "string"
+                        },
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "endpoint": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "tipo": {
+                          "type": "string"
+                        },
+                        "texto_semantico": {
+                          "type": "string"
+                        },
+                        "vector": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "exito": {
+                          "type": "boolean"
+                        }
                       }
                     }
                   }
@@ -4019,9 +4080,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "exito": {"type": "boolean"},
-                    "documentos_subidos": {"type": "integer"},
-                    "resultado": {"type": "string"}
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "documentos_subidos": {
+                      "type": "integer"
+                    },
+                    "resultado": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -4030,224 +4097,352 @@
         }
       }
     },
-    "/api/guardar-memoria": {
-      "post": {
-      "summary": "🧠 GUARDAR EN MEMORIA - Almacenamiento intencional de contexto",
-      "description": "Permite al agente guardar contenido explícitamente en memoria vectorial. El agente decide QUÉ es importante basándose en intención semántica.\n\nCasos de uso:\n- Guardar resúmenes de conversaciones largas\n- Almacenar decisiones importantes del usuario\n- Registrar configuraciones aplicadas\n- Documentar soluciones a problemas complejos\n\nNO usa heurísticas automáticas - el agente tiene control total.",
-      "operationId": "guardarMemoria",
-      "tags": [
-        "🧠 Memoria Semántica"
-      ],
-      "security": [],
-      "requestBody": {
-        "required": true,
-        "content": {
-        "application/json": {
-          "schema": {
-          "type": "object",
-          "required": [
-            "contenido"
-          ],
-          "properties": {
-            "contenido": {
-            "type": "string",
-            "description": "Contenido a guardar en memoria vectorial",
-            "example": "Resumen: El usuario configuró top_k=8 para mejorar búsqueda vectorial..."
-            },
-            "tipo": {
-            "type": "string",
-            "description": "Tipo de memoria",
-            "enum": [
-              "resumen_conversacion",
-              "decision_usuario",
-              "configuracion_aplicada",
-              "solucion_problema",
-              "memoria_manual"
-            ],
-            "default": "memoria_manual"
-            },
-            "session_id": {
-            "type": "string",
-            "description": "ID de sesión (opcional, se detecta automáticamente)"
-            },
-            "agent_id": {
-            "type": "string",
-            "description": "ID del agente (opcional, se detecta automáticamente)"
-            },
-            "metadata": {
-            "type": "object",
-            "description": "Metadata adicional",
-            "properties": {
-              "importancia": {
+    "/api/logs": {
+      "get": {
+        "summary": "📝 LOGS ESTRUCTURADOS - Consulta logs del backend para análisis",
+        "description": "Expone logs estructurados del backend con filtros por nivel, endpoint, tiempo. Permite al agente analizar errores y patrones sin acceso directo a Application Insights.",
+        "operationId": "logs",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "nivel",
+            "in": "query",
+            "description": "Filtrar por nivel de log",
+            "schema": {
               "type": "string",
               "enum": [
-                "baja",
-                "media",
-                "alta"
+                "ERROR",
+                "WARNING",
+                "INFO",
+                "DEBUG"
               ]
-              },
-              "fuente": {
-              "type": "string"
-              },
-              "tags": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-              }
-            }
-            }
-          }
-          },
-          "examples": {
-          "resumen": {
-            "summary": "Guardar resumen de conversación",
-            "value": {
-            "contenido": "Resumen: Usuario solicitó configurar top_k=8 en copiloto-semantico-func-us2. Se aplicó exitosamente.",
-            "tipo": "resumen_conversacion",
-            "metadata": {
-              "importancia": "alta",
-              "fuente": "foundry"
-            }
             }
           },
-          "decision": {
-            "summary": "Guardar decisión del usuario",
-            "value": {
-            "contenido": "Decisión: Usuario prefiere usar Azure CLI en lugar de SDK para operaciones de storage",
-            "tipo": "decision_usuario",
-            "session_id": "assistant"
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número máximo de logs a devolver",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 1000
             }
-          }
-          }
-        }
-        }
-      },
-      "responses": {
-        "200": {
-        "description": "Contenido guardado exitosamente en memoria",
-        "content": {
-          "application/json": {
-          "schema": {
-            "type": "object",
-            "properties": {
-            "exito": {
-              "type": "boolean",
-              "example": true
-            },
-            "mensaje": {
-              "type": "string",
-              "example": "Contenido guardado en memoria vectorial"
-            },
-            "detalles": {
-              "type": "object",
-              "properties": {
-              "longitud": {
-                "type": "integer",
-                "description": "Longitud del contenido guardado"
-              },
-              "tipo": {
-                "type": "string"
-              },
-              "session_id": {
-                "type": "string"
-              },
-              "timestamp": {
-                "type": "string",
-                "format": "date-time"
-              }
-              }
+          },
+          {
+            "name": "horas",
+            "in": "query",
+            "description": "Logs de las últimas N horas",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1
             }
-            }
-          }
-          }
-        }
-        },
-        "400": {
-        "description": "Parámetros inválidos",
-        "content": {
-          "application/json": {
-          "schema": {
-            "type": "object",
-            "properties": {
-            "exito": {
-              "type": "boolean",
-              "example": false
-            },
-            "error": {
+          },
+          {
+            "name": "endpoint",
+            "in": "query",
+            "description": "Filtrar por endpoint específico",
+            "schema": {
               "type": "string"
-            },
-            "ejemplo": {
-              "type": "object"
-            }
             }
           }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs obtenidos exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nivel": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "mensaje": {
+                            "type": "string"
+                          },
+                          "es_error": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "analisis": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "por_nivel": {
+                          "type": "object"
+                        },
+                        "endpoints_problematicos": {
+                          "type": "object"
+                        },
+                        "patrones": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "respuesta_usuario": {
+                      "type": "string",
+                      "description": "Resumen en lenguaje natural para el agente"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error consultando logs"
           }
-        }
         }
       }
+    },
+    "/api/guardar-memoria": {
+      "post": {
+        "summary": "🧠 GUARDAR EN MEMORIA - Almacenamiento intencional de contexto",
+        "description": "Permite al agente guardar contenido explícitamente en memoria vectorial. El agente decide QUÉ es importante basándose en intención semántica.\n\nCasos de uso:\n- Guardar resúmenes de conversaciones largas\n- Almacenar decisiones importantes del usuario\n- Registrar configuraciones aplicadas\n- Documentar soluciones a problemas complejos\n\nNO usa heurísticas automáticas - el agente tiene control total.",
+        "operationId": "guardarMemoria",
+        "tags": [
+          "🧠 Memoria Semántica"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "contenido"
+                ],
+                "properties": {
+                  "contenido": {
+                    "type": "string",
+                    "description": "Contenido a guardar en memoria vectorial",
+                    "example": "Resumen: El usuario configuró top_k=8 para mejorar búsqueda vectorial..."
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "description": "Tipo de memoria",
+                    "enum": [
+                      "resumen_conversacion",
+                      "decision_usuario",
+                      "configuracion_aplicada",
+                      "solucion_problema",
+                      "memoria_manual"
+                    ],
+                    "default": "memoria_manual"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "ID de sesión (opcional, se detecta automáticamente)"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "ID del agente (opcional, se detecta automáticamente)"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Metadata adicional",
+                    "properties": {
+                      "importancia": {
+                        "type": "string",
+                        "enum": [
+                          "baja",
+                          "media",
+                          "alta"
+                        ]
+                      },
+                      "fuente": {
+                        "type": "string"
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "resumen": {
+                  "summary": "Guardar resumen de conversación",
+                  "value": {
+                    "contenido": "Resumen: Usuario solicitó configurar top_k=8 en copiloto-semantico-func-us2. Se aplicó exitosamente.",
+                    "tipo": "resumen_conversacion",
+                    "metadata": {
+                      "importancia": "alta",
+                      "fuente": "foundry"
+                    }
+                  }
+                },
+                "decision": {
+                  "summary": "Guardar decisión del usuario",
+                  "value": {
+                    "contenido": "Decisión: Usuario prefiere usar Azure CLI en lugar de SDK para operaciones de storage",
+                    "tipo": "decision_usuario",
+                    "session_id": "assistant"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contenido guardado exitosamente en memoria",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "example": "Contenido guardado en memoria vectorial"
+                    },
+                    "detalles": {
+                      "type": "object",
+                      "properties": {
+                        "longitud": {
+                          "type": "integer",
+                          "description": "Longitud del contenido guardado"
+                        },
+                        "tipo": {
+                          "type": "string"
+                        },
+                        "session_id": {
+                          "type": "string"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "ejemplo": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
-     },
-    "tags": [
-      {
+  },
+  "tags": [
+    {
       "name": "Azure Storage",
       "description": "Operaciones de Azure Blob Storage incluyendo descarga robusta de archivos"
-      },
-      {
+    },
+    {
       "name": "🚀 Universal CLI Executor",
       "description": "Ejecutor universal que acepta cualquier tipo de comando sin restricciones"
-      },
-      {
+    },
+    {
       "name": "Diagnóstico",
       "description": "Diagnóstico y monitoreo de recursos"
-      },
-      {
+    },
+    {
       "name": "Azure Deployment",
       "description": "Deployment de recursos con ARM templates"
-      },
-      {
+    },
+    {
       "name": "Azure Configuration",
       "description": "Configuración de recursos Azure"
-      },
-      {
+    },
+    {
       "name": "Testing",
       "description": "Pruebas y validación de endpoints"
-      },
-      {
+    },
+    {
       "name": "Internal",
       "description": "Operaciones internas de la Function App"
-      },
-      {
+    },
+    {
       "name": "🧠 Memoria Integrada",
       "description": "Sistema automático de memoria con consulta previa y guardado de interacciones en Cosmos DB"
-      },
-      {
+    },
+    {
       "name": "🧠 Memoria Semántica",
       "description": "Búsqueda e indexación semántica con Azure AI Search usando Managed Identity"
-      },
-      {
+    },
+    {
       "name": "Local Storage",
       "description": "Operaciones en el filesystem local del contenedor"
-      },
-      {
+    },
+    {
       "name": "Autocorrección",
       "description": "Endpoints relacionados con sugerencias, revisión y promoción de correcciones automatizadas o manuales."
-      },
-      {
+    },
+    {
       "name": "Bridge",
       "description": "Endpoints tolerantes para agentes problemáticos"
-      },
-      {
+    },
+    {
       "name": "🚀 Despliegues Robustos",
       "description": "Sistema robusto y semántico para gestión completa de despliegues. Acepta cualquier formato, nunca falla, siempre retorna éxito=true para compatibilidad con agentes."
-      },
-      {
+    },
+    {
       "name": "🔍 Análisis Semántico",
       "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
-      }
-      
-    ],
+    }
+  ],
   "components": {
     "schemas": {
       "ErrorEnvelope": {
@@ -4511,5 +4706,4 @@
       }
     }
   }
-
 }

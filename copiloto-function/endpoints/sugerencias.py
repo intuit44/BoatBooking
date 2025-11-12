@@ -84,10 +84,17 @@ def sugerencias_http(req: func.HttpRequest) -> func.HttpResponse:
                     "relevancia": 0.3
                 })
             
+            # Generar respuesta para el usuario
+            top_sugerencias = sorted(sugerencias, key=lambda x: x["relevancia"], reverse=True)[:5]
+            respuesta_texto = f"Basándome en tus {len(resultados)} interacciones recientes, te sugiero:\n\n"
+            for i, sug in enumerate(top_sugerencias, 1):
+                respuesta_texto += f"{i}. {sug['texto']}\n"
+            
             return func.HttpResponse(
                 json.dumps({
                     "exito": True,
-                    "sugerencias": sorted(sugerencias, key=lambda x: x["relevancia"], reverse=True)[:5],
+                    "respuesta_usuario": respuesta_texto,  # Campo para el wrapper
+                    "sugerencias": top_sugerencias,
                     "analisis": {
                         "total_interacciones": len(resultados),
                         "endpoints_usados": list(endpoints_usados),

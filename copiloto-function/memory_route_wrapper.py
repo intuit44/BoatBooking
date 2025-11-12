@@ -377,6 +377,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     # response_data_for_semantic con metadatos completos.
                     # ------------------------------------------------------------------
 
+                    # 5.5️⃣ SINCRONIZAR THREAD DE FOUNDRY CON MEMORIA
+                    try:
+                        from thread_memory_hook import sync_thread_to_memory
+                        response_data = sync_thread_to_memory(req, response_data_for_semantic or {})
+                    except Exception as e:
+                        logging.warning(f"⚠️ Error sincronizando thread: {e}")
+
                     # 6️⃣ CAPTURA DE RESPUESTA COMPLETA FOUNDRY UI
                     try:
                         session_id = req.headers.get(
