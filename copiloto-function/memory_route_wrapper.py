@@ -76,6 +76,8 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # 0️⃣ CAPTURA COMPLETA DE ENTRADA DEL USUARIO
                     try:
+                        from memory_helpers import extraer_session_info
+                        
                         body = req.get_json() if req.method in [
                             "POST", "PUT", "PATCH"] else {}
                         # Priorizar 'input' (Foundry real) sobre 'mensaje' (legacy)
@@ -83,10 +85,10 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             "query") or body.get("prompt")
 
                         if user_message and len(user_message.strip()) > 3:
-                            session_id = req.headers.get(
-                                "Session-ID") or "fallback_session"
-                            agent_id = req.headers.get(
-                                "Agent-ID") or "foundry_user"
+                            # CAPTURA AUTOMÁTICA DE THREAD
+                            session_info = extraer_session_info(req)
+                            session_id = session_info.get("session_id") or "fallback_session"
+                            agent_id = session_info.get("agent_id") or "foundry_user"
 
                             # Crear evento completo
                             evento = {
@@ -118,12 +120,12 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     memoria_previa = {}
                     try:
                         from cosmos_memory_direct import consultar_memoria_cosmos_directo
+                        from memory_helpers import extraer_session_info
 
-                        # Obtener session_id y agent_id
-                        session_id = req.headers.get(
-                            "Session-ID") or req.params.get("session_id") or "global"
-                        agent_id = req.headers.get(
-                            "Agent-ID") or req.params.get("agent_id") or "unknown_agent"
+                        # CAPTURA AUTOMÁTICA DE THREAD
+                        session_info = extraer_session_info(req)
+                        session_id = session_info.get("session_id") or "global"
+                        agent_id = session_info.get("agent_id") or "unknown_agent"
 
                         # 🔥 CONSULTA COMPLETA: Recupera TODA la conversación rica desde Cosmos DB
                         memoria_previa = consultar_memoria_cosmos_directo(req)
@@ -274,11 +276,11 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # 4️⃣ CAPTURA AUTOMÁTICA DE CONVERSACIÓN RICA COMPLETA (solo si hay contexto real)
                     try:
-                        session_id = (
-                            req.headers.get("Session-ID")
-                            or req.params.get("session_id")
-                            or "global"
-                        )
+                        from memory_helpers import extraer_session_info
+                        
+                        # CAPTURA AUTOMÁTICA DE THREAD
+                        session_info = extraer_session_info(req)
+                        session_id = session_info.get("session_id") or "global"
 
                         resumen_completo = (memoria_previa.get(
                             "resumen_conversacion", "") if memoria_previa else "")
@@ -386,10 +388,12 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # 6️⃣ CAPTURA DE RESPUESTA COMPLETA FOUNDRY UI
                     try:
-                        session_id = req.headers.get(
-                            "Session-ID") or "fallback_session"
-                        agent_id = req.headers.get(
-                            "Agent-ID") or "foundry_user"
+                        from memory_helpers import extraer_session_info
+                        
+                        # CAPTURA AUTOMÁTICA DE THREAD
+                        session_info = extraer_session_info(req)
+                        session_id = session_info.get("session_id") or "fallback_session"
+                        agent_id = session_info.get("agent_id") or "foundry_user"
 
                         logging.info(f"[BLOQUE 6] Iniciando para {route_path}")
 
