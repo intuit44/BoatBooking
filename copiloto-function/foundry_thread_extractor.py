@@ -10,11 +10,26 @@ from typing import Optional, Dict, Any
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
-def obtener_thread_desde_foundry(agent_id: str = None) -> Optional[str]:
+def obtener_thread_desde_foundry(agent_id: str = None, timeout: int = 2) -> Optional[str]:
     """
     Consulta Azure AI Foundry para obtener el thread activo más reciente
+    CON TIMEOUT para evitar bloqueos
     """
+    import signal
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError("Foundry API timeout")
+    
     try:
+        # Solo en Windows, skip timeout (signal no funciona igual)
+        if os.name == 'nt':
+            logging.debug("Skipping Foundry API call en Windows local")
+            return None
+        
+        # Configurar timeout
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout)
+        
         endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT", "https://AgenteOpenAi.services.ai.azure.com/api/projects/AgenteOpenAi-project")
         
         client = AIProjectClient(
@@ -22,16 +37,24 @@ def obtener_thread_desde_foundry(agent_id: str = None) -> Optional[str]:
             endpoint=endpoint
         )
         
-        # Obtener threads recientes (último minuto)
         threads = list(client.agents.threads.list(limit=1))
+        
+        signal.alarm(0)  # Cancelar timeout
         
         if threads:
             thread_id = threads[0].id
             logging.info(f"Thread capturado desde Foundry API: {thread_id}")
             return thread_id
             
+    except TimeoutError:
+        logging.warning("Foundry API timeout - usando fallback")
     except Exception as e:
         logging.warning(f"No se pudo obtener thread desde Foundry: {e}")
+    finally:
+        try:
+            signal.alarm(0)  # Asegurar cancelación
+        except:
+            pass
     
     return None
 

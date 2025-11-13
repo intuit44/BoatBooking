@@ -417,6 +417,12 @@ except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint escribir_archivo: {e}")
 
 try:
+    import endpoints.crear_contenedor
+    logging.info("✅ Endpoint crear_contenedor registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint crear_contenedor: {e}")
+
+try:
     import endpoints.introspection
     logging.info("✅ Endpoint introspection registrado correctamente")
 except Exception as e:
@@ -427,6 +433,12 @@ try:
     logging.info("✅ Endpoint logs registrado correctamente")
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint logs: {e}")
+
+try:
+    import endpoints.agent_output
+    logging.info("✅ Endpoint agent_output registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint agent_output: {e}")
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -3425,6 +3437,7 @@ def invocar_endpoint_local(endpoint: str, method: str = "GET", body: Optional[di
         # Mapear endpoints a funciones
         from endpoints.diagnostico_recursos import diagnostico_recursos_http
         from endpoints.escribir_archivo import escribir_archivo_http
+        from endpoints.crear_contenedor import crear_contenedor_http
         endpoint_map = {
             "/api/status": status,
             "/api/health": health,
@@ -4494,9 +4507,11 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         body = dict(req.params)
 
     # 🧠 INTERPRETAR INTENCIÓN PRIMERO
-    query_texto = body.get("query") or body.get("mensaje") or body.get("tipo") or req.params.get("q") or ""
-    intencion_params = interpretar_intencion_agente(query_texto, dict(req.headers))
-    
+    query_texto = body.get("query") or body.get(
+        "mensaje") or body.get("tipo") or req.params.get("q") or ""
+    intencion_params = interpretar_intencion_agente(
+        query_texto, dict(req.headers))
+
     # 🔥 FUSIONAR CON PARÁMETROS EXPLÍCITOS (overrides)
     params_completos = {**intencion_params}
     for key in ["tipo", "contiene", "endpoint", "exito", "fecha_inicio", "fecha_fin", "orden", "limite"]:
@@ -4504,18 +4519,18 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             params_completos[key] = body.get(key)
         elif req.params.get(key) is not None:
             params_completos[key] = req.params.get(key)
-    
+
     params_completos["session_id"] = session_id or "unknown"
     params_completos["intencion_detectada"] = query_texto
-    
+
     logging.info(f"🧠 HISTORIAL: Parámetros interpretados: {params_completos}")
-    
+
     query_universal = query_texto or "últimas interacciones recientes"
     logging.info(f"🔍 HISTORIAL: Query vectorial: '{query_universal}'")
 
     # === 🔍 BÚSQUEDA HÍBRIDA: AI Search (vectorial) + Cosmos (estructurado) ===
     docs_search = []
-    
+
     # 1️⃣ AI Search: Búsqueda vectorial semántica
     try:
         from endpoints_search_memory import buscar_memoria_endpoint
@@ -4529,30 +4544,36 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             logging.info(f"✅ AI Search: {len(docs_search)} docs vectoriales")
     except Exception as e:
         logging.warning(f"⚠️ AI Search falló: {e}")
-    
+
     # 2️⃣ Cosmos: Filtro estructurado por event_type derivado de intención
-    usar_query_cosmos = params_completos.get("tipo") or params_completos.get("endpoint") or params_completos.get("exito") is not None
-    
+    usar_query_cosmos = params_completos.get("tipo") or params_completos.get(
+        "endpoint") or params_completos.get("exito") is not None
+
     if usar_query_cosmos:
         try:
             query_sql = construir_query_dinamica(**params_completos)
-            resultados_cosmos = ejecutar_query_cosmos(query_sql, memory_service.memory_container)
-            logging.info(f"✅ Cosmos: {len(resultados_cosmos)} docs estructurados (event_type filtrado)")
-            
+            resultados_cosmos = ejecutar_query_cosmos(
+                query_sql, memory_service.memory_container)
+            logging.info(
+                f"✅ Cosmos: {len(resultados_cosmos)} docs estructurados (event_type filtrado)")
+
             # 3️⃣ INTERSECCIÓN: Combinar resultados vectoriales + estructurados
             if docs_search and resultados_cosmos:
                 ids_cosmos = {d.get("id") for d in resultados_cosmos}
-                docs_search = [d for d in docs_search if d.get("id") in ids_cosmos]
-                logging.info(f"🎯 Intersección: {len(docs_search)} docs (vectorial ∩ estructurado)")
+                docs_search = [
+                    d for d in docs_search if d.get("id") in ids_cosmos]
+                logging.info(
+                    f"🎯 Intersección: {len(docs_search)} docs (vectorial ∩ estructurado)")
             elif resultados_cosmos and not docs_search:
                 docs_search = resultados_cosmos[:10]
-                logging.info(f"📊 Usando solo resultados estructurados de Cosmos")
+                logging.info(
+                    f"📊 Usando solo resultados estructurados de Cosmos")
         except Exception as e:
             logging.error(f"❌ Query Cosmos falló: {e}")
 
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE (para contexto general)
     memoria_previa = consultar_memoria_cosmos_directo(req)
-    
+
     # 🔥 ENRIQUECER memoria_previa con resultados de búsqueda híbrida
     if docs_search and memoria_previa:
         memoria_previa["docs_hibridos"] = docs_search
@@ -12250,366 +12271,6 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json",
                 status_code=200
             )
-
-
-# ========== CREAR CONTENEDOR ==========
-
-
-@app.function_name(name="crear_contenedor_http")
-@app.route(route="crear-contenedor", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def crear_contenedor_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(
-            f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(
-            f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    """Crea una nueva cuenta de almacenamiento en Azure usando CLI con Bing Fallback para parámetros faltantes"""
-    try:
-        body = req.get_json()
-        nombre = (body.get("nombre") or "").strip()
-        location = (body.get("location") or body.get(
-            "ubicacion") or "eastus").strip()
-        sku = (body.get("sku") or "Standard_LRS").strip()
-        kind = (body.get("kind") or "StorageV2").strip()
-        public_access = body.get("public_access") or body.get("publico", False)
-        resource_group = (body.get("resource_group") or body.get(
-            "resourceGroup") or os.environ.get("RESOURCE_GROUP", "boat-rental-app-group")).strip()
-
-        # Validar parámetros requeridos
-        parametros_validos = bool(
-            nombre and location and sku and kind and resource_group)
-        if not parametros_validos:
-            # Activar Bing Fallback por parámetros faltantes
-            try:
-                from bing_fallback_guard import ejecutar_grounding_fallback
-                fallback = ejecutar_grounding_fallback(
-                    prompt=f"Crear cuenta de almacenamiento Azure con nombre '{nombre or 'desconocido'}', location '{location}', sku '{sku}', kind '{kind}', resource_group '{resource_group}'. Proporciona el comando az completo con todos los parámetros requeridos.",
-                    contexto="creación de cuenta de almacenamiento",
-                    error_info={"tipo_error": "MissingParameter", "parametros_faltantes": [p for p in [
-                        "nombre", "location", "sku", "kind", "resource_group"] if not locals().get(p)]}
-                )
-                if fallback.get("exito") and fallback.get("comando_sugerido"):
-                    # Ejecutar el comando sugerido por Bing
-                    result = subprocess.run(
-                        fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
-                    if result.returncode == 0:
-                        res = {
-                            "exito": True,
-                            "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing",
-                            "comando_ejecutado": fallback["comando_sugerido"],
-                            "stdout": result.stdout,
-                            "cuenta": nombre,
-                            "location": location,
-                            "sku": sku,
-                            "kind": kind,
-                            "resource_group": resource_group
-                        }
-                        # Aplicar memoria Cosmos y memoria manual
-                        res = aplicar_memoria_cosmos_directo(req, res)
-                        res = aplicar_memoria_manual(req, res)
-
-                        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                        # Registrar llamada en memoria después de construir la respuesta final
-                        logging.info(
-                            f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                        memory_service.registrar_llamada(
-                            source="crear_contenedor",
-                            endpoint="/api/crear-contenedor",
-                            method=req.method,
-                            params={"session_id": req.headers.get(
-                                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                            response_data=res,
-                            success=res.get("exito", False)
-                        )
-                        return func.HttpResponse(
-                            json.dumps(res, ensure_ascii=False),
-                            mimetype="application/json",
-                            status_code=201
-                        )
-            except Exception as bing_error:
-                logging.warning(f"Bing Fallback falló: {bing_error}")
-
-            res = {
-                "exito": False,
-                "error": "Parámetros insuficientes para crear cuenta de almacenamiento",
-                "parametros_requeridos": ["nombre", "location", "sku", "kind", "resource_group"],
-                "parametros_recibidos": {
-                    "nombre": nombre,
-                    "location": location,
-                    "sku": sku,
-                    "kind": kind,
-                    "resource_group": resource_group
-                },
-                "ejemplo": {
-                    "nombre": "mi-storage-account",
-                    "location": "eastus",
-                    "sku": "Standard_LRS",
-                    "kind": "StorageV2",
-                    "resource_group": "mi-resource-group",
-                    "public_access": False
-                }
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(
-                f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-            memory_service.registrar_llamada(
-                source="crear_contenedor",
-                endpoint="/api/crear-contenedor",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=400
-            )
-
-        # Construir comando CLI
-        cmd = [
-            "az", "storage", "account", "create",
-            "--name", nombre,
-            "--resource-group", resource_group,
-            "--location", location,
-            "--sku", sku,
-            "--kind", kind,
-            "--output", "json"
-        ]
-
-        if public_access:
-            cmd.extend(["--allow-blob-public-access", "true"])
-
-        # Ejecutar comando
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120)
-
-        if result.returncode == 0:
-            try:
-                account_info = json.loads(result.stdout)
-                res = {
-                    "exito": True,
-                    "mensaje": f"Cuenta de almacenamiento '{nombre}' creada exitosamente",
-                    "cuenta": account_info.get("name"),
-                    "location": account_info.get("location"),
-                    "sku": account_info.get("sku", {}).get("name"),
-                    "kind": account_info.get("kind"),
-                    "resource_group": account_info.get("resourceGroup"),
-                    "id": account_info.get("id")
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                res = aplicar_memoria_cosmos_directo(req, res)
-                res = aplicar_memoria_manual(req, res)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                # Registrar llamada en memoria después de construir la respuesta final
-                logging.info(
-                    f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                memory_service.registrar_llamada(
-                    source="crear_contenedor",
-                    endpoint="/api/crear-contenedor",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=res,
-                    success=res.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(res, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=201
-                )
-            except json.JSONDecodeError:
-                res = {
-                    "exito": True,
-                    "mensaje": "Cuenta de almacenamiento creada (respuesta no parseable)",
-                    "stdout": result.stdout
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                res = aplicar_memoria_cosmos_directo(req, res)
-                res = aplicar_memoria_manual(req, res)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                # Registrar llamada en memoria después de construir la respuesta final
-                logging.info(
-                    f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                memory_service.registrar_llamada(
-                    source="crear_contenedor",
-                    endpoint="/api/crear-contenedor",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=res,
-                    success=res.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(res, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=201
-                )
-        else:
-            # Comando falló - activar Bing Fallback
-            try:
-                from bing_fallback_guard import ejecutar_grounding_fallback
-                fallback = ejecutar_grounding_fallback(
-                    prompt=f"El comando az storage account create falló. Error: {result.stderr}. Sugiere el comando correcto para crear cuenta '{nombre}' en '{resource_group}' con sku '{sku}'.",
-                    contexto="creación de cuenta de almacenamiento fallida",
-                    error_info={"tipo_error": "CommandFailed",
-                                "stderr": result.stderr, "returncode": result.returncode}
-                )
-                if fallback.get("exito") and fallback.get("comando_sugerido"):
-                    # Reintentar con comando sugerido
-                    retry_result = subprocess.run(
-                        fallback["comando_sugerido"], shell=True, capture_output=True, text=True, timeout=60)
-                    if retry_result.returncode == 0:
-                        res = {
-                            "exito": True,
-                            "mensaje": "Cuenta de almacenamiento creada usando sugerencia de Bing (reintento)",
-                            "comando_ejecutado": fallback["comando_sugerido"],
-                            "cuenta": nombre
-                        }
-                        # Aplicar memoria Cosmos y memoria manual
-                        res = aplicar_memoria_cosmos_directo(req, res)
-                        res = aplicar_memoria_manual(req, res)
-
-                        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                        # Registrar llamada en memoria después de construir la respuesta final
-                        logging.info(
-                            f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-                        memory_service.registrar_llamada(
-                            source="crear_contenedor",
-                            endpoint="/api/crear-contenedor",
-                            method=req.method,
-                            params={"session_id": req.headers.get(
-                                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                            response_data=res,
-                            success=res.get("exito", False)
-                        )
-                        return func.HttpResponse(
-                            json.dumps(res, ensure_ascii=False),
-                            mimetype="application/json",
-                            status_code=201
-                        )
-            except Exception as bing_error:
-                logging.warning(
-                    f"Bing Fallback en reintento falló: {bing_error}")
-
-            # Error final
-            mensaje = result.stderr.lower()
-            if "already exists" in mensaje or "name already taken" in mensaje:
-                status_code = 409
-                error_msg = f"La cuenta de almacenamiento '{nombre}' ya existe"
-            elif "invalid" in mensaje and "location" in mensaje:
-                status_code = 400
-                error_msg = f"Location '{location}' inválida"
-            elif "authorization" in mensaje or "forbidden" in mensaje:
-                status_code = 403
-                error_msg = "Permisos insuficientes para crear cuenta de almacenamiento"
-            else:
-                status_code = 500
-                error_msg = f"Error creando cuenta de almacenamiento: {result.stderr}"
-
-            res = {
-                "exito": False,
-                "error": error_msg,
-                "stderr": result.stderr,
-                "returncode": result.returncode,
-                "comando_intentado": " ".join(cmd)
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            res = aplicar_memoria_cosmos_directo(req, res)
-            res = aplicar_memoria_manual(req, res)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            # Registrar llamada en memoria después de construir la respuesta final
-            logging.info(
-                f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-            memory_service.registrar_llamada(
-                source="crear_contenedor",
-                endpoint="/api/crear-contenedor",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=res,
-                success=res.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(res, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=status_code
-            )
-
-    except subprocess.TimeoutExpired:
-        res = {
-            "exito": False,
-            "error": "Timeout creando cuenta de almacenamiento (2 minutos)",
-            "sugerencia": "Verificar conectividad de red o reducir parámetros"
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(
-            f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-        memory_service.registrar_llamada(
-            source="crear_contenedor",
-            endpoint="/api/crear-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=408
-        )
-    except Exception as e:
-        logging.exception("crear_contenedor_http failed")
-        res = {
-            "exito": False,
-            "error": str(e),
-            "tipo_error": type(e).__name__
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(
-            f"💾 Registering call for crear_contenedor: success={res.get('exito', False)}, endpoint=/api/crear-contenedor")
-        memory_service.registrar_llamada(
-            source="crear_contenedor",
-            endpoint="/api/crear-contenedor",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(res, ensure_ascii=False),
-            mimetype="application/json",
-            status_code=500
-        )
 
 
 @app.function_name(name="proxy_local_http")

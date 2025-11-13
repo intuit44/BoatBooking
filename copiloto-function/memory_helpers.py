@@ -30,13 +30,18 @@ def obtener_prompt_memoria(req: func.HttpRequest) -> str:
         pass
     return ""
 
-def extraer_session_info(req: func.HttpRequest, skip_api_call: bool = False) -> Dict[str, Optional[str]]:
+def extraer_session_info(req: func.HttpRequest, skip_api_call: bool = True) -> Dict[str, Optional[str]]:
     """
     Extrae session_id y agent_id del request - NORMALIZA AUTOMÁTICAMENTE
-    Si Foundry no envía thread, lo captura desde la API
+    
+    PRIORIDAD:
+    1. Headers: X-Thread-ID, Thread-ID, X-Session-ID
+    2. Query params: thread_id, session_id
+    3. Body JSON: thread_id, session_id, context.thread_id
+    4. Foundry API (solo si skip_api_call=False)
     
     Args:
-        skip_api_call: Si True, no consulta Foundry API (para tests)
+        skip_api_call: Si True, NO consulta Foundry API (por defecto True)
     """
     session_id = None
     agent_id = None
@@ -67,11 +72,14 @@ def extraer_session_info(req: func.HttpRequest, skip_api_call: bool = False) -> 
         if not session_id and body:
             session_id = extraer_thread_de_contexto(body)
         
-        # 5. ÚLTIMO RECURSO: Consultar Foundry API directamente (solo en producción)
+        # 5. Foundry API como último recurso (con timeout)
         if not session_id and not skip_api_call:
-            session_id = obtener_thread_desde_foundry(agent_id)
-            if session_id:
-                logging.info(f"Thread capturado desde Foundry API: {session_id}")
+            try:
+                session_id = obtener_thread_desde_foundry(agent_id, timeout=1)
+                if session_id:
+                    logging.info(f"Thread capturado desde Foundry API: {session_id}")
+            except Exception as e:
+                logging.debug(f"Foundry API no disponible: {e}")
             
     except Exception as e:
         logging.warning(f"Error extrayendo session info: {e}")

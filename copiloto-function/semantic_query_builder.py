@@ -133,6 +133,47 @@ def construir_query_dinamica(
     return query
 
 
+def detectar_query_tecnica(query: str) -> Optional[Dict[str, Any]]:
+    """
+    Detecta si la query es técnica (UUID, IDs) y debe usar búsqueda literal
+    
+    Returns:
+        Dict con tipo de query técnica y valor extraído, o None si no es técnica
+    """
+    query_lower = query.lower()
+    
+    # Patrón UUID estándar
+    uuid_pattern = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+    uuid_match = re.search(uuid_pattern, query, re.IGNORECASE)
+    
+    if uuid_match:
+        return {
+            "tipo": "uuid_literal",
+            "valor": uuid_match.group(0),
+            "modo_busqueda": "literal_cosmos"
+        }
+    
+    # Detectar solicitudes de IDs técnicos
+    id_keywords = [
+        "client id", "clientid", "client-id",
+        "tenant id", "tenantid", "tenant-id",
+        "principal id", "principalid", "principal-id",
+        "subscription id", "subscriptionid",
+        "resource id", "resourceid",
+        "application id", "applicationid"
+    ]
+    
+    for keyword in id_keywords:
+        if keyword in query_lower:
+            return {
+                "tipo": "id_request",
+                "campo": keyword.replace(" ", "_"),
+                "modo_busqueda": "literal_cosmos"
+            }
+    
+    return None
+
+
 def interpretar_intencion_agente(mensaje_agente: str, headers: Dict[str, str]) -> Dict[str, Any]:
     """
     Interpreta la intención del agente y extrae parámetros
@@ -150,6 +191,14 @@ def interpretar_intencion_agente(mensaje_agente: str, headers: Dict[str, str]) -
     }
 
     msg_lower = mensaje_agente.lower()
+    
+    # 🔍 DETECTAR QUERY TÉCNICA (prioridad máxima)
+    query_tecnica = detectar_query_tecnica(mensaje_agente)
+    if query_tecnica:
+        params["query_tecnica"] = query_tecnica
+        params["usar_busqueda_literal"] = True
+        logging.info(f"🔧 Query técnica detectada: {query_tecnica['tipo']}")
+        return params
 
     # Detectar intención temporal
     if any(x in msg_lower for x in ["últimas", "ayer", "hoy", "semana", "mes"]):
@@ -199,6 +248,68 @@ def interpretar_intencion_agente(mensaje_agente: str, headers: Dict[str, str]) -
 
     logging.info(f"🧠 Parámetros interpretados: {params}")
     return params
+
+
+def buscar_literal_cosmos(query_tecnica: Dict[str, Any], cosmos_container, session_id: Optional[str] = None, agent_id: Optional[str] = None) -> List[Dict]:
+    """
+    Ejecuta búsqueda literal en Cosmos DB para queries técnicas (UUIDs, IDs)
+    
+    Args:
+        query_tecnica: Dict con tipo y valor de query técnica
+        cosmos_container: Cliente del contenedor de Cosmos
+        session_id: ID de sesión (opcional)
+        agent_id: ID del agente (opcional)
+    
+    Returns:
+        Lista de documentos encontrados
+    """
+    try:
+        condiciones = []
+        
+        if query_tecnica["tipo"] == "uuid_literal":
+            # Búsqueda literal del UUID en texto_semantico
+            valor = query_tecnica["valor"]
+            condiciones.append(f"CONTAINS(c.texto_semantico, '{valor}')")
+            logging.info(f"🔍 Búsqueda literal UUID: {valor}")
+        
+        elif query_tecnica["tipo"] == "id_request":
+            # Búsqueda de campos ID en texto_semantico
+            campo = query_tecnica["campo"]
+            # Buscar patrones como "principalId", "clientId", etc.
+            condiciones.append(f"(CONTAINS(c.texto_semantico, 'principalId') OR CONTAINS(c.texto_semantico, 'clientId') OR CONTAINS(c.texto_semantico, 'tenantId'))")
+            logging.info(f"🔍 Búsqueda literal campo ID: {campo}")
+        
+        # Aplicar session widening: primero sesión específica, luego agent_id, luego universal
+        resultados = []
+        
+        # Nivel 1: Sesión específica
+        if session_id and session_id not in ["assistant", "test_session", "unknown", "global", None]:
+            where_clause = " AND ".join(condiciones + [f"c.session_id = '{session_id}'"])
+            query = f"SELECT * FROM c WHERE {where_clause} ORDER BY c._ts DESC"
+            resultados = list(cosmos_container.query_items(query=query, enable_cross_partition_query=True))
+            if resultados:
+                logging.info(f"✅ Nivel 1 literal: {len(resultados)} resultados en sesión {session_id}")
+                return resultados
+        
+        # Nivel 2: Agent-wide
+        if agent_id and agent_id not in ["unknown", "unknown_agent", None]:
+            where_clause = " AND ".join(condiciones + [f"c.agent_id = '{agent_id}'"])
+            query = f"SELECT * FROM c WHERE {where_clause} ORDER BY c._ts DESC"
+            resultados = list(cosmos_container.query_items(query=query, enable_cross_partition_query=True))
+            if resultados:
+                logging.info(f"✅ Nivel 2 literal: {len(resultados)} resultados para agent_id {agent_id}")
+                return resultados
+        
+        # Nivel 3: Universal
+        where_clause = " AND ".join(condiciones)
+        query = f"SELECT * FROM c WHERE {where_clause} ORDER BY c._ts DESC"
+        resultados = list(cosmos_container.query_items(query=query, enable_cross_partition_query=True))
+        logging.info(f"✅ Nivel 3 literal: {len(resultados)} resultados (universal)")
+        return resultados
+        
+    except Exception as e:
+        logging.error(f"❌ Error en búsqueda literal: {e}")
+        return []
 
 
 def ejecutar_query_cosmos(query: str, cosmos_container) -> List[Dict]:

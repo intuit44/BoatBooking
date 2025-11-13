@@ -128,6 +128,56 @@
         }
       }
     },
+    "/api/agent-output": {
+      "post": {
+        "summary": "Registrar salida autónoma del agente Foundry",
+        "description": "Recibe la respuesta final del agente cuando no se invoca otro endpoint y la persiste con el thread real",
+        "operationId": "agentOutput",
+        "tags": [
+          "Memoria"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "thread_id": { "type": "string", "description": "ID de thread en Foundry (alias de session_id)" },
+                  "session_id": { "type": "string", "description": "ID de sesión (si no se usa thread_id)" },
+                  "agent_id": { "type": "string" },
+                  "texto": { "type": "string", "description": "Texto de salida del agente" },
+                  "metadata": { "type": "object" }
+                },
+                "required": ["texto"],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Salida registrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": { "type": "boolean" },
+                    "mensaje": { "type": "string" },
+                    "session_id": { "type": "string" },
+                    "agent_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Solicitud inválida (falta texto o identificadores)" },
+          "500": { "description": "Error del servidor" }
+        }
+      }
+    },
     "/api/diagnostico-recursos": {
       "get": {
         "summary": "Diagnóstico completo de recursos Azure",
@@ -4099,131 +4149,131 @@
     },
     "/api/logs": {
       "get": {
-        "summary": "📝 LOGS ESTRUCTURADOS - Consulta logs del backend para análisis",
-        "description": "Expone logs estructurados del backend con filtros por nivel, endpoint, tiempo. Permite al agente analizar errores y patrones sin acceso directo a Application Insights.",
-        "operationId": "logs",
-        "tags": [
-          "Diagnóstico"
-        ],
-        "security": [],
-        "parameters": [
-          {
-            "name": "nivel",
-            "in": "query",
-            "description": "Filtrar por nivel de log",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "ERROR",
-                "WARNING",
-                "INFO",
-                "DEBUG"
-              ]
-            }
+      "summary": "📝 ANÁLISIS DE ERRORES - Consulta errores desde Cosmos DB",
+      "description": "Analiza errores y warnings recientes desde el historial de Cosmos DB. Detecta automáticamente fallos por palabras clave (error, failed, warning). Para logs detallados de Azure, usar Application Insights.",
+      "operationId": "logs",
+      "tags": [
+      "Diagnóstico"
+      ],
+      "security": [],
+      "parameters": [
+      {
+      "name": "nivel",
+      "in": "query",
+      "description": "Filtrar por nivel de log",
+      "schema": {
+        "type": "string",
+        "enum": [
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG"
+        ]
+      }
+      },
+      {
+      "name": "limite",
+      "in": "query",
+      "description": "Número máximo de logs a devolver",
+      "schema": {
+        "type": "integer",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 1000
+      }
+      },
+      {
+      "name": "horas",
+      "in": "query",
+      "description": "Logs de las últimas N horas",
+      "schema": {
+        "type": "integer",
+        "default": 24,
+        "minimum": 1
+      }
+      },
+      {
+      "name": "endpoint",
+      "in": "query",
+      "description": "Filtrar por endpoint específico",
+      "schema": {
+        "type": "string"
+      }
+      }
+      ],
+      "responses": {
+      "200": {
+      "description": "Logs obtenidos exitosamente",
+      "content": {
+        "application/json": {
+        "schema": {
+        "type": "object",
+        "properties": {
+        "exito": {
+          "type": "boolean"
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+          "type": "object",
+          "properties": {
+          "nivel": {
+          "type": "string"
           },
-          {
-            "name": "limite",
-            "in": "query",
-            "description": "Número máximo de logs a devolver",
-            "schema": {
-              "type": "integer",
-              "default": 100,
-              "minimum": 1,
-              "maximum": 1000
-            }
+          "timestamp": {
+          "type": "string"
           },
-          {
-            "name": "horas",
-            "in": "query",
-            "description": "Logs de las últimas N horas",
-            "schema": {
-              "type": "integer",
-              "default": 24,
-              "minimum": 1
-            }
+          "endpoint": {
+          "type": "string"
           },
-          {
-            "name": "endpoint",
-            "in": "query",
-            "description": "Filtrar por endpoint específico",
-            "schema": {
-              "type": "string"
-            }
+          "mensaje": {
+          "type": "string"
+          },
+          "es_error": {
+          "type": "boolean"
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "Logs obtenidos exitosamente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exito": {
-                      "type": "boolean"
-                    },
-                    "logs": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "nivel": {
-                            "type": "string"
-                          },
-                          "timestamp": {
-                            "type": "string"
-                          },
-                          "endpoint": {
-                            "type": "string"
-                          },
-                          "mensaje": {
-                            "type": "string"
-                          },
-                          "es_error": {
-                            "type": "boolean"
-                          }
-                        }
-                      }
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "analisis": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "integer"
-                        },
-                        "por_nivel": {
-                          "type": "object"
-                        },
-                        "endpoints_problematicos": {
-                          "type": "object"
-                        },
-                        "patrones": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "respuesta_usuario": {
-                      "type": "string",
-                      "description": "Resumen en lenguaje natural para el agente"
-                    },
-                    "metadata": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Error consultando logs"
           }
+          }
+        },
+        "total": {
+          "type": "integer"
+        },
+        "analisis": {
+          "type": "object",
+          "properties": {
+          "total": {
+          "type": "integer"
+          },
+          "por_nivel": {
+          "type": "object"
+          },
+          "endpoints_problematicos": {
+          "type": "object"
+          },
+          "patrones": {
+          "type": "array",
+          "items": {
+          "type": "string"
+          }
+          }
+          }
+        },
+        "respuesta_usuario": {
+          "type": "string",
+          "description": "Resumen en lenguaje natural para el agente"
+        },
+        "metadata": {
+          "type": "object"
         }
+        }
+        }
+        }
+      }
+      },
+      "500": {
+      "description": "Error consultando logs"
+      }
+      }
       }
     },
     "/api/guardar-memoria": {

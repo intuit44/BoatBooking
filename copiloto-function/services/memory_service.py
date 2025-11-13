@@ -129,6 +129,22 @@ class MemoryService:
                 event["texto_semantico"] = f"Evento {event.get('event_type', 'unknown')} en sesión {event.get('session_id', 'unknown')}"
                 logging.warning(
                     f"⚠️ Generando texto_semantico de fallback: {event['texto_semantico']}")
+            
+            # 🔧 ENRIQUECER texto_semantico con campos técnicos si no fueron agregados antes
+            if "🔑" not in event.get("texto_semantico", ""):
+                def _extraer_ids_evento(evt):
+                    ids = []
+                    data = evt.get("data", {})
+                    if isinstance(data, dict):
+                        for key in ['principalId', 'clientId', 'tenantId', 'subscriptionId']:
+                            if data.get(key):
+                                ids.append(f"{key}: {data[key]}")
+                    return "\n🔑 " + "\n🔑 ".join(ids) if ids else ""
+                
+                ids_extra = _extraer_ids_evento(event)
+                if ids_extra:
+                    event["texto_semantico"] += ids_extra
+                    logging.info(f"🔑 IDs técnicos agregados al evento en _log_cosmos")
 
             # Intentar upsert
             result = self.memory_container.upsert_item(event)
@@ -358,6 +374,48 @@ class MemoryService:
                 logging.info(
                     f"📊 Resumen enriquecido: {respuesta_resumen[:100]}...")
 
+        # === 🔧 EXTRACTOR DE CAMPOS TÉCNICOS ===
+        def _extraer_campos_tecnicos(data: Any) -> str:
+            """Extrae IDs técnicos (UUIDs, Client ID, etc.) de JSONs para búsqueda literal."""
+            campos_extraidos = []
+            
+            def _buscar_recursivo(obj, profundidad=0):
+                if profundidad > 3:  # Limitar recursión
+                    return
+                
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        key_lower = str(key).lower()
+                        
+                        # Detectar campos de IDs
+                        if any(id_key in key_lower for id_key in ['principalid', 'clientid', 'tenantid', 'subscriptionid', 'applicationid', 'resourceid']):
+                            if value and isinstance(value, str):
+                                # Formatear para búsqueda
+                                campo_nombre = key.replace('_', ' ').replace('-', ' ').title()
+                                campos_extraidos.append(f"{campo_nombre}: {value}")
+                        
+                        # Buscar UUIDs en valores
+                        if isinstance(value, str) and len(value) == 36 and value.count('-') == 4:
+                            import re
+                            if re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', value, re.IGNORECASE):
+                                campo_nombre = key.replace('_', ' ').replace('-', ' ').title()
+                                campos_extraidos.append(f"{campo_nombre}: {value}")
+                        
+                        # Recursión
+                        _buscar_recursivo(value, profundidad + 1)
+                
+                elif isinstance(obj, (list, tuple)) and profundidad < 2:
+                    for item in obj[:5]:  # Limitar a primeros 5 elementos
+                        _buscar_recursivo(item, profundidad + 1)
+            
+            _buscar_recursivo(data)
+            
+            if campos_extraidos:
+                # Deduplicar
+                campos_unicos = list(dict.fromkeys(campos_extraidos))
+                return "\n🔑 " + "\n🔑 ".join(campos_unicos[:10])  # Máximo 10 campos
+            return ""
+        
         # === 🧠 GENERADOR SEMÁNTICO ENRIQUECIDO ===
         def _construir_texto_semantico_rico(response_data, endpoint, agent_id, success, params):
             """Construye texto semántico útil, contextual y rico como lo haría un asistente inteligente."""
@@ -456,6 +514,12 @@ class MemoryService:
         texto_semantico_final, auto_generated = _construir_texto_semantico_rico(
             response_data, endpoint, agent_id, success, params
         )
+        
+        # 🔧 ENRIQUECER con campos técnicos extraídos
+        campos_tecnicos = _extraer_campos_tecnicos(response_data)
+        if campos_tecnicos:
+            texto_semantico_final = f"{texto_semantico_final}\n{campos_tecnicos}"
+            logging.info(f"🔑 Campos técnicos extraídos y agregados al texto semántico")
 
         if auto_generated:
             logging.info(

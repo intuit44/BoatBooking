@@ -90,6 +90,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             session_id = session_info.get("session_id") or "fallback_session"
                             agent_id = session_info.get("agent_id") or "foundry_user"
 
+                            # Exponer identificadores en el request para el resto del pipeline
+                            try:
+                                setattr(req, "_session_id", session_id)
+                                setattr(req, "_agent_id", agent_id)
+                            except Exception:
+                                pass
+
                             # Crear evento completo
                             evento = {
                                 "id": f"{session_id}_user_input_{int(datetime.utcnow().timestamp())}",
@@ -126,6 +133,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         session_info = extraer_session_info(req)
                         session_id = session_info.get("session_id") or "global"
                         agent_id = session_info.get("agent_id") or "unknown_agent"
+
+                        # Exponer identificadores en el request para el resto del pipeline
+                        try:
+                            setattr(req, "_session_id", session_id)
+                            setattr(req, "_agent_id", agent_id)
+                        except Exception:
+                            pass
 
                         # 🔥 CONSULTA COMPLETA: Recupera TODA la conversación rica desde Cosmos DB
                         memoria_previa = consultar_memoria_cosmos_directo(req)
