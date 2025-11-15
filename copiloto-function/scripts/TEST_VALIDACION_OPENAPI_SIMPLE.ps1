@@ -84,9 +84,9 @@ $testCases = @(
   @{Name = "DiagnosticoRecursos"; Method = "GET"; Path = "/api/diagnostico-recursos"; Body = $null; ExpectedStatus = @(200, 401) },
   @{Name = "AuditarDeploy"; Method = "GET"; Path = "/api/auditar-deploy"; Body = $null; ExpectedStatus = @(200, 401, 403, 500) },
     
-  # Test endpoints
-  @{Name = "ProbarEndpoint"; Method = "POST"; Path = "/api/probar-endpoint"; 
-    Body = @{endpoint = "/api/status"; method = "GET" }; ExpectedStatus = @(200)
+  # Router principal
+  @{Name = "CopilotoRouter"; Method = "POST"; Path = "/api/copiloto"; 
+    Body = @{mensaje = "resumen"}; ExpectedStatus = @(200)
   },
     
   # Deploy validation

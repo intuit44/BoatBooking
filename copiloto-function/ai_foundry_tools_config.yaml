@@ -26,22 +26,22 @@ tools:
               required: false
               description: Prefijo para filtrar archivos
         
-        - path: /api/invocar
+        - path: /api/copiloto
           method: POST
-          description: Proxy para otros endpoints
+          description: Router semántico principal (usa memoria y decide la acción adecuada)
           parameters:
-            endpoint:
+            mensaje:
               type: string
-              required: true
-              description: Nombre del endpoint (sin /api/)
-            method:
-              type: string
-              required: true
-              description: MÃ©todo HTTP (GET/POST)
-            data:
-              type: object
               required: false
-              description: Datos para el endpoint destino
+              description: Mensaje natural o intención a resolver
+            consulta:
+              type: string
+              required: false
+              description: Consulta alternativa (si no se usa "mensaje")
+            session_id:
+              type: string
+              required: false
+              description: ID de sesión para mantener contexto
         
         - path: /api/diagnostico-recursos
           method: GET

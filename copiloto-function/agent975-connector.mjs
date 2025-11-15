@@ -100,8 +100,15 @@ class Agent975CopilotoConnector {
     this.log(`Invocando Copiloto: ${JSON.stringify(command)}`, 'copilot');
 
     // Determinar endpoint y método
-    const endpoint = command.endpoint || "ejecutar";
+    let endpoint = command.endpoint || "ejecutar";
     const method = command.method || "POST";
+
+    if (endpoint === "invocar" || endpoint === "/api/invocar") {
+      endpoint = "copiloto";
+      if (!command.mensaje && typeof command.data === "object" && command.data) {
+        command.mensaje = command.data.mensaje || command.data.consulta || command.data.endpoint || "";
+      }
+    }
 
     try {
       let url = `${this.copilotoConfig.baseUrl}/${endpoint}`;

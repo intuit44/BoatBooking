@@ -25,7 +25,6 @@ CRITICAL_ENDPOINTS = [
     "gestionar_despliegue_http",
     "info_archivo_http",
     "interpretar_intencion_http",
-    "invocar",
     "mover_archivo_http",
     "preparar_script_http",
     "promover_http",

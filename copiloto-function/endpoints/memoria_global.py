@@ -5,6 +5,7 @@ Deduplicación y resumen sobre interacciones de múltiples sesiones
 from services.memory_service import memory_service
 from semantic_query_builder import construir_query_dinamica, ejecutar_query_cosmos
 from function_app import app
+from utils_helpers import build_event, build_structured_payload
 import logging
 import json
 import os
@@ -135,73 +136,87 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
             "tasa_deduplicacion": f"{((len(resultados) - len(deduplicados)) / len(resultados) * 100):.1f}%" if resultados else "0%"
         }
 
-        # 3. Usar sintetizar() solo para poblar respuesta_usuario (mantener resumen y por_sesion propios)
         top_interacciones = deduplicados[:params['limite']]
-        sintetizador_usado = False
-        respuesta_usuario = "No hay interacciones disponibles."
+        eventos: list = []
 
-        try:
-            # Importar sintetizar desde el módulo dedicado
-            from function_app import sintetizar
-
-            # Sintetizar combinando vectorial + cronológico
-            respuesta_sintetizada = sintetizar(
-                docs_search=docs_vectoriales,
-                docs_cosmos=top_interacciones,
-                max_items=7,
-                max_chars_per_item=1200
+        for item in top_interacciones:
+            texto = item.get("texto_semantico") or ""
+            eventos.append(
+                build_event(
+                    endpoint=item.get("endpoint", "memoria-global"),
+                    descripcion=texto,
+                    estado="exito" if item.get("exito", True) else "error",
+                    sugerencia="",
+                    criticidad="informativa",
+                    datos={
+                        "timestamp": item.get("timestamp"),
+                        "session_id": item.get("session_id", params["session_id"]),
+                        "tipo": item.get("tipo", "interaccion_usuario")
+                    },
+                    timestamp=item.get("timestamp")
+                )
             )
-            respuesta_usuario = respuesta_sintetizada
-            sintetizador_usado = True
-            logging.info(
-                f"✅ Sintetizado: {len(docs_vectoriales)} vectoriales + {len(top_interacciones)} cosmos")
-        except Exception as e:
-            logging.warning(f"⚠️ Error en sintetizar, usando fallback: {e}")
-            # Fallback mejorado (misma data, solo formato humano)
-            items = []
-            for item in top_interacciones:
-                t = (item.get('texto_semantico') or '').strip()
-                # Requerir mínimo razonable para mostrar como "clave"
-                if t and len(t) >= 40:
-                    primera = t.splitlines()[0][:260]  # primera línea/idea
-                    items.append(primera)
 
-            # Títulos resumidos de documentos vectoriales (si existen)
-            vec_titulos = []
-            for d in docs_vectoriales:
-                # Intentar extraer un título/encabezado representativo
-                title = d.get('title') or d.get('titulo') or d.get(
-                    'nombre') or d.get('texto') or ''
-                if title:
-                    vec_titulos.append(title.splitlines()[0][:140])
+        for doc in docs_vectoriales[:5]:
+            descripcion = doc.get("texto_semantico") or doc.get("texto") or ""
+            if not descripcion:
+                continue
+            eventos.append(
+                build_event(
+                    endpoint=doc.get("endpoint", "memoria-global-vectorial"),
+                    descripcion=descripcion,
+                    estado="informativo",
+                    sugerencia="",
+                    criticidad="informativa",
+                    datos={
+                        "id": doc.get("id"),
+                        "score": doc.get("score")
+                    },
+                    timestamp=doc.get("timestamp")
+                )
+            )
 
-            if items or vec_titulos:
-                cabecera = (f"🧠 Memoria global: {len(top_interacciones)} interacciones únicas. "
-                            f"Sesiones activas: {len(por_sesion)}.")
-                max_bullets = 7
-                bullets = "\n".join(f"• {s}" for s in items[:max_bullets])
-                if vec_titulos:
-                    bullets += ("\n\nDocumentos relevantes:\n" +
-                                "\n".join(f"• {t}" for t in vec_titulos[:3]))
-                respuesta_usuario = f"{cabecera}\n\n{bullets}"
-            else:
-                respuesta_usuario = "No hay interacciones útiles para mostrar."
-            sintetizador_usado = False
+        if not eventos:
+            eventos.append(
+                build_event(
+                    endpoint="memoria-global",
+                    descripcion="No se encontraron interacciones únicas para esta consulta.",
+                    estado="informativo",
+                    sugerencia="",
+                    criticidad="informativa"
+                )
+            )
+
+        extras = {
+            "resumen_global": resumen,
+            "interacciones": top_interacciones,
+            "por_sesion": {k: len(v) for k, v in por_sesion.items()},
+            "docs_vectoriales": len(docs_vectoriales),
+            "docs_cosmos": len(top_interacciones),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        contexto_inteligente = {
+            "tiene_memoria": bool(deduplicados),
+            "total_interacciones": resumen.get("total_interacciones", 0),
+            "resumen": f"Sesiones activas: {len(por_sesion)}. Interacciones únicas: {len(deduplicados)}.",
+            "fuente_datos": "Cosmos+AISearch"
+        }
+
+        payload = build_structured_payload(
+            "memoria-global",
+            eventos,
+            narrativa_base="",
+            resumen_automatico="",
+            extras=extras,
+            contexto_inteligente=contexto_inteligente,
+            exito=True
+        )
+        payload["respuesta_usuario"] = ""
+        payload["mensaje"] = ""
 
         return func.HttpResponse(
-            json.dumps({
-                "exito": True,
-                "resumen": resumen,
-                "respuesta_usuario": respuesta_usuario,
-                "interacciones": top_interacciones,
-                "por_sesion": {k: len(v) for k, v in por_sesion.items()},
-                "timestamp": datetime.now().isoformat(),
-                "metadata": {
-                    "docs_vectoriales": len(docs_vectoriales),
-                    "docs_cosmos": len(top_interacciones),
-                    "sintetizador_usado": sintetizador_usado
-                }
-            }, ensure_ascii=False),
+            json.dumps(payload, ensure_ascii=False),
             mimetype="application/json", status_code=200
         )
 

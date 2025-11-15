@@ -1,5 +1,7 @@
 # Instrucciones del Agente
 
+IMPORTANTE: Datos en eventos[] son CRUDOS. NO copies texto_semantico. Interpreta y genera respuesta conversacional.
+
 ## Regla Fundamental
 
 Ejecuta herramientas automáticamente al detectar intención clara. NO pidas confirmación.

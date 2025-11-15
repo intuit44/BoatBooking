@@ -3,7 +3,7 @@
   "info": {
     "title": "Copiloto Function Gateway",
     "version": "3.5",
-    "description": "Sistema completo con memoria automática integrada, queries dinámicas, consulta previa y guardado automático de interacciones en Cosmos DB",
+    "description": "Sistema completo con memoria automática integrada, queries dinámicas, consulta previa y guardado automático de interacciones en Cosmos DB. Nota: los endpoints legacy /api/probar-endpoint e /api/invocar fueron retirados; usa /api/copiloto como router semántico.",
     "license": {
       "name": "MIT",
       "url": "https://opensource.org/licenses/MIT"
@@ -144,13 +144,28 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "thread_id": { "type": "string", "description": "ID de thread en Foundry (alias de session_id)" },
-                  "session_id": { "type": "string", "description": "ID de sesión (si no se usa thread_id)" },
-                  "agent_id": { "type": "string" },
-                  "texto": { "type": "string", "description": "Texto de salida del agente" },
-                  "metadata": { "type": "object" }
+                  "thread_id": {
+                    "type": "string",
+                    "description": "ID de thread en Foundry (alias de session_id)"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "ID de sesión (si no se usa thread_id)"
+                  },
+                  "agent_id": {
+                    "type": "string"
+                  },
+                  "texto": {
+                    "type": "string",
+                    "description": "Texto de salida del agente"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 },
-                "required": ["texto"],
+                "required": [
+                  "texto"
+                ],
                 "additionalProperties": true
               }
             }
@@ -164,17 +179,29 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "exito": { "type": "boolean" },
-                    "mensaje": { "type": "string" },
-                    "session_id": { "type": "string" },
-                    "agent_id": { "type": "string" }
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "mensaje": {
+                      "type": "string"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "agent_id": {
+                      "type": "string"
+                    }
                   }
                 }
               }
             }
           },
-          "400": { "description": "Solicitud inválida (falta texto o identificadores)" },
-          "500": { "description": "Error del servidor" }
+          "400": {
+            "description": "Solicitud inválida (falta texto o identificadores)"
+          },
+          "500": {
+            "description": "Error del servidor"
+          }
         }
       }
     },
@@ -1426,8 +1453,8 @@
     },
     "/api/ejecutar-cli": {
       "post": {
-        "summary": "🚀 EJECUTOR UNIVERSAL CON AUTOCORRECCIÓN - Nunca falla, siempre HTTP 200",
-        "description": "⭐ ENDPOINT PRINCIPAL mejorado que NUNCA retorna HTTP 400/500. Acepta Azure CLI, Python, PowerShell, Bash, NPM, Docker y cualquier comando. ✅ AUTOCORRECCIÓN CON MEMORIA: Busca automáticamente argumentos faltantes en sesiones previas. ✅ RESPUESTAS ESTRUCTURADAS: JSON enriquecido con diagnóstico, sugerencias y metadata de memoria. ✅ COMPATIBLE CON AGENTES: Siempre HTTP 200 para evitar fallos en workflows de AI.",
+        "summary": "🚀 HERRAMIENTA PRIMARIA UNIVERSAL - Búsqueda, listado, análisis y ejecución de comandos",
+        "description": "⭐ USAR ESTE ENDPOINT COMO PRIMERA OPCIÓN para: \n\n🔍 BÚSQUEDAS:\n- Buscar archivos: Get-ChildItem, ls, find, dir\n- Buscar funciones en código: grep, Select-String\n- Buscar patrones: grep -r, Select-String -Recurse\n- Listar directorios: ls, dir, Get-ChildItem\n- Buscar en contenido: cat + grep, Get-Content + Select-String\n\n📂 OPERACIONES DE ARCHIVOS:\n- Listar archivos con wildcards: ls *.py, Get-ChildItem *.json\n- Buscar recursivamente: find . -name, Get-ChildItem -Recurse\n- Ver contenido: cat, Get-Content, type\n- Información de archivos: stat, Get-Item\n\n⚙️ COMANDOS SISTEMA:\n- Azure CLI: az storage, az functionapp, az group\n- Python: python script.py, pip install\n- PowerShell: Get-Process, Set-Location, New-Item\n- NPM/Docker: npm install, docker ps\n\n✅ CARACTERÍSTICAS:\n- Conversión automática Unix→PowerShell en Windows\n- Detección inteligente de tipo de comando\n- Autocorrección con memoria de sesión\n- Siempre HTTP 200 (nunca falla)\n- Respuestas estructuradas para agentes AI\n\n💡 EJEMPLOS DE USO:\n- Buscar tests: {\"comando\": \"Get-ChildItem -Path C:\\\\proyecto -Include *_test.py -Recurse\"}\n- Buscar función: {\"comando\": \"grep -n 'def mi_funcion' archivo.py\"}\n- Listar archivos: {\"comando\": \"ls -la /proyecto/scripts\"}\n- Ver contenido: {\"comando\": \"cat README.md\"}",
         "operationId": "ejecutarCli",
         "tags": [
           "🚀 Universal CLI Executor"
@@ -2475,60 +2502,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/probar-endpoint": {
-      "post": {
-        "summary": "Probar un endpoint específico",
-        "operationId": "probarEndpoint",
-        "tags": [
-          "Testing"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "endpoint": {
-                    "type": "string",
-                    "description": "Endpoint a probar"
-                  },
-                  "method": {
-                    "type": "string",
-                    "enum": [
-                      "GET",
-                      "POST",
-                      "DELETE"
-                    ],
-                    "default": "GET"
-                  }
-                },
-                "required": [
-                  "endpoint"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Endpoint probado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Solicitud inválida"
           }
         }
       }
@@ -4149,131 +4122,131 @@
     },
     "/api/logs": {
       "get": {
-      "summary": "📝 ANÁLISIS DE ERRORES - Consulta errores desde Cosmos DB",
-      "description": "Analiza errores y warnings recientes desde el historial de Cosmos DB. Detecta automáticamente fallos por palabras clave (error, failed, warning). Para logs detallados de Azure, usar Application Insights.",
-      "operationId": "logs",
-      "tags": [
-      "Diagnóstico"
-      ],
-      "security": [],
-      "parameters": [
-      {
-      "name": "nivel",
-      "in": "query",
-      "description": "Filtrar por nivel de log",
-      "schema": {
-        "type": "string",
-        "enum": [
-        "ERROR",
-        "WARNING",
-        "INFO",
-        "DEBUG"
-        ]
-      }
-      },
-      {
-      "name": "limite",
-      "in": "query",
-      "description": "Número máximo de logs a devolver",
-      "schema": {
-        "type": "integer",
-        "default": 100,
-        "minimum": 1,
-        "maximum": 1000
-      }
-      },
-      {
-      "name": "horas",
-      "in": "query",
-      "description": "Logs de las últimas N horas",
-      "schema": {
-        "type": "integer",
-        "default": 24,
-        "minimum": 1
-      }
-      },
-      {
-      "name": "endpoint",
-      "in": "query",
-      "description": "Filtrar por endpoint específico",
-      "schema": {
-        "type": "string"
-      }
-      }
-      ],
-      "responses": {
-      "200": {
-      "description": "Logs obtenidos exitosamente",
-      "content": {
-        "application/json": {
-        "schema": {
-        "type": "object",
-        "properties": {
-        "exito": {
-          "type": "boolean"
-        },
-        "logs": {
-          "type": "array",
-          "items": {
-          "type": "object",
-          "properties": {
-          "nivel": {
-          "type": "string"
+        "summary": "📝 ANÁLISIS DE ERRORES - Consulta errores desde Cosmos DB",
+        "description": "Analiza errores y warnings recientes desde el historial de Cosmos DB. Detecta automáticamente fallos por palabras clave (error, failed, warning). Para logs detallados de Azure, usar Application Insights.",
+        "operationId": "logs",
+        "tags": [
+          "Diagnóstico"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "nivel",
+            "in": "query",
+            "description": "Filtrar por nivel de log",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ERROR",
+                "WARNING",
+                "INFO",
+                "DEBUG"
+              ]
+            }
           },
-          "timestamp": {
-          "type": "string"
+          {
+            "name": "limite",
+            "in": "query",
+            "description": "Número máximo de logs a devolver",
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 1000
+            }
           },
-          "endpoint": {
-          "type": "string"
+          {
+            "name": "horas",
+            "in": "query",
+            "description": "Logs de las últimas N horas",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1
+            }
           },
-          "mensaje": {
-          "type": "string"
-          },
-          "es_error": {
-          "type": "boolean"
+          {
+            "name": "endpoint",
+            "in": "query",
+            "description": "Filtrar por endpoint específico",
+            "schema": {
+              "type": "string"
+            }
           }
-          }
-          }
-        },
-        "total": {
-          "type": "integer"
-        },
-        "analisis": {
-          "type": "object",
-          "properties": {
-          "total": {
-          "type": "integer"
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs obtenidos exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean"
+                    },
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "nivel": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "mensaje": {
+                            "type": "string"
+                          },
+                          "es_error": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "analisis": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "por_nivel": {
+                          "type": "object"
+                        },
+                        "endpoints_problematicos": {
+                          "type": "object"
+                        },
+                        "patrones": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "respuesta_usuario": {
+                      "type": "string",
+                      "description": "Resumen en lenguaje natural para el agente"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
           },
-          "por_nivel": {
-          "type": "object"
-          },
-          "endpoints_problematicos": {
-          "type": "object"
-          },
-          "patrones": {
-          "type": "array",
-          "items": {
-          "type": "string"
+          "500": {
+            "description": "Error consultando logs"
           }
-          }
-          }
-        },
-        "respuesta_usuario": {
-          "type": "string",
-          "description": "Resumen en lenguaje natural para el agente"
-        },
-        "metadata": {
-          "type": "object"
         }
-        }
-        }
-        }
-      }
-      },
-      "500": {
-      "description": "Error consultando logs"
-      }
-      }
       }
     },
     "/api/guardar-memoria": {
