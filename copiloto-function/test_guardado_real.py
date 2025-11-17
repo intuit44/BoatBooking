@@ -125,9 +125,9 @@ def test_ai_search_ultimos_documentos():
     print("="*80)
 
     try:
-        from services.azure_search_client import AzureSearchService
+        from services.azure_search_client import get_search_service
 
-        search_service = AzureSearchService()
+        search_service = get_search_service()
 
         # Buscar documentos recientes (sin filtros, ordenados por score)
         resultado = search_service.search(

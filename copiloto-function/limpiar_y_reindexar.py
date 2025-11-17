@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from services.memory_service import memory_service
-from services.azure_search_client import AzureSearchService
+from services.azure_search_client import get_search_service
 from endpoints_search_memory import indexar_memoria_endpoint
 
 def limpiar_ai_search():
@@ -22,7 +22,7 @@ def limpiar_ai_search():
     print("="*80)
     
     try:
-        search_service = AzureSearchService()
+        search_service = get_search_service()
         
         # Buscar todos los documentos
         resultado = search_service.search(query="*", top=1000)

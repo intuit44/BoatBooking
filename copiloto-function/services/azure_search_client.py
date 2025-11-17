@@ -12,6 +12,8 @@ from azure.core.credentials import AzureKeyCredential
 from openai import AzureOpenAI
 from datetime import datetime, timezone
 
+_search_service_instance = None
+
 
 class AzureSearchService:
     """Cliente para Azure AI Search usando Managed Identity o API Key (fallback)."""
@@ -202,3 +204,11 @@ class AzureSearchService:
         """Alias que acepta lista de dicts con 'id'"""
         doc_ids = [doc["id"] for doc in docs if "id" in doc]
         return self.delete_documents(doc_ids)
+
+
+def get_search_service() -> AzureSearchService:
+    """Obtiene una instancia singleton del cliente de Azure Search."""
+    global _search_service_instance
+    if _search_service_instance is None:
+        _search_service_instance = AzureSearchService()
+    return _search_service_instance

@@ -51,9 +51,9 @@ print("TEST DE CONEXION")
 print("=" * 60)
 
 try:
-    from services.azure_search_client import AzureSearchService
+    from services.azure_search_client import get_search_service
     
-    service = AzureSearchService()
+    service = get_search_service()
     print(f"\nCliente inicializado correctamente")
     print(f"Endpoint activo: {service.endpoint}")
     

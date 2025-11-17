@@ -55,8 +55,8 @@ def test_azure_search_integration():
     # 2. Importar cliente
     print("\n2️⃣ Inicializando cliente Azure Search...")
     try:
-        from services.azure_search_client import AzureSearchService
-        search_service = AzureSearchService()
+        from services.azure_search_client import get_search_service
+        search_service = get_search_service()
         print("   ✅ Cliente inicializado correctamente")
     except Exception as e:
         print(f"   ❌ ERROR inicializando cliente: {e}")
@@ -190,8 +190,8 @@ def simulate_foundry_request():
     # Procesar con el servicio
     print("\n🔄 Procesando con AzureSearchService...")
     try:
-        from services.azure_search_client import AzureSearchService
-        search_service = AzureSearchService()
+        from services.azure_search_client import get_search_service
+        search_service = get_search_service()
         
         resultado = search_service.search(
             query=foundry_payload["query"],

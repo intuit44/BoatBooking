@@ -16,7 +16,6 @@ except Exception as e:
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from services.azure_search_client import AzureSearchService
 import logging
 
 logging.basicConfig(level=logging.INFO)

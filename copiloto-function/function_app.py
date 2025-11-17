@@ -4025,8 +4025,8 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
     # === 🔍 INTEGRACIÓN ADICIONAL CON AZURE SEARCH (OPCIONAL) ===
     try:
-        from services.azure_search_client import AzureSearchService
-        search = AzureSearchService()
+        from services.azure_search_client import get_search_service
+        search = get_search_service()
 
         consulta_usuario = (
             body.get("mensaje") or

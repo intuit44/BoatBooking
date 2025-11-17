@@ -83,8 +83,8 @@ def aplicar_correcciones():
             buscar_patron,
             """# 🔍 USAR AZURE AI SEARCH PARA CONTEXTO SEMÁNTICO
         try:
-            from services.azure_search_client import AzureSearchService
-            search = AzureSearchService()
+            from services.azure_search_client import get_search_service
+            search = get_search_service()
             
             query_usuario = (req.params.get("q") or req.params.get("mensaje") or "en que quedamos").strip()
             filtros = []

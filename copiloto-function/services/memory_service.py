@@ -688,8 +688,8 @@ class MemoryService:
     def evento_ya_existe(self, texto_semantico: str) -> bool:
         """Verifica si un evento con texto similar ya existe en AI Search."""
         try:
-            from services.azure_search_client import AzureSearchService
-            search_service = AzureSearchService()
+            from services.azure_search_client import get_search_service
+            search_service = get_search_service()
 
             resultados = search_service.search(
                 query=texto_semantico, top=1).get("documentos", [])

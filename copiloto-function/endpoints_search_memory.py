@@ -17,7 +17,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     🔧 DETECCIÓN TÉCNICA: Búsqueda literal para UUIDs e IDs
     """
     try:
-        from services.azure_search_client import AzureSearchService
+        from services.azure_search_client import get_search_service
         from semantic_query_builder import detectar_query_tecnica, buscar_literal_cosmos
         from services.cosmos_store import CosmosMemoryStore
 
@@ -68,7 +68,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 # Continuar con búsqueda vectorial como fallback
         
         # Búsqueda VECTORIAL normal (Azure AI Search)
-        search_service = AzureSearchService()
+        search_service = get_search_service()
         
         # 🔄 CASCADA DE BÚSQUEDA
         resultado = None
@@ -158,7 +158,7 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     Indexa documentos en Azure AI Search CON EMBEDDINGS REALES
     """
     try:
-        from services.azure_search_client import AzureSearchService
+        from services.azure_search_client import get_search_service
         from embedding_generator import generar_embedding
         from services.memory_service import MemoryService
 
@@ -226,7 +226,7 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 "mensaje": "Todos los documentos eran duplicados o inválidos"
             }
 
-        search_service = AzureSearchService()
+        search_service = get_search_service()
         resultado = search_service.indexar_documentos(documentos_con_vectores)
 
         indexados = len(documentos_con_vectores)

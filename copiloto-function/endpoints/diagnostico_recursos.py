@@ -468,8 +468,8 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
         try:
             if "search" in rid.lower():
                 try:
-                    from services.azure_search_client import AzureSearchService
-                    search_service = AzureSearchService()
+                    from services.azure_search_client import get_search_service
+                    search_service = get_search_service()
                     test_search = search_service.search("test", top=1)
 
                     result = {
