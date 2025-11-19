@@ -46,25 +46,53 @@ def extraer_session_info(req: func.HttpRequest, skip_api_call: bool = True) -> D
     session_id = None
     agent_id = None
     body = None
+    params = {}
     
     try:
         # 1. Headers (prioridad alta - Foundry usa headers)
-        session_id = req.headers.get("X-Thread-ID") or req.headers.get("Thread-ID") or req.headers.get("X-Session-ID")
-        agent_id = req.headers.get("X-Agent-ID") or req.headers.get("Agent-ID")
+        session_id = (
+            req.headers.get("X-Thread-ID")
+            or req.headers.get("Thread-ID")
+            or req.headers.get("X-Session-ID")
+            or req.headers.get("Session-ID")
+        )
+        agent_id = (
+            req.headers.get("X-Agent-ID")
+            or req.headers.get("Agent-ID")
+            or req.headers.get("X-Agent")
+            or req.headers.get("Agent")
+        )
         
         # 2. Query params
+        try:
+            params = req.params or {}
+        except Exception:
+            params = {}
+
         if not session_id:
-            session_id = req.params.get("thread_id") or req.params.get("session_id")
+            session_id = (
+                params.get("thread_id")
+                or params.get("session_id")
+                or params.get("Session-ID")
+                or params.get("Thread-ID")
+            )
         if not agent_id:
-            agent_id = req.params.get("agent_id")
+            agent_id = params.get("agent_id") or params.get("Agent-ID")
         
         # 3. Body JSON
         if not session_id or not agent_id:
             try:
                 body = req.get_json()
                 if body:
-                    session_id = session_id or body.get("thread_id") or body.get("session_id")
-                    agent_id = agent_id or body.get("agent_id")
+                    if isinstance(body, dict):
+                        lower_map = {
+                            (k.lower() if isinstance(k, str) else k): v
+                            for k, v in body.items()
+                        }
+                        session_id = session_id or lower_map.get("thread_id") or lower_map.get(
+                            "session_id") or body.get("Thread-ID") or body.get("Session-ID")
+                        agent_id = agent_id or lower_map.get("agent_id") or body.get(
+                            "Agent-ID") or body.get("agent")
             except:
                 pass
         

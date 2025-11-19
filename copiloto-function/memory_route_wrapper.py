@@ -8,9 +8,206 @@ import logging
 import azure.functions as func
 import json
 import time
-from typing import Callable
+import re
+from typing import Any, Callable, Dict
 from datetime import datetime
 from azure.storage.queue import QueueClient
+
+from services.redis_buffer_service import redis_buffer
+
+# Constantes globales de control de tamaño
+MAX_MENSAJE_CHARS = 600
+MAX_MENSAJES_THREAD = 20
+MAX_RESUMEN_CHARS = 6000
+
+THREADS_CONTAINER_NAME = os.getenv(
+    "THREADS_CONTAINER_NAME", "boat-rental-project")
+THREADS_BLOB_PREFIX = "threads/"
+CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
+
+
+def _emit_cache_custom_event(event_name: str, dimensions: Dict[str, Any]) -> None:
+    """Envía métricas al canal customEvent de Application Insights."""
+    if not dimensions:
+        return
+    try:
+        payload = dict(dimensions)
+        payload.setdefault("event_name", event_name)
+        CUSTOM_EVENT_LOGGER.info(
+            event_name,
+            extra={"custom_dimensions": payload}
+        )
+    except Exception:
+        logging.debug("No se pudo emitir customEvent de cache.", exc_info=True)
+
+
+def _clean_thread_text(texto):
+    """Normaliza texto eliminando emojis para almacenamiento de threads."""
+    if not isinstance(texto, str):
+        return ""
+    texto = texto.strip()
+    if not texto:
+        return ""
+    try:
+        return re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto).strip()
+    except re.error:
+        return texto
+
+
+def _resolver_identificadores_thread(req: func.HttpRequest):
+    """Obtiene thread_id, session_id y agent_id normalizados."""
+    thread_id = req.headers.get("Thread-ID") or req.headers.get("X-Thread-ID")
+    session_id = getattr(req, "_session_id", None)
+    agent_id = getattr(req, "_agent_id", None)
+
+    if not session_id or not agent_id:
+        try:
+            from memory_helpers import extraer_session_info
+
+            info = extraer_session_info(req)
+            session_id = session_id or info.get("session_id")
+            agent_id = agent_id or info.get("agent_id")
+        except Exception:
+            session_id = session_id or None
+            agent_id = agent_id or None
+
+    if not thread_id and session_id and session_id.startswith("assistant-"):
+        thread_id = session_id
+
+    if not thread_id:
+        thread_id = f"thread_fallback_session_{int(time.time())}"
+
+    return thread_id, session_id or "fallback_session", agent_id or "foundry_user"
+
+
+def _append_message(messages, role, content):
+    """Agrega mensaje evitando duplicados consecutivos y truncando a MAX_MENSAJE_CHARS."""
+    if not content:
+        return
+    content_truncado = content[:MAX_MENSAJE_CHARS] if len(
+        content) > MAX_MENSAJE_CHARS else content
+    payload = {
+        "role": role,
+        "content": content_truncado,
+        "created_at": datetime.utcnow().isoformat() + "Z"
+    }
+    if messages and messages[-1].get("role") == role and messages[-1].get("content") == content_truncado:
+        return
+    messages.append(payload)
+
+
+def _extraer_respuesta_desde_response(response_data: dict) -> str:
+    """Intenta extraer texto de respuesta desde el payload del endpoint."""
+    if not isinstance(response_data, dict):
+        return ""
+    for key in ("respuesta_usuario", "respuesta", "resultado", "mensaje", "texto_semantico", "output"):
+        valor = response_data.get(key)
+        if isinstance(valor, str) and valor.strip():
+            return _clean_thread_text(valor)
+    interacciones = response_data.get(
+        "interacciones") if isinstance(response_data, dict) else None
+    if isinstance(interacciones, list):
+        for item in interacciones:
+            texto = (item or {}).get("texto_semantico")
+            if isinstance(texto, str) and texto.strip():
+                return _clean_thread_text(texto)
+    return ""
+
+
+def guardar_thread_en_blob(req: func.HttpRequest, route_path: str, response_data: dict, respuesta_agente: str = ""):
+    """
+    Persiste el thread completo (mensajes + metadata) en Blob Storage para historiales reales.
+    """
+    try:
+        from blob_service import get_blob_client
+    except Exception:
+        logging.debug(
+            "Blob client no disponible; se omite guardado de thread.")
+        return
+
+    thread_id, session_id, agent_id = _resolver_identificadores_thread(req)
+    user_message = _clean_thread_text(
+        getattr(req, "_ultimo_mensaje_usuario", ""))
+    assistant_message = _clean_thread_text(
+        respuesta_agente) or _extraer_respuesta_desde_response(response_data or {})
+
+    if not user_message and not assistant_message and not isinstance(response_data, dict):
+        return
+
+    try:
+        client = get_blob_client()
+        container = client.get_container_client(THREADS_CONTAINER_NAME)
+        blob_name = f"{THREADS_BLOB_PREFIX}{thread_id}.json"
+        blob_client = container.get_blob_client(blob_name)
+
+        existing_data = None
+        try:
+            existing_bytes = blob_client.download_blob().readall()
+            existing_data = json.loads(existing_bytes.decode("utf-8"))
+        except Exception:
+            existing_data = None
+
+        mensajes_existentes = []
+        if isinstance(existing_data, dict):
+            mensajes_existentes = existing_data.get("mensajes") or []
+            if not isinstance(mensajes_existentes, list):
+                mensajes_existentes = []
+
+        mensajes_totales = list(mensajes_existentes)
+        _append_message(mensajes_totales, "usuario", user_message)
+        _append_message(mensajes_totales, "asistente", assistant_message)
+
+        if not mensajes_totales:
+            return
+
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        thread_payload = existing_data if isinstance(
+            existing_data, dict) else {}
+        thread_payload.update({
+            "id": thread_id,
+            "session_id": session_id,
+            "agent_id": agent_id,
+            "endpoint": route_path,
+            "timestamp": timestamp,
+        })
+
+        # Limitar mensajes a MAX_MENSAJES_THREAD
+        thread_payload["mensajes"] = mensajes_totales[-MAX_MENSAJES_THREAD:]
+
+        # Limpiar response_data antes de guardar (eliminar campos inútiles)
+        if isinstance(response_data, dict):
+            response_clean = {}
+            for k, v in response_data.items():
+                if k in ("texto_semantico", "respuesta_usuario", "metadata", "interacciones"):
+                    continue
+                if v and not (isinstance(v, str) and not v.strip()):
+                    response_clean[k] = v
+            if response_clean:
+                thread_payload["response_data"] = response_clean
+
+        metadata = thread_payload.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        metadata.update({
+            "user_agent": req.headers.get("User-Agent", ""),
+            "source": req.headers.get("X-Source") or req.headers.get("Source") or metadata.get("source") or "foundry_ui",
+            "ultima_actualizacion": timestamp,
+            "wrapper_aplicado": True
+        })
+        thread_payload["metadata"] = metadata
+
+        body_bytes = json.dumps(thread_payload, ensure_ascii=False,
+                                indent=2).encode("utf-8")
+        blob_client.upload_blob(body_bytes, overwrite=True)
+        logging.info(
+            f"[THREAD_STORE] Thread {thread_id} actualizado ({len(thread_payload['mensajes'])} mensajes).")
+        try:
+            redis_buffer.cache_thread_snapshot(thread_id, thread_payload)
+        except Exception:
+            logging.debug(
+                f"[THREAD_STORE] No se pudo cachear thread {thread_id} en Redis.", exc_info=True)
+    except Exception as exc:
+        logging.warning(f"Error guardando thread en blob: {exc}")
 
 
 def recuperar_contexto_conversacional(session_id: str, endpoint_actual: str) -> str:
@@ -77,18 +274,29 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     # 0️⃣ CAPTURA COMPLETA DE ENTRADA DEL USUARIO
                     try:
                         from memory_helpers import extraer_session_info
-                        
+
                         body = req.get_json() if req.method in [
                             "POST", "PUT", "PATCH"] else {}
                         # Priorizar 'input' (Foundry real) sobre 'mensaje' (legacy)
-                        user_message = body.get("input") or body.get("mensaje") or body.get(
+                        user_message_raw = body.get("input") or body.get("mensaje") or body.get(
                             "query") or body.get("prompt")
+                        user_message = user_message_raw.strip(
+                        ) if isinstance(user_message_raw, str) else None
 
-                        if user_message and len(user_message.strip()) > 3:
+                        if user_message:
+                            try:
+                                setattr(
+                                    req, "_ultimo_mensaje_usuario", user_message)
+                            except Exception:
+                                pass
+
+                        if user_message and len(user_message) > 3:
                             # CAPTURA AUTOMÁTICA DE THREAD
                             session_info = extraer_session_info(req)
-                            session_id = session_info.get("session_id") or "fallback_session"
-                            agent_id = session_info.get("agent_id") or "foundry_user"
+                            session_id = session_info.get(
+                                "session_id") or "fallback_session"
+                            agent_id = session_info.get(
+                                "agent_id") or "foundry_user"
 
                             # Exponer identificadores en el request para el resto del pipeline
                             try:
@@ -132,7 +340,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         # CAPTURA AUTOMÁTICA DE THREAD
                         session_info = extraer_session_info(req)
                         session_id = session_info.get("session_id") or "global"
-                        agent_id = session_info.get("agent_id") or "unknown_agent"
+                        agent_id = session_info.get(
+                            "agent_id") or "unknown_agent"
+                        try:
+                            thread_id_cache, _, _ = _resolver_identificadores_thread(
+                                req)
+                        except Exception:
+                            thread_id_cache = None
 
                         # Exponer identificadores en el request para el resto del pipeline
                         try:
@@ -141,8 +355,45 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         except Exception:
                             pass
 
-                        # 🔥 CONSULTA COMPLETA: Recupera TODA la conversación rica desde Cosmos DB
-                        memoria_previa = consultar_memoria_cosmos_directo(req)
+                        cache_dimensions = {
+                            "cache_scope": "memoria_contexto",
+                            "route": source_name,
+                            "session_id": session_id,
+                            "thread_id": thread_id_cache or "",
+                            "redis_enabled": redis_buffer.is_enabled
+                        }
+                        memoria_previa = None
+                        redis_lookup_ms = 0.0
+                        if redis_buffer.is_enabled:
+                            start_lookup = time.perf_counter()
+                            memoria_previa = redis_buffer.get_memoria_cache(
+                                session_id)
+                            redis_lookup_ms = (
+                                time.perf_counter() - start_lookup) * 1000
+
+                        if memoria_previa:
+                            cache_dimensions.update({
+                                "hit": True,
+                                "latency_ms": round(redis_lookup_ms, 2),
+                                "source": "redis"
+                            })
+                            _emit_cache_custom_event(
+                                "redis_buffer_lookup", cache_dimensions)
+                        else:
+                            cosmos_lookup = time.perf_counter()
+                            memoria_previa = consultar_memoria_cosmos_directo(
+                                req)
+                            cosmos_latency_ms = (
+                                time.perf_counter() - cosmos_lookup) * 1000
+                            redis_buffer.cache_memoria_contexto(
+                                session_id, memoria_previa, thread_id=thread_id_cache)
+                            cache_dimensions.update({
+                                "hit": False,
+                                "latency_ms": round(cosmos_latency_ms, 2),
+                                "source": "cosmos"
+                            })
+                            _emit_cache_custom_event(
+                                "redis_buffer_lookup", cache_dimensions)
 
                         if memoria_previa and memoria_previa.get("tiene_historial"):
                             total = memoria_previa.get(
@@ -203,18 +454,60 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             "top": 20  # Más resultados
                         }
 
-                        resultado_vectorial = buscar_memoria_endpoint(
-                            memoria_payload)
+                        search_material = f"{route_path}|{getattr(req, '_session_id', '')}|{query_busqueda}"
+                        search_hash = redis_buffer.stable_hash(search_material)
+                        search_metrics = {
+                            "cache_scope": "search_vectorial",
+                            "route": route_path,
+                            "session_id": getattr(req, "_session_id", ""),
+                            "query_hash": search_hash,
+                            "redis_enabled": redis_buffer.is_enabled
+                        }
+                        cached_docs = None
+                        search_latency_ms = 0.0
+                        if redis_buffer.is_enabled:
+                            start_lookup = time.perf_counter()
+                            cached_docs = redis_buffer.get_cached_payload(
+                                "search", search_hash)
+                            search_latency_ms = (
+                                time.perf_counter() - start_lookup) * 1000
 
-                        if resultado_vectorial.get("exito") and resultado_vectorial.get("documentos"):
-                            docs_vectoriales = resultado_vectorial["documentos"]
-                            logging.info(
-                                f"🔍 [{source_name}] AI Search: {len(docs_vectoriales)} docs vectoriales para endpoint {route_path}")
+                        if cached_docs:
+                            docs_vectoriales = cached_docs
+                            search_metrics.update({
+                                "hit": True,
+                                "latency_ms": round(search_latency_ms, 2),
+                                "source": "redis",
+                                "docs": len(docs_vectoriales)
+                            })
+                            _emit_cache_custom_event(
+                                "redis_buffer_search", search_metrics)
+                        else:
+                            resultado_lookup = time.perf_counter()
+                            resultado_vectorial = buscar_memoria_endpoint(
+                                memoria_payload)
+                            consulta_latency = (
+                                time.perf_counter() - resultado_lookup) * 1000
+                            if resultado_vectorial.get("exito") and resultado_vectorial.get("documentos"):
+                                docs_vectoriales = resultado_vectorial["documentos"]
+                                redis_buffer.cache_response(
+                                    "search", search_hash, docs_vectoriales)
+                                logging.info(
+                                    f"🔍 [{source_name}] AI Search: {len(docs_vectoriales)} docs vectoriales para endpoint {route_path}")
 
-                            # Inyectar en memoria_previa
-                            if memoria_previa:
-                                memoria_previa["docs_vectoriales"] = docs_vectoriales
-                                memoria_previa["fuente_datos"] = "Endpoint+AISearch"
+                                # Inyectar en memoria_previa
+                                if memoria_previa:
+                                    memoria_previa["docs_vectoriales"] = docs_vectoriales
+                                    memoria_previa["fuente_datos"] = "Endpoint+AISearch"
+
+                            search_metrics.update({
+                                "hit": False,
+                                "latency_ms": round(consulta_latency, 2),
+                                "source": "search_service",
+                                "docs": len(docs_vectoriales)
+                            })
+                            _emit_cache_custom_event(
+                                "redis_buffer_search", search_metrics)
                     except Exception as e:
                         logging.warning(
                             f"⚠️ [{source_name}] Error en búsqueda vectorial: {e}")
@@ -246,6 +539,20 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             status_code=500
                         )
 
+                    # Guardar contexto caliente después de la ejecución
+                    try:
+                        session_cache = getattr(req, "_session_id", None)
+                        thread_cache, _, _ = _resolver_identificadores_thread(
+                            req)
+                        memoria_contexto = getattr(
+                            req, "_memoria_contexto", None)
+                        if session_cache and memoria_contexto:
+                            redis_buffer.cache_memoria_contexto(
+                                session_cache, memoria_contexto, thread_id=thread_cache)
+                    except Exception:
+                        logging.debug(
+                            "No se pudo refrescar la caché de memoria post-ejecución.", exc_info=True)
+
                     # 3️⃣ INYECTAR METADATA SIN PERDER CONTENIDO
                     response_data_for_semantic = None
                     try:
@@ -264,13 +571,16 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                                 response_data["metadata"]["wrapper_aplicado"] = True
 
-                                if memoria_previa.get("tiene_historial"):
+                                # Proteger accesos en caso de que memoria_previa sea None
+                                mp = memoria_previa or {}
+                                if mp.get("tiene_historial"):
                                     response_data["metadata"]["memoria_aplicada"] = True
-                                    response_data["metadata"]["interacciones_previas"] = memoria_previa["total_interacciones"]
+                                    response_data["metadata"]["interacciones_previas"] = mp.get(
+                                        "total_interacciones", 0)
                                     response_data["metadata"]["docs_vectoriales"] = len(
-                                        memoria_previa.get("docs_vectoriales", []))
+                                        mp.get("docs_vectoriales", []))
                                     logging.info(
-                                        f"🧠 [{source_name}] Metadata inyectada: {memoria_previa['total_interacciones']} interacciones")
+                                        f"🧠 [{source_name}] Metadata inyectada: {mp.get('total_interacciones', 0)} interacciones")
 
                                 # Recrear HttpResponse preservando TODO
                                 new_body = json.dumps(
@@ -291,7 +601,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     # 4️⃣ CAPTURA AUTOMÁTICA DE CONVERSACIÓN RICA COMPLETA (solo si hay contexto real)
                     try:
                         from memory_helpers import extraer_session_info
-                        
+
                         # CAPTURA AUTOMÁTICA DE THREAD
                         session_info = extraer_session_info(req)
                         session_id = session_info.get("session_id") or "global"
@@ -396,18 +706,22 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     # 5.5️⃣ SINCRONIZAR THREAD DE FOUNDRY CON MEMORIA
                     try:
                         from thread_memory_hook import sync_thread_to_memory
-                        response_data = sync_thread_to_memory(req, response_data_for_semantic or {})
+                        response_data = sync_thread_to_memory(
+                            req, response_data_for_semantic or {})
                     except Exception as e:
                         logging.warning(f"⚠️ Error sincronizando thread: {e}")
 
                     # 6️⃣ CAPTURA DE RESPUESTA COMPLETA FOUNDRY UI
+                    assistant_thread_text = None
                     try:
                         from memory_helpers import extraer_session_info
-                        
+
                         # CAPTURA AUTOMÁTICA DE THREAD
                         session_info = extraer_session_info(req)
-                        session_id = session_info.get("session_id") or "fallback_session"
-                        agent_id = session_info.get("agent_id") or "foundry_user"
+                        session_id = session_info.get(
+                            "session_id") or "fallback_session"
+                        agent_id = session_info.get(
+                            "agent_id") or "foundry_user"
 
                         logging.info(f"[BLOQUE 6] Iniciando para {route_path}")
 
@@ -429,13 +743,15 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 logging.info(
                                     f"[BLOQUE 6] respuesta_texto encontrado: {bool(respuesta_texto)}, len={len(str(respuesta_texto)) if respuesta_texto else 0}")
                                 if respuesta_texto and isinstance(respuesta_texto, str):
-                                    import re
-                                    texto_limpio = re.sub(
-                                        r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', respuesta_texto)
+                                    texto_limpio = _clean_thread_text(
+                                        respuesta_texto)
                                     texto_limpio = texto_limpio.replace(
                                         "endpoint", "consulta").replace("**", "")
                                     logging.info(
                                         f"[BLOQUE 6] texto_limpio len={len(texto_limpio.strip())}")
+
+                                    if texto_limpio.strip():
+                                        assistant_thread_text = texto_limpio.strip()
 
                                     if len(texto_limpio.strip()) > 20:
                                         logging.info(
@@ -446,14 +762,13 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                             f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars")
 
                                 elif response_data_for_semantic.get("interacciones"):
-                                    import re
                                     interacciones = response_data_for_semantic.get(
                                         "interacciones", [])
                                     resumen_partes = []
                                     for i in interacciones[:5]:
                                         texto = i.get("texto_semantico", "")
-                                        texto_limpio = re.sub(
-                                            r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
+                                        texto_limpio = _clean_thread_text(
+                                            texto)
                                         texto_limpio = texto_limpio.replace(
                                             "endpoint", "consulta").replace("**", "")
                                         if len(texto_limpio.strip()) > 20:
@@ -462,6 +777,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                     if resumen_partes:
                                         texto_sintetizado = " | ".join(
                                             resumen_partes)
+                                        assistant_thread_text = texto_sintetizado.strip()
                                         registrar_respuesta_semantica(
                                             texto_sintetizado, session_id, agent_id, route_path)
                                         logging.info(
@@ -476,6 +792,17 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     except Exception as e:
                         logging.warning(
                             f"⚠️ Error capturando respuesta Foundry UI: {e}")
+
+                    try:
+                        guardar_thread_en_blob(
+                            req,
+                            route_path,
+                            response_data_for_semantic or {},
+                            assistant_thread_text or ""
+                        )
+                    except Exception as e:
+                        logging.warning(
+                            f"⚠️ Error guardando snapshot de thread: {e}")
 
                     return response
 

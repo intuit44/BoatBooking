@@ -107,94 +107,113 @@ if (-not $acrUsername -or -not $acrPassword) {
 Write-Success "Credenciales ACR obtenidas"
 
 # ==========================================
-# FASE 3: CONFIGURAR APP SETTINGS CRÍTICOS
+# FASE 2.5: CAMBIAR A DIRECTORIO RAÍZ CON PROTECCIÓN
 # ==========================================
-Write-Step "FASE 3: CONFIGURAR APP SETTINGS" 3
+Write-Step "FASE 2.5: CAMBIAR A DIRECTORIO RAÍZ" 2.5
 
-$settings = @{
-  "FUNCTIONS_WORKER_RUNTIME"                    = "python"
-  "FUNCTIONS_EXTENSION_VERSION"                 = "~4"
-  "AzureWebJobsStorage"                         = "..."
-  "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
-  "WEBSITES_PORT"                               = "80"
-  "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
-  "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot"
-  "AzureWebJobsDisableHomepage"                 = "false"
-  "WEBSITE_MOUNT_ENABLED"                       = "1"
-  "DOCKER_ENABLE_CI"                            = "true"
-  "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
-  "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
-  # Variables de Voice Live
-  "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
-  "AZURE_VOICE_LIVE_DEPLOYMENT"                 = "gpt-4o-mini"
-  "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
-  # 🔐 CREDENCIALES GITHUB (IMPORTANTE)
-  "GITHUB_PAT"                                  = "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"
-  # Cosmos DB
-  "COSMOSDB_ENDPOINT"                           = "https://copiloto-cosmos.documents.azure.com:443/"
-  "COSMOSDB_DATABASE"                           = "agentMemory"
-  "COSMOSDB_CONTAINER"                          = "memory"
-  # Autopilot
-  "SEMANTIC_AUTOPILOT"                          = "on"
-  # App Insights
-  "APPINSIGHTS_WORKSPACE_ID"                    = "3e355ae8-3dd7-44ad-be64-fa332dc93c96"
-  "APPLICATIONINSIGHTS_CONNECTION_STRING"       = "InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53"
-  # Bing Search
-  "BING_SEARCH_KEY"                             = "7242cc4c0c9449f6989f14e21af9ff44"
-  "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
-  # Azure Cognitive Search (added)
-  "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch-s1.search.windows.net"
-  "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index"
-  "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
-  "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
-  "AGENTE_OPENAI_PROJECT_URL"                   = "https://agenteopenai.services.ai.azure.com/api/projects/AgenteOpenAi-project"
-  # Embeddings model
-  "EMBEDDING_MODEL"                             = "text-embedding-3-large"
-  # Dejarlo de último
-  "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
-  "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
-  "AZURE_RESOURCE_GROUP"                        = "boat-rental-app-group"
-}
-
-
-
-
-Write-Info "Aplicando settings críticos..."
-foreach ($key in $settings.Keys) {
-  $value = $settings[$key]
-  $applied = $false
-  for ($i = 1; $i -le 3; $i++) {
-    Write-Info "  Configurando: $key (intento $i/3)"
-    $result = az functionapp config appsettings set `
-      -g $ResourceGroup `
-      -n $FunctionApp `
-      --settings "$key=$value" 2>&1
-    if ($LASTEXITCODE -eq 0) {
-      Write-Success "$key configurado"
-      $applied = $true
-      break
-    }
-    else {
-      Write-Warning "Fallo al configurar $key. Reintentando en $([int](5 * $i))s..."
-      Start-Sleep -Seconds (5 * $i)
-    }
-  }
-  if (-not $applied -and -not $Force) {
-    Write-Error "No se pudo configurar $key después de 3 intentos"
-    exit 1
-  }
-}
-
-Write-Success "App Settings configurados"
-
-
-# ==========================================
-# FASE 3.1: CONFIGURAR GIT CREDENTIALS
-# ==========================================
-Write-Step "FASE 3.1: CONFIGURAR GIT CREDENTIALS" 3.1
+Push-Location ..
+Write-Success "Cambiado a directorio raíz: $(Get-Location)"
 
 try {
-  $gitScript = @"
+  # ==========================================
+  # FASE 3: CONFIGURAR APP SETTINGS CRÍTICOS
+  # ==========================================
+  Write-Step "FASE 3: CONFIGURAR APP SETTINGS" 3
+
+  $settings = @{
+    "FUNCTIONS_WORKER_RUNTIME"                    = "python"
+    "FUNCTIONS_EXTENSION_VERSION"                 = "~4"
+    "AzureWebJobsStorage"                         = "..."
+    "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
+    "WEBSITES_PORT"                               = "80"
+    "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
+    "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot/copiloto-function"
+    "AzureWebJobsDisableHomepage"                 = "false"
+    "WEBSITE_MOUNT_ENABLED"                       = "1"
+    "DOCKER_ENABLE_CI"                            = "true"
+    "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
+    "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
+    # Variables de Voice Live
+    "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
+    "AZURE_VOICE_LIVE_DEPLOYMENT"                 = "gpt-4o-mini"
+    "AZURE_VOICE_LIVE_API_KEY"                    = "DfcXE1OSYCtiy2CHfVJTzUsoTvf0W9wvRdptkIP73YODTiLAfy51JQQJ99BIACHYHv6XJ3w3AAAAACOGfKnW"
+    # 🔐 CREDENCIALES GITHUB (IMPORTANTE)
+    "GITHUB_PAT"                                  = "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"
+    # Cosmos DB
+    "COSMOSDB_ENDPOINT"                           = "https://copiloto-cosmos.documents.azure.com:443/"
+    "COSMOSDB_DATABASE"                           = "agentMemory"
+    "COSMOSDB_CONTAINER"                          = "memory"
+    # Autopilot
+    "SEMANTIC_AUTOPILOT"                          = "on"
+    # App Insights
+    "APPINSIGHTS_WORKSPACE_ID"                    = "3e355ae8-3dd7-44ad-be64-fa332dc93c96"
+    "APPLICATIONINSIGHTS_CONNECTION_STRING"       = "InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53"
+    # Bing Search
+    "BING_SEARCH_KEY"                             = "7242cc4c0c9449f6989f14e21af9ff44"
+    "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
+    # Azure Cognitive Search (added)
+    "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch-s1.search.windows.net"
+    "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index"
+    "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
+    "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
+    "AGENTE_OPENAI_PROJECT_URL"                   = "https://agenteopenai.services.ai.azure.com/api/projects/AgenteOpenAi-project"
+    # Embeddings model
+    "EMBEDDING_MODEL"                             = "text-embedding-3-large"
+    # Redis (Managed)
+    "REDIS_HOST"                                  = "Managed-redis-copiloto.eastus2.redis.azure.net"
+    "REDIS_PORT"                                  = "10000"
+    "REDIS_SSL"                                   = "1"
+    "REDIS_USE_MANAGED_IDENTITY"                  = "true"
+    "REDIS_JSON"                                  = "1"
+    "REDIS_DB"                                    = "0"
+    # Dejarlo de último
+    "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
+    "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
+    "AZURE_RESOURCE_GROUP"                        = "boat-rental-app-group"
+  }
+
+
+
+
+  Write-Info "Aplicando settings críticos..."
+  foreach ($key in $settings.Keys) {
+    $value = $settings[$key]
+    $applied = $false
+    for ($i = 1; $i -le 3; $i++) {
+      Write-Info "  Configurando: $key (intento $i/3)"
+      $result = az functionapp config appsettings set `
+        -g $ResourceGroup `
+        -n $FunctionApp `
+        --settings "$key=$value" 2>&1
+      if ($LASTEXITCODE -eq 0) {
+        Write-Success "$key configurado"
+        $applied = $true
+        break
+      }
+      else {
+        Write-Warning "Fallo al configurar $key. Reintentando en $([int](5 * $i))s..."
+        Start-Sleep -Seconds (5 * $i)
+      }
+    }
+    if (-not $applied -and -not $Force) {
+      Write-Error "No se pudo configurar $key después de 3 intentos"
+      exit 1
+    }
+  }
+
+  Write-Success "App Settings configurados"
+
+
+  # ==========================================
+  # FASE 3.1: CONFIGURAR GIT CREDENTIALS
+  # ==========================================
+  Write-Step "FASE 3.1: CONFIGURAR GIT CREDENTIALS" 3.1
+
+  # Restaurar directorio original al final del script
+  trap { Pop-Location }
+
+  try {
+    $gitScript = @"
 git config --global user.email 'copiloto@azure.com'
 git config --global user.name 'Azure Copiloto'
 git config --global credential.helper 'store --file ~/.git-credentials'
@@ -202,294 +221,305 @@ echo 'https://x-access-token:$GITHUB_PAT@github.com' > ~/.git-credentials
 chmod 600 ~/.git-credentials
 "@
 
-  $gitScriptBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($gitScript))
+    $gitScriptBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($gitScript))
 
-  az functionapp config appsettings set `
-    -g $ResourceGroup `
-    -n $FunctionApp `
-    --settings `
-    "GIT_INIT_SCRIPT_BASE64=$gitScriptBase64" `
-    "GITHUB_PAT=$GITHUB_PAT" 1>$null
+    az functionapp config appsettings set `
+      -g $ResourceGroup `
+      -n $FunctionApp `
+      --settings `
+      "GIT_INIT_SCRIPT_BASE64=$gitScriptBase64" `
+      "GITHUB_PAT=$GITHUB_PAT" 1>$null
 
-  Write-Success "Configuración Git aplicada (base64)"
-}
-catch {
-  Write-Warning "Error configurando Git credentials: $($_.Exception.Message)"
-}
+    Write-Success "Configuración Git aplicada (base64)"
+  }
+  catch {
+    Write-Warning "Error configurando Git credentials: $($_.Exception.Message)"
+  }
 
-# ==========================================
-# FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)
-# ==========================================
-Write-Step "FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)" 3.5
+  # ==========================================
+  # FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)
+  # ==========================================
+  Write-Step "FASE 3.5: IDENTIDAD ADMINISTRADA PARA BLOB (SIN CLAVES)" 3.5
 
-# Variables de storage
-$StorageAccount = "boatrentalstorage"
-$ContainerName = "boat-rental-project"
+  # Variables de storage
+  $StorageAccount = "boatrentalstorage"
+  $ContainerName = "boat-rental-project"
 
-# 3.5.1 – Asignar RBAC a la MI de la Function App (Data Contributor)
-try {
-  $mi = az functionapp show -g $ResourceGroup -n $FunctionApp --query identity.principalId -o tsv
-  $saId = az storage account show -g $ResourceGroup -n $StorageAccount --query id -o tsv
+  # 3.5.1 – Asignar RBAC a la MI de la Function App (Data Contributor)
+  try {
+    $mi = az functionapp show -g $ResourceGroup -n $FunctionApp --query identity.principalId -o tsv
+    $saId = az storage account show -g $ResourceGroup -n $StorageAccount --query id -o tsv
 
-  if (-not $mi -or -not $saId) {
-    Write-Error "No se pudo obtener MI o id de Storage Account"
+    if (-not $mi -or -not $saId) {
+      Write-Error "No se pudo obtener MI o id de Storage Account"
+      if (-not $Force) { exit 1 }
+    }
+
+    Write-Info "Asignando rol 'Storage Blob Data Contributor' a la MI de la app..."
+    az role assignment create --assignee $mi --role "Storage Blob Data Contributor" --scope $saId 1>$null 2>$null
+    Write-Success "RBAC aplicado (puede tardar 1–3 min en propagarse)"
+  }
+  catch {
+    Write-Warning "No se pudo asignar RBAC (posible duplicado). Continuo..."
+  }
+
+  # 3.5.2 – Garantizar acceso público de red al endpoint de blobs (sin abrir anonimato)
+  try {
+    $pna = az storage account show -g $ResourceGroup -n $StorageAccount --query publicNetworkAccess -o tsv
+    $dfa = az storage account show -g $ResourceGroup -n $StorageAccount --query networkRuleSet.defaultAction -o tsv
+
+    if ($pna -ne "Enabled") {
+      Write-Info "Habilitando PublicNetworkAccess=Enabled..."
+      az storage account update -g $ResourceGroup -n $StorageAccount --public-network-access Enabled 1>$null
+    }
+    if ($dfa -ne "Allow") {
+      Write-Info "Estableciendo defaultAction=Allow..."
+      az storage account update -g $ResourceGroup -n $StorageAccount --default-action Allow 1>$null
+    }
+    Write-Success "Red de Storage OK (PNA=Enabled / defaultAction=Allow)"
+  }
+  catch {
+    Write-Warning "No se pudo actualizar configuración de red de Storage. Reviso de todos modos..."
+  }
+
+  # 3.5.3 – Forzar ruta MI en tu código: solo BLOB_ACCOUNT_URL, sin connection string de datos
+  try {
+    $blobUrl = "https://$StorageAccount.blob.core.windows.net"
+    az functionapp config appsettings set -g $ResourceGroup -n $FunctionApp --settings BLOB_ACCOUNT_URL="$blobUrl" 1>$null
+    az functionapp config appsettings delete -g $ResourceGroup -n $FunctionApp --setting-names AZURE_STORAGE_CONNECTION_STRING 1>$null
+    Write-Success "AppSettings para MI aplicados (BLOB_ACCOUNT_URL set / AZURE_STORAGE_CONNECTION_STRING eliminado)"
+  }
+  catch {
+    Write-Error "No se pudieron aplicar AppSettings para MI"
     if (-not $Force) { exit 1 }
   }
 
-  Write-Info "Asignando rol 'Storage Blob Data Contributor' a la MI de la app..."
-  az role assignment create --assignee $mi --role "Storage Blob Data Contributor" --scope $saId 1>$null 2>$null
-  Write-Success "RBAC aplicado (puede tardar 1–3 min en propagarse)"
-}
-catch {
-  Write-Warning "No se pudo asignar RBAC (posible duplicado). Continuo..."
-}
-
-# 3.5.2 – Garantizar acceso público de red al endpoint de blobs (sin abrir anonimato)
-try {
-  $pna = az storage account show -g $ResourceGroup -n $StorageAccount --query publicNetworkAccess -o tsv
-  $dfa = az storage account show -g $ResourceGroup -n $StorageAccount --query networkRuleSet.defaultAction -o tsv
-
-  if ($pna -ne "Enabled") {
-    Write-Info "Habilitando PublicNetworkAccess=Enabled..."
-    az storage account update -g $ResourceGroup -n $StorageAccount --public-network-access Enabled 1>$null
+  # 3.5.4 – Asegurar que existe el contenedor que usa tu código (CONTAINER_NAME)
+  try {
+    Write-Info "Creando contenedor '$ContainerName' (idempotente) con AAD..."
+    az storage container create -n $ContainerName --account-name $StorageAccount --auth-mode login 1>$null
+    Write-Success "Contenedor verificado/creado"
   }
-  if ($dfa -ne "Allow") {
-    Write-Info "Estableciendo defaultAction=Allow..."
-    az storage account update -g $ResourceGroup -n $StorageAccount --default-action Allow 1>$null
+  catch {
+    Write-Warning "No se pudo crear/verificar el contenedor (quizá ya existe)."
   }
-  Write-Success "Red de Storage OK (PNA=Enabled / defaultAction=Allow)"
-}
-catch {
-  Write-Warning "No se pudo actualizar configuración de red de Storage. Reviso de todos modos..."
-}
 
-# 3.5.3 – Forzar ruta MI en tu código: solo BLOB_ACCOUNT_URL, sin connection string de datos
-try {
-  $blobUrl = "https://$StorageAccount.blob.core.windows.net"
-  az functionapp config appsettings set -g $ResourceGroup -n $FunctionApp --settings BLOB_ACCOUNT_URL="$blobUrl" 1>$null
-  az functionapp config appsettings delete -g $ResourceGroup -n $FunctionApp --setting-names AZURE_STORAGE_CONNECTION_STRING 1>$null
-  Write-Success "AppSettings para MI aplicados (BLOB_ACCOUNT_URL set / AZURE_STORAGE_CONNECTION_STRING eliminado)"
-}
-catch {
-  Write-Error "No se pudieron aplicar AppSettings para MI"
-  if (-not $Force) { exit 1 }
-}
+  # 3.5.5 – Reinicio rápido para recoger RBAC/AppSettings
+  Write-Info "Reiniciando para recoger MI/RBAC..."
+  az functionapp restart -g $ResourceGroup -n $FunctionApp 1>$null
+  Write-Info "Esperando propagación de RBAC (75s)..."
+  Start-Sleep -Seconds 75
 
-# 3.5.4 – Asegurar que existe el contenedor que usa tu código (CONTAINER_NAME)
-try {
-  Write-Info "Creando contenedor '$ContainerName' (idempotente) con AAD..."
-  az storage container create -n $ContainerName --account-name $StorageAccount --auth-mode login 1>$null
-  Write-Success "Contenedor verificado/creado"
-}
-catch {
-  Write-Warning "No se pudo crear/verificar el contenedor (quizá ya existe)."
-}
+  # ==========================================
+  # FASE 3.9: CONSTRUIR Y PUBLICAR IMAGEN DOCKER
+  # ==========================================
+  Write-Step "FASE 3.9: CONSTRUIR Y PUBLICAR IMAGEN DOCKER" 3.9
 
-# 3.5.5 – Reinicio rápido para recoger RBAC/AppSettings
-Write-Info "Reiniciando para recoger MI/RBAC..."
-az functionapp restart -g $ResourceGroup -n $FunctionApp 1>$null
-Write-Info "Esperando propagación de RBAC (75s)..."
-Start-Sleep -Seconds 75
+  $fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
 
-# ==========================================
-# FASE 3.9: CONSTRUIR Y PUBLICAR IMAGEN DOCKER
-# ==========================================
-Write-Step "FASE 3.9: CONSTRUIR Y PUBLICAR IMAGEN DOCKER" 3.9
-
-$fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
-
-# Build de imagen Docker
-Write-Info "Construyendo imagen Docker: $fullImage"
-docker build -t $fullImage .
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló la construcción de la imagen Docker"
-  if (-not $Force) { exit 1 }
-}
-Write-Success "Imagen Docker construida exitosamente"
-
-# Login ACR
-Write-Info "Autenticando con ACR: $ACR"
-az acr login -n $ACR
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló autenticación con ACR"
-  if (-not $Force) { exit 1 }
-}
-Write-Success "Login en ACR exitoso"
-
-# Push al ACR
-Write-Info "Publicando imagen en ACR: $fullImage"
-docker push $fullImage
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "Falló la publicación de la imagen en ACR"
-  if (-not $Force) { exit 1 }
-}
-Write-Success "Imagen Docker publicada exitosamente"
-
-
-# ==========================================
-# FASE 4: CONFIGURAR CONTENEDOR CON CREDENCIALES
-# ==========================================
-Write-Step "FASE 4: CONFIGURAR CONTENEDOR" 4
-
-$fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
-Write-Info "Configurando imagen: $fullImage"
-
-# Validar que la imagen existe en ACR
-Write-Info "Verificando que la imagen existe en ACR..."
-$tagExists = az acr repository show-tags -n $ACR --repository copiloto-func-azcli --query "[?@ == '$ImageTag']" -o tsv
-if (-not $tagExists) {
-  Write-Error "La imagen $fullImage no existe en ACR"
-  if (-not $Force) { exit 1 }
-}
-Write-Success "Imagen encontrada en ACR: $ImageTag"
-
-# Verificación opcional del contenido de la imagen Docker
-Write-Info "Verificando contenido de la imagen Docker..."
-try {
-  $dockerContent = docker run --rm $fullImage ls -la /home/site/wwwroot 2>&1
-  if ($LASTEXITCODE -eq 0) {
-    Write-Success "Contenido de la imagen verificado"
-    Write-Info "Archivos en /home/site/wwwroot:"
-    $dockerContent | ForEach-Object { Write-Info "  $_" }
+  # Build de imagen Docker (contexto: copiloto-function)
+  Write-Info "Construyendo imagen Docker: $fullImage"
+  docker build -t $fullImage ./copiloto-function
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Falló la construcción de la imagen Docker"
+    if (-not $Force) { exit 1 }
   }
-  else {
-    Write-Warning "No se pudo verificar el contenido de la imagen Docker"
-    Write-Info "Error: $dockerContent"
+  Write-Success "Imagen Docker construida exitosamente"
+
+  # Login ACR
+  Write-Info "Autenticando con ACR: $ACR"
+  az acr login -n $ACR
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Falló autenticación con ACR"
+    if (-not $Force) { exit 1 }
   }
-}
-catch {
-  Write-Warning "Docker no disponible o imagen no accesible localmente"
-}
+  Write-Success "Login en ACR exitoso"
 
-# Intentar configurar con credenciales explícitas
-$containerResult = az functionapp config container set `
-  -g $ResourceGroup `
-  -n $FunctionApp `
-  --image $fullImage `
-  --registry-server "https://$ACR.azurecr.io" `
-  --registry-username $acrUsername `
-  --registry-password $acrPassword 2>&1
+  # Push al ACR
+  Write-Info "Publicando imagen en ACR: $fullImage"
+  docker push $fullImage
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Falló la publicación de la imagen en ACR"
+    if (-not $Force) { exit 1 }
+  }
+  Write-Success "Imagen Docker publicada exitosamente"
 
-if ($LASTEXITCODE -ne 0) {
-  Write-Warning "Primer intento falló, reintentando sin https..."
-      
+
+  # ==========================================
+  # FASE 4: CONFIGURAR CONTENEDOR CON CREDENCIALES
+  # ==========================================
+  Write-Step "FASE 4: CONFIGURAR CONTENEDOR" 4
+
+  $fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
+  Write-Info "Configurando imagen: $fullImage"
+
+  # Validar que la imagen existe en ACR
+  Write-Info "Verificando que la imagen existe en ACR..."
+  $tagExists = az acr repository show-tags -n $ACR --repository copiloto-func-azcli --query "[?@ == '$ImageTag']" -o tsv
+  if (-not $tagExists) {
+    Write-Error "La imagen $fullImage no existe en ACR"
+    if (-not $Force) { exit 1 }
+  }
+  Write-Success "Imagen encontrada en ACR: $ImageTag"
+
+  # Verificación opcional del contenido de la imagen Docker
+  Write-Info "Verificando contenido de la imagen Docker..."
+  try {
+    $dockerContent = docker run --rm $fullImage ls -la /home/site/wwwroot 2>&1
+    if ($LASTEXITCODE -eq 0) {
+      Write-Success "Contenido de la imagen verificado"
+      Write-Info "Archivos en /home/site/wwwroot:"
+      $dockerContent | ForEach-Object { Write-Info "  $_" }
+    }
+    else {
+      Write-Warning "No se pudo verificar el contenido de la imagen Docker"
+      Write-Info "Error: $dockerContent"
+    }
+  }
+  catch {
+    Write-Warning "Docker no disponible o imagen no accesible localmente"
+  }
+
+  # Intentar configurar con credenciales explícitas
   $containerResult = az functionapp config container set `
     -g $ResourceGroup `
     -n $FunctionApp `
-    --docker-custom-image-name $fullImage `
-    --docker-registry-server-url "$ACR.azurecr.io" `
-    --docker-registry-server-username $acrUsername `
-    --docker-registry-server-password $acrPassword 2>&1
-}
+    --image $fullImage `
+    --registry-server "https://$ACR.azurecr.io" `
+    --registry-username $acrUsername `
+    --registry-password $acrPassword 2>&1
 
-Write-Success "Contenedor configurado"
-
-# Verificar que se aplicó
-$containerConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp | ConvertFrom-Json
-$dockerImageSetting = $containerConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }
-
-if ($dockerImageSetting.value -like "*$ImageTag*") {
-  Write-Success "Imagen verificada: $($dockerImageSetting.value)"
-}
-else {
-  Write-Error "La imagen no se configuró correctamente"
-  if (-not $Force) { exit 1 }
-}
-
-# ==========================================
-# FASE 5: REINICIAR Y ESPERAR
-# ==========================================
-Write-Step "FASE 5: REINICIAR FUNCTION APP" 5
-
-Write-Info "Reiniciando Function App..."
-$restartResult = az functionapp restart -g $ResourceGroup -n $FunctionApp 2>&1
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "Fallo al reiniciar Function App"
-  Write-Info "Error: $restartResult"
-  if (-not $Force) { exit 1 }
-}
-else {
-  Write-Success "Function App reiniciada correctamente"
-}
-
-Write-Info "Esperando 60 segundos para que el contenedor inicie..."
-$waitTime = 60
-for ($i = 1; $i -le $waitTime; $i++) {
-  Write-Progress -Activity "Esperando inicio del contenedor" -Status "$i de $waitTime segundos" -PercentComplete (($i / $waitTime) * 100)
-  Start-Sleep -Seconds 1
-}
-Write-Progress -Activity "Esperando inicio del contenedor" -Completed
-
-# ==========================================
-# FASE 6: VERIFICACIÓN DE ENDPOINTS
-# ==========================================
-Write-Step "FASE 6: VERIFICACIÓN DE ENDPOINTS" 6
-
-$baseUrl = "https://$FunctionApp.azurewebsites.net"
-$successCount = 0
-
-function Test-Endpoint($url, $label) {
-  try {
-    $r = Invoke-WebRequest -Uri $url -Method GET -TimeoutSec 15 -ErrorAction Stop
-    Write-Success "$label - Status: $($r.StatusCode)"
-    return $true
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Primer intento falló, reintentando sin https..."
+        
+    $containerResult = az functionapp config container set `
+      -g $ResourceGroup `
+      -n $FunctionApp `
+      --docker-custom-image-name $fullImage `
+      --docker-registry-server-url "$ACR.azurecr.io" `
+      --docker-registry-server-username $acrUsername `
+      --docker-registry-server-password $acrPassword 2>&1
   }
-  catch {
-    $sc = $_.Exception.Response.StatusCode.value__
-    if ($sc) { Write-Warning "$label - Status: $sc" } else { Write-Error "$label - No responde" }
-    return $false
+
+  Write-Success "Contenedor configurado"
+
+  # Verificar que se aplicó
+  $containerConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp | ConvertFrom-Json
+  $dockerImageSetting = $containerConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }
+
+  if ($dockerImageSetting.value -like "*$ImageTag*") {
+    Write-Success "Imagen verificada: $($dockerImageSetting.value)"
   }
-}
-
-# Health + Status (una vez)
-if (Test-Endpoint "$baseUrl/api/health" "(/api/health)") { $successCount++ }
-if (Test-Endpoint "$baseUrl/api/status" "(/api/status)") { $successCount++ }
-
-# listar-blobs con retry suave (RBAC puede demorar)
-$max = 4; $ok = $false
-for ($i = 1; $i -le $max; $i++) {
-  if (Test-Endpoint "$baseUrl/api/listar-blobs" "(/api/listar-blobs intento $i/$max)") { $ok = $true; break }
-  if ($i -lt $max) { Write-Info "Reintentando en 20s..."; Start-Sleep -Seconds 20 }
-}
-if ($ok) { $successCount++ }
-
-# ==========================================
-# FASE 7: DIAGNÓSTICO FINAL
-# ==========================================
-Write-Step "FASE 7: DIAGNÓSTICO FINAL" 7
-
-if ($successCount -gt 0) {
-  Write-Host "`n========================================" -ForegroundColor Green
-  Write-Host "✓ ÉXITO: Function App OPERATIVA" -ForegroundColor Green
-  Write-Host "========================================" -ForegroundColor Green
-  Write-Success "$successCount de 3 endpoints funcionando"
-  Write-Info "URL: $baseUrl"
-      
-  # Listar funciones disponibles
-  Write-Info "`nFunciones registradas:"
-  $functions = az functionapp function list -g $ResourceGroup -n $FunctionApp --query "[].name" -o tsv 2>$null
-  foreach ($func in $functions) {
-    Write-Info "  • $func"
+  else {
+    Write-Error "La imagen no se configuró correctamente"
+    if (-not $Force) { exit 1 }
   }
-      
-}
-else {
-  Write-Host "`n========================================" -ForegroundColor Red
-  Write-Host "✗ PROBLEMA PERSISTE" -ForegroundColor Red
-  Write-Host "========================================" -ForegroundColor Red
-      
-  Write-Warning "Acciones adicionales requeridas:"
-  Write-Info "1. Verificar logs del contenedor:"
-  Write-Info "   az webapp log tail -g $ResourceGroup -n $FunctionApp"
-      
-  Write-Info "2. Verificar que la imagen tiene los archivos correctos:"
-  Write-Info "   docker run --rm $fullImage ls -la /home/site/wwwroot/"
-      
-  Write-Info "3. Si persiste, recrear la Function App:"
-  Write-Info "   az functionapp delete -g $ResourceGroup -n $FunctionApp"
-  Write-Info "   az functionapp create -g $ResourceGroup -n $FunctionApp --plan <PLAN> --deployment-container-image-name $fullImage --runtime custom"
-}
 
-# Registrar timestamp de ejecución final
-Write-Info "Ejecución completada en: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host "`nScript completado.`n" -ForegroundColor Cyan 
+  # ==========================================
+  # FASE 5: REINICIAR Y ESPERAR
+  # ==========================================
+  Write-Step "FASE 5: REINICIAR FUNCTION APP" 5
+
+  Write-Info "Reiniciando Function App..."
+  $restartResult = az functionapp restart -g $ResourceGroup -n $FunctionApp 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Fallo al reiniciar Function App"
+    Write-Info "Error: $restartResult"
+    if (-not $Force) { exit 1 }
+  }
+  else {
+    Write-Success "Function App reiniciada correctamente"
+  }
+
+  Write-Info "Esperando 60 segundos para que el contenedor inicie..."
+  $waitTime = 60
+  for ($i = 1; $i -le $waitTime; $i++) {
+    Write-Progress -Activity "Esperando inicio del contenedor" -Status "$i de $waitTime segundos" -PercentComplete (($i / $waitTime) * 100)
+    Start-Sleep -Seconds 1
+  }
+  Write-Progress -Activity "Esperando inicio del contenedor" -Completed
+
+  # ==========================================
+  # FASE 6: VERIFICACIÓN DE ENDPOINTS
+  # ==========================================
+  Write-Step "FASE 6: VERIFICACIÓN DE ENDPOINTS" 6
+
+  $baseUrl = "https://$FunctionApp.azurewebsites.net"
+  $successCount = 0
+
+  function Test-Endpoint($url, $label) {
+    try {
+      $r = Invoke-WebRequest -Uri $url -Method GET -TimeoutSec 15 -ErrorAction Stop
+      Write-Success "$label - Status: $($r.StatusCode)"
+      return $true
+    }
+    catch {
+      $sc = $_.Exception.Response.StatusCode.value__
+      if ($sc) { Write-Warning "$label - Status: $sc" } else { Write-Error "$label - No responde" }
+      return $false
+    }
+  }
+
+  # Health + Status (una vez)
+  if (Test-Endpoint "$baseUrl/api/health" "(/api/health)") { $successCount++ }
+  if (Test-Endpoint "$baseUrl/api/status" "(/api/status)") { $successCount++ }
+
+  # listar-blobs con retry suave (RBAC puede demorar)
+  $max = 4; $ok = $false
+  for ($i = 1; $i -le $max; $i++) {
+    if (Test-Endpoint "$baseUrl/api/listar-blobs" "(/api/listar-blobs intento $i/$max)") { $ok = $true; break }
+    if ($i -lt $max) { Write-Info "Reintentando en 20s..."; Start-Sleep -Seconds 20 }
+  }
+  if ($ok) { $successCount++ }
+
+  # ==========================================
+  # FASE 7: DIAGNÓSTICO FINAL
+  # ==========================================
+  Write-Step "FASE 7: DIAGNÓSTICO FINAL" 7
+
+  if ($successCount -gt 0) {
+    Write-Host "`n========================================" -ForegroundColor Green
+    Write-Host "✓ ÉXITO: Function App OPERATIVA" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Success "$successCount de 3 endpoints funcionando"
+    Write-Info "URL: $baseUrl"
+        
+    # Listar funciones disponibles
+    Write-Info "`nFunciones registradas:"
+    $functions = az functionapp function list -g $ResourceGroup -n $FunctionApp --query "[].name" -o tsv 2>$null
+    foreach ($func in $functions) {
+      Write-Info "  • $func"
+    }
+        
+  }
+  else {
+    Write-Host "`n========================================" -ForegroundColor Red
+    Write-Host "✗ PROBLEMA PERSISTE" -ForegroundColor Red
+    Write-Host "========================================" -ForegroundColor Red
+        
+    Write-Warning "Acciones adicionales requeridas:"
+    Write-Info "1. Verificar logs del contenedor:"
+    Write-Info "   az webapp log tail -g $ResourceGroup -n $FunctionApp"
+        
+    Write-Info "2. Verificar que la imagen tiene los archivos correctos:"
+    Write-Info "   docker run --rm $fullImage ls -la /home/site/wwwroot/"
+        
+    Write-Info "3. Si persiste, recrear la Function App:"
+    Write-Info "   az functionapp delete -g $ResourceGroup -n $FunctionApp"
+    Write-Info "   az functionapp create -g $ResourceGroup -n $FunctionApp --plan <PLAN> --deployment-container-image-name $fullImage --runtime custom"
+  }
+
+  # Registrar timestamp de ejecución final
+  Write-Info "Ejecución completada en: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+  Write-Host "`nScript completado exitosamente.`n" -ForegroundColor Cyan
+}
+catch {
+  Write-Error "Error fatal en el script: $($_.Exception.Message)"
+  Write-Warning "Restaurando directorio y saliendo..."
+  throw
+}
+finally {
+  # GARANTIZA 100% que se restaura el directorio original
+  Pop-Location
+  Write-Info "Directorio restaurado a: $(Get-Location)"
+}

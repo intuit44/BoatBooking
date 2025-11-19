@@ -1,0 +1,60 @@
+    for match in matches:
+        relative_path = match
+
+        # Normalizar separadores de ruta (soporta rutas mixtas)
+        normalized_path = relative_path.replace(
+            '/', os.sep).replace('\\', os.sep)
+
+        # Determinar si es una ruta absoluta estilo Windows (C:\...) incluso en Linux
+        is_windows_absolute = bool(re.match(r'^[a-zA-Z]:[\\/]', relative_path))
+        is_absolute = Path(
+            normalized_path).is_absolute() or is_windows_absolute
+
+        resolved_path = None
+
+        if is_absolute:
+            candidate = Path(
+                relative_path if is_windows_absolute else normalized_path)
+            if candidate.exists():
+                resolved_path = candidate
+            elif is_windows_absolute:
+                fallback = _resolve_windows_absolute_path(
+                    relative_path, root_path)
+                if fallback:
+                    resolved_path = fallback
+                else:
+                    logging.warning(
+                        f"?? Ruta absoluta (Windows) no mapeada: {relative_path}")
+            else:
+                logging.warning(
+                    f"?? Ruta absoluta no existente: {relative_path}")
+        else:
+            # 1?? Intentar ruta directa relativa al root detectado
+            absolute_path = root_path / normalized_path
+
+            if absolute_path.exists():
+                resolved_path = absolute_path
+            else:
+                # 2?? Búsqueda recursiva si no existe en ruta directa
+                filename = Path(normalized_path).name
+                pattern = str(root_path / "**" / filename)
+
+                logging.info(f"?? Búsqueda recursiva: {pattern}")
+                matches_found = glob.glob(pattern, recursive=True)
+
+                if matches_found:
+                    resolved_path = Path(matches_found[0])
+                else:
+                    logging.warning(
+                        f"?? No existe (ni en raíz ni subdirectorios): {relative_path}")
+
+        if resolved_path:
+            if platform.system() == "Windows":
+                comando = comando.replace(relative_path, f'"{resolved_path}"')
+            else:
+                comando = comando.replace(relative_path, str(
+                    resolved_path).replace(' ', '\\ '))
+            logging.info(
+                f"? Ruta resuelta: {relative_path} -> {resolved_path}")
+
+

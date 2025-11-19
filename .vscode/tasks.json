@@ -1,24 +1,44 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "type": "func",
-      "label": "func: host start",
-      "command": "host start",
-      "problemMatcher": "$func-node-watch",
-      "isBackground": true,
-      "dependsOn": "npm install (functions)"
-    },
-    {
-      "type": "shell",
-      "label": "npm install (functions)",
-      "command": "npm install"
-    },
-    {
-      "type": "shell",
-      "label": "npm prune (functions)",
-      "command": "npm prune --production",
-      "problemMatcher": []
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "npm install (functions)",
+            "command": "npm install"
+        },
+        {
+            "type": "shell",
+            "label": "npm prune (functions)",
+            "command": "npm prune --production",
+            "problemMatcher": []
+        },
+        {
+            "type": "func",
+            "label": "func: host start",
+            "command": "host start",
+            "problemMatcher": "$func-python-watch",
+            "isBackground": true,
+            "dependsOn": "pip install (functions)",
+            "options": {
+                "cwd": "${workspaceFolder}/copiloto-function"
+            }
+        },
+        {
+            "label": "pip install (functions)",
+            "type": "shell",
+            "osx": {
+                "command": "${config:azureFunctions.pythonVenv}/bin/python -m pip install -r requirements.txt"
+            },
+            "windows": {
+                "command": "${config:azureFunctions.pythonVenv}/Scripts/python -m pip install -r requirements.txt"
+            },
+            "linux": {
+                "command": "${config:azureFunctions.pythonVenv}/bin/python -m pip install -r requirements.txt"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/copiloto-function"
+            }
+        }
+    ]
 }

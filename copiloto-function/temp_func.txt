@@ -1,0 +1,324 @@
+﻿def consultar_memoria_cosmos_directo(req: func.HttpRequest) -> Optional[Dict[str, Any]]:
+    """
+    Consulta DIRECTAMENTE Cosmos DB para obtener historial de interacciones
+    CON DEDUPLICACIÃ“N SEMÃNTICA
+    """
+    try:
+        key = os.environ.get(""COSMOSDB_KEY"")
+        if not key:
+            logging.warning(""COSMOSDB_KEY no configurada"")
+            return None
+        # Extraer session_id del request
+        session_id = extraer_session_id_request(req)
+        if not session_id:
+            logging.info("No se encontrÃ³ session_id en el request")
+            return None
+
+        # Extraer agent_id para fallback
+        agent_id = extraer_agent_id_request(req)
+
+        # Conectar a Cosmos DB
+        client = CosmosClient(endpoint, key)
+        database = client.get_database_client(database_name)
+        container = database.get_container_client(container_name)
+
+        # ðŸŒ MEMORIA GLOBAL DIRECTA: Solo por agent_id
+        if not agent_id or agent_id == "unknown_agent":
+            agent_id = "GlobalAgent"  # Forzar agent_id por defecto
+            logging.info(f"ðŸ”§ Agent ID forzado a: {agent_id}")
+
+        # ðŸŒ MEMORIA GLOBAL CON DEDUPLICACIÃ“N SEMÃNTICA
+        # Traer mÃ¡s items para luego deduplicar
+        query = """
+        SELECT TOP 150 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
+                       c.event_type, c.texto_semantico, c.contexto_conversacion,
+                       c.metadata, c.resumen_conversacion, c.data.respuesta_resumen,
+                       c.data.interpretacion_semantica, c.data.contexto_inteligente,
+                       c.data.response_data.respuesta_usuario, c._ts
+        FROM c
+        WHERE IS_DEFINED(c.texto_semantico) 
+          AND LENGTH(c.texto_semantico) > 30
+          AND NOT CONTAINS(c.texto_semantico, 'Evento semantic en sesi')
+          AND NOT CONTAINS(c.texto_semantico, 'CONSULTA DE HISTORIAL')
+          AND NOT CONTAINS(c.texto_semantico, 'Se encontraron')
+          AND NOT CONTAINS(c.texto_semantico, 'interacciones recientes')
+          AND NOT CONTAINS(c.texto_semantico, 'Consulta completada')
+          AND NOT CONTAINS(c.endpoint, 'health')
+          AND NOT CONTAINS(c.endpoint, 'verificar-')
+          AND NOT CONTAINS(c.endpoint, 'historial-interacciones')
+        ORDER BY c._ts DESC
+        """
+        logging.info("ðŸŒ Ejecutando memoria con deduplicaciÃ³n semÃ¡ntica")
+        logging.debug(f"ðŸŒ Query: {query}")
+
+        raw_items = list(container.query_items(
+            query=query,
+            enable_cross_partition_query=True
+        ))
+        
+        # âœ… DEDUPLICACIÃ“N SEMÃNTICA: Agrupar por endpoint + texto similar
+        items = deduplicar_interacciones_semanticas(raw_items, max_items=50)
+        logging.info(f"ðŸ§¹ DeduplicaciÃ³n: {len(raw_items)} â†’ {len(items)} interacciones Ãºnicas")
+
+        # LOG de aplicaciÃ³n (aparece en 'traces' table)
+        logging.info("historial-interacciones: memoria_global_aplicada count=%d", len(items))
+
+        # MÃ‰TRICA personalizada como log (AI la convierte en customMetrics)
+        try:
+            logging.info(
+                f"customMetric|name=historial_interacciones_hits;value=1;agent_id={agent_id};endpoint=historial_interacciones"
+            )
+        except Exception as _:
+            pass
+
+        # TRACE manual (aparece en 'traces' con span)
+        try:
+            tracer = trace.get_tracer("copiloto.memory")
+            with tracer.start_as_current_span("consultar_memoria_cosmos_directo") as span:
+                span.set_attribute("items_encontrados", len(items))
+                span.set_attribute("agent_id", agent_id or "unknown")
+        except Exception as _:
+            pass
+
+        if items:
+            logging.info(f"ðŸŒ Memoria global: {len(items)} interacciones encontradas")
+        else:
+            logging.warning("ðŸ“ Sin memoria previa encontrada")
+
+        if items:
+            # Procesar interacciones encontradas CON TEXTO_SEMANTICO
+            interacciones_formateadas = []
+
+            # Ajustes de truncado mÃ¡s generosos para evitar pÃ©rdida de contexto
+            CONSULTA_MAX = int(os.environ.get("CONSULTA_MAX_CHARS", "1000"))
+            RESPUESTA_MAX = int(os.environ.get("RESPUESTA_MAX_CHARS", "1000"))
+            LOG_SNIPPET = int(os.environ.get("LOG_SNIPPET_CHARS", "200"))
+
+            for item in items:
+                # Extraer datos del nivel raÃ­z y de secciÃ³n posible de data
+                data_section = item.get("data", {})
+
+                # âœ… EXTRAER INFORMACIÃ“N ENRIQUECIDA
+                consulta_text = (
+                    data_section.get("params", {}).get("comando", "") or
+                    data_section.get("params", {}).get("consulta", "") or
+                    item.get("resumen_conversacion", "") or
+                    ""
+                )
+                
+                # âœ… PRIORIZAR respuesta_resumen si existe
+                respuesta_text = (
+                    item.get("respuesta_resumen") or  # Campo directo
+                    data_section.get("respuesta_resumen") or  # En data
+                    data_section.get("interpretacion_semantica", "") or  # InterpretaciÃ³n
+                    str(data_section.get("response_data", {}).get("respuesta_usuario", "")) or  # respuesta_usuario
+                    item.get("resumen_conversacion", "")
+                )
+                
+                # âœ… EXTRAER CONTEXTO INTELIGENTE si existe
+                contexto_extra = None
+                if data_section.get("contexto_inteligente"):
+                    ctx = data_section["contexto_inteligente"]
+                    if isinstance(ctx, dict) and ctx.get("resumen_inteligente"):
+                        contexto_extra = ctx["resumen_inteligente"]
+
+                interaccion = {
+                    "timestamp": item.get("timestamp", data_section.get("timestamp", "")),
+                    "endpoint": item.get("endpoint", data_section.get("endpoint", "unknown")),
+                    "consulta": consulta_text[:CONSULTA_MAX],
+                    "exito": data_section.get("success", True),
+                    "texto_semantico": item.get("texto_semantico", ""),  # NIVEL RAÃZ
+                    "respuesta_resumen": respuesta_text[:RESPUESTA_MAX],
+                    "contexto_extra": contexto_extra  # âœ… NUEVO: Contexto adicional
+                }
+                interacciones_formateadas.append(interaccion)
+
+                # Log para verificar (mostrar snippet mayor)
+                texto_snippet = interaccion['texto_semantico'][:LOG_SNIPPET] if interaccion['texto_semantico'] else interaccion['consulta'][:LOG_SNIPPET]
+                logging.info(f"ðŸ“ InteracciÃ³n recuperada: {interaccion['endpoint']} - texto: {texto_snippet}...")
+                if contexto_extra:
+                    logging.info(f"  ðŸŽ¯ Contexto extra: {contexto_extra[:100]}...")
+
+            # Generar resumen para el agente
+            resumen_conversacion = generar_resumen_conversacion(interacciones_formateadas)
+
+            # ðŸ§  INTERPRETACIÃ“N SEMÃNTICA RICA DEL SISTEMA
+            interpretacion_semantica = interpretar_patron_semantico(interacciones_formateadas)
+            logging.info(f"ðŸ§  InterpretaciÃ³n semÃ¡ntica: {interpretacion_semantica}")
+
+            # ðŸŽ¯ CONTEXTO INTELIGENTE ADICIONAL
+            try:
+                from semantic_classifier import get_intelligent_context
+                context_analysis = get_intelligent_context(interacciones_formateadas)
+                contexto_inteligente = {
+                    "modo_operacion": context_analysis['mode'],
+                    "contexto_seleccionado": len(context_analysis['context']),
+                    "total_analizado": context_analysis['total_analyzed'],
+                    "resumen_inteligente": context_analysis['summary']
+                }
+                logging.info(f"ðŸŽ¯ Contexto inteligente: {contexto_inteligente}")
+            except ImportError:
+                contexto_inteligente = {
+                    "modo_operacion": "fallback",
+                    "contexto_seleccionado": len(interacciones_formateadas),
+                    "total_analizado": len(items),
+                    "resumen_inteligente": "AnÃ¡lisis bÃ¡sico aplicado"
+                }
+
+            # Dejar registro local adicional justo antes del return para verificar emisiÃ³n
+            logging.info("âœ… customMetric|name=historial_interacciones_hits;value=1;agent_id=%s;endpoint=historial_interacciones", agent_id)
+
+            response = {
+                "tiene_historial": True,
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "total_interacciones": len(items),
+                "total_interacciones_sesion": len(items),
+                "interacciones_recientes": interacciones_formateadas,
+                "resumen_conversacion": resumen_conversacion,
+                "interpretacion_semantica": interpretacion_semantica,
+                "contexto_inteligente": contexto_inteligente,
+                "ultima_actividad": items[0].get("timestamp") if items else None,
+                "contexto_recuperado": True,
+                "memoria_global": True,
+                "estrategia": "global_por_agent_id",
+                "foundry_optimized": False,
+                "validation_applied": False,
+                "validation_stats": {
+                    "original_count": len(items),
+                    "final_optimized": len(interacciones_formateadas)
+                },
+                "metadata": {
+                    "memoria_aplicada": True,
+                    "memoria_global": True,
+                    "interacciones_previas": len(items),
+                    "endpoint_detectado": "historial_interacciones",
+                    "agent_id": agent_id,
+                    "foundry_detected": False,
+                    "session_info": {
+                        "session_id": session_id,
+                        "agent_id": agent_id
+                    },
+                    "memoria_disponible": True,
+                    "wrapper_aplicado": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+
+            # ðŸ” VALIDACIÃ“N DE CONTEXTO ANTES DEL MODELO
+            try:
+                from context_validator import validate_context_before_model
+                response = validate_context_before_model(response)
+                logging.info(f"ðŸ” Contexto validado y optimizado")
+            except ImportError:
+                logging.warning("âš ï¸ Validador de contexto no disponible")
+
+            return response
+        else:
+            return {
+                "tiene_historial": False,
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "nueva_sesion": True,
+                "memoria_global": False,
+                "estrategia": "sin_memoria",
+                "interpretacion_semantica": "Nueva sesiÃ³n iniciada sin historial previo",
+                "contexto_inteligente": {
+                    "modo_operacion": "new_session",
+                    "contexto_seleccionado": 0,
+                    "total_analizado": 0,
+                    "resumen_inteligente": "Sin contexto previo disponible"
+                },
+                "validation_applied": True,
+                "validation_stats": {
+                    "original_count": 0,
+                    "final_optimized": 0
+                },
+                "metadata": {
+                    "memoria_aplicada": False,
+                    "memoria_global": False,
+                    "interacciones_previas": 0,
+                    "endpoint_detectado": "historial_interacciones",
+                    "agent_id": agent_id,
+                    "session_info": {
+                        "session_id": session_id,
+                        "agent_id": agent_id
+                    },
+                    "memoria_disponible": False,
+                    "wrapper_aplicado": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+
+    except Exception as e:
+        logging.error(f"Error consultando Cosmos DB directamente: {e}")
+        return None
+
+def extraer_session_id_request(req: func.HttpRequest) -> Optional[str]:
+    """Extrae session_id de mÃºltiples fuentes en el request (solo para metadata)"""
+    
+    # 1. Desde headers (prioridad alta)
+    session_id = (
+        req.headers.get("Session-ID") or
+        req.headers.get("X-Session-ID") or
+        req.headers.get("x-session-id")
+    )
+    if session_id:
+        return session_id
+    
+    # 2. Desde parÃ¡metros de query
+    session_id = req.params.get("session_id")
+    if session_id:
+        return session_id
+    
+    # 3. Desde body JSON
+    try:
+        body = req.get_json()
+        if body and isinstance(body, dict):
+            session_id = body.get("session_id")
+            if session_id:
+                return session_id
+    except:
+        pass
+    
+    # 4. Generar session_id temporal (solo para metadata, no afecta memoria)
+    import time
+    session_id = f"temp_{int(time.time())}"
+    return session_id
+
+
+# Importar funciÃ³n desde semantic_helpers
+from semantic_helpers import generar_resumen_conversacion
+
+# Usar clasificador semÃ¡ntico existente para interpretaciÃ³n dinÃ¡mica
+try:
+    from semantic_classifier import get_intelligent_context
+    from semantic_intent_classifier import classify_user_intent
+    
+    def interpretar_patron_semantico(interacciones: list) -> str:
+        if not interacciones:
+            return "Sin actividad previa detectada"
+        
+        # Usar el contexto inteligente existente
+        contexto = get_intelligent_context(interacciones)
+        
+        # Analizar la Ãºltima interacciÃ³n para detectar intenciÃ³n
+        ultima = interacciones[0] if interacciones else {}
+        texto_semantico = ultima.get('texto_semantico', '')
+        
+        if texto_semantico:
+            intent_result = classify_user_intent(texto_semantico)
+            intent = intent_result.get('intent', 'general')
+            confidence = intent_result.get('confidence', 0.5)
+            
+            return f"AnÃ¡lisis inteligente: {contexto['summary']} | IntenciÃ³n detectada: {intent} (confianza: {int(confidence*100)}%) | Modo: {contexto['mode']}"
+        else:
+            return f"AnÃ¡lisis inteligente: {contexto['summary']} | Modo: {contexto['mode']}"
+            
+except ImportError:
+    def interpretar_patron_semantico(interacciones: list) -> str:
+        if not interacciones:
+            return "Sin actividad previa detectada"
+        return f"AnÃ¡lisis de {len(interacciones)} interacciones completado"
+
+def aplicar_memoria_cosmos_directo

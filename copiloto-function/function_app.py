@@ -11,6 +11,7 @@ from azure.mgmt.resource.resources.models import (
 )
 from command_fixers.auto_fixers import apply_auto_fixes
 from services.memory_service import memory_service
+from services.redis_buffer_service import redis_buffer
 from azure.monitor.query import LogsQueryClient, LogsTable
 from azure.monitor.query._models import LogsQueryResult
 from azure.cosmos import CosmosClient
@@ -40,6 +41,7 @@ from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
 from datetime import timedelta
 from collections.abc import Iterator
+from collections import Counter
 
 
 import subprocess
@@ -69,6 +71,7 @@ import json
 from datetime import datetime
 from azure.functions import HttpRequest, HttpResponse
 from endpoints_search_memory import buscar_memoria_endpoint, indexar_memoria_endpoint
+from thread_enricher import generar_narrativa_contextual
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "services"))
 
@@ -154,11 +157,96 @@ def setup_git_credentials():
 if not os.path.exists(os.path.expanduser("~/.git-credentials")):
     setup_git_credentials()
 
+
+def _construir_resumen_narrativo(narrativa_ctx: Optional[Dict[str, Any]],
+                                 payload: Optional[Dict[str, Any]] = None) -> str:
+    """Genera una narrativa resumida amigable usando contexto estructurado."""
+    if not narrativa_ctx:
+        return ""
+
+    payload = payload or {}
+    resumen_lineas: List[str] = []
+    contexto_inteligente = (payload.get(
+        "contexto_inteligente") or {}).get("resumen")
+    detalles = narrativa_ctx.get("detalles") or {}
+    session_id = payload.get("session_id") or narrativa_ctx.get("session_id")
+
+    if session_id or contexto_inteligente:
+        resumen_lineas.append(
+            f"Sesión {session_id or 'desconocida'}: {contexto_inteligente or 'sin novedades recientes.'}"
+        )
+
+    historial_ctx = detalles.get("historial") or {}
+    if historial_ctx.get("resumen_corto"):
+        resumen_lineas.append(historial_ctx["resumen_corto"])
+
+    ai_ctx = detalles.get("ai_search") or {}
+    if ai_ctx.get("resumen_corto"):
+        resumen_lineas.append(ai_ctx["resumen_corto"])
+
+    response_snapshot = detalles.get("response_snapshot") or {}
+    mensaje_snapshot = response_snapshot.get("mensaje")
+    if mensaje_snapshot:
+        resumen_lineas.append(
+            f"Última respuesta registrada: {preview_text(str(mensaje_snapshot), 240)}"
+        )
+
+    eventos = payload.get("eventos") or []
+    if eventos:
+        contadores = Counter()
+        ultimas: List[str] = []
+        for evento in eventos[:3]:
+            endpoint = evento.get("endpoint") or (
+                evento.get("datos") or {}).get("endpoint")
+            contadores[endpoint or "desconocido"] += 1
+            estado = evento.get("estado") or (
+                (evento.get("datos") or {}).get("estado"))
+            marca_tiempo = format_timestamp_humano(evento.get(
+                "timestamp")) if evento.get("timestamp") else "Reciente"
+            ultimas.append(
+                f"{marca_tiempo} · {endpoint or 'endpoint desconocido'} ({estado or 'sin estado'})"
+            )
+        if ultimas:
+            resumen_lineas.append(
+                "Últimas operaciones:\n" + "\n".join(ultimas))
+        if contadores:
+            resumen_lineas.append(
+                "Endpoints frecuentes recientes: " + ", ".join(
+                    f"{nombre} ({cantidad})" for nombre, cantidad in contadores.most_common(3)
+                )
+            )
+
+    docs_vectoriales = (
+        (payload.get("detalles_operacion") or {}).get("docs_vectoriales")
+        or (payload.get("metadata") or {}).get("docs_vectoriales")
+    )
+    if docs_vectoriales:
+        resumen_lineas.append(
+            f"AI Search aportó {docs_vectoriales} documento(s) relevantes para esta respuesta."
+        )
+
+    mensajes_fmt = narrativa_ctx.get(
+        "mensajes_formateados") or narrativa_ctx.get("mensajes") or []
+    if mensajes_fmt:
+        resumen_lineas.append("🗣️ Fragmento reciente:\n" +
+                              "\n".join(mensajes_fmt[:2]))
+
+    if not resumen_lineas:
+        texto_ctx = narrativa_ctx.get("texto")
+        if texto_ctx:
+            resumen_lineas.append(texto_ctx.strip())
+
+    texto_final = "\n\n".join(resumen_lineas).strip()
+    if len(texto_final) > 4000:
+        texto_final = texto_final[:4000].rstrip() + "…"
+    return texto_final
+
 # --- Built-ins y estándar ---
 
 # --- Azure Core ---P
 
 # --- Azure SDK de gestión ---
+
 
 # --- Configuración de AI Projects y Agents ---
 # Proyecto principal (yellowstone)
@@ -461,6 +549,12 @@ try:
     logging.info("✅ Endpoint agent_output registrado correctamente")
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint agent_output: {e}")
+
+try:
+    import endpoints.ejecutar_cli
+    logging.info("✅ Endpoint ejecutar_cli registrado correctamente")
+except Exception as e:
+    logging.warning(f"⚠️ No se pudo registrar endpoint ejecutar_cli: {e}")
 
 # --- Cerebro Semántico Autónomo ---
 try:
@@ -2389,10 +2483,10 @@ def invocar_endpoint_local(endpoint: str, method: str = "GET", body: Optional[di
         from endpoints.crear_contenedor import crear_contenedor_http
         from endpoints.eliminar_archivo import eliminar_archivo_http
         from endpoints.leer_archivo import leer_archivo_http
+        from endpoints.ejecutar_cli import ejecutar_cli_http
         endpoint_map = {
             "/api/status": status,
             "/api/health": health,
-            "/api/listar-blobs": listar_blobs,
             "/api/diagnostico-recursos": diagnostico_recursos_http,
             "/api/escribir-archivo": escribir_archivo_http,
             "/api/leer-archivo": leer_archivo_http,
@@ -3169,6 +3263,8 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
     # === 🔍 CONSTRUCCIÓN DE QUERY UNIVERSAL (COMBINA TIPO + QUERY + MENSAJE) ===
     session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+    thread_id = req.headers.get(
+        "Thread-ID") or req.headers.get("X-Thread-ID") or req.params.get("thread_id")
 
     try:
         body = req.get_json() or {}
@@ -3196,6 +3292,51 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
     query_universal = query_texto or "últimas interacciones recientes"
     logging.info(f"🔍 HISTORIAL: Query vectorial: '{query_universal}'")
+
+    def _inyectar_narrativa(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Inserta la narrativa enriquecida (threads + Cosmos + AI Search) en la respuesta.
+        """
+        narrativa_ctx = None
+        try:
+            def _compute_narrativa():
+                return generar_narrativa_contextual(
+                    session_id=session_id,
+                    thread_id=thread_id,
+                    query=query_universal or query_texto or "",
+                    use_cache=False
+                )
+
+            narrativa_ctx, cache_hit, cache_latency = redis_buffer.get_or_compute_narrativa(
+                session_id=session_id,
+                thread_id=thread_id,
+                compute_fn=_compute_narrativa
+            )
+            logging.debug(
+                f"[Narrativa] cache_hit={cache_hit} latency={cache_latency:.2f}ms para sesión={session_id} thread={thread_id}")
+        except Exception as narrativa_err:
+            logging.warning(
+                f"⚠️ No se pudo generar narrativa contextual para historial: {narrativa_err}")
+            narrativa_ctx = None
+
+        if narrativa_ctx and (narrativa_ctx.get("texto") or narrativa_ctx.get("mensajes")):
+            mensajes_fmt = narrativa_ctx.get(
+                "mensajes") or narrativa_ctx.get("mensajes_formateados") or []
+            texto_base = _construir_resumen_narrativo(
+                narrativa_ctx, payload) or narrativa_ctx.get("texto", "").strip()
+            payload["respuesta_usuario"] = texto_base
+            payload["texto_semantico"] = texto_base
+            payload.setdefault("metadata", {})
+            payload["metadata"]["narrativa_contexto"] = {
+                "thread_id": narrativa_ctx.get("thread_id"),
+                "blob": narrativa_ctx.get("fuente_blob"),
+                "mensajes_recuperados": len(mensajes_fmt),
+                "session_id": narrativa_ctx.get("session_id"),
+                "fragmento_conversacion": mensajes_fmt[:3]
+            }
+        else:
+            payload.setdefault("respuesta_usuario", "")
+        return payload
 
     # === 🔍 BÚSQUEDA HÍBRIDA: AI Search (vectorial) + Cosmos (estructurado) ===
     docs_search = []
@@ -3578,7 +3719,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             t = texto.lower()
             return any(g in t for g in genericos)
 
-        def _descripcion_evento(registro: Dict[str, Any], texto: str) -> str:
+        def _descripcion_evento(registro: Dict[str, Any], texto: str) -> Tuple[str, str]:
             endpoint_val = registro.get(
                 "endpoint") or "historial-interacciones"
             timestamp_val = registro.get("timestamp") or ""
@@ -3792,23 +3933,17 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
         # Asegurar campos reservados para que el modelo genere la narrativa
         response_data["mensaje"] = ""
-        response_data["respuesta_usuario"] = ""
         response_data["_instruccion_modelo"] = "INTERPRETA eventos[] y genera respuesta conversacional. NO copies texto_semantico literalmente."
 
         # Aplicar memoria Cosmos y memoria manual
         response_data = aplicar_memoria_cosmos_directo(req, response_data)
         response_data = aplicar_memoria_manual(req, response_data)
-        response_data["mensaje"] = ""
-        response_data["respuesta_usuario"] = ""
 
-        # ❌ NO generar texto_semantico para historial-interacciones
-        # Esto evita que se guarde a sí mismo en Cosmos creando bucle infinito
-        # El filtro en memory_saver.py ya lo excluye, pero mejor no generarlo
-        response_data["texto_semantico"] = ""  # SIEMPRE vacío
-
-        # ✅ VALIDACIÓN FINAL: El modelo genera la respuesta final; mantener campo vacío
-        if "respuesta_usuario" not in response_data:
-            response_data["respuesta_usuario"] = ""
+        # Inyectar narrativa enriquecida y mantener coherencia de campos reservados
+        response_data = _inyectar_narrativa(response_data)
+        if not response_data.get("texto_semantico"):
+            response_data["texto_semantico"] = response_data.get(
+                "respuesta_usuario", "")
         response_data["mensaje"] = ""
 
         # ❌ NO REGISTRAR: Este endpoint consulta historial, no debe guardarse a sí mismo
@@ -3901,6 +4036,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+def _descripcion_evento(evento, texto):
+    raise NotImplementedError
+
+
 @app.function_name(name="copiloto")
 @app.route(route="copiloto", auth_level=func.AuthLevel.ANONYMOUS)
 def copiloto(req: func.HttpRequest) -> func.HttpResponse:
@@ -3915,10 +4054,40 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
     memoria_previa = {}
     session_id = None
+    thread_id = req.headers.get("Thread-ID") or req.headers.get("X-Thread-ID")
 
     try:
-        session_id = req.headers.get("Session-ID") or "test_session"
-        agent_id = req.headers.get("Agent-ID") or "TestAgent"
+        session_id = (
+            req.headers.get("Session-ID")
+            or req.headers.get("X-Session-ID")
+            or thread_id
+            or "test_session"
+        )
+        agent_id = req.headers.get(
+            "Agent-ID") or req.headers.get("X-Agent-ID") or "TestAgent"
+
+        if not session_id or session_id == "test_session":
+            try:
+                body_identificadores = req.get_json()
+            except ValueError:
+                body_identificadores = {}
+            session_id = (
+                body_identificadores.get("session_id")
+                or body_identificadores.get("thread_id")
+                or req.params.get("session_id")
+                or req.params.get("thread_id")
+                or thread_id
+                or "test_session"
+            )
+            if not thread_id:
+                thread_id = body_identificadores.get("thread_id")
+
+        if not thread_id:
+            thread_id = (
+                req.params.get("thread_id")
+                or req.params.get("session_id")
+                or session_id
+            )
 
         logging.info(
             f"🔍 COPILOTO Headers: Session={session_id}, Agent={agent_id}")
@@ -3969,8 +4138,80 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"❌ COPILOTO Error cargando memoria: {e}")
 
+    # =========================
+    # Local helper: garantizar _inyectar_narrativa disponible
+    # =========================
+    def _inyectar_narrativa(payload: dict) -> dict:
+        """
+        Wrapper local que intenta:
+         1) llamar a una implementación global/module-level llamada _inyectar_narrativa si existe
+         2) en su defecto, usar generar_narrativa_contextual (si está disponible) como fallback mínimo
+         3) si todo falla, devolver payload sin modificar
+        Esto evita NameError cuando el fichero se ejecuta por fragmentos.
+        """
+        try:
+            # 1) Si existe una implementación global ya definida, usarla
+            fn = globals().get("_inyectar_narrativa")
+            if callable(fn) and getattr(fn, "__code__", None) is not None:
+                # evitamos recursión llamando a esta misma función
+                if fn is not _inyectar_narrativa:
+                    try:
+                        return fn(payload)
+                    except Exception:
+                        # seguir a fallback
+                        logging.warning(
+                            "Global _inyectar_narrativa falló, intentando fallback")
+        except Exception:
+            pass
+
+        # 2) Fallback: usar generar_narrativa_contextual si está presente
+        try:
+            # generar_narrativa_contextual fue importado en el módulo; usarlo si existe
+            if "generar_narrativa_contextual" in globals() and callable(globals().get("generar_narrativa_contextual")):
+                try:
+                    narrativa_ctx = generar_narrativa_contextual(
+                        session_id=session_id,
+                        thread_id=thread_id,
+                        query=payload.get("mensaje") or payload.get(
+                            "texto_semantico") or ""
+                    )
+                    if narrativa_ctx and isinstance(narrativa_ctx, dict) and (
+                        narrativa_ctx.get(
+                            "texto") or narrativa_ctx.get("mensajes")
+                    ):
+                        mensajes_fmt = narrativa_ctx.get(
+                            "mensajes") or narrativa_ctx.get("mensajes_formateados") or []
+                        texto_base = _construir_resumen_narrativo(
+                            narrativa_ctx, payload) or narrativa_ctx.get("texto", "").strip()
+
+                        payload["respuesta_usuario"] = texto_base
+                        payload["texto_semantico"] = texto_base
+                        payload.setdefault("metadata", {})
+                        payload["metadata"]["narrativa_contexto"] = {
+                            "thread_id": narrativa_ctx.get("thread_id"),
+                            "blob": narrativa_ctx.get("fuente_blob"),
+                            "mensajes_recuperados": len(mensajes_fmt),
+                            "session_id": narrativa_ctx.get("session_id"),
+                            "fragmento_conversacion": mensajes_fmt[:3]
+                        }
+                        if narrativa_ctx.get("detalles"):
+                            payload.setdefault("contexto_inteligente", {})
+                            payload["contexto_inteligente"]["pipeline_contexto"] = narrativa_ctx["detalles"]
+                        return payload
+                except Exception as e:
+                    logging.warning(
+                        f"Fallback generar_narrativa_contextual falló: {e}")
+        except Exception:
+            pass
+
+        # 3) No-op fallback
+        return payload
+    # =========================
+
     # === 🔍 BÚSQUEDA AUTOMÁTICA EN MEMORIA SEMÁNTICA (SIEMPRE PRIMERO) ===
     docs_sem = []
+    narrativa_texto = None
+    narrativa_contextual = None
     body = {}
     agent_id = None
 
@@ -3979,6 +4220,18 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json() or {}
     except ValueError:
         body = dict(req.params)
+    if not thread_id:
+        thread_id = body.get("thread_id") or body.get(
+            "session_id") or thread_id
+
+    if not thread_id:
+        thread_id = (
+            body.get("thread_id")
+            or body.get("session_id")
+            or req.params.get("thread_id")
+            or req.params.get("session_id")
+            or session_id
+        )
 
     consulta_usuario = (
         body.get("mensaje") or
@@ -4226,6 +4479,9 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
             respuesta_struct["mensaje"] = ""
             respuesta_struct["respuesta_usuario"] = ""
 
+            # Aplicar narrativa (usa helper local que evita NameError)
+            respuesta_struct = _inyectar_narrativa(respuesta_struct)
+
             return func.HttpResponse(
                 json.dumps(respuesta_struct, ensure_ascii=False),
                 mimetype="application/json",
@@ -4239,6 +4495,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     # Extraer consulta del request
     limit = {}
     contexto_detectado: Dict[str, Any] = {}
+    consulta = ""
     try:
         consulta = body.get("consulta") or body.get(
             "query") or body.get("mensaje") or body.get("prompt") or ""
@@ -4249,7 +4506,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
             clasificacion = analizar_intencion_semantica(consulta) or {}
 
-            # 🎯 ROUTER SEMÁNTICO DINÁMICO
+            # 🎯 ROUTER SEMÁNTICO DINAMICO
             endpoint_sugerido = clasificacion.get("endpoint_sugerido")
             if endpoint_sugerido:
                 logging.info(f"🔀 Redirigiendo a {endpoint_sugerido}")
@@ -4386,7 +4643,7 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                     "validation_applied": True
                 })
                 respuesta_struct["mensaje"] = ""
-                respuesta_struct["respuesta_usuario"] = ""
+                respuesta_struct = _inyectar_narrativa(respuesta_struct)
 
                 return func.HttpResponse(
                     json.dumps(respuesta_struct, ensure_ascii=False),
@@ -4435,566 +4692,58 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
     logging.info(
         f"🔍 COPILOTO: Mensaje extraído: '{mensaje}' (body={bool(body.get('mensaje'))}, params={bool(req.params.get('mensaje'))})")
 
-    # 🎯 DETECCIÓN DE INTENCIONES Y ENRUTAMIENTO AUTOMÁTICO
-    if mensaje and not mensaje.startswith(("leer:", "buscar:", "explorar:", "analizar:", "generar:", "diagnosticar:")):
-        # Detectar intenciones comunes y redirigir
-        mensaje_lower = mensaje.lower()
-
-        if any(kw in mensaje_lower for kw in ["verifica", "estado", "cosmos", "db", "base de datos"]):
-            # Redirigir a diagnóstico de Cosmos DB
-            logging.info(f"🎯 Intención detectada: verificar Cosmos DB")
-            resultado = invocar_endpoint_directo_seguro(
-                "/api/diagnostico-recursos-completo", "GET", params={"recurso": "cosmos"})
-            resultado["intencion_detectada"] = "verificar_cosmos_db"
-            resultado["comando_original"] = mensaje
-            resultado[
-                "respuesta_usuario"] = f"Verificación de Cosmos DB solicitada: {mensaje}\n\nResultado: {resultado.get('mensaje', 'Procesando...')}"
-            return func.HttpResponse(
-                json.dumps(resultado, indent=2, ensure_ascii=False),
-                mimetype="application/json"
-            )
-
-        elif any(kw in mensaje_lower for kw in ["diagnostica", "revisa", "analiza sistema"]):
-            logging.info(f"🎯 Intención detectada: diagnóstico completo")
-            resultado = procesar_intencion_semantica(
-                "diagnosticar:completo", {})
-            resultado["intencion_detectada"] = "diagnostico_completo"
-            resultado["comando_original"] = mensaje
-            return func.HttpResponse(
-                json.dumps(resultado, indent=2, ensure_ascii=False),
-                mimetype="application/json"
-            )
-
-    if not mensaje:
-        # 🔥 PRIORIDAD: Usar docs del wrapper si existen (en memoria_previa)
-        logging.info(
-            f"🔍 COPILOTO: Sin mensaje. memoria_previa keys: {list(memoria_previa.keys()) if memoria_previa else 'None'}")
-        docs_vectoriales_wrapper = memoria_previa.get("docs_vectoriales", [])
-        logging.info(
-            f"🔍 COPILOTO: docs_vectoriales_wrapper = {len(docs_vectoriales_wrapper)} docs")
-
-        if docs_vectoriales_wrapper:
-            logging.info(
-                f"✅ WRAPPER dejó {len(docs_vectoriales_wrapper)} docs vectoriales, procesando sin mensaje...")
-            # Forzar mensaje para que continúe el flujo
-            mensaje = "resumen contexto"
-            docs_sem = docs_vectoriales_wrapper
-        else:
-            logging.info(
-                "🔍 COPILOTO: Sin mensaje ni docs del wrapper, buscando globalmente...")
-
-            try:
-                from endpoints_search_memory import buscar_memoria_endpoint
-
-                memoria_result = buscar_memoria_endpoint({
-                    "query": "últimas interacciones",
-                    "top": 10
-                })
-
-                logging.info(
-                    f"📊 Resultado búsqueda: exito={memoria_result.get('exito')}, docs={len(memoria_result.get('documentos', []))}")
-
-                if memoria_result.get("exito") and memoria_result.get("documentos"):
-                    docs_sem = memoria_result["documentos"]
-                    docs_cosmos = memoria_previa.get(
-                        "interacciones_recientes", [])
-
-                    logging.info(
-                        f"✅ Encontrados: {len(docs_sem)} vectoriales, {len(docs_cosmos)} cosmos")
-
-                    # MERGE sin duplicados
-                    docs_merged = []
-                    ids_vistos = set()
-                    for doc in docs_sem:
-                        doc_id = doc.get("id")
-                        if doc_id and doc_id not in ids_vistos:
-                            docs_merged.append(doc)
-                            ids_vistos.add(doc_id)
-                    for doc in docs_cosmos[:10]:
-                        doc_id = doc.get("id")
-                        if doc_id and doc_id not in ids_vistos:
-                            docs_merged.append(doc)
-                            ids_vistos.add(doc_id)
-
-                    # NO SINTETIZAR - El modelo debe generar su propia respuesta
-                    respuesta_semantica = ""
-
-                    return func.HttpResponse(
-                        json.dumps({
-                            "exito": True,
-                            "respuesta_usuario": "",
-                            "fuente_datos": "Cosmos+AISearch",
-                            "total_docs_semanticos": len(docs_sem),
-                            "total_docs_cosmos": len(docs_cosmos),
-                            "total_merged": len(docs_merged),
-                            "metadata": {
-                                "wrapper_aplicado": True,
-                                "memoria_aplicada": True,
-                                "auto_query": True,
-                                "sin_filtro_sesion": True,
-                                "interacciones_previas": len(docs_cosmos)
-                            }
-                        }, ensure_ascii=False),
-                        mimetype="application/json",
-                        status_code=200
-                    )
-                else:
-                    logging.warning(f"⚠️ Búsqueda no devolvió documentos")
-            except Exception as e:
-                logging.error(f"❌ Error en búsqueda automática: {e}")
-
-            logging.info(
-                "ℹ️ COPILOTO: Sin resultados, devolviendo panel inicial")
-        # Panel inicial mejorado con capacidades semánticas Y CONTEXTO ENRIQUECIDO
-        panel = {
-            "tipo": "panel_inicial",
-            "titulo": f"🤖 COPILOTO SEMÁNTICO - {'AZURE' if IS_AZURE else 'LOCAL'}",
-            "version": "2.0-semantic-enhanced",
-            "capacidades": SEMANTIC_CAPABILITIES,
-            "contexto_semantico": contexto_semantico,
-            "estado": {
-                "ambiente": "Azure" if IS_AZURE else "Local",
-                "blob_storage": {
-                    "configurado": bool(STORAGE_CONNECTION_STRING),
-                    "conectado": bool(get_blob_client()),
-                    "container": CONTAINER_NAME if STORAGE_CONNECTION_STRING else None
-                },
-                "cache_activo": len(CACHE),
-                "inteligencia": {
-                    "analisis_semantico": True,
-                    "generacion_artefactos": True,
-                    "sugerencias_contextuales": True,
-                    "memoria_semantica_activa": bool(contexto_semantico),
-                    "conocimiento_cognitivo": bool(contexto_semantico.get("conocimiento_cognitivo"))
-                }
-            },
-            "comandos": {
-                "basicos": {
-                    "leer:<ruta>": "Lee cualquier archivo del proyecto",
-                    "buscar:<patron>": "Búsqueda semántica inteligente",
-                    "explorar:<dir>": "Explora directorios con metadata"
-                },
-                "semanticos": {
-                    "analizar:<ruta>": "Análisis profundo de código",
-                    "generar:<tipo>": "Genera artefactos (readme, config, test, script)",
-                    "diagnosticar:<aspecto>": "Diagnóstico del sistema",
-                    "sugerir": "Sugerencias basadas en contexto"
-                }
-            },
-            "metadata": {
-                "timestamp": datetime.now().isoformat(),
-                "ready_for_agents": True,
-                "api_version": "2.0-enhanced",
-                "memoria_semantica_integrada": True,
-                "contexto_enriquecido": bool(contexto_semantico)
-            }
-        }
-
-        # 🔥 APLICAR WRAPPER AUTOMÁTICO TAMBIÉN AL PANEL INICIAL
-        from cosmos_memory_direct import aplicar_memoria_cosmos_directo
-        panel = aplicar_memoria_cosmos_directo(req, panel) or _as_dict(panel)
-
-        # NOTA: La memoria semántica se registra automáticamente por el wrapper @registrar_memoria
-
-        return func.HttpResponse(
-            json.dumps(panel, indent=2, ensure_ascii=False),
-            mimetype="application/json"
+    # ✅ Fallback final: intentar al menos devolver narrativa contextual
+    try:
+        narrativa_fallback = generar_narrativa_contextual(
+            session_id=session_id,
+            thread_id=thread_id,
+            query=mensaje or consulta or consulta_usuario or ""
         )
-
-    # === 🧠 FUSIONAR MEMORIA GLOBAL Y CONTEXTO SEMÁNTICO ===
-    try:
-        contexto_semantico = getattr(req, "contexto_semantico", None)
-        memoria_global = getattr(req, "memoria_global", None)
-
-        if contexto_semantico or memoria_global:
-            logging.info(
-                f"🧠 Copiloto: memoria detectada (semántica={bool(contexto_semantico)}, global={bool(memoria_global)})")
-
-            resumen_ctx = ""
-            if contexto_semantico and contexto_semantico.get("resumen"):
-                resumen_ctx += f"Contexto semántico: {contexto_semantico['resumen'][:200]} "
-            if memoria_global and memoria_global.get("tiene_historial"):
-                resumen_ctx += f"Interacciones previas: {memoria_global.get('total_interacciones', 0)} "
-
-            if resumen_ctx:
-                req.__dict__["_contexto_fusionado"] = resumen_ctx
-                logging.info(f"🧩 Contexto fusionado: {resumen_ctx[:150]}")
-    except Exception as e:
+    except Exception as fallback_err:
+        narrativa_fallback = None
         logging.warning(
-            f"⚠️ No se pudo aplicar contexto semántico en copiloto: {e}")
+            f"⚠️ Fallback narrativa no disponible: {fallback_err}")
 
-    # Procesar comandos con respuesta estructurada
-    try:
-        respuesta_base = {
-            "tipo": "respuesta_semantica",
-            "timestamp": datetime.now().isoformat(),
-            "comando_original": mensaje,
+    if narrativa_fallback and (narrativa_fallback.get("texto") or narrativa_fallback.get("mensajes")):
+        logging.info("✅ Fallback de narrativa contextual aplicado")
+        mensajes_fmt = narrativa_fallback.get(
+            "mensajes") or narrativa_fallback.get("mensajes_formateados") or []
+        texto_base = _construir_resumen_narrativo(
+            narrativa_fallback) or narrativa_fallback.get("texto", "").strip()
+
+        payload_fallback = {
+            "exito": True,
+            "respuesta_usuario": texto_base,
+            "texto_semantico": texto_base,
             "metadata": {
-                "procesado_por": "copiloto-semantico",
-                "ambiente": "Azure" if IS_AZURE else "Local",
-                "version": "2.0"
-            }
-        }
-
-        # 🔥 Agregar contexto fusionado si existe
-        if "_contexto_fusionado" in req.__dict__:
-            respuesta_base["contexto"] = req.__dict__["_contexto_fusionado"]
-            respuesta_base["metadata"]["memoria_global"] = True
-            respuesta_base["metadata"]["memoria_aplicada"] = True
-
-        # Comando: leer
-        if mensaje.startswith("leer:"):
-            ruta = mensaje.split(":", 1)[1]
-            resultado = leer_archivo_dinamico(ruta) or {}
-            respuesta_base.update({
-                "accion": "leer_archivo",
-                "resultado": resultado,
-                "proximas_acciones": [
-                    f"analizar:{ruta}",
-                    f"generar:test para {ruta}",
-                    "buscar:archivos similares"
-                ] if resultado.get("exito") else ["buscar:*", "explorar:."]
-            })
-
-        # Comando: buscar (semántico)
-        elif mensaje.startswith("buscar:"):
-            patron = mensaje.split(":", 1)[1]
-            resultado = buscar_archivos_semantico(patron) or {}
-            respuesta_base.update({
-                "accion": "busqueda_semantica",
-                "resultado": resultado,
-                "proximas_acciones": [
-                    f"leer:{archivo['ruta']}" for archivo in resultado.get("archivos", [])[:3]
-                ] + ["explorar:directorio relevante"]
-            })
-
-        # Comando: explorar
-        elif mensaje.startswith("explorar:"):
-            directorio = mensaje.split(":", 1)[1]
-            archivos = explorar_directorio_blob(directorio) if IS_AZURE else []
-            archivos = archivos or []
-
-            respuesta_base.update({
-                "accion": "explorar_directorio",
-                "resultado": {
-                    "directorio": directorio,
-                    "archivos": archivos[:30],
-                    "total": len(archivos),
-                    "estadisticas": {
-                        "tipos": {},
-                        "tamaño_total": sum(a.get("tamaño", 0) for a in archivos)
-                    }
-                },
-                "proximas_acciones": [
-                    f"analizar:{directorio}/*.py",
-                    f"generar:readme para {directorio}"
-                ]
-            })
-
-        # Comando: analizar
-        elif mensaje.startswith("analizar:"):
-            ruta = mensaje.split(":", 1)[1]
-            resultado = analizar_codigo_semantico(ruta) or {}
-            respuesta_base.update({
-                "accion": "analisis_semantico",
-                "resultado": resultado,
-                "proximas_acciones": resultado.get("intenciones_sugeridas", [])
-            })
-
-        # Comando: generar
-        elif mensaje.startswith("generar:"):
-            partes = mensaje.split(":", 1)[1].split(" para ")
-            tipo = partes[0]
-            contexto = {"target": partes[1]} if len(partes) > 1 else {}
-
-            resultado = generar_artefacto(tipo, contexto) or {}
-            respuesta_base.update({
-                "accion": "generar_artefacto",
-                "resultado": resultado,
-                "proximas_acciones": [
-                    "leer:archivo generado",
-                    "analizar:calidad del artefacto"
-                ]
-            })
-
-        # Comando: diagnosticar (CON CONTEXTO SEMÁNTICO)
-        elif mensaje.startswith("diagnosticar:"):
-            parametros_enriquecidos = {
-                "contexto_semantico": contexto_semantico}
-            resultado = procesar_intencion_semantica(
-                mensaje, parametros_enriquecidos) or {}
-
-            if contexto_semantico is not None and isinstance(contexto_semantico, dict) and contexto_semantico.get("conocimiento_cognitivo") and isinstance(resultado, dict):
-                resultado["evaluacion_cognitiva"] = contexto_semantico["conocimiento_cognitivo"]
-
-            respuesta_base.update({
-                "accion": "diagnostico_enriquecido",
-                "resultado": resultado,
-                "proximas_acciones": ["sugerir", "explorar:.", "analizar:tendencias"]
-            })
-
-        # Comando: sugerir (CON CONTEXTO SEMÁNTICO)
-        elif mensaje == "sugerir":
-            ctx_valido = contexto_semantico if isinstance(
-                contexto_semantico, dict) else {}
-            sugerencias_contextuales = generar_sugerencias_contextuales(
-                ctx_valido) or []
-            resultado = procesar_intencion_semantica(
-                "sugerir", {"contexto_semantico": contexto_semantico}) or {}
-
-            if isinstance(resultado, dict) and resultado.get("exito"):
-                resultado["sugerencias_contextuales"] = sugerencias_contextuales
-                resultado["sugerencias"] = (resultado.get(
-                    "sugerencias", []) + sugerencias_contextuales)[:10]
-
-            respuesta_base.update({
-                "accion": "sugerencias_enriquecidas",
-                "resultado": resultado,
-                "proximas_acciones": resultado.get("sugerencias", [])[:3] if resultado.get("exito") else []
-            })
-
-        # Comando no reconocido - interpretación semántica ENRIQUECIDA
-        else:
-            # Validar que contexto_semantico sea dict
-            ctx_valido = contexto_semantico if isinstance(
-                contexto_semantico, dict) else {}
-            interpretacion_enriquecida = interpretar_con_contexto_semantico(
-                mensaje, ctx_valido) or {}
-            respuesta_base.update({
-                "accion": "interpretacion_enriquecida",
-                "resultado": {
-                    "mensaje": "No reconozco ese comando específico, pero basándome en el contexto puedo sugerir:",
-                    "interpretacion": interpretacion_enriquecida.get("interpretacion", f"Parece que quieres: {mensaje}"),
-                    "sugerencias": interpretacion_enriquecida.get("sugerencias", [
-                        "buscar:" + mensaje,
-                        "generar:script para " + mensaje,
-                        "sugerir"
-                    ]),
-                    "contexto_aplicado": bool(contexto_semantico)
-                },
-                "proximas_acciones": ["sugerir", "buscar:*", "diagnosticar:sistema"]
-            })
-
-        # Asegurar respuesta_base es dict antes de usar
-        respuesta_base = _as_dict(respuesta_base)
-
-        # Conservar los snapshots de contexto/intención sin generar narrativa
-        contexto_inteligente_local = getattr(
-            req, '_contexto_inteligente', {}) or {}
-        interpretacion_semantica_local = getattr(
-            req, '_interpretacion_semantica', "") or ""
-
-        if contexto_inteligente_local:
-            respuesta_base["contexto_inteligente"] = contexto_inteligente_local
-        if interpretacion_semantica_local:
-            respuesta_base["interpretacion_semantica"] = interpretacion_semantica_local
-
-        if contexto_detectado:
-            respuesta_base["clasificacion_contexto"] = contexto_detectado
-        if isinstance(memoria_previa, dict):
-            respuesta_base.setdefault("resumen_conversacion",
-                                      memoria_previa.get("resumen_conversacion", ""))
-            respuesta_base.setdefault("total_interacciones_previas",
-                                      memoria_previa.get("total_interacciones", 0))
-
-        # 🔥 APLICAR WRAPPER AUTOMÁTICO PARA CONTEXTO_INTELIGENTE E INTERPRETACION_SEMANTICA
-        from cosmos_memory_direct import aplicar_memoria_cosmos_directo
-        respuesta_base = aplicar_memoria_cosmos_directo(
-            req, respuesta_base) or _as_dict(respuesta_base)
-
-        # 🧠 EXTRAER CONTEXTO_INTELIGENTE E INTERPRETACION_SEMANTICA DEL WRAPPER
-        contexto_inteligente_wrapper = respuesta_base.get(
-            "contexto_inteligente", {}) or {}
-        interpretacion_semantica_wrapper = respuesta_base.get(
-            "interpretacion_semantica", "") or ""
-
-        # Guardar datos del wrapper (sin construir narrativa)
-        if contexto_inteligente_wrapper:
-            respuesta_base["contexto_inteligente"] = contexto_inteligente_wrapper
-        if interpretacion_semantica_wrapper:
-            respuesta_base["interpretacion_semantica"] = interpretacion_semantica_wrapper
-
-        # Registrar la clasificación de contexto detectada (sin sintetizar narrativa)
-        if contexto_detectado:
-            respuesta_base["clasificacion_contexto"] = contexto_detectado
-
-        # Registrar con datos enriquecidos
-        try:
-            from services.memory_service import memory_service
-            session_id = req.headers.get("Session-ID") or "unknown"
-            agent_id = req.headers.get("Agent-ID") or "unknown"
-            accion = respuesta_base.get("accion", "consulta")
-            resultado_exito = respuesta_base.get("resultado", {}).get(
-                "exito", True) if isinstance(respuesta_base.get("resultado"), dict) else True
-            texto_semantico = json.dumps({
-                "comando": comando,
-                "accion": accion,
-                "resultado": "OK" if resultado_exito else "FAIL"
-            }, ensure_ascii=False)
-            respuesta_base["texto_semantico"] = texto_semantico
-            respuesta_base["respuesta_usuario"] = ""
-            memory_service.registrar_llamada(source="copiloto", endpoint="/api/copiloto", method=req.method, params={
-                                             "comando": comando, "consulta": comando, "mensaje": comando, "session_id": session_id, "agent_id": agent_id}, response_data=respuesta_base, success=resultado_exito)
-            logging.info(f"Registrado: {texto_semantico[:80]}")
-        except Exception as e:
-            logging.warning(f"Error registrando: {e}")
-
-        # 🔥 MERGE FINAL: Combinar docs vectoriales + cosmos
-        docs_vectoriales = docs_sem or memoria_previa.get(
-            "docs_vectoriales", [])
-        docs_cosmos = memoria_previa.get("interacciones_recientes", [])
-
-        docs_merged = []
-        ids_vistos = set()
-        resultado_exito = True
-
-        # Prioridad 1: Docs vectoriales (más relevantes)
-        for doc in docs_vectoriales:
-            doc_id = doc.get("id")
-            if doc_id and doc_id not in ids_vistos:
-                docs_merged.append(doc)
-                ids_vistos.add(doc_id)
-
-        # Prioridad 2: Docs de Cosmos (cronológicos)
-        for doc in docs_cosmos[:10]:
-            doc_id = doc.get("id")
-            if doc_id and doc_id not in ids_vistos:
-                docs_merged.append(doc)
-                ids_vistos.add(doc_id)
-
-        logging.info(
-            f"🔥 MERGE: {len(docs_vectoriales)} vectorial + {len(docs_cosmos)} cosmos = {len(docs_merged)} total")
-
-        # 🧠 CONSERVAR CONTEXTO CRUDO SI HAY DOCS MERGED
-        if docs_merged:
-            contexto_docs: List[str] = []
-            for doc in docs_vectoriales:
-                texto_doc = doc.get("texto_semantico") or doc.get("texto")
-                if texto_doc:
-                    contexto_docs.append(str(texto_doc))
-            for doc in docs_cosmos[:10]:
-                texto_doc = doc.get("texto_semantico") or doc.get("texto")
-                if texto_doc:
-                    contexto_docs.append(str(texto_doc))
-
-            respuesta_base["contexto_semantico_docs"] = contexto_docs
-            respuesta_base["fuente_datos"] = "Cosmos+AISearch"
-            respuesta_base["total_docs_semanticos"] = len(docs_vectoriales)
-            respuesta_base["total_docs_cosmos"] = len(docs_cosmos)
-            respuesta_base["total_merged"] = len(docs_merged)
-
-            if "metadata" not in respuesta_base:
-                respuesta_base["metadata"] = {}
-
-            respuesta_base["metadata"].update({
+                "fuente": "narrativa_enriquecida",
+                "thread_id": narrativa_fallback.get("thread_id"),
+                "blob": narrativa_fallback.get("fuente_blob"),
+                "mensajes_recuperados": len(mensajes_fmt),
+                "session_id": narrativa_fallback.get("session_id"),
+                "fragmento_conversacion": mensajes_fmt[:3],
                 "wrapper_aplicado": True,
                 "memoria_aplicada": True,
-                "interacciones_previas": len(docs_cosmos),
-                "fuente": "azure_search_vectorial"
-            })
-
-            respuesta_base["contexto_conversacion"] = {
-                "mensaje": f"Continuando conversación con {len(docs_cosmos)} interacciones previas",
-                "ultimas_consultas": memoria_previa.get("resumen_conversacion", "")[:500],
-                "session_id": session_id,
-                "ultima_actividad": memoria_previa.get("ultima_actividad")
-            }
-
-            logging.info(
-                f"✅ COPILOTO: Contexto semántico crudo listo para el modelo")
-
-        # 🔥 APLICAR ENRIQUECIMIENTO DE BING SI EXISTE (después del MERGE)
-        bing_enrichment = getattr(req, '_bing_enrichment', None)
-        if bing_enrichment and isinstance(bing_enrichment, dict):
-            logging.info(
-                "🔍 Aplicando enriquecimiento de Bing DESPUÉS del MERGE")
-            respuesta_base["bing_enrichment"] = {
-                "aplicado": True,
-                "fuente": bing_enrichment.get("fuente", "bing_grounding"),
-                "respuesta": bing_enrichment.get("respuesta")
-            }
-
-        # Construir respuesta estructurada para el modelo
-        evento_descripcion = json.dumps({
-            "comando": mensaje,
-            "accion": respuesta_base.get("accion"),
-            "resultado": respuesta_base.get("resultado"),
-            "proximas_acciones": respuesta_base.get("proximas_acciones"),
-            "clasificacion_contexto": respuesta_base.get("clasificacion_contexto"),
-            "metadata": respuesta_base.get("metadata")
-        }, ensure_ascii=False)
-
-        evento_principal = build_event(
-            endpoint="copiloto",
-            descripcion=evento_descripcion,
-            estado="exito" if resultado_exito else "error",
-            sugerencia="",
-            criticidad="informativa",
-            datos={
-                "timestamp": respuesta_base.get("timestamp"),
-                "session_id": session_id,
-                "agent_id": agent_id
+                "interacciones_previas": narrativa_fallback.get("total_interacciones", 0)
             },
-            timestamp=respuesta_base.get("timestamp")
-        )
-
-        extras_payload = {
-            "resultado": respuesta_base.get("resultado"),
-            "proximas_acciones": respuesta_base.get("proximas_acciones"),
-            "metadata": respuesta_base.get("metadata"),
-            "contexto_conversacion": respuesta_base.get("contexto_conversacion"),
-            "contexto_semantico_docs": respuesta_base.get("contexto_semantico_docs"),
-            "clasificacion_contexto": respuesta_base.get("clasificacion_contexto"),
-            "docs_vectoriales": docs_vectoriales,
-            "docs_cosmos": docs_cosmos,
-            "docs_merged": docs_merged,
-            "bing_enrichment": respuesta_base.get("bing_enrichment"),
-            "texto_semantico_original": respuesta_base.get("texto_semantico")
+            "timestamp": datetime.now().isoformat()
         }
-
-        structured_response = build_structured_payload(
-            "copiloto",
-            [evento_principal],
-            narrativa_base="",
-            resumen_automatico="",
-            extras=extras_payload,
-            contexto_inteligente=respuesta_base.get("contexto_inteligente"),
-            exito=resultado_exito
-        )
-        structured_response.update({
-            "session_id": session_id,
-            "agent_id": agent_id,
-            "fuente": "wrapper_automatico",
-            "validation_applied": True
-        })
-        structured_response["mensaje"] = ""
-        structured_response["respuesta_usuario"] = ""
-
         return func.HttpResponse(
-            json.dumps(structured_response, ensure_ascii=False),
-            mimetype="application/json"
-        )
-
-    except Exception as e:
-        logging.error(f"Error: {str(e)}")
-        return func.HttpResponse(
-            json.dumps({
-                "tipo": "error",
-                "error": str(e),
-                "detalles": {
-                    "tipo_error": type(e).__name__,
-                    "ambiente": "Azure" if IS_AZURE else "Local",
-                    "blob_configurado": bool(STORAGE_CONNECTION_STRING)
-                },
-                "sugerencias": [
-                    "Verificar la sintaxis del comando",
-                    "Consultar el panel inicial para ver comandos disponibles",
-                    "Intentar con 'sugerir' para obtener ayuda"
-                ]
-            }, indent=2),
+            json.dumps(payload_fallback, ensure_ascii=False),
             mimetype="application/json",
-            status_code=500
+            status_code=200
         )
+
+    return func.HttpResponse(
+        json.dumps({
+            "exito": False,
+            "error": "No se procesó la solicitud correctamente",
+            "mensaje": "El endpoint no generó una respuesta válida",
+            "timestamp": datetime.now().isoformat()
+        }, ensure_ascii=False),
+        mimetype="application/json",
+        status_code=500
+    )
 
 
 def detectar_consulta_contexto_semantica(consulta: str) -> dict:
@@ -6594,7 +6343,7 @@ def bridge_cli(req: func.HttpRequest) -> func.HttpResponse:
     Endpoint súper tolerante para agentes problemáticos que combina parsing raw + JSON
     """
     request_id = uuid.uuid4().hex[:8]
-
+    from endpoints.ejecutar_cli import ejecutar_cli_http
     try:
         # 🔥 VALIDACIÓN DEFENSIVA DE JSON + raw_body
         raw_body = req.get_body().decode('utf-8') if req.get_body() else ""
@@ -7041,6 +6790,7 @@ def contexto_agente_http(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="interpretar-intencion", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def interpretar_intencion_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from endpoints.ejecutar_cli import ejecutar_comando_sistema
     """Endpoint que interpreta lenguaje natural y genera comandos"""
     try:
         body = req.get_json() if req.get_body() else {}
@@ -7348,413 +7098,6 @@ def generar_sugerencias_locales(query: str) -> list:
         ]
 
     return sugerencias[:5]  # Máximo 5 sugerencias
-
-# Endpoint /api/ejecutar-comando removido - funcionalidad integrada en /api/ejecutar-cli
-
-
-def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
-    """Ejecuta comando del sistema según su tipo de manera dinámica y adaptable"""
-
-    start_time = time.time()
-
-    try:
-        # 🔥 APLICAR AUTO-FIXES ANTES DE CUALQUIER EJECUCIÓN
-        try:
-            from command_fixers.auto_fixers import apply_auto_fixes
-            comando = apply_auto_fixes(comando, tipo)
-            logging.info(f"Auto-fixes aplicados: {comando}")
-        except ImportError:
-            logging.warning("auto_fixers no disponible")
-
-        # Configurar entorno
-        env = os.environ.copy()
-        shell = False
-        cmd_args = []
-
-        # Detección dinámica y configuración por tipo
-        if tipo == "python":
-            # Detectar si es pip, python script, o código inline
-            if comando.startswith("pip "):
-                # Comando pip directo
-                cmd_args = comando.split()
-                shell = True
-            elif comando.startswith("python "):
-                # Comando python con argumentos
-                cmd_args = comando.split()
-                shell = False
-            elif any(keyword in comando for keyword in ["import ", "print(", "def ", "class "]):
-                # Código Python inline
-                cmd_args = ["python", "-c", comando]
-                shell = False
-            else:
-                # Script Python o comando genérico
-                cmd_args = ["python"] + comando.split()
-                shell = False
-
-            env['PYTHONIOENCODING'] = 'utf-8'
-            env['PYTHONUNBUFFERED'] = '1'
-
-        elif tipo == "powershell":
-            # 🔥 AUTO-FIX: Agregar | Out-String si hay pipes pero no está presente
-            if '|' in comando and '| Out-String' not in comando and '| out-string' not in comando.lower():
-                comando = f"{comando} | Out-String"
-                logging.info(
-                    f"PowerShell: Auto-agregado | Out-String para convertir objetos a texto")
-
-            # 🔥 SOLUCIÓN: Envolver comando en & { } para ejecutar dentro de PowerShell
-            comando_wrapped = f"& {{ {comando} }}"
-
-            # PowerShell con detección de cmdlets
-            if any(comando.startswith(prefix) for prefix in ["Get-", "Set-", "New-", "Remove-", "Invoke-"]):
-                # Cmdlet nativo
-                cmd_args = ["powershell", "-NoProfile",
-                            "-Command", comando_wrapped]
-            else:
-                # Comando o script PowerShell
-                cmd_args = ["powershell", "-NoProfile",
-                            "-ExecutionPolicy", "Bypass", "-Command", comando_wrapped]
-
-            env['POWERSHELL_TELEMETRY_OPTOUT'] = '1'
-            shell = False
-
-        elif tipo == "bash":
-            # Bash con detección de comandos Unix
-            bash_path = shutil.which("bash") or "/bin/bash"
-            cmd_args = [bash_path, "-c", comando]
-            shell = False
-
-        elif tipo == "npm":
-            # NPM con detección de subcomandos
-            if comando.startswith("npm "):
-                cmd_args = comando.split()
-            else:
-                cmd_args = ["npm"] + comando.split()
-            shell = True
-
-        elif tipo == "docker":
-            # Docker con detección de subcomandos
-            if comando.startswith("docker "):
-                cmd_args = comando.split()
-            else:
-                cmd_args = ["docker"] + comando.split()
-            shell = False
-
-        elif tipo == "azure_cli":
-            # Azure CLI
-            if comando.startswith("az "):
-                cmd_args = comando.split()
-            else:
-                cmd_args = ["az"] + comando.split()
-            shell = False
-
-        else:
-            # Comando genérico - ejecutar tal como está
-            if " " in comando:
-                cmd_args = comando.split()
-            else:
-                cmd_args = [comando]
-            shell = True
-
-        # EJECUCIÓN ROBUSTA: Detección dinámica de método óptimo
-        import shlex
-
-        # Detectar si el comando tiene rutas con espacios o caracteres especiales
-        has_spaces_in_paths = ' ' in comando and (
-            '\\' in comando or '/' in comando)
-        has_quotes = '"' in comando or "'" in comando
-        has_pipes = any(char in comando for char in [
-                        '|', '&&', '||', '>', '<'])
-
-        # Normalizar rutas de Windows con espacios
-        if has_spaces_in_paths and not has_quotes and tipo == "python":
-            # Detectar rutas de Windows y agregar comillas si es necesario
-            # Buscar patrones como "C:\path with spaces\file.py"
-            path_pattern = r'([A-Za-z]:\\[^"]*\s[^"]*\.[a-zA-Z]+)'
-            matches = re.findall(path_pattern, comando)
-
-            for match in matches:
-                if '"' not in match:  # Solo si no tiene comillas ya
-                    comando = comando.replace(match, f'"{match}"')
-                    logging.info(f"Ruta normalizada: {match} -> \"{match}\"")
-
-        # Decidir método de ejecución dinámicamente
-        # 🔥 FIX: Si es PowerShell, SIEMPRE usar powershell.exe, nunca cmd.exe
-        if tipo == "powershell":
-            # PowerShell SIEMPRE debe ejecutarse con powershell.exe
-            execution_method = "powershell_native"
-            logging.info(
-                f"Ejecutando PowerShell con powershell.exe: {cmd_args}")
-
-            result = subprocess.run(
-                # Ya contiene ["powershell", "-NoProfile", "-Command", comando]
-                cmd_args,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding='utf-8',
-                errors='replace',
-                env=env,
-                shell=False  # NUNCA usar shell=True para PowerShell
-            )
-        elif has_spaces_in_paths or has_quotes or has_pipes or shell:
-            # Usar shell para comandos complejos
-            execution_method = "shell"
-
-            # 🔥 LIMPIEZA FINAL: Eliminar comillas duplicadas/mal escapadas
-            from command_cleaner import limpiar_comillas_comando
-            comando_limpio = limpiar_comillas_comando(comando)
-            logging.info(f"Comando original: {comando}")
-            logging.info(f"Comando limpio: {comando_limpio}")
-            logging.info(f"Ejecutando {tipo} con shell")
-
-            result = subprocess.run(
-                comando_limpio,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding='utf-8',
-                errors='replace',
-                env=env
-            )
-        else:
-            # Intentar con lista de argumentos primero
-            execution_method = "args_list"
-            try:
-                if cmd_args:
-                    # Usar shlex para parsing inteligente
-                    if isinstance(cmd_args, list) and len(cmd_args) > 1:
-                        final_args = cmd_args
-                    else:
-                        try:
-                            final_args = shlex.split(comando) if isinstance(
-                                comando, str) else cmd_args
-                        except ValueError:
-                            # Si shlex falla, usar split simple como fallback
-                            final_args = comando.split() if isinstance(comando, str) else cmd_args
-
-                    logging.info(f"Ejecutando {tipo} con args: {final_args}")
-
-                    result = subprocess.run(
-                        final_args,
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        encoding='utf-8',
-                        errors='replace',
-                        env=env
-                    )
-                else:
-                    raise ValueError("No hay argumentos para ejecutar")
-
-            except (ValueError, FileNotFoundError) as e:
-                # Fallback a shell si falla el método de argumentos
-                execution_method = "shell_fallback"
-                logging.info(f"Fallback a shell para {tipo}: {e}")
-
-                result = subprocess.run(
-                    comando,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    encoding='utf-8',
-                    errors='replace',
-                    env=env
-                )
-
-        duration = time.time() - start_time
-
-        # --- NORMALIZADOR DE SALIDA POWERSHELL CON RE-EJECUCIÓN AUTOMÁTICA ---
-        if tipo == "powershell" and result.returncode == 0:
-            stdout_limpio = result.stdout.strip()
-            if stdout_limpio and "Perfil de PowerShell cargado" in stdout_limpio:
-                stdout_limpio = ""
-
-            if not stdout_limpio:
-                logging.info(
-                    "PowerShell: stdout vacío, re-ejecutando con | Out-String")
-                comando_con_outstring = f"{comando} | Out-String" if '| Out-String' not in comando else comando
-                comando_retry_wrapped = f"& {{ {comando_con_outstring} }}"
-
-                try:
-                    result_retry = subprocess.run(
-                        cmd_args[:-1] + [comando_retry_wrapped],
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        encoding='utf-8',
-                        errors='replace',
-                        env=env
-                    )
-
-                    if result_retry.returncode == 0 and result_retry.stdout.strip():
-                        logging.info(
-                            f"PowerShell: Re-ejecución exitosa, {len(result_retry.stdout)} chars")
-                        object.__setattr__(
-                            result, 'stdout', result_retry.stdout)
-                    else:
-                        decoded = f"⚠️ PowerShell sin salida visible. Comando: {comando[:100]}..."
-                        object.__setattr__(result, 'stdout', decoded)
-                except Exception as e:
-                    logging.warning(f"PowerShell re-ejecución falló: {e}")
-                    object.__setattr__(result, 'stdout', f"⚠️ Error: {str(e)}")
-
-            # 🔥 DETECCIÓN DE VARIABLES: Si hay $ y stdout vacío, forzar salida
-            if "$" in comando and result.returncode == 0 and not result.stdout.strip():
-                logging.info(
-                    "PowerShell: Variable detectada sin salida, aplicando auto-fixes")
-
-                # 🧠 APLICAR AUTO-FIXES INTELIGENTES
-                try:
-                    from command_fixers.auto_fixers import apply_auto_fixes
-                    comando = apply_auto_fixes(comando, tipo)
-                except ImportError:
-                    logging.warning(
-                        "auto_fixers no disponible, usando fallback")
-
-                comando_con_variable = f"& {{ {comando} | Out-String }}"
-                try:
-                    result_var = subprocess.run(
-                        cmd_args[:-1] + [comando_con_variable],
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        encoding='utf-8',
-                        errors='replace',
-                        env=env
-                    )
-                    if result_var.returncode == 0 and result_var.stdout.strip():
-                        logging.info(
-                            f"PowerShell: Variable forzada exitosa, {len(result_var.stdout)} chars")
-                        object.__setattr__(result, 'stdout', result_var.stdout)
-                except Exception as e:
-                    logging.warning(f"PowerShell variable forzada falló: {e}")
-        # --- FIN NORMALIZADOR ---
-
-        # ✅ MEJORADO: Más información de debugging
-        resultado = {
-            "exito": result.returncode == 0,
-            "output": result.stdout,
-            "error": result.stderr if result.stderr else None,
-            "return_code": result.returncode,
-            "duration": f"{duration:.2f}s",
-            "comando_ejecutado": comando,
-            "tipo_comando": tipo,
-            "metodo_ejecucion": execution_method,
-            "deteccion_automatica": {
-                "rutas_con_espacios": has_spaces_in_paths,
-                "tiene_comillas": has_quotes,
-                "tiene_pipes": has_pipes
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-
-        # ✅ AGREGAR: Información adicional si falla
-        if result.returncode != 0:
-            resultado["diagnostico_error"] = {
-                "archivo_no_encontrado": "No such file or directory" in (result.stderr or ""),
-                "permisos_denegados": "Permission denied" in (result.stderr or ""),
-                "comando_no_reconocido": any(phrase in (result.stderr or "").lower() for phrase in [
-                    "not recognized", "command not found", "no se reconoce"
-                ]),
-                "sintaxis_incorrecta": "syntax error" in (result.stderr or "").lower(),
-                "ruta_no_existe": "cannot find the path" in (result.stderr or "").lower()
-            }
-
-            # Sugerencias basadas en el tipo de error
-            sugerencias = []
-            if resultado["diagnostico_error"]["archivo_no_encontrado"]:
-                sugerencias.append(
-                    "Verificar que el archivo existe en la ruta especificada")
-            if resultado["diagnostico_error"]["permisos_denegados"]:
-                sugerencias.append(
-                    "Ejecutar con permisos de administrador o verificar permisos del archivo")
-            if resultado["diagnostico_error"]["comando_no_reconocido"]:
-                sugerencias.append(
-                    f"Verificar que {tipo} esté instalado y en el PATH")
-            if resultado["diagnostico_error"]["sintaxis_incorrecta"]:
-                sugerencias.append("Revisar la sintaxis del comando")
-            if resultado["diagnostico_error"]["ruta_no_existe"]:
-                sugerencias.append(
-                    "Verificar que la ruta del directorio existe")
-
-            if not sugerencias:
-                sugerencias.append(
-                    "Revisar el mensaje de error para más detalles")
-
-            resultado["sugerencias_solucion"] = sugerencias
-
-        return resultado
-
-    except subprocess.TimeoutExpired:
-        return {
-            "exito": False,
-            "error": "Comando excedió tiempo límite (60s)",
-            "return_code": -1,
-            "duration": "timeout",
-            "comando_ejecutado": comando,
-            "tipo_comando": tipo,
-            "diagnostico_error": {
-                "tipo_error": "timeout",
-                "timeout_segundos": 60,
-                "posibles_causas": [
-                    "Comando muy lento o colgado",
-                    "Problemas de conectividad",
-                    "Proceso esperando entrada del usuario"
-                ]
-            },
-            "sugerencias_solucion": [
-                "Verificar que el comando no requiera interacción",
-                "Simplificar el comando si es muy complejo",
-                "Verificar conectividad de red si aplica"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-    except FileNotFoundError as e:
-        return {
-            "exito": False,
-            "error": f"Comando o programa no encontrado: {str(e)}",
-            "return_code": -1,
-            "duration": f"{time.time() - start_time:.2f}s",
-            "comando_ejecutado": comando,
-            "tipo_comando": tipo,
-            "diagnostico_error": {
-                "tipo_error": "programa_no_encontrado",
-                "programa_buscado": tipo,
-                "error_detallado": str(e),
-                "verificar_instalacion": True
-            },
-            "sugerencias_solucion": [
-                f"Instalar {tipo} si no está instalado",
-                f"Verificar que {tipo} esté en el PATH del sistema",
-                "Reiniciar terminal después de la instalación",
-                "Usar ruta completa al ejecutable si es necesario"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "exito": False,
-            "error": f"Error ejecutando comando: {str(e)}",
-            "return_code": -1,
-            "duration": f"{time.time() - start_time:.2f}s",
-            "comando_ejecutado": comando,
-            "tipo_comando": tipo,
-            "diagnostico_error": {
-                "tipo_error": "excepcion_inesperada",
-                "tipo_excepcion": type(e).__name__,
-                "mensaje_completo": str(e),
-                "requiere_investigacion": True
-            },
-            "sugerencias_debug": [
-                "Verificar formato y sintaxis del comando",
-                "Comprobar permisos del usuario",
-                "Revisar logs del sistema",
-                "Reportar este error si persiste"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
 
 
 @app.function_name(name="health")
@@ -8100,6 +7443,7 @@ def modificar_archivo_http(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from services.memory_service import memory_service
+    from helpers_file_operations import _generar_respuesta_no_encontrado
     """Endpoint ultra-resiliente para modificar archivos - nunca falla por formato"""
 
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
@@ -11578,1183 +10922,136 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
         return None
 
 
+def _resolve_windows_absolute_path(raw_path: str, root_path: Path) -> Optional[Path]:
+    """
+    Convierte rutas absolutas estilo Windows (C:\...) a rutas dentro del proyecto actual.
+    Permite ejecutar comandos que envían rutas de su máquina local dentro de entornos Linux.
+    """
+    if not raw_path:
+        return None
+
+    import re
+
+    sanitized = re.sub(r'^[a-zA-Z]:[\\/]+', '', raw_path)
+    sanitized = sanitized.lstrip("\\/")
+    if not sanitized:
+        return None
+
+    parts = [p for p in re.split(r'[\\/]+', sanitized) if p]
+    if not parts:
+        return None
+
+    for idx in range(len(parts)):
+        candidate = root_path.joinpath(*parts[idx:])
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _locate_file_in_root(path_candidate: str, root_path: Path) -> Optional[Path]:
+    """
+    Busca un archivo dentro del root del proyecto considerando rutas absolutas,
+    rutas Windows provenientes del cliente y rutas relativas con subdirectorios.
+    """
+    if not path_candidate:
+        return None
+
+    import re
+
+    normalized = path_candidate.replace('/', os.sep).replace('\\', os.sep)
+    windows_absolute = bool(re.match(r'^[a-zA-Z]:[\\/]', path_candidate))
+    normalized_path = Path(normalized)
+    candidate_paths = []
+
+    # Rutas absolutas válidas (Linux/Unix)
+    if normalized_path.is_absolute() and not windows_absolute:
+        candidate_paths.append(normalized_path)
+
+    # Intentar mapear rutas absolutas de Windows
+    if windows_absolute:
+        candidate_paths.append(Path(path_candidate))
+        candidate_paths.append(normalized_path)
+        mapped = _resolve_windows_absolute_path(path_candidate, root_path)
+        if mapped:
+            candidate_paths.append(mapped)
+
+    # Interpretar como ruta relativa directa desde root
+    candidate_paths.append(root_path / normalized_path)
+
+    for candidate in candidate_paths:
+        try:
+            if candidate and candidate.exists():
+                return candidate
+        except Exception:
+            continue
+
+    # Búsqueda recursiva por nombre
+    filename = normalized_path.name
+    if not filename:
+        return None
+
+    try:
+        for ruta in root_path.rglob(filename):
+            if ruta.is_file():
+                return ruta
+    except Exception as e:
+        logging.warning(f"Error buscando {filename} en {root_path}: {e}")
+        return None
+
+    return None
+
+
 def _auto_resolve_file_paths(comando: str) -> str:
     """
     Resuelve rutas de archivos en comandos de forma robusta.
     Convierte rutas relativas a absolutas automáticamente.
+    Busca recursivamente en subdirectorios si no encuentra en raíz.
     """
     if not comando:
         return comando
 
     import re
+    import glob
 
     # Detectar comandos que usan archivos
-    file_commands = ['grep', 'sed', 'findstr', 'awk', 'cat', 'head', 'tail', 'Get-Content', 'python', 'node', 'Select-String']
+    file_commands = ['grep', 'sed', 'findstr', 'awk', 'cat', 'head',
+                     'tail', 'Get-Content', 'python', 'node', 'Select-String']
     if not any(cmd in comando for cmd in file_commands):
         return comando
 
-    # 🔥 FIX: Patrón mejorado que captura rutas con guiones y subdirectorios
-    # Captura: copiloto-function/file.py, src/utils/helper.js, etc.
-    file_pattern = r'([a-zA-Z0-9_\-./\\]+\.(py|js|ts|md|json|txt|sh|ps1|yml|yaml|tsx|jsx))'
-    matches = re.findall(file_pattern, comando)
+    # 🔥 FIX: Patrón mejorado que captura rutas con guiones, subdirectorios y discos de Windows
+    extensions = r'(py|js|ts|md|json|txt|sh|ps1|yml|yaml|tsx|jsx)'
+    file_pattern = re.compile(
+        rf'(?P<abs_win>[a-zA-Z]:[\\/][^\\s"\'|]+\.(?:{extensions}))|'
+        rf'(?P<rel>[a-zA-Z0-9_\-./\\]+\.(?:{extensions}))'
+    )
+    matches = []
+    for match in file_pattern.finditer(comando):
+        match_value = match.group('abs_win') or match.group('rel')
+        if match_value:
+            matches.append(match_value)
 
     if not matches:
         return comando
 
-    comando_original = comando
-    
     # Determinar root según entorno
     root_path = Path("/home/site/wwwroot") if IS_AZURE else PROJECT_ROOT
-    
-    for match in matches:
-        relative_path = match[0]
-        
-        # Normalizar separadores de ruta
-        normalized_path = relative_path.replace('/', os.sep).replace('\\', os.sep)
-        
-        # Convertir a ruta absoluta
-        absolute_path = root_path / normalized_path
-        
-        if absolute_path.exists():
-            # En Windows, usar comillas dobles; en Unix, escapar espacios
+
+    for referenced_path in matches:
+        resolved_path = _locate_file_in_root(referenced_path, root_path)
+        if resolved_path:
             if platform.system() == "Windows":
-                comando = comando.replace(relative_path, f'"{absolute_path}"')
+                comando = comando.replace(
+                    referenced_path, f'"{resolved_path}"')
             else:
-                comando = comando.replace(relative_path, str(absolute_path).replace(' ', '\\ '))
-            logging.info(f"✅ Ruta resuelta: {relative_path} -> {absolute_path}")
+                comando = comando.replace(referenced_path, str(
+                    resolved_path).replace(' ', '\\ '))
+            logging.info(
+                f"✅ Ruta resuelta: {referenced_path} -> {resolved_path}")
         else:
-            logging.warning(f"⚠️ No existe: {absolute_path}")
-
-    if comando != comando_original:
-        logging.info(f"🔄 Transformado: {comando_original} -> {comando}")
-    
+            logging.warning(
+                f"⚠️ No existe (ni en raíz ni subdirectorios): {referenced_path}")
     return comando
-
-
-@app.function_name(name="ejecutar_cli_http")
-@app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(
-            f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(
-            f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    """Endpoint UNIVERSAL para ejecutar comandos - NUNCA falla con HTTP 400"""
-    comando = None
-    az_paths = []
-    try:
-        body = req.get_json()
-        logging.warning(f"[DEBUG] Payload recibido: {body}")
-
-        if not body:
-            # ✅ CAMBIO: HTTP 200 con mensaje explicativo
-            resultado = {
-                "exito": False,
-                "error": "Request body must be valid JSON",
-                "ejemplo": {"comando": "storage account list"},
-                "accion_requerida": "Proporciona un comando válido en el campo 'comando'"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=200,  # ✅ SIEMPRE 200
-                mimetype="application/json"
-            )
-
-        comando = body.get("comando")
-
-        # 🔥 DETECCIÓN AUTOMÁTICA DE TIPO DE COMANDO
-        tipo_comando = "generic"
-        if comando:
-            # Detectar comandos PowerShell
-            powershell_cmdlets = ['Get-', 'Set-', 'New-', 'Remove-', 'Invoke-', 'Add-', 'Clear-',
-                                  'Copy-', 'Export-', 'Import-', 'Move-', 'Select-', 'Test-', 'Where-', 'ForEach-']
-            if any(comando.startswith(cmdlet) for cmdlet in powershell_cmdlets):
-                tipo_comando = "powershell"
-                logging.info(f"✅ Comando PowerShell detectado: {comando}")
-            # Detectar comandos Python
-            elif comando.startswith('python ') or comando.startswith('pip '):
-                tipo_comando = "python"
-            # Detectar comandos Azure CLI
-            elif comando.startswith('az '):
-                tipo_comando = "azure_cli"
-            # Detectar comandos Docker
-            elif comando.startswith('docker '):
-                tipo_comando = "docker"
-            # Detectar comandos NPM
-            elif comando.startswith('npm '):
-                tipo_comando = "npm"
-
-        # 🔥 NORMALIZAR COMANDOS AWK AUTOMÁTICAMENTE
-        if comando and 'awk' in comando.lower():
-            from validate_awk_command import suggest_awk_fix
-            comando_original = comando
-            comando = suggest_awk_fix(comando)
-            if comando != comando_original:
-                logging.info(
-                    f"✅ AWK normalizado: {comando_original} -> {comando}")
-
-        # 🔍 AUTO-RESOLVER RUTAS DE ARCHIVOS EN EL COMANDO
-        comando_transformado = comando
-        if comando:
-            comando_transformado = _auto_resolve_file_paths(comando)
-            logging.info(f"✅ Comando transformado: {comando_transformado}")
-            # Usar el comando transformado para todas las operaciones siguientes
-            comando = comando_transformado
-
-        if not comando:
-            if body.get("intencion"):
-                # ✅ CAMBIO: HTTP 200 con redirección sugerida
-                resultado = {
-                    "exito": False,
-                    "error": "Este endpoint ejecuta comandos CLI, no intenciones semánticas",
-                    "sugerencia": "Usa /api/hybrid para intenciones semánticas",
-                    "alternativa": "O proporciona un comando CLI directo",
-                    "ejemplo": {"comando": "storage account list"}
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado),
-                    status_code=200,  # ✅ SIEMPRE 200
-                    mimetype="application/json"
-                )
-
-            # ✅ CAMBIO: HTTP 200 con solicitud de comando
-            resultado = {
-                "exito": False,
-                "error": "Falta el parámetro 'comando'",
-                "accion_requerida": "¿Qué comando CLI quieres ejecutar?",
-                "ejemplo": {"comando": "storage account list"},
-                "comandos_comunes": [
-                    "storage account list",
-                    "group list",
-                    "functionapp list",
-                    "storage container list --account-name <nombre>"
-                ]
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=200,  # ✅ SIEMPRE 200
-                mimetype="application/json"
-            )
-
-        # 🔧 Forzar cwd real al del proyecto
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        os.chdir(project_root)
-
-        # DETECCIÓN ROBUSTA DE AZURE CLI
-        az_paths = [
-            shutil.which("az"),
-            shutil.which("az.cmd"),
-            shutil.which("az.exe"),
-            "/usr/bin/az",
-            "/usr/local/bin/az",
-            "C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd",
-            "C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd"
-        ]
-
-        az_binary = None
-        for path in az_paths:
-            if path and os.path.exists(path):
-                az_binary = path
-                break
-
-        if not az_binary:
-            resultado = {
-                "exito": False,
-                "error": "Azure CLI no está instalado o no está disponible en el PATH",
-                "diagnostico": {
-                    "paths_verificados": [p for p in az_paths if p],
-                    "sugerencia": "Instalar Azure CLI o verificar PATH",
-                    "ambiente": "Azure" if IS_AZURE else "Local"
-                }
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=503,
-                mimetype="application/json"
-            )
-
-        # ✅ VERIFICACIÓN PREVIA: Comprobar existencia de archivos si el comando los referencia
-        archivo_verificado = _verificar_archivos_en_comando(comando)
-        if not archivo_verificado["exito"]:
-            # Aplicar memoria Cosmos y memoria manual
-            archivo_verificado = aplicar_memoria_cosmos_directo(
-                req, archivo_verificado)
-            archivo_verificado = aplicar_memoria_manual(
-                req, archivo_verificado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={archivo_verificado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=archivo_verificado,
-                success=archivo_verificado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(archivo_verificado, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200  # 200 para que Foundry pueda procesar el error
-            )
-
-        # REDIRECCIÓN AUTOMÁTICA: Si no es comando Azure CLI, redirigir a ejecutor genérico
-        try:
-            from command_type_detector import detect_and_normalize_command
-
-            # Detectar tipo de comando dinámicamente
-            detection = detect_and_normalize_command(comando)
-            command_type = detection.get("type", "generic")
-
-            logging.info(f"Comando detectado como: {command_type}")
-
-            # Si NO es comando Azure CLI, redirigir automáticamente
-            if command_type != "azure_cli":
-                logging.info(
-                    f"Redirigiendo comando {command_type} a ejecutor genérico")
-
-                # 🔧 NORMALIZACIÓN ROBUSTA para comandos no-Azure CLI
-                comando_normalizado = comando  # NO normalizar
-                logging.info(f"Comando normalizado: {comando_normalizado}")
-
-                # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(
-                    comando_normalizado, command_type)
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=200  # ✅ CAMBIO: Siempre 200
-                )
-
-            # Normalizar comando Azure CLI
-            comando = detection.get("normalized_command", comando)
-
-        except ImportError as e:
-            logging.warning(f"No se pudo importar command_type_detector: {e}")
-            # Fallback: si no parece Azure CLI, ejecutar como comando genérico
-            if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
-                logging.info(
-                    "Ejecutando comando no-Azure con fallback genérico")
-                # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
-                comando_normalizado = comando  # NO normalizar
-                logging.info(
-                    f"Comando fallback normalizado: {comando_normalizado}")
-                # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(
-                    comando_normalizado, tipo_comando)
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=200 if resultado.get("exito") else 500
-                )
-
-            # Agregar prefijo az si no lo tiene (se mantiene)
-            if not comando.startswith("az "):
-                comando = f"az {comando}"
-
-        # 🔧 NORMALIZACIÓN ROBUSTA: Manejar rutas con espacios y caracteres especiales
-        comando = comando  # NO normalizar
-
-        # --- Nuevo bloque dinámico: reemplazo automático de placeholders ---
-        # Recuperar memoria del agente (si ya tienes contexto cargado)
-        memoria = memoria_previa or getattr(req, "_memoria_contexto", {}) or {}
-        # Ejemplo explícito si quieres forzar un valor de memoria conocido:
-        if not memoria.get("app_insights_name"):
-            memoria.setdefault("app_insights_name",
-                               "copiloto-semantico-func-us2")
-        try:
-            comando = _resolver_placeholders_dinamico(comando, memoria)
-        except Exception as e:
-            logging.warning(f"Falló resolver_placeholders_dinamico: {e}")
-        # --- Fin bloque dinámico ---
-
-        # --- BLOQUE ADICIONAL: Ampliar contexto para cat/grep o extraer función completa con awk ---
-        try:
-            import shlex
-            import re
-
-            # Solo aplicar heurística para comandos que usan grep/cat y apuntan a archivos .py
-            lower_cmd = comando.lower()
-            if ("grep" in lower_cmd or "cat " in lower_cmd) and (".py" in comando or "function_app.py" in comando):
-                tokens = shlex.split(comando)
-                # intentar localizar archivo y patrón
-                file_token = None
-                pattern = None
-                # file token is likely the last token or explicit .py token
-                for t in reversed(tokens):
-                    if t.endswith(".py"):
-                        file_token = t
-                        break
-                # pattern: token after grep or quoted regex
-                if "grep" in tokens:
-                    try:
-                        idx = tokens.index("grep")
-                        if idx + 1 < len(tokens):
-                            pattern = tokens[idx + 1].strip("'\"")
-                    except ValueError:
-                        pattern = None
-                if not pattern:
-                    m = re.search(
-                        r"grep\s+(?:-n\s+)?['\"]([^'\"]+)['\"]", comando, re.IGNORECASE)
-                    if m:
-                        pattern = m.group(1)
-
-                # resolver ruta local si es relativa al proyecto
-                if file_token:
-                    fpath = file_token
-                    if not os.path.isabs(fpath):
-                        fpath = os.path.join(project_root, fpath)
-                    if os.path.exists(fpath) and pattern:
-                        # leer archivo y localizar coincidencia
-                        try:
-                            with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
-                                lines = fh.read().splitlines()
-                        except Exception:
-                            lines = []
-                        # buscar primer match por substring o regex
-                        match_index = None
-                        for i, ln in enumerate(lines):
-                            if pattern in ln or (re.search(pattern, ln) if re.search(pattern, ln) else False):
-                                match_index = i
-                                break
-                        if match_index is not None:
-                            line = lines[match_index]
-                            # si la línea es un decorator o contiene def, extraer nombre de la función completa usando awk
-                            if "@" in line or "def " in line or line.strip().startswith("def "):
-                                # si la línea contiene 'def', extraer nombre directamente; si es decorator, buscar siguiente def
-                                fname = None
-                                if "def " in line:
-                                    m2 = re.search(
-                                        r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", line)
-                                    if m2:
-                                        fname = m2.group(1)
-                                else:
-                                    # buscar la siguiente def en el archivo
-                                    for j in range(match_index, min(match_index + 200, len(lines))):
-                                        if "def " in lines[j]:
-                                            m3 = re.search(
-                                                r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", lines[j])
-                                            if m3:
-                                                fname = m3.group(1)
-                                                break
-                                if fname:
-                                    # construir awk para extraer desde def hasta línea en blanco siguiente (heurística)
-                                    awk_cmd = f"awk '/^def {fname}\\b/,/^$/' \"{fpath}\""
-                                    logging.info(
-                                        f"🔧 Rewriting grep/cat pipeline to awk to extract full function: {awk_cmd}")
-                                    comando = awk_cmd
-                                else:
-                                    # fallback: ampliar contexto de grep agregando -A/-B si no existen
-                                    if "-A" not in comando and "-B" not in comando:
-                                        comando = comando.replace(
-                                            "grep ", "grep -A 40 -B 5 ", 1)
-                                        logging.info(
-                                            f"🔧 Ampliado contexto grep: {comando}")
-                            else:
-                                # Si la línea encontrada no es decorator/def, ampliar contexto igualmente
-                                if "-A" not in comando and "-B" not in comando:
-                                    comando = comando.replace(
-                                        "grep ", "grep -A 40 -B 5 ", 1)
-                                    logging.info(
-                                        f"🔧 Ampliado contexto grep (no def/decorator): {comando}")
-        except Exception as e:
-            logging.warning(f"Error optimizando grep/cat/awk extraction: {e}")
-        # --- FIN BLOQUE ADICIONAL ---
-
-        # Manejar conflictos de output
-        if "-o table" in comando and "--output json" not in comando:
-            pass
-        elif "--output" not in comando and "-o" not in comando:
-            comando += " --output json"
-
-        logging.info(f"Ejecutando: {comando} con binary: {az_binary}")
-
-        # EJECUCIÓN ROBUSTA: Manejar rutas con espacios y comandos complejos
-        import shlex
-
-        try:
-            # Método 1: Usar shlex para parsing inteligente
-            if az_binary != "az":
-                # Reemplazar 'az' con ruta completa manteniendo estructura
-                if comando.startswith("az "):
-                    comando_final = comando.replace(
-                        "az ", f'"{az_binary}" ', 1)
-                else:
-                    comando_final = f'"{az_binary}" {comando}'
-            else:
-                comando_final = comando
-
-            # Detectar si necesita shell=True (rutas con espacios, pipes, etc.)
-            needs_shell = any(char in comando_final for char in [
-                              ' && ', ' || ', '|', '>', '<', '"', "'"])
-
-            if needs_shell:
-                # Usar shell para comandos complejos
-                result = subprocess.run(
-                    comando_final,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    encoding="utf-8",
-                    errors="replace"
-                )
-            else:
-                # Usar lista de argumentos para comandos simples
-                try:
-                    cmd_parts = shlex.split(comando_final)
-                    result = subprocess.run(
-                        cmd_parts,
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        encoding="utf-8",
-                        errors="replace"
-                    )
-                except ValueError:
-                    # Fallback a shell si shlex falla
-                    result = subprocess.run(
-                        comando_final,
-                        shell=True,
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        encoding="utf-8",
-                        errors="replace"
-                    )
-        except Exception as exec_error:
-            # Último fallback: shell simple
-            logging.warning(f"Fallback a shell simple: {exec_error}")
-            result = subprocess.run(
-                comando,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding="utf-8",
-                errors="replace"
-            )
-
-        if result.returncode == 0:
-            # Intentar parsear JSON solo si no es tabla
-            if "-o table" not in comando:
-                try:
-                    output_json = json.loads(
-                        result.stdout) if result.stdout else []
-                    resultado_temp = {
-                        "exito": True,
-                        "comando": comando,
-                        "resultado": output_json,
-                        "codigo_salida": result.returncode
-                    }
-                    # Aplicar memoria Cosmos y memoria manual
-                    resultado_temp = aplicar_memoria_cosmos_directo(
-                        req, resultado_temp)
-                    resultado_temp = aplicar_memoria_manual(
-                        req, resultado_temp)
-
-                    # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                    logging.info(
-                        f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                    memory_service.registrar_llamada(
-                        source="ejecutar_cli",
-                        endpoint="/api/ejecutar-cli",
-                        method=req.method,
-                        params={"session_id": req.headers.get(
-                            "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                        response_data=resultado_temp,
-                        success=resultado_temp.get("exito", False)
-                    )
-                    return func.HttpResponse(
-                        json.dumps(resultado_temp),
-                        mimetype="application/json",
-                        status_code=200
-                    )
-                except json.JSONDecodeError:
-                    pass
-
-            # Devolver como texto si no es JSON válido
-            resultado_temp = {
-                "exito": True,
-                "comando": comando,
-                "resultado": result.stdout,
-                "codigo_salida": result.returncode,
-                "formato": "texto"
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado_temp = aplicar_memoria_cosmos_directo(
-                req, resultado_temp)
-            resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado_temp,
-                success=resultado_temp.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado_temp),
-                mimetype="application/json",
-                status_code=200
-            )
-        else:
-            # 🔍 DETECCIÓN DE ARGUMENTOS FALTANTES
-            error_msg = result.stderr or "Comando falló sin mensaje de error"
-
-            # Detectar argumentos faltantes comunes
-            missing_arg_info = _detectar_argumento_faltante(comando, error_msg)
-
-            if missing_arg_info:
-                # 🧠 AUTOCORRECCIÓN CON MEMORIA
-                logging.info(
-                    f"🔍 Argumento faltante detectado: --{missing_arg_info['argumento']}")
-
-                # Intentar autocorrección con memoria
-                try:
-                    from memory_helpers_autocorrection import buscar_parametro_en_memoria, obtener_memoria_request
-
-                    memoria_contexto = obtener_memoria_request(req)
-                    if memoria_contexto and memoria_contexto.get("tiene_historial"):
-                        valor_memoria = buscar_parametro_en_memoria(
-                            memoria_contexto,
-                            missing_arg_info["argumento"],
-                            comando
-                        )
-
-                        if valor_memoria:
-                            # ✅ REEJECUTAR COMANDO AUTOCORREGIDO
-                            comando_corregido = f"{comando} --{missing_arg_info['argumento']} {valor_memoria}"
-                            logging.info(
-                                f"🧠 Reejecutando con memoria: {comando_corregido}")
-
-                            # Ejecutar comando corregido
-                            result_corregido = subprocess.run(
-                                comando_corregido,
-                                shell=True,
-                                capture_output=True,
-                                text=True,
-                                timeout=60,
-                                encoding="utf-8",
-                                errors="replace"
-                            )
-
-                            if result_corregido.returncode == 0:
-                                try:
-                                    output_json = json.loads(
-                                        result_corregido.stdout) if result_corregido.stdout else []
-                                except json.JSONDecodeError:
-                                    output_json = result_corregido.stdout
-
-                                resultado_temp = {
-                                    "exito": True,
-                                    "comando_original": comando,
-                                    "comando_ejecutado": comando_corregido,
-                                    "resultado": output_json,
-                                    "codigo_salida": result_corregido.returncode,
-                                    "autocorreccion": {
-                                        "aplicada": True,
-                                        "argumento_corregido": missing_arg_info["argumento"],
-                                        "valor_usado": valor_memoria,
-                                        "fuente": "memoria_sesion"
-                                    },
-                                    "mensaje": f"✅ Comando autocorregido usando memoria: --{missing_arg_info['argumento']} {valor_memoria}"
-                                }
-                                # Aplicar memoria Cosmos y memoria manual
-                                resultado_temp = aplicar_memoria_cosmos_directo(
-                                    req, resultado_temp)
-                                resultado_temp = aplicar_memoria_manual(
-                                    req, resultado_temp)
-
-                                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                                logging.info(
-                                    f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                                memory_service.registrar_llamada(
-                                    source="ejecutar_cli",
-                                    endpoint="/api/ejecutar-cli",
-                                    method=req.method,
-                                    params={"session_id": req.headers.get(
-                                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                                    response_data=resultado_temp,
-                                    success=resultado_temp.get("exito", False)
-                                )
-                                return func.HttpResponse(
-                                    json.dumps(resultado_temp),
-                                    mimetype="application/json",
-                                    status_code=200
-                                )
-                except Exception as e:
-                    logging.warning(f"Error en autocorrección: {e}")
-
-                # ✅ NO SE PUDO AUTOCORREGIR - SOLICITAR AL USUARIO (HTTP 200)
-                resultado_temp = {
-                    "exito": False,
-                    "comando": comando,
-                    "error": f"Falta el argumento --{missing_arg_info['argumento']}",
-                    "accion_requerida": f"¿Puedes indicarme el valor para --{missing_arg_info['argumento']}?",
-                    "diagnostico": {
-                        "argumento_faltante": missing_arg_info["argumento"],
-                        "descripcion": missing_arg_info["descripcion"],
-                        "sugerencia_automatica": missing_arg_info["sugerencia"],
-                        "comando_para_listar": missing_arg_info.get("comando_listar"),
-                        "valores_comunes": missing_arg_info.get("valores_comunes", []),
-                        "memoria_consultada": True,
-                        "valor_encontrado_en_memoria": False
-                    },
-                    "sugerencias": [
-                        f"Ejecutar: {missing_arg_info.get('comando_listar', 'az --help')} para ver valores disponibles",
-                        f"Proporcionar --{missing_arg_info['argumento']} <valor> en el comando",
-                        "El sistema recordará el valor para futuros comandos"
-                    ],
-                    "ejemplo_corregido": f"{comando} --{missing_arg_info['argumento']} <valor>"
-                }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado_temp = aplicar_memoria_cosmos_directo(
-                    req, resultado_temp)
-                resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado_temp,
-                    success=resultado_temp.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado_temp),
-                    mimetype="application/json",
-                    status_code=200  # ✅ SIEMPRE 200, NUNCA 400
-                )
-
-            # Error normal sin argumentos faltantes detectados - MEJORADO
-            error_result = {
-                "exito": False,
-                "comando": comando,
-                "error": error_msg,
-                "codigo_salida": result.returncode,
-                "stderr": result.stderr,
-                "stdout": result.stdout,
-                "diagnostico": {
-                    "tipo_error": "ejecucion_fallida",
-                    "comando_completo": comando,
-                    "az_binary_usado": az_binary,
-                    "ambiente": "Azure" if IS_AZURE else "Local"
-                },
-                "sugerencias_debug": [
-                    "Verificar sintaxis del comando",
-                    "Comprobar permisos de Azure CLI",
-                    "Revisar si el recurso existe",
-                    "Ejecutar 'az login' si hay problemas de autenticación"
-                ],
-                "timestamp": datetime.now().isoformat()
-            }
-            # Aplicar memoria Cosmos y memoria manual
-            error_result = aplicar_memoria_cosmos_directo(req, error_result)
-            error_result = aplicar_memoria_manual(req, error_result)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={error_result.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=error_result,
-                success=error_result.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(error_result),
-                mimetype="application/json",
-                status_code=200  # ✅ CAMBIO: Siempre 200 para que Foundry pueda procesar
-            )
-
-    except subprocess.TimeoutExpired:
-        resultado = {
-            "exito": False,
-            "error": "Comando excedió tiempo límite (60s)",
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "timeout",
-                "timeout_segundos": 60,
-                "sugerencia": "El comando tardó más de 60 segundos en ejecutarse"
-            },
-            "sugerencias_solucion": [
-                "Verificar conectividad de red",
-                "Simplificar el comando si es muy complejo",
-                "Verificar que Azure CLI esté respondiendo"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
-        )
-    except FileNotFoundError as e:
-        resultado = {
-            "exito": False,
-            "error": "Azure CLI no encontrado en el sistema",
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "programa_no_encontrado",
-                "programa_buscado": "az (Azure CLI)",
-                "paths_verificados": [p for p in az_paths if p] if 'az_paths' in locals() else [],
-                "error_detallado": str(e)
-            },
-            "sugerencias_solucion": [
-                "Instalar Azure CLI desde https://docs.microsoft.com/cli/azure/install-azure-cli",
-                "Verificar que Azure CLI esté en el PATH del sistema",
-                "Reiniciar terminal después de la instalación"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 503
-        )
-    except Exception as e:
-        logging.error(f"Error en ejecutar_cli_http: {str(e)}")
-        resultado = {
-            "exito": False,
-            "error": str(e),
-            "comando": comando or "desconocido",
-            "diagnostico": {
-                "tipo_error": "excepcion_inesperada",
-                "tipo_excepcion": type(e).__name__,
-                "mensaje_completo": str(e)
-            },
-            "sugerencias_debug": [
-                "Verificar formato del comando",
-                "Comprobar logs del sistema",
-                "Reportar este error si persiste"
-            ],
-            "timestamp": datetime.now().isoformat(),
-            "ambiente": "Azure" if IS_AZURE else "Local"
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
-        )
-
-
-def _verificar_archivos_en_comando(comando: str) -> dict:
-    """
-    Verifica si el comando referencia archivos que deben existir antes de ejecutar.
-    IGNORA patrones glob y wildcards usados en comandos de búsqueda.
-    """
-    try:
-        from pathlib import Path
-
-        # 🔥 DETECTAR COMANDOS DE BÚSQUEDA QUE USAN PATRONES GLOB
-        comandos_busqueda = ['Get-ChildItem', 'gci', 'ls', 'dir',
-                             'find', 'grep', 'findstr', '-Include', '-Filter', '-Recurse']
-        if any(cmd in comando for cmd in comandos_busqueda):
-            logging.info(
-                f"✅ Comando de búsqueda detectado, saltando validación de archivos: {comando}")
-            return {"exito": True, "mensaje": "Comando de búsqueda - validación de archivos omitida"}
-
-        # Patrones para detectar referencias a archivos
-        file_patterns = [
-            r'scripts/([\w\-\.]+\.(py|sh|ps1|bat))',  # scripts/archivo.ext
-            r'([\w\-\.]+\.(py|sh|ps1|bat))',  # archivo.ext
-            r'"([^"]+\.(py|sh|ps1|bat))"',  # "archivo.ext"
-            r"'([^']+\.(py|sh|ps1|bat))'",  # 'archivo.ext'
-        ]
-
-        archivos_referenciados = []
-        for pattern in file_patterns:
-            matches = re.findall(pattern, comando, re.IGNORECASE)
-            for match in matches:
-                if isinstance(match, tuple):
-                    archivo = match[0]  # Primer grupo del match
-                else:
-                    archivo = match
-
-                # 🔥 IGNORAR PATRONES GLOB Y WILDCARDS
-                if any(char in archivo for char in ['*', '?', '[', ']']):
-                    logging.info(f"⏭️ Ignorando patrón glob: {archivo}")
-                    continue
-
-                archivos_referenciados.append(archivo)
-
-        if not archivos_referenciados:
-            return {"exito": True, "mensaje": "No se detectaron referencias a archivos"}
-
-        # Verificar existencia de cada archivo
-        archivos_faltantes = []
-        archivos_encontrados = []
-
-        for archivo in archivos_referenciados:
-            # Buscar en ubicaciones comunes
-            posibles_rutas = [
-                Path(archivo),  # Ruta tal como está
-                PROJECT_ROOT / archivo,  # En la raíz del proyecto
-                PROJECT_ROOT / "scripts" / archivo,  # En carpeta scripts
-                PROJECT_ROOT / "copiloto-function" / "scripts" /
-                archivo,  # En scripts del copiloto
-            ]
-
-            archivo_encontrado = False
-            for ruta in posibles_rutas:
-                if ruta.exists():
-                    archivos_encontrados.append({
-                        "archivo": archivo,
-                        "ruta_completa": str(ruta),
-                        "tamaño": ruta.stat().st_size
-                    })
-                    archivo_encontrado = True
-                    break
-
-            if not archivo_encontrado:
-                archivos_faltantes.append({
-                    "archivo": archivo,
-                    "rutas_verificadas": [str(r) for r in posibles_rutas]
-                })
-
-        if archivos_faltantes:
-            return {
-                "exito": False,
-                "error": f"Archivos no encontrados: {', '.join([a['archivo'] for a in archivos_faltantes])}",
-                "diagnostico": {
-                    "tipo_error": "archivos_faltantes",
-                    "comando_original": comando,
-                    "archivos_faltantes": archivos_faltantes,
-                    "archivos_encontrados": archivos_encontrados
-                },
-                "sugerencias_solucion": [
-                    "Crear los archivos faltantes antes de ejecutar el comando",
-                    "Verificar la ruta correcta de los archivos",
-                    "Usar rutas absolutas si es necesario",
-                    f"Crear archivo con: /api/escribir-archivo-local"
-                ],
-                "timestamp": datetime.now().isoformat()
-            }
-
-        return {
-            "exito": True,
-            "mensaje": f"Todos los archivos verificados: {', '.join([a['archivo'] for a in archivos_encontrados])}",
-            "archivos_verificados": archivos_encontrados
-        }
-
-    except Exception as e:
-        logging.warning(f"Error verificando archivos: {e}")
-        return {"exito": True, "mensaje": "Verificación de archivos omitida por error"}
-
-
-def _normalizar_findstr(comando: str) -> str:
-    """
-    Convierte comandos findstr con múltiples /C: a forma segura usando pipe con type.
-    Evita el error 'No se puede abrir /C:return' y conserva las comillas correctamente.
-    """
-    import re
-
-    try:
-        if comando.lower().startswith("findstr") and comando.count("/C:") > 1:
-            # Captura archivo con o sin comillas
-            match = re.search(
-                r'([\w]:[\\/].+?\.(?:py|txt|json|yml|yaml))', comando)
-            if not match:
-                return comando  # no se encontró archivo
-
-            archivo = match.group(1).strip('"')
-            # Extraer todo lo que no sea el archivo (los patrones)
-            patrones = comando.split("findstr", 1)[
-                1].replace(archivo, "").strip()
-
-            # Construir comando final
-            nuevo = f'type "{archivo}" | findstr {patrones}'
-            return nuevo
-        return comando
-    except Exception as e:
-        import logging
-        logging.warning(f"_normalizar_findstr error: {e}")
-        return comando
-
-
-def _normalizar_type(comando: str) -> str:
-    """
-    Normaliza comandos type para manejar rutas con espacios.
-    """
-    try:
-        # type "archivo con espacios"
-        parts = comando.split()
-        if len(parts) >= 2:
-            file_arg = ' '.join(parts[1:])  # Todo después de 'type'
-            if ' ' in file_arg and not (file_arg.startswith('"') and file_arg.endswith('"')):
-                return f'{parts[0]} "{file_arg}"'
-
-        return comando
-
-    except Exception:
-        return comando
-
-
-def _detectar_argumento_faltante(comando: str, error_msg: str) -> Optional[dict]:
-    """
-    Detecta argumentos faltantes en comandos Azure CLI y sugiere soluciones.
-    Usa la misma lógica de detección de intención para inferir valores faltantes.
-    """
-    try:
-        error_lower = error_msg.lower()
-        comando_lower = comando.lower()
-
-        # Patrones de detección de argumentos faltantes
-        missing_patterns = {
-            "--resource-group": {
-                "patterns": ["resource group", "--resource-group", "-g", "resource-group is required"],
-                "argumento": "--resource-group",
-                "descripcion": "Este comando requiere especificar el grupo de recursos",
-                "comando_listar": "az group list --output table",
-                "sugerencia": "¿Quieres que liste los grupos de recursos disponibles?",
-                "valores_comunes": ["boat-rental-app-group", "boat-rental-app-group", "DefaultResourceGroup-EUS2"]
-            },
-            "--account-name": {
-                "patterns": ["account name", "--account-name", "storage account", "account-name is required"],
-                "argumento": "--account-name",
-                "descripcion": "Este comando requiere el nombre de la cuenta de almacenamiento",
-                "comando_listar": "az storage account list --output table",
-                "sugerencia": "¿Quieres que liste las cuentas de almacenamiento disponibles?",
-                "valores_comunes": ["boatrentalstorage", "copilotostorage"]
-            },
-            "--name": {
-                "patterns": ["function app name", "--name", "app name", "name is required"],
-                "argumento": "--name",
-                "descripcion": "Este comando requiere el nombre de la aplicación",
-                "comando_listar": "az functionapp list --output table" if "functionapp" in comando_lower else "az webapp list --output table",
-                "sugerencia": "¿Quieres que liste las aplicaciones disponibles?",
-                "valores_comunes": ["copiloto-semantico-func-us2", "boat-rental-app"]
-            },
-            "--subscription": {
-                "patterns": ["subscription", "--subscription", "subscription id"],
-                "argumento": "--subscription",
-                "descripcion": "Este comando requiere especificar la suscripción",
-                "comando_listar": "az account list --output table",
-                "sugerencia": "¿Quieres que liste las suscripciones disponibles?",
-                "valores_comunes": []
-            },
-            "--location": {
-                "patterns": ["location", "--location", "region"],
-                "argumento": "--location",
-                "descripcion": "Este comando requiere especificar la ubicación/región",
-                "comando_listar": "az account list-locations --output table",
-                "sugerencia": "¿Quieres que liste las ubicaciones disponibles?",
-                "valores_comunes": ["eastus", "eastus2", "westus2", "centralus"]
-            }
-        }
-
-        # Buscar patrones en el mensaje de error
-        for arg_name, info in missing_patterns.items():
-            for pattern in info["patterns"]:
-                if pattern in error_lower:
-                    # Verificar que el argumento no esté ya en el comando
-                    if arg_name not in comando_lower:
-                        logging.info(
-                            f"🔍 Argumento faltante detectado: {arg_name}")
-                        return info
-
-        # Detección específica para Cosmos DB
-        if "cosmosdb" in comando_lower and any(pattern in error_lower for pattern in ["account-name", "account name"]):
-            return {
-                "argumento": "--account-name",
-                "descripcion": "Este comando de Cosmos DB requiere el nombre de la cuenta",
-                "comando_listar": "az cosmosdb list --output table",
-                "sugerencia": "¿Quieres que liste las cuentas de Cosmos DB disponibles?",
-                "valores_comunes": ["copiloto-cosmos", "boat-rental-cosmos"]
-            }
-
-        # Detección para contenedores de storage
-        if "storage" in comando_lower and "container" in comando_lower and any(pattern in error_lower for pattern in ["container-name", "container name"]):
-            return {
-                "argumento": "--container-name",
-                "descripcion": "Este comando requiere el nombre del contenedor de almacenamiento",
-                "comando_listar": "az storage container list --account-name <account-name> --output table",
-                "sugerencia": "¿Quieres que liste los contenedores disponibles?",
-                "valores_comunes": ["boat-rental-project", "scripts", "backups"]
-            }
-
-        return None
-
-    except Exception as e:
-        logging.warning(f"Error detectando argumento faltante: {e}")
-        return None
-        return func.HttpResponse(
-            json.dumps({
-                "exito": False,
-                "error": str(e),
-                "tipo_error": type(e).__name__,
-                "comando": comando or "desconocido"
-            }),
-            mimetype="application/json",
-            status_code=500
-        )
 
 
 def ejecutar_operacion_dinamica(cliente, operacion: str, params: list):
@@ -16334,6 +14631,7 @@ def aplicar_correccion_comando_cli(body: dict, run_id: str) -> dict:
     """
     Aplica correcciones ejecutando comandos CLI.
     """
+
     try:
         comando = body.get("comando") or body.get("command") or body.get("cmd")
 
@@ -16344,6 +14642,9 @@ def aplicar_correccion_comando_cli(body: dict, run_id: str) -> dict:
             }
 
         logging.info(f"[{run_id}] Aplicando corrección CLI: {comando}")
+
+        # Importar la función desde el módulo de endpoints
+        from endpoints.ejecutar_cli import ejecutar_cli_http
 
         # Usar el sistema existente de ejecutar CLI
         mock_req = func.HttpRequest(

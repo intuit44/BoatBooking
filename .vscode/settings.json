@@ -1,8 +1,15 @@
 {
-  "python.analysis.exclude": [
-    "**/copiloto-function/function_app.py"
-  ],
-  "python.analysis.diagnosticSeverityOverrides": {
-    "reportGeneralTypeIssues": "none"
-  }
+    "python.analysis.exclude": [
+        "**/copiloto-function/function_app.py"
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportGeneralTypeIssues": "none"
+    },
+    "azureFunctions.projectSubpath": "copiloto-function",
+    "azureFunctions.deploySubpath": "copiloto-function",
+    "azureFunctions.scmDoBuildDuringDeployment": true,
+    "azureFunctions.pythonVenv": ".venv",
+    "azureFunctions.projectLanguage": "Python",
+    "azureFunctions.projectRuntime": "~4",
+    "debug.internalConsoleOptions": "neverOpen"
 }

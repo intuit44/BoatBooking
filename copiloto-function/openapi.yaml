@@ -3511,9 +3511,9 @@
           }
         }
       }
-    },
-    "/api/diagnostico": {
-      "get": {
+     },
+      "/api/diagnostico": {
+        "get": {
         "summary": "🔍 DIAGNÓSTICO DE SESIÓN - Analiza qué ocurrió en una sesión",
         "description": "Analiza interacciones de una sesión específica, detecta patrones de errores y genera diagnóstico con métricas.",
         "operationId": "diagnostico",
@@ -3523,42 +3523,52 @@
         "security": [],
         "parameters": [
           {
-            "name": "session_id",
-            "in": "query",
-            "description": "ID de sesión a diagnosticar",
-            "schema": {
-              "type": "string"
-            }
+          "name": "session_id",
+          "in": "query",
+          "description": "ID de sesión a diagnosticar",
+          "schema": {
+            "type": "string"
+          }
           }
         ],
         "responses": {
           "200": {
-            "description": "Diagnóstico completado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exito": {
-                      "type": "boolean"
-                    },
-                    "diagnostico": {
-                      "type": "object"
-                    },
-                    "metricas": {
-                      "type": "object"
-                    },
-                    "patrones_detectados": {
-                      "type": "array"
-                    }
-                  }
-                }
+          "description": "Diagnóstico completado",
+          "content": {
+            "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+              "exito": {
+                "type": "boolean"
+              },
+              "diagnostico": {
+                "type": "object"
+              },
+              "metricas": {
+                "type": "object"
+              },
+              "patrones_detectados": {
+                "type": "array"
+              }
+              }
+            },
+            "examples": {
+              "custom_python_test": {
+              "summary": "Ejecutar snippet Python de prueba (ejemplo)",
+              "value": {
+                "test": "custom_python",
+                "code": "from services.redis_buffer_service import RedisBufferService\nr = RedisBufferService()\nprint(r._client.ping())"
+              }
               }
             }
+            }
+          }
           }
         }
-      }
-    },
+        }
+      },
+
     "/api/msearch": {
       "post": {
         "summary": "🔍 ANÁLISIS SEMÁNTICO AVANZADO - Detección de clases, funciones, duplicados y errores lógicos",

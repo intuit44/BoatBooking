@@ -103,18 +103,28 @@ def extract_parameters(req: func.HttpRequest) -> Dict[str, Any]:
     """Extrae y normaliza parámetros de la request"""
     from function_app import CONTAINER_NAME  # Import diferido para evitar ciclos
 
-    return {
-        "ruta_raw": (req.params.get("ruta") or
-                     req.params.get("path") or
-                     req.params.get("archivo") or
-                     req.params.get("blob") or "").strip(),
-        "container": (req.params.get("container") or
-                      req.params.get("contenedor") or
-                      CONTAINER_NAME).strip(),
+    ruta_raw = (req.params.get("ruta") or
+                req.params.get("path") or
+                req.params.get("archivo") or
+                req.params.get("blob") or "").strip()
+
+    container = (req.params.get("container") or
+                 req.params.get("contenedor") or
+                 CONTAINER_NAME).strip()
+
+    params = {
+        "ruta_raw": ruta_raw,
+        "container": container,
         "force_refresh": req.params.get("force_refresh", "false").lower() == "true",
         "include_preview": req.params.get("include_preview", "true").lower() == "true",
         "semantic_analysis": req.params.get("semantic_analysis", "false").lower() == "true"
     }
+
+    # Normalizar: asegurar prefijo "threads/" si se proporcionó una ruta y no lo tiene
+    if params["ruta_raw"] and not params["ruta_raw"].startswith("threads/"):
+        params["ruta_raw"] = "threads/" + params["ruta_raw"]
+
+    return params
 
 
 def detect_request_type(path: str) -> str:
