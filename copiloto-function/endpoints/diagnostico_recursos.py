@@ -8,6 +8,8 @@ import json
 import os
 import sys
 import re
+import time
+import uuid
 import concurrent.futures
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -131,6 +133,119 @@ def obtener_info_storage_account(account_name: str, resource_group: str, subscri
     except Exception as e:
         logging.exception("obtener_info_storage_account failed")
         return {"nombre": account_name, "estado": "Unknown", "error": str(e), "tipo_error": type(e).__name__}
+
+
+def diagnosticar_cache_redis(rid: str, profundidad: str, payload: dict) -> dict:
+    """
+    Ejecuta una validación real de lectura/escritura contra Redis para confirmar que la caché responde.
+    """
+    from services.redis_buffer_service import RedisBufferService
+
+    payload = payload or {}
+    diagnostico = {
+        "ok": True,
+        "recurso": rid,
+        "tipo": "Azure Cache for Redis",
+        "profundidad": profundidad,
+        "timestamp": datetime.now().isoformat(),
+        "metricas": {"redis": {}},
+        "diagnostico": {"estado": "desconocido", "tipo": "redis_cache"}
+    }
+
+    try:
+        buffer = RedisBufferService()
+    except Exception as exc:
+        diagnostico["ok"] = False
+        diagnostico["diagnostico"]["estado"] = "error"
+        diagnostico["diagnostico"]["error"] = f"RedisBufferService init: {str(exc)}"
+        return diagnostico
+
+    client = getattr(buffer, "_client", None)
+    redis_metrics = diagnostico["metricas"]["redis"]
+
+    if not getattr(buffer, "is_enabled", False) or client is None:
+        diagnostico["ok"] = False
+        diagnostico["diagnostico"]["estado"] = "no_disponible"
+        diagnostico["diagnostico"]["detalle"] = "RedisBufferService no tiene un cliente activo"
+        return diagnostico
+
+    ping_ok = False
+    roundtrip_ok = False
+    ttl_cfg = payload.get("ttl")
+    try:
+        ttl = int(ttl_cfg) if ttl_cfg else 30
+    except Exception:
+        ttl = 30
+
+    ttl = max(ttl, 5)
+    test_key = payload.get("key") or f"diagnostico:redis:{uuid.uuid4().hex}"
+    sample_payload = {
+        "ts": datetime.utcnow().isoformat(),
+        "nonce": uuid.uuid4().hex,
+        "origen": "diagnostico_recursos"
+    }
+
+    try:
+        start = time.perf_counter()
+        ping_ok = bool(client.ping())
+        redis_metrics["ping_ms"] = round((time.perf_counter() - start) * 1000, 3)
+    except Exception as exc:
+        diagnostico["ok"] = False
+        diagnostico["diagnostico"]["estado"] = "error"
+        diagnostico["diagnostico"]["error"] = f"PING falló: {str(exc)}"
+        return diagnostico
+
+    try:
+        buffer._json_set(test_key, sample_payload, ttl=ttl)
+        stored = buffer._json_get(test_key)
+        roundtrip_ok = stored == sample_payload
+        redis_metrics["ttl_usado"] = ttl
+        redis_metrics["key_prueba"] = test_key
+        redis_metrics["roundtrip_ok"] = roundtrip_ok
+    except Exception as exc:
+        diagnostico["ok"] = False
+        diagnostico["diagnostico"]["estado"] = "error"
+        diagnostico["diagnostico"]["error"] = f"Lectura/escritura falló: {str(exc)}"
+        return diagnostico
+    finally:
+        try:
+            client.delete(test_key)
+        except Exception:
+            pass
+
+    try:
+        info = client.info()
+        redis_metrics["version"] = info.get("redis_version")
+        redis_metrics["used_memory_human"] = info.get("used_memory_human")
+        redis_metrics["connected_clients"] = info.get("connected_clients")
+        redis_metrics["uptime_seconds"] = info.get("uptime_in_seconds")
+        redis_metrics["keyspace_hits"] = info.get("keyspace_hits")
+        redis_metrics["keyspace_misses"] = info.get("keyspace_misses")
+
+        db_key = f"db{getattr(buffer, '_db', 0)}"
+        keyspace_section = info.get("Keyspace") or info.get("keyspace") or {}
+        db_stats = keyspace_section.get(db_key)
+        if isinstance(db_stats, str):
+            parsed = {}
+            for part in db_stats.split(","):
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    parsed[k.strip()] = int(v)
+            db_stats = parsed
+        redis_metrics["dbsize"] = client.dbsize()
+        if isinstance(db_stats, dict):
+            redis_metrics["keyspace"] = db_stats
+    except Exception as exc:
+        redis_metrics["info_error"] = str(exc)
+
+    diagnostico["diagnostico"]["estado"] = "operativo" if ping_ok and roundtrip_ok else "degradado"
+    diagnostico["diagnostico"]["detalle"] = (
+        "Ping y lectura/escritura exitosos" if roundtrip_ok else
+        "Ping OK, pero la lectura/escritura no coincidió"
+    )
+    diagnostico["diagnostico"]["roundtrip_ok"] = roundtrip_ok
+
+    return diagnostico
 
 
 def obtener_metricas_function_app(app_name: str, resource_group: str, subscription_id: str) -> dict:
@@ -429,6 +544,7 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
 
         rid = _s(body.get("recurso")) if body else ""
         profundidad = _s(body.get("profundidad") or "basico") if body else "basico"
+        payload_cfg = body.get("payload") if isinstance(body.get("payload"), dict) else {}
 
         # Sin recurso específico = diagnóstico general
         if not rid:
@@ -466,7 +582,10 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
 
         # Diagnóstico de recurso específico
         try:
-            if "search" in rid.lower():
+            rid_lower = rid.lower()
+            if "redis" in rid_lower:
+                result = diagnosticar_cache_redis(rid, profundidad, payload_cfg)
+            elif "search" in rid_lower:
                 try:
                     from services.azure_search_client import get_search_service
                     search_service = get_search_service()

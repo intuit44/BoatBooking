@@ -36,7 +36,7 @@ from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpRespons
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
 from azure.monitor.query import LogsQueryClient
 from azure.cosmos import CosmosClient
-from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type
+from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type, NoReturn
 from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
 from datetime import timedelta
@@ -4036,8 +4036,22 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
-def _descripcion_evento(evento, texto):
-    raise NotImplementedError
+def _descripcion_evento(evento: Dict[str, Any], texto: str) -> Tuple[str, str]:
+    """Genera descripción y detalle de un evento para contexto."""
+    endpoint_val = evento.get("endpoint") or "evento"
+    timestamp_val = evento.get("timestamp") or ""
+    estado_val = "éxito" if evento.get("exito", True) else "error"
+    detalle = (
+        evento.get("params", {}).get("comando")
+        or evento.get("consulta")
+        or evento.get("mensaje")
+        or texto
+        or ""
+    )
+    descripcion = f"{timestamp_val} - {endpoint_val} ({estado_val})"
+    if detalle:
+        descripcion += f": {detalle[:240]}"
+    return descripcion.strip(), detalle
 
 
 @app.function_name(name="copiloto")

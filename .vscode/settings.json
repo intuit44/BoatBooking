@@ -1,10 +1,15 @@
 {
-    "python.analysis.exclude": [
-        "**/copiloto-function/function_app.py"
+    "python.analysis.extraPaths": [
+        "./copiloto-function"
     ],
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportGeneralTypeIssues": "none"
-    },
+    "python.analysis.exclude": [
+        "**/.venv",
+        "**/__pycache__",
+        "**/node_modules"
+    ],
+    "python.analysis.diagnosticMode": "openFilesOnly",
+    "python.analysis.indexing": true,
+    "python.languageServer": "Pylance",
     "azureFunctions.projectSubpath": "copiloto-function",
     "azureFunctions.deploySubpath": "copiloto-function",
     "azureFunctions.scmDoBuildDuringDeployment": true,

@@ -19,9 +19,10 @@ import redis
 
 # Intento de importar credenciales de Azure
 try:
-    from azure.identity import DefaultAzureCredential  # type: ignore
+    from azure.identity import DefaultAzureCredential, AzureCliCredential
 except Exception:  # pragma: no cover
-    DefaultAzureCredential = None  # type: ignore
+    DefaultAzureCredential = None
+    AzureCliCredential = None
 
 # Estrategia de TTLs (segundos) por tipo de payload
 CACHE_STRATEGY: Dict[str, Dict[str, int]] = {
@@ -62,23 +63,25 @@ class RedisBufferService:
         self._host = os.getenv(
             "REDIS_HOST", "Managed-redis-copiloto.eastus2.redis.azure.net")
         self._port = int(os.getenv("REDIS_PORT", "10000"))
-        # Eliminada la ruta basada en REDIS_KEY: ahora usamos Managed Identity (DefaultAzureCredential)
+        # Eliminada la ruta basada en REDIS_KEY: ahora intentamos MSI y fallback a clave si es necesario
         self._db = int(os.getenv("REDIS_DB", "0"))
-        # Forzamos SSL (Azure Cache for Redis requiere TLS)
+        # Forzamos SSL por defecto para entornos Azure, pero el fallback por clave puede respetar REDIS_SSL
         self._ssl = True
-        # Enabled sólo si redis-py está instalado y hay host configurado y credencial de Azure disponible
-        self._enabled = bool(redis and self._host and DefaultAzureCredential)
+        self._aad_scope = os.getenv(
+            "REDIS_AAD_SCOPE", "https://redis.azure.com/.default")
+        # Enabled si redis-py está instalado y hay host configurado (MSI será opcional)
+        self._enabled = bool(redis and self._host)
         if not DefaultAzureCredential:
             logging.warning(
-                "[RedisBuffer] azure-identity no está instalado; Redis via MSI inhabilitado.")
-            self._enabled = False
+                "[RedisBuffer] azure-identity no está instalado; se intentará fallback con REDIS_KEY si existe.")
         self._connect()
 
     # ------------------------------------------------------------------ #
-    # Conexión (MSI / DefaultAzureCredential)
+    # Conexión (AAD vía MSI/CLI / fallback por clave)
     # ------------------------------------------------------------------ #
     def _connect(self) -> None:
-        if not self._enabled or self._client is not None:
+        # Si ya hay cliente, no hacer nada
+        if self._client is not None:
             return
 
         if not redis:
@@ -87,49 +90,83 @@ class RedisBufferService:
             self._enabled = False
             return
 
-        if not DefaultAzureCredential:
-            logging.warning(
-                "DefaultAzureCredential no disponible; RedisBuffer inhabilitado.")
-            self._enabled = False
-            return
-
-        try:
-            # Obtener token desde Managed Identity / DefaultAzureCredential
+        def _try_token_credential(label: str, credential) -> bool:
             try:
-                credential = DefaultAzureCredential()
-                # Usamos el scope recomendado para Azure Cache for Redis (wildcard)
-                token = credential.get_token(
-                    "https://*.redis.cache.windows.net/.default")
+                token = credential.get_token(self._aad_scope)
                 bearer = getattr(token, "token", None)
-                # Validación explícita del token antes de intentar usarlo
                 if not bearer:
                     raise ValueError(
-                        "Token MSI vacío; no se puede autenticar contra Redis.")
-            except Exception as exc:  # pragma: no cover - puede fallar en entornos locales sin MSI
-                logging.error(f"[RedisBuffer] MSI falló para Redis: {exc}")
+                        "Token AAD vacío; no se puede autenticar contra Redis.")
+
+                username = os.getenv("REDIS_AAD_USERNAME", "") or None
+
+                self._client = redis.Redis(
+                    host=self._host,
+                    port=self._port,
+                    username=username,
+                    password=bearer,
+                    db=self._db,
+                    ssl=self._ssl,
+                    ssl_cert_reqs=ssl.CERT_REQUIRED,
+                    socket_timeout=2,
+                    socket_connect_timeout=2,
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                )
+                self._client.ping()
+                self._enabled = True
+                logging.info(
+                    f"[RedisBuffer] Conectado a {self._host}:{self._port} usando {label} (ssl={self._ssl})")
+                return True
+            except Exception as exc:
+                logging.warning(
+                    f"[RedisBuffer] {label} no pudo obtener token para Redis: {exc}")
                 self._client = None
-                self._enabled = False
+                return False
+
+        # Intentar DefaultAzureCredential (incluye MSI y otros proveedores AAD)
+        if DefaultAzureCredential:
+            credential = DefaultAzureCredential(
+                exclude_interactive_browser_credential=True)
+            if _try_token_credential("DefaultAzureCredential", credential):
                 return
 
-            # Construir cliente redis usando el token como "password"
+        # Intentar Azure CLI explícitamente para escenarios locales
+        if AzureCliCredential:
+            credential = AzureCliCredential()
+            if _try_token_credential("AzureCliCredential", credential):
+                return
+
+        # Fallback: usar REDIS_KEY / REDIS_SSL si AAD no está disponible
+        key = os.getenv("REDIS_KEY")
+        if not key:
+            logging.error(
+                "[RedisBuffer] No se pudo obtener token AAD y no hay REDIS_KEY configurada; Redis quedará inhabilitado.")
+            self._client = None
+            self._enabled = False
+            return
+        try:
+            ssl_flag = bool(int(os.getenv("REDIS_SSL", "0")))
+            logging.info(
+                f"[RedisBuffer] Usando fallback REDIS_KEY (host={self._host}, ssl={ssl_flag})")
             self._client = redis.Redis(
                 host=self._host,
                 port=self._port,
-                password=bearer,
+                password=key,
                 db=self._db,
-                ssl=self._ssl,
-                ssl_cert_reqs=ssl.CERT_REQUIRED,  # Azure Functions administra el certificado
+                ssl=ssl_flag,
                 socket_timeout=2,
                 socket_connect_timeout=2,
                 retry_on_timeout=True,
                 health_check_interval=30,
             )
-            # Prueba rápida de conexión (el token debe estar ya aplicado)
             self._client.ping()
+            self._enabled = True
             logging.info(
-                f"[RedisBuffer] Conectado a {self._host}:{self._port} usando MSI (ssl={self._ssl})")
+                f"[RedisBuffer] Conectado a {self._host}:{self._port} usando REDIS_KEY/REDIS_SSL (ssl={ssl_flag})")
         except Exception as exc:  # pragma: no cover - depende de entorno
-            logging.warning(f"[RedisBuffer] No se pudo conectar: {exc}")
+            logging.warning(
+                f"[RedisBuffer] No se pudo conectar (AAD y fallback): {exc}")
             self._client = None
             self._enabled = False
 
@@ -213,11 +250,13 @@ class RedisBufferService:
         memoria_key = self._format_key("memoria", session_id)
         self._json_set(memoria_key, memoria_payload,
                        ttl=self._get_ttl("memoria"))
+        logging.info(f"[RedisBuffer] cache WRITE: {memoria_key}")
 
         if thread_id:
             thread_key = self._format_key("thread", thread_id)
             self._json_set(thread_key, memoria_payload,
                            ttl=self._get_ttl("thread"))
+            logging.info(f"[RedisBuffer] cache WRITE: {thread_key}")
 
     def get_thread_cache(self, thread_id: Optional[str]) -> Optional[Dict[str, Any]]:
         if not thread_id:
@@ -249,7 +288,10 @@ class RedisBufferService:
         start = time.perf_counter()
         cached = self._json_get(cache_key)
         if cached:
+            logging.info(f"[RedisBuffer] cache HIT: {cache_key}")
             return cached, True, (time.perf_counter() - start) * 1000
+
+        logging.info(f"[RedisBuffer] cache MISS: {cache_key}")
 
         payload = None
         try:
@@ -260,6 +302,7 @@ class RedisBufferService:
         latency_ms = (time.perf_counter() - start) * 1000
         if payload:
             self._json_set(cache_key, payload, ttl=self._get_ttl("narrativa"))
+            logging.info(f"[RedisBuffer] cache WRITE: {cache_key}")
         return payload, False, latency_ms
 
     # ------------------------------------------------------------------ #
@@ -267,7 +310,12 @@ class RedisBufferService:
     # ------------------------------------------------------------------ #
     def get_cached_payload(self, bucket: str, payload_hash: str) -> Optional[Any]:
         key = self._format_key(bucket, payload_hash)
-        return self._json_get(key)
+        cached = self._json_get(key)
+        if cached is not None:
+            logging.info(f"[RedisBuffer] cache HIT: {key}")
+        else:
+            logging.info(f"[RedisBuffer] cache MISS: {key}")
+        return cached
 
     def cache_response(self, bucket: str, payload_hash: str, payload: Any) -> None:
         if not bucket or not payload_hash or payload is None:
@@ -275,6 +323,7 @@ class RedisBufferService:
         ttl = self._get_ttl(bucket)
         key = self._format_key(bucket, payload_hash)
         self._json_set(key, payload, ttl=ttl)
+        logging.info(f"[RedisBuffer] cache WRITE: {key}")
 
 
 # Instancia global para importar como redis_buffer
