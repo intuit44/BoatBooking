@@ -57,6 +57,26 @@ def _clean_thread_text(texto):
 def _resolver_identificadores_thread(req: func.HttpRequest):
     """Obtiene thread_id, session_id y agent_id normalizados."""
     thread_id = req.headers.get("Thread-ID") or req.headers.get("X-Thread-ID")
+    if not thread_id:
+        try:
+            thread_id = req.params.get("thread_id")
+        except Exception:
+            thread_id = None
+    if not thread_id:
+        try:
+            body = req.get_json()
+            if isinstance(body, dict):
+                thread_id = body.get("thread_id") or (
+                    (body.get("contexto") or {}).get("thread_id")
+                    if isinstance(body.get("contexto"), dict) else None
+                ) or (
+                    (body.get("contexto_conversacion") or {}).get("thread_id")
+                    if isinstance(body.get("contexto_conversacion"), dict) else None
+                )
+        except Exception:
+            thread_id = None
+
+    raw_thread_id = thread_id
     session_id = getattr(req, "_session_id", None)
     agent_id = getattr(req, "_agent_id", None)
 
@@ -71,13 +91,32 @@ def _resolver_identificadores_thread(req: func.HttpRequest):
             session_id = session_id or None
             agent_id = agent_id or None
 
+    if not session_id:
+        if raw_thread_id:
+            session_id = raw_thread_id
+        elif agent_id:
+            session_id = f"agent-{agent_id}"
+
+    session_id = session_id or "fallback_session"
+
     if not thread_id and session_id and session_id.startswith("assistant-"):
         thread_id = session_id
 
     if not thread_id:
-        thread_id = f"thread_fallback_session_{int(time.time())}"
+        thread_id = raw_thread_id or f"thread_fallback_session_{int(time.time())}"
 
-    return thread_id, session_id or "fallback_session", agent_id or "foundry_user"
+    return thread_id, session_id, agent_id or "foundry_user"
+
+
+def _hydrate_request_identificadores(req: func.HttpRequest):
+    """Resuelve y adjunta session_id/agent_id al request para reutilización."""
+    thread_id, session_id, agent_id = _resolver_identificadores_thread(req)
+    try:
+        setattr(req, "_session_id", session_id)
+        setattr(req, "_agent_id", agent_id)
+    except Exception:
+        pass
+    return thread_id, session_id, agent_id
 
 
 def _append_message(messages, role, content):
@@ -273,8 +312,6 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # 0️⃣ CAPTURA COMPLETA DE ENTRADA DEL USUARIO
                     try:
-                        from memory_helpers import extraer_session_info
-
                         body = req.get_json() if req.method in [
                             "POST", "PUT", "PATCH"] else {}
                         # Priorizar 'input' (Foundry real) sobre 'mensaje' (legacy)
@@ -292,18 +329,8 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                         if user_message and len(user_message) > 3:
                             # CAPTURA AUTOMÁTICA DE THREAD
-                            session_info = extraer_session_info(req)
-                            session_id = session_info.get(
-                                "session_id") or "fallback_session"
-                            agent_id = session_info.get(
-                                "agent_id") or "foundry_user"
-
-                            # Exponer identificadores en el request para el resto del pipeline
-                            try:
-                                setattr(req, "_session_id", session_id)
-                                setattr(req, "_agent_id", agent_id)
-                            except Exception:
-                                pass
+                            _, session_id, agent_id = _hydrate_request_identificadores(
+                                req)
 
                             # Crear evento completo
                             evento = {
@@ -335,25 +362,10 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     memoria_previa = {}
                     try:
                         from cosmos_memory_direct import consultar_memoria_cosmos_directo
-                        from memory_helpers import extraer_session_info
 
                         # CAPTURA AUTOMÁTICA DE THREAD
-                        session_info = extraer_session_info(req)
-                        session_id = session_info.get("session_id") or "global"
-                        agent_id = session_info.get(
-                            "agent_id") or "unknown_agent"
-                        try:
-                            thread_id_cache, _, _ = _resolver_identificadores_thread(
-                                req)
-                        except Exception:
-                            thread_id_cache = None
-
-                        # Exponer identificadores en el request para el resto del pipeline
-                        try:
-                            setattr(req, "_session_id", session_id)
-                            setattr(req, "_agent_id", agent_id)
-                        except Exception:
-                            pass
+                        thread_id_cache, session_id, agent_id = _hydrate_request_identificadores(
+                            req)
 
                         cache_dimensions = {
                             "cache_scope": "memoria_contexto",
@@ -600,11 +612,9 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # 4️⃣ CAPTURA AUTOMÁTICA DE CONVERSACIÓN RICA COMPLETA (solo si hay contexto real)
                     try:
-                        from memory_helpers import extraer_session_info
-
                         # CAPTURA AUTOMÁTICA DE THREAD
-                        session_info = extraer_session_info(req)
-                        session_id = session_info.get("session_id") or "global"
+                        _, session_id, _ = _hydrate_request_identificadores(
+                            req)
 
                         resumen_completo = (memoria_previa.get(
                             "resumen_conversacion", "") if memoria_previa else "")
@@ -714,14 +724,9 @@ def memory_route(app: func.FunctionApp) -> Callable:
                     # 6️⃣ CAPTURA DE RESPUESTA COMPLETA FOUNDRY UI
                     assistant_thread_text = None
                     try:
-                        from memory_helpers import extraer_session_info
-
                         # CAPTURA AUTOMÁTICA DE THREAD
-                        session_info = extraer_session_info(req)
-                        session_id = session_info.get(
-                            "session_id") or "fallback_session"
-                        agent_id = session_info.get(
-                            "agent_id") or "foundry_user"
+                        _, session_id, agent_id = _hydrate_request_identificadores(
+                            req)
 
                         logging.info(f"[BLOQUE 6] Iniciando para {route_path}")
 

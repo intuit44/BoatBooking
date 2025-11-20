@@ -2,7 +2,7 @@
 Endpoint: /api/ejecutar-cli
 Endpoint UNIVERSAL para ejecutar comandos CLI
 """
-from function_app import app
+from function_app import _resolver_placeholders_dinamico, app
 import logging
 import json
 import os
@@ -579,7 +579,7 @@ def _verificar_archivos_en_comando(comando: str) -> dict:
     """
     try:
         from pathlib import Path
-        from function_app import PROJECT_ROOT, _resolve_windows_absolute_path
+        from function_app import PROJECT_ROOT, _locate_file_in_root
 
         # 🔥 DETECTAR COMANDOS DE BÚSQUEDA QUE USAN PATRONES GLOB
         comandos_busqueda = ['Get-ChildItem', 'gci', 'ls', 'dir',
@@ -669,7 +669,7 @@ def _verificar_archivos_en_comando(comando: str) -> dict:
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     """Endpoint UNIVERSAL - Ejecuta CUALQUIER comando sin validaciones previas"""
-    from function_app import PROJECT_ROOT, _auto_resolve_file_paths, IS_AZURE, _locate_file_in_root
+    from function_app import PROJECT_ROOT, _auto_resolve_file_paths, IS_AZURE, _locate_file_in_root, _locate_file_in_root
     from memory_manual import aplicar_memoria_manual
     from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
     from services.memory_service import memory_service
@@ -689,6 +689,9 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
         logging.warning(f"[DEBUG] Payload recibido: {body}")
+
+        # 🔥 EXTRACCIÓN AUTOMÁTICA DE session_id Y agent_id
+        _extraer_ids_de_comando(body, req)
 
         if not body:
             # ✅ CAMBIO: HTTP 200 con mensaje explicativo
@@ -1536,3 +1539,13 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=200  # ✅ CAMBIO: 200 en lugar de 500
         )
+
+
+def _extraer_ids_de_comando(body: dict, req: func.HttpRequest) -> None:
+    """Extrae session_id y agent_id del body o headers y los agrega al body"""
+    if not body.get("session_id"):
+        body["session_id"] = req.headers.get(
+            "Session-ID") or req.headers.get("X-Session-ID")
+    if not body.get("agent_id"):
+        body["agent_id"] = req.headers.get(
+            "Agent-ID") or req.headers.get("X-Agent-ID")

@@ -20,6 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 T = TypeVar('T')
 
+
 def _safe(obj: Any, attr: str, default: T) -> T:
     """Devuelve obj.attr o default si obj es None o el atributo no existe/vale None."""
     try:
@@ -50,7 +51,7 @@ def obtener_credenciales_azure():
 def obtener_estado_function_app(app_name: str, resource_group: str, subscription_id: str) -> dict:
     from function_app import MGMT_SDK, WebSiteManagementClient
     from azure.core.exceptions import ResourceNotFoundError, AzureError
-    
+
     if not MGMT_SDK or WebSiteManagementClient is None:
         return {"nombre": app_name, "estado": "Unknown", "error": "SDK de administración no instalado"}
 
@@ -90,7 +91,7 @@ def obtener_estado_function_app(app_name: str, resource_group: str, subscription
 def obtener_info_storage_account(account_name: str, resource_group: str, subscription_id: str) -> dict:
     from function_app import MGMT_SDK, StorageManagementClient
     from azure.core.exceptions import ResourceNotFoundError
-    
+
     if not MGMT_SDK or StorageManagementClient is None:
         return {"nombre": account_name, "estado": "Unknown", "error": "SDK de administración no instalado"}
 
@@ -100,10 +101,12 @@ def obtener_info_storage_account(account_name: str, resource_group: str, subscri
             return {"nombre": account_name, "estado": "Unknown", "error": "Sin credenciales"}
 
         client = StorageManagementClient(credential, subscription_id)
-        sa = client.storage_accounts.get_properties(resource_group, account_name)
+        sa = client.storage_accounts.get_properties(
+            resource_group, account_name)
 
         try:
-            keys_obj = client.storage_accounts.list_keys(resource_group, account_name)
+            keys_obj = client.storage_accounts.list_keys(
+                resource_group, account_name)
             keys_list = getattr(keys_obj, "keys", None)
             has_keys = bool(keys_list) and len(keys_list) > 0
         except Exception:
@@ -188,7 +191,8 @@ def diagnosticar_cache_redis(rid: str, profundidad: str, payload: dict) -> dict:
     try:
         start = time.perf_counter()
         ping_ok = bool(client.ping())
-        redis_metrics["ping_ms"] = round((time.perf_counter() - start) * 1000, 3)
+        redis_metrics["ping_ms"] = round(
+            (time.perf_counter() - start) * 1000, 3)
     except Exception as exc:
         diagnostico["ok"] = False
         diagnostico["diagnostico"]["estado"] = "error"
@@ -245,13 +249,25 @@ def diagnosticar_cache_redis(rid: str, profundidad: str, payload: dict) -> dict:
     )
     diagnostico["diagnostico"]["roundtrip_ok"] = roundtrip_ok
 
+    # Consolidar resumen clave en el objeto diagnostico principal (duplicar sin eliminar metricas.redis)
+    diagnostico["diagnostico"].update({
+        "ping_ms": redis_metrics.get("ping_ms"),
+        "dbsize": redis_metrics.get("dbsize"),
+        "keyspace_hits": redis_metrics.get("keyspace_hits"),
+        "keyspace_misses": redis_metrics.get("keyspace_misses"),
+        "used_memory_human": redis_metrics.get("used_memory_human"),
+        "connected_clients": redis_metrics.get("connected_clients"),
+        "version": redis_metrics.get("version"),
+        "roundtrip_ok": roundtrip_ok
+    })
+
     return diagnostico
 
 
 def obtener_metricas_function_app(app_name: str, resource_group: str, subscription_id: str) -> dict:
     """Obtiene métricas de la Function App usando el SDK"""
     from function_app import MGMT_SDK, MonitorManagementClient
-    
+
     if not MGMT_SDK or MonitorManagementClient is None:
         return {"error": "SDK de administración no instalado"}
 
@@ -262,7 +278,7 @@ def obtener_metricas_function_app(app_name: str, resource_group: str, subscripti
 
         client = MonitorManagementClient(credential, subscription_id)
         resource_id = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Web/sites/{app_name}"
-        
+
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(hours=24)
         metricas = {}
@@ -307,7 +323,7 @@ def obtener_metricas_function_app(app_name: str, resource_group: str, subscripti
 def diagnosticar_function_app_con_sdk() -> dict:
     """Diagnóstico completo usando SDK de Azure - OPTIMIZADO"""
     from function_app import IS_AZURE, CACHE, CONTAINER_NAME, get_blob_client
-    
+
     diagnostico = {
         "timestamp": datetime.now().isoformat(),
         "function_app": os.environ.get("WEBSITE_SITE_NAME", "local"),
@@ -319,7 +335,8 @@ def diagnosticar_function_app_con_sdk() -> dict:
         "optimizado": True
     }
 
-    app_insights_key = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING") or os.environ.get("APPINSIGHTS_INSTRUMENTATIONKEY")
+    app_insights_key = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING") or os.environ.get(
+        "APPINSIGHTS_INSTRUMENTATIONKEY")
 
     diagnostico["checks"]["configuracion"] = {
         "blob_storage": False,
@@ -347,7 +364,8 @@ def diagnosticar_function_app_con_sdk() -> dict:
                     "error": f"El contenedor '{CONTAINER_NAME}' no existe"
                 }
         except Exception as e:
-            diagnostico["checks"]["blob_storage_detalles"] = {"conectado": False, "error": str(e)}
+            diagnostico["checks"]["blob_storage_detalles"] = {
+                "conectado": False, "error": str(e)}
 
     # Métricas de cache
     diagnostico["metricas"]["cache"] = {
@@ -383,22 +401,28 @@ def diagnosticar_function_app_con_sdk() -> dict:
                 future_storage = executor.submit(get_storage_info)
 
                 try:
-                    diagnostico["recursos"]["function_app"] = future_function.result(timeout=5)
+                    diagnostico["recursos"]["function_app"] = future_function.result(
+                        timeout=5)
                 except concurrent.futures.TimeoutError:
-                    diagnostico["recursos"]["function_app"] = {"estado": "timeout", "mensaje": "Consulta excedió 5s"}
+                    diagnostico["recursos"]["function_app"] = {
+                        "estado": "timeout", "mensaje": "Consulta excedió 5s"}
 
                 try:
-                    diagnostico["recursos"]["storage_account"] = future_storage.result(timeout=3)
+                    diagnostico["recursos"]["storage_account"] = future_storage.result(
+                        timeout=3)
                 except concurrent.futures.TimeoutError:
-                    diagnostico["recursos"]["storage_account"] = {"estado": "timeout", "mensaje": "Consulta excedió 3s"}
+                    diagnostico["recursos"]["storage_account"] = {
+                        "estado": "timeout", "mensaje": "Consulta excedió 3s"}
 
             # Obtener métricas de Function App
             try:
-                metricas_fa = obtener_metricas_function_app(app_name, resource_group, subscription_id)
+                metricas_fa = obtener_metricas_function_app(
+                    app_name, resource_group, subscription_id)
                 if metricas_fa and not metricas_fa.get("error"):
                     diagnostico["metricas"]["function_app"] = metricas_fa
                 else:
-                    diagnostico["metricas"]["function_app"] = {"error": metricas_fa.get("error", "No se pudieron obtener métricas")}
+                    diagnostico["metricas"]["function_app"] = {
+                        "error": metricas_fa.get("error", "No se pudieron obtener métricas")}
             except Exception as e:
                 diagnostico["metricas"]["function_app"] = {"error": str(e)}
 
@@ -440,32 +464,35 @@ def diagnosticar_function_app_con_sdk() -> dict:
 def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
     """Endpoint consolidado para diagnósticos de recursos Azure"""
     logging.info("[ENTRY] diagnostico_recursos_http iniciado")
-    
+
     try:
         from function_app import IS_AZURE, MGMT_SDK, STORAGE_CONNECTION_STRING, CACHE, CONTAINER_NAME, get_blob_client
         from services.memory_service import memory_service
+        from services.redis_buffer_service import redis_buffer
         from memory_manual import aplicar_memoria_manual
         from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
         from function_app import _json, _error, _s, _to_bool, _try_default_credential
-        
+
         logging.info("[OK] Imports completados")
     except Exception as import_err:
         logging.error(f"[FAIL] Error en imports: {import_err}")
         return func.HttpResponse(
-            json.dumps({"ok": False, "error": f"Import error: {str(import_err)}"}, ensure_ascii=False),
+            json.dumps(
+                {"ok": False, "error": f"Import error: {str(import_err)}"}, ensure_ascii=False),
             mimetype="application/json",
             status_code=500
         )
-    
+
     # 🧠 CONSULTAR MEMORIA
     try:
         memoria_previa = consultar_memoria_cosmos_directo(req)
         if memoria_previa and memoria_previa.get("tiene_historial"):
-            logging.info(f"🧠 Diagnostico-recursos: {memoria_previa['total_interacciones']} interacciones")
+            logging.info(
+                f"🧠 Diagnostico-recursos: {memoria_previa['total_interacciones']} interacciones")
     except Exception as mem_err:
         logging.warning(f"Error consultando memoria: {mem_err}")
         memoria_previa = None
-    
+
     try:
         metricas_param = req.params.get("metricas", "false").lower() == "true"
 
@@ -474,23 +501,23 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
             logging.info("Ejecutando diagnóstico completo con métricas")
             try:
                 diagnostico = diagnosticar_function_app_con_sdk()
-                
+
                 # Agregar storage stats
                 client = get_blob_client()
                 if client:
                     contenedores = list(client.list_containers())
-                    total_blobs = sum(sum(1 for _ in client.get_container_client(c.name).list_blobs()) 
-                                    for c in contenedores if c.name)
-                    
+                    total_blobs = sum(sum(1 for _ in client.get_container_client(c.name).list_blobs())
+                                      for c in contenedores if c.name)
+
                     diagnostico["recursos"]["storage_stats"] = {
                         "contenedores": len(contenedores),
                         "total_blobs": total_blobs,
                         "contenedor_principal": CONTAINER_NAME
                     }
-                
+
                 diagnostico["ok"] = True
                 diagnostico["modo"] = "completo_con_metricas"
-                
+
                 return func.HttpResponse(
                     json.dumps(diagnostico, ensure_ascii=False),
                     mimetype="application/json",
@@ -499,7 +526,8 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
             except Exception as e:
                 logging.error(f"Error en diagnóstico completo: {str(e)}")
                 return func.HttpResponse(
-                    json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False),
+                    json.dumps({"ok": False, "error": str(e)},
+                               ensure_ascii=False),
                     mimetype="application/json",
                     status_code=500
                 )
@@ -532,7 +560,7 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
                     diagnostico = diagnosticar_function_app_con_sdk()
                     diagnostico["ok"] = True
                     diagnostico["modo"] = "completo_post"
-                    
+
                     return func.HttpResponse(
                         json.dumps(diagnostico, ensure_ascii=False),
                         mimetype="application/json",
@@ -543,8 +571,10 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
                 body = {}
 
         rid = _s(body.get("recurso")) if body else ""
-        profundidad = _s(body.get("profundidad") or "basico") if body else "basico"
-        payload_cfg = body.get("payload") if isinstance(body.get("payload"), dict) else {}
+        profundidad = _s(body.get("profundidad")
+                         or "basico") if body else "basico"
+        payload_cfg = body.get("payload") if isinstance(
+            body.get("payload"), dict) else {}
 
         # Sin recurso específico = diagnóstico general
         if not rid:
@@ -561,6 +591,28 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
                 },
                 "profundidad": profundidad,
                 "mensaje": "Diagnóstico general del sistema completado"
+            }
+            try:
+                redis_stats = redis_buffer.get_cache_stats()
+            except Exception as redis_err:
+                logging.warning(f"No se pudieron obtener métricas de Redis: {redis_err}")
+                redis_stats = {"enabled": False, "info_error": str(redis_err)}
+
+            cache_metrics = {
+                "archivos_en_cache": len(CACHE),
+                "memoria_cache_bytes": sum(len(str(v)) for v in CACHE.values()),
+                "redis_enabled": redis_stats.get("enabled", False),
+                "redis_dbsize": redis_stats.get("dbsize"),
+                "redis_keyspace_hits": redis_stats.get("keyspace_hits"),
+                "redis_keyspace_misses": redis_stats.get("keyspace_misses"),
+                "redis_used_memory_human": redis_stats.get("used_memory_human")
+            }
+            redis_warning = redis_stats.get("dbsize_error") or redis_stats.get("info_error")
+            if redis_warning:
+                cache_metrics["redis_warning"] = redis_warning
+
+            general_diagnostics["metricas"] = {
+                "cache": cache_metrics
             }
 
             try:
@@ -584,7 +636,8 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
         try:
             rid_lower = rid.lower()
             if "redis" in rid_lower:
-                result = diagnosticar_cache_redis(rid, profundidad, payload_cfg)
+                result = diagnosticar_cache_redis(
+                    rid, profundidad, payload_cfg)
             elif "search" in rid_lower:
                 try:
                     from services.azure_search_client import get_search_service
@@ -640,19 +693,20 @@ def diagnostico_recursos_http(req: func.HttpRequest) -> func.HttpResponse:
 
             result = aplicar_memoria_cosmos_directo(req, result)
             result = aplicar_memoria_manual(req, result)
-            
+
             try:
                 memory_service.registrar_llamada(
                     source="diagnostico_recursos",
                     endpoint="/api/diagnostico-recursos",
                     method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "recurso": rid},
+                    params={"session_id": req.headers.get(
+                        "Session-ID"), "recurso": rid},
                     response_data=result,
                     success=result.get("ok", False)
                 )
             except Exception as reg_err:
                 logging.warning(f"Error registrando llamada: {reg_err}")
-            
+
             return _json(result)
         except PermissionError as e:
             return _error("AZURE_AUTH_FORBIDDEN", 403, f"{type(e).__name__}: {str(e)}")

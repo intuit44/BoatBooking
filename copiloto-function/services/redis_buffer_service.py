@@ -17,6 +17,8 @@ import ssl
 from typing import Any, Callable, Dict, Optional, Tuple
 import redis
 
+CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
+
 # Intento de importar credenciales de Azure
 try:
     from azure.identity import DefaultAzureCredential, AzureCliCredential
@@ -222,6 +224,41 @@ class RedisBufferService:
         norm_parts = [p for p in parts if p]
         return f"{prefix}:{':'.join(norm_parts)}" if norm_parts else prefix
 
+    def _refresh_ttl(self, key: str, bucket: str) -> None:
+        if not self.is_enabled:
+            return
+        ttl = self._get_ttl(bucket)
+        if not ttl:
+            return
+        try:
+            client = self._client
+            if client:
+                client.expire(key, ttl)
+        except Exception:
+            logging.debug(f"[RedisBuffer] No se pudo refrescar TTL de {key}.", exc_info=True)
+
+    def _emit_cache_event(self, action: str, bucket: str, key: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        """Envía evento estructurado a App Insights para auditoría de caché."""
+        if not key:
+            return
+        try:
+            hashed_key = self.stable_hash(key)
+            dims = {
+                "component": "redis_buffer",
+                "bucket": bucket or key.split(":")[0],
+                "action": action,
+                "key_hash": hashed_key,
+                "redis_enabled": self.is_enabled
+            }
+            if extra:
+                dims.update(extra)
+            CUSTOM_EVENT_LOGGER.info(
+                f"redis_buffer_{action}",
+                extra={"custom_dimensions": dims}
+            )
+        except Exception:
+            logging.debug("No se pudo emitir evento custom de Redis.", exc_info=True)
+
     @staticmethod
     def stable_hash(payload: str) -> str:
         """SHA-256 deterministic hash to build cache keys for prompts/queries."""
@@ -236,7 +273,15 @@ class RedisBufferService:
         if not session_id:
             return None
         key = self._format_key("memoria", session_id)
-        return self._json_get(key)
+        payload = self._json_get(key)
+        if payload is not None:
+            logging.info(f"[RedisBuffer] cache HIT: {key}")
+            self._refresh_ttl(key, "memoria")
+            self._emit_cache_event("hit", "memoria", key)
+        else:
+            logging.info(f"[RedisBuffer] cache MISS: {key}")
+            self._emit_cache_event("miss", "memoria", key)
+        return payload
 
     def cache_memoria_contexto(
         self,
@@ -251,24 +296,36 @@ class RedisBufferService:
         self._json_set(memoria_key, memoria_payload,
                        ttl=self._get_ttl("memoria"))
         logging.info(f"[RedisBuffer] cache WRITE: {memoria_key}")
+        self._emit_cache_event(
+            "write", "memoria", memoria_key, {"thread_id_present": bool(thread_id)})
 
         if thread_id:
             thread_key = self._format_key("thread", thread_id)
             self._json_set(thread_key, memoria_payload,
                            ttl=self._get_ttl("thread"))
             logging.info(f"[RedisBuffer] cache WRITE: {thread_key}")
+            self._emit_cache_event("write", "thread", thread_key)
 
     def get_thread_cache(self, thread_id: Optional[str]) -> Optional[Dict[str, Any]]:
         if not thread_id:
             return None
         key = self._format_key("thread", thread_id)
-        return self._json_get(key)
+        payload = self._json_get(key)
+        if payload is not None:
+            logging.info(f"[RedisBuffer] cache HIT: {key}")
+            self._refresh_ttl(key, "thread")
+            self._emit_cache_event("hit", "thread", key)
+        else:
+            logging.info(f"[RedisBuffer] cache MISS: {key}")
+            self._emit_cache_event("miss", "thread", key)
+        return payload
 
     def cache_thread_snapshot(self, thread_id: Optional[str], thread_payload: Dict[str, Any]) -> None:
         if not thread_id or not thread_payload:
             return
         key = self._format_key("thread", thread_id)
         self._json_set(key, thread_payload, ttl=self._get_ttl("thread"))
+        self._emit_cache_event("write", "thread", key)
 
     # ------------------------------------------------------------------ #
     # Narrativa contextual
@@ -289,9 +346,12 @@ class RedisBufferService:
         cached = self._json_get(cache_key)
         if cached:
             logging.info(f"[RedisBuffer] cache HIT: {cache_key}")
+            self._refresh_ttl(cache_key, "narrativa")
+            self._emit_cache_event("hit", "narrativa", cache_key)
             return cached, True, (time.perf_counter() - start) * 1000
 
         logging.info(f"[RedisBuffer] cache MISS: {cache_key}")
+        self._emit_cache_event("miss", "narrativa", cache_key)
 
         payload = None
         try:
@@ -303,6 +363,8 @@ class RedisBufferService:
         if payload:
             self._json_set(cache_key, payload, ttl=self._get_ttl("narrativa"))
             logging.info(f"[RedisBuffer] cache WRITE: {cache_key}")
+            self._emit_cache_event(
+                "write", "narrativa", cache_key, {"latency_ms": round(latency_ms, 2)})
         return payload, False, latency_ms
 
     # ------------------------------------------------------------------ #
@@ -313,8 +375,11 @@ class RedisBufferService:
         cached = self._json_get(key)
         if cached is not None:
             logging.info(f"[RedisBuffer] cache HIT: {key}")
+            self._refresh_ttl(key, bucket)
+            self._emit_cache_event("hit", bucket, key)
         else:
             logging.info(f"[RedisBuffer] cache MISS: {key}")
+            self._emit_cache_event("miss", bucket, key)
         return cached
 
     def cache_response(self, bucket: str, payload_hash: str, payload: Any) -> None:
@@ -324,6 +389,29 @@ class RedisBufferService:
         key = self._format_key(bucket, payload_hash)
         self._json_set(key, payload, ttl=ttl)
         logging.info(f"[RedisBuffer] cache WRITE: {key}")
+        self._emit_cache_event("write", bucket, key, {"ttl": ttl})
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Retorna snapshot de métricas básicas del cliente Redis."""
+        stats: Dict[str, Any] = {
+            "enabled": self.is_enabled,
+            "db": getattr(self, "_db", 0)
+        }
+        client = self._client
+        if not client:
+            return stats
+        try:
+            stats["dbsize"] = client.dbsize()
+        except Exception as exc:
+            stats["dbsize_error"] = str(exc)
+        try:
+            info = client.info()
+            stats["used_memory_human"] = info.get("used_memory_human")
+            stats["keyspace_hits"] = info.get("keyspace_hits")
+            stats["keyspace_misses"] = info.get("keyspace_misses")
+        except Exception as exc:
+            stats["info_error"] = str(exc)
+        return stats
 
 
 # Instancia global para importar como redis_buffer

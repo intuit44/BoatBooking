@@ -1444,6 +1444,140 @@ def generar_sugerencias_busqueda(intencion: dict, archivos: list) -> list:
     return sugerencias
 
 
+def _extraer_patron_archivo_desde_consulta(consulta: str) -> Optional[str]:
+    """Detecta un posible nombre de archivo dentro de la consulta."""
+    if not consulta:
+        return None
+    patron = re.compile(r"[a-zA-Z0-9_./\\-]+\.[a-zA-Z0-9_]{1,12}")
+    matches = patron.findall(consulta)
+    for match in matches:
+        cleaned = match.strip().strip("'\"")
+        if cleaned and not cleaned.lower().startswith(("que", "como")):
+            return cleaned
+    return None
+
+
+def _construir_comando_busqueda_archivo_cli(patron_archivo: str) -> str:
+    """Crea un comando Python cross-platform que lista coincidencias para el archivo."""
+    sanitized = (patron_archivo or "").strip().strip("'\"")
+    if not sanitized:
+        sanitized = ".*"
+    term_literal = json.dumps(sanitized)
+    root_literal = json.dumps(str(PROJECT_ROOT))
+    comando = (
+        "python -c \"import pathlib; term = {term}; term = term.lower(); "
+        "root = pathlib.Path({root}); "
+        "matches = [str(p) for p in root.rglob('*') if p.is_file() and term in p.name.lower()]; "
+        "print('\\\\n'.join(matches) if matches else 'NO_MATCH::' + term)\""
+    ).format(term=term_literal, root=root_literal)
+    return comando
+
+
+def _relativizar_ruta_detectada(ruta: str) -> Optional[str]:
+    """Normaliza rutas retornadas por CLI a rutas relativas del proyecto."""
+    if not ruta:
+        return None
+    ruta_limpia = ruta.strip().strip("'\"")
+    if not ruta_limpia or ruta_limpia.startswith("NO_MATCH"):
+        return None
+    ruta_limpia = ruta_limpia.replace("\\", "/")
+
+    try:
+        candidate = Path(ruta_limpia)
+        if candidate.is_absolute():
+            try:
+                return str(candidate.relative_to(PROJECT_ROOT)).replace("\\", "/")
+            except ValueError:
+                if "copiloto-function" in candidate.parts:
+                    idx = candidate.parts.index("copiloto-function")
+                    rel = Path(*candidate.parts[idx:])
+                    return str(rel).replace("\\", "/")
+                return str(candidate).replace("\\", "/")
+        resolved = (PROJECT_ROOT / candidate).resolve()
+        if resolved.exists():
+            return str(resolved.relative_to(PROJECT_ROOT)).replace("\\", "/")
+    except Exception:
+        pass
+
+    return ruta_limpia
+
+
+def _normalizar_rutas_cli(resultado_cli: Dict[str, Any]) -> List[str]:
+    """Extrae rutas limpias del resultado devuelto por /api/ejecutar-cli."""
+    bruto = resultado_cli.get("resultado")
+    lineas: List[str] = []
+    if isinstance(bruto, list):
+        lineas = [str(item) for item in bruto]
+    elif isinstance(bruto, str):
+        lineas = bruto.splitlines()
+
+    rutas: List[str] = []
+    for linea in lineas:
+        linea = linea.strip()
+        if not linea or linea.startswith("? Perfil"):
+            continue
+        ruta_rel = _relativizar_ruta_detectada(linea)
+        if ruta_rel and ruta_rel not in rutas:
+            rutas.append(ruta_rel)
+    return rutas
+
+
+def ejecutar_busqueda_cli_y_leer_archivo(consulta: str, session_id: Optional[str] = None, patron_preferido: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Ejecuta un flujo CLI -> lectura:
+    1. Usa /api/ejecutar-cli para buscar el archivo.
+    2. Lee el archivo con /api/leer-archivo cuando la ruta está confirmada.
+    """
+    patron = patron_preferido or _extraer_patron_archivo_desde_consulta(
+        consulta)
+    if not patron:
+        patron = consulta.strip()
+
+    if not patron:
+        return {
+            "exito": False,
+            "flujo": "cli_search_then_read",
+            "error": "No se pudo extraer un patrón de archivo desde la consulta."
+        }
+
+    comando_cli = _construir_comando_busqueda_archivo_cli(patron)
+    payload_cli = {"comando": comando_cli}
+    if session_id:
+        payload_cli["session_id"] = session_id
+
+    cli_resultado = invocar_endpoint_directo_seguro(
+        "/api/ejecutar-cli",
+        method="POST",
+        body=payload_cli
+    )
+
+    rutas_encontradas = _normalizar_rutas_cli(cli_resultado)
+    if not rutas_encontradas:
+        return {
+            "exito": False,
+            "flujo": "cli_search_then_read",
+            "error": "La búsqueda CLI no devolvió rutas.",
+            "patron_busqueda": patron,
+            "busqueda": cli_resultado
+        }
+
+    ruta_objetivo = rutas_encontradas[0]
+    lectura = invocar_endpoint_directo_seguro(
+        "/api/leer-archivo",
+        method="GET",
+        params={"ruta": ruta_objetivo}
+    )
+
+    return {
+        "exito": lectura.get("exito", False),
+        "flujo": "cli_search_then_read",
+        "archivo_detectado": ruta_objetivo,
+        "todas_rutas_detectadas": rutas_encontradas,
+        "busqueda": cli_resultado,
+        "lectura": lectura
+    }
+
+
 def generar_test(contexto: dict) -> dict:
     """Genera un archivo de prueba básico basado en el contexto"""
     nombre_archivo = contexto.get("target", "test_sample.py")
@@ -4548,13 +4682,25 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
 
             # 🔥 ROUTER SEMANTICO DINAMICO
             if tipo_intencion and confianza > 0.5:
+                if tipo_intencion == "leer_archivo":
+                    resultado_flujo = ejecutar_busqueda_cli_y_leer_archivo(
+                        consulta,
+                        session_id=session_id,
+                        patron_preferido=clasificacion.get("archivo_objetivo")
+                    )
+                    status_code = 200 if resultado_flujo.get("exito") else 202
+                    return func.HttpResponse(
+                        json.dumps(resultado_flujo, ensure_ascii=False),
+                        mimetype="application/json",
+                        status_code=status_code
+                    )
+
                 endpoint_map = {
                     "ejecutar_comando_cli": ("/api/ejecutar-cli", "POST", {"comando": consulta}),
                     "listar_storage": ("/api/listar-blobs", "GET", None),
                     "buscar_memoria": ("/api/buscar-memoria", "POST", {"query": consulta}),
                     "diagnostico_sistema": ("/api/diagnostico-recursos-completo", "GET", None),
                     "crear_recurso": ("/api/crear-contenedor", "POST", {"nombre": consulta}),
-                    "leer_archivo": ("/api/leer-archivo", "GET", {"ruta": consulta}),
                 }
 
                 if tipo_intencion in endpoint_map:
@@ -6677,6 +6823,104 @@ def consultar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 
+@app.function_name(name="precalentar_memoria_http")
+@app.route(route="precalentar-memoria", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def precalentar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Carga explícitamente la memoria de una sesión desde Cosmos y la guarda en Redis."""
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo
+    from memory_helpers import extraer_session_info
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+
+    session_id = (
+        (body or {}).get("session_id")
+        or req.headers.get("Session-ID")
+        or req.headers.get("X-Session-ID")
+    )
+    thread_id = (
+        (body or {}).get("thread_id")
+        or req.headers.get("Thread-ID")
+        or req.headers.get("X-Thread-ID")
+    )
+    agent_id = (
+        (body or {}).get("agent_id")
+        or req.headers.get("Agent-ID")
+        or req.headers.get("X-Agent-ID")
+    )
+
+    try:
+        session_info = extraer_session_info(req, skip_api_call=True)
+    except AttributeError as e:
+        logging.warning(f"AttributeError: {e}")
+        session_info = {}
+    except Exception as e:
+        logging.warning(f"Error: {e}")
+        session_info = {}
+
+    session_id = session_id or session_info.get("session_id")
+    agent_id = agent_id or session_info.get("agent_id")
+
+    # Clave estable para Redis (aunque Foundry cambie Session-ID).
+    redis_session_key = session_id or thread_id
+    if not redis_session_key and agent_id:
+        redis_session_key = f"agent-{agent_id}"
+    if not redis_session_key:
+        redis_session_key = "agent-global"
+
+    agent_id = agent_id or "foundry_user"
+    thread_id = thread_id or redis_session_key
+
+    logging.info(
+        f"[precalentar-memoria] Precargando sesión={redis_session_key} (session_id={session_id or 'N/A'}) agente={agent_id} thread={thread_id}")
+
+    memoria = consultar_memoria_cosmos_directo(
+        req, session_override=session_id, agent_override=agent_id)
+
+    if not memoria:
+        return func.HttpResponse(
+            json.dumps({
+                "exito": False,
+                "session_id": redis_session_key,
+                "agent_id": agent_id,
+                "error": "No se encontró memoria en Cosmos con los identificadores proporcionados."
+            }, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=404
+        )
+
+    redis_snapshot = {
+        "enabled": redis_buffer.is_enabled,
+        "cached": False
+    }
+
+    if redis_buffer.is_enabled:
+        redis_buffer.cache_memoria_contexto(
+            redis_session_key, memoria, thread_id=thread_id)
+        redis_snapshot["cached"] = True
+
+    total_interacciones = memoria.get("total_interacciones", 0)
+
+    respuesta = {
+        "exito": True,
+        "session_id": redis_session_key,
+        "thread_id": thread_id,
+        "agent_id": agent_id,
+        "interacciones_cacheadas": total_interacciones,
+        "redis": redis_snapshot,
+        "fuente": "cosmos",
+        "mensaje": "Memoria precalentada y enviada a Redis" if redis_snapshot["cached"] else "Memoria recuperada. Redis no disponible."
+    }
+
+    return func.HttpResponse(
+        json.dumps(respuesta, ensure_ascii=False),
+        mimetype="application/json",
+        status_code=200
+    )
+
+
 @app.function_name(name="conocimiento_cognitivo_http")
 @app.route(route="conocimiento-cognitivo", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def conocimiento_cognitivo_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -8118,10 +8362,12 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
                 script_blob_path = ruta
             else:
                 return func.HttpResponse(json.dumps({
+                    "exito": False,
                     "success": False,
                     "error": "La ruta especificada no es un script ejecutable",
-                    "sugerencia": "Use /api/leer-archivo para archivos de texto"
-                }), status_code=400, mimetype="application/json")
+                    "sugerencia": "Use /api/leer-archivo para archivos de texto",
+                    "formatos_validos": [".py", ".sh", ".ps1", ".bat"]
+                }), status_code=200, mimetype="application/json")
 
     timeout_s = int(req_body.get("timeout_s") or req_body.get("timeout") or 60)
     args = req_body.get("args", [])
@@ -8142,14 +8388,15 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
             scripts_disponibles = []
 
         return func.HttpResponse(json.dumps({
+            "exito": False,
             "success": False,
-            "error": "No se pudo determinar qué script ejecutar",
-            "formatos_aceptados": {
-                "directo": {"script": "scripts/mi_script.py"},
-                "semantico": {"intencion": "ejecutar", "parametros": {"ruta": "scripts/mi_script.py"}}
-            },
-            "scripts_disponibles": scripts_disponibles
-        }), status_code=400, mimetype="application/json")
+            "error": "Falta parámetro 'script' con la ruta del script a ejecutar",
+            "mensaje": "Este endpoint ejecuta scripts almacenados en el contenedor Azure Blob Storage",
+            "formato_correcto": {"script": "scripts/mi_script.py", "args": []},
+            "extensiones_soportadas": [".py", ".sh", ".ps1", ".bat"],
+            "scripts_disponibles": scripts_disponibles,
+            "ejemplo": {"script": "scripts/test_storage_access.py", "args": [], "timeout_s": 60}
+        }), status_code=200, mimetype="application/json")
 
     # 4. Normalizar ruta del script en blob
     script_blob_path = normalizar_blob_path(script_blob_path)
@@ -8158,9 +8405,11 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
     blob_service_client = get_blob_client()
     if not blob_service_client:
         return func.HttpResponse(json.dumps({
+            "exito": False,
             "success": False,
-            "error": "Blob Storage no configurado"
-        }), status_code=500, mimetype="application/json")
+            "error": "Blob Storage no configurado",
+            "mensaje": "No se pudo conectar al contenedor de Azure Blob Storage"
+        }), status_code=200, mimetype="application/json")
 
     blob_client = blob_service_client.get_blob_client(
         container=CONTAINER_NAME,
@@ -8173,10 +8422,13 @@ def ejecutar_script_http(req: func.HttpRequest) -> func.HttpResponse:
         scripts_disponibles = [
             blob.name for blob in container_client.list_blobs()]
         return func.HttpResponse(json.dumps({
+            "exito": False,
             "success": False,
-            "error": f"Script no encontrado: {script_blob_path}",
-            "available_scripts": scripts_disponibles[:10]
-        }), status_code=404, mimetype="application/json")
+            "error": f"Script no encontrado en el contenedor: {script_blob_path}",
+            "mensaje": "El script especificado no existe en Azure Blob Storage",
+            "scripts_disponibles": scripts_disponibles[:10],
+            "sugerencia": "Verifique que el script esté subido al contenedor o use /api/listar-blobs para ver scripts disponibles"
+        }), status_code=200, mimetype="application/json")
 
     try:
         extension = Path(script_blob_path).suffix.lower()

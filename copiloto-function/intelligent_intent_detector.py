@@ -5,8 +5,57 @@ Basado en análisis semántico real, no solo palabras clave
 
 import re
 import logging
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
+
+
+FILE_TOKEN_REGEX = re.compile(r"[a-zA-Z0-9_./\\-]+\.[a-zA-Z0-9_]{1,8}")
+
+
+def _extraer_tokens_archivo(consulta: str) -> List[str]:
+    """Devuelve posibles referencias a archivos detectadas en el texto."""
+    if not consulta:
+        return []
+    return FILE_TOKEN_REGEX.findall(consulta)
+
+
+def _evaluar_busqueda_y_lectura(consulta: str) -> Dict[str, Any]:
+    """
+    Calcula una puntuación (0-1) que indica si el usuario quiere buscar un archivo
+    y luego leerlo. Usa señales semánticas suaves + umbral, no coincidencias exactas.
+    """
+    texto = (consulta or "").lower()
+    tokens_archivo = _extraer_tokens_archivo(texto)
+
+    score = 0.0
+    detalles = {
+        "tokens_archivo": tokens_archivo,
+        "signos_busqueda": False,
+        "signos_lectura": False
+    }
+
+    if tokens_archivo:
+        score += 0.4  # señal fuerte: referencia a archivo concreto
+
+    # Señal de búsqueda: raíces como "busc", "encuent", "find", "where"
+    if re.search(r"\b(busca\w*|encuentra\w*|find|locat\w+|where)\b", texto):
+        detalles["signos_busqueda"] = True
+        score += 0.3
+
+    # Señal de lectura/contenido
+    if re.search(r"\b(lee\w*|leer|read|muestrame|show)\b", texto) or "que contiene" in texto or "contenido" in texto:
+        detalles["signos_lectura"] = True
+        score += 0.3
+
+    # Bonus si explícitamente pide "dime que contiene"
+    if "dime" in texto and "contiene" in texto:
+        score += 0.1
+
+    return {
+        "score": min(score, 1.0),
+        "archivo_objetivo": tokens_archivo[0] if tokens_archivo else None,
+        "detalles": detalles
+    }
 
 def detectar_necesidad_bing_inteligente(consulta: str, contexto: Optional[Dict] = None) -> Dict:
     """
@@ -85,6 +134,17 @@ def detectar_necesidad_bing_inteligente(consulta: str, contexto: Optional[Dict] 
 
 def analizar_intencion_semantica(consulta: str) -> Dict:
     """Analiza la intención semántica usando búsqueda vectorial en memoria"""
+    analisis_archivo = _evaluar_busqueda_y_lectura(consulta or "")
+    if analisis_archivo["score"] >= 0.75:
+        logging.info(f"[INTENCION] buscar+leer detectada (score={analisis_archivo['score']:.2f})")
+        return {
+            "tipo": "leer_archivo",
+            "confianza": analisis_archivo["score"],
+            "endpoint_sugerido": "/api/leer-archivo",
+            "archivo_objetivo": analisis_archivo["archivo_objetivo"],
+            "pipeline": "cli_search_then_read",
+            "detalles": analisis_archivo["detalles"]
+        }
     try:
         from endpoints_search_memory import buscar_memoria_endpoint
         

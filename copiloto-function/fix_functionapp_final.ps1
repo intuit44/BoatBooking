@@ -166,6 +166,19 @@ try {
     "REDIS_USE_MANAGED_IDENTITY"                  = "true"
     "REDIS_JSON"                                  = "1"
     "REDIS_DB"                                    = "0"
+    # Redis TTLs
+    "REDIS_MEMORIA_TTL"                           = "7200"   # 2 horas - Memoria de sesión activa
+    "REDIS_THREAD_TTL"                            = "14400"  # 4 horas - Threads de conversación
+    "REDIS_NARRATIVA_TTL"                         = "21600"  # 6 horas - Narrativas contextuales
+    "REDIS_RESPONSE_TTL"                          = "10800"  # 3 horas - Respuestas procesadas
+    "REDIS_SEARCH_TTL"                            = "3600"   # 1 hora - Búsquedas semánticas
+    "REDIS_LLM_TTL"                               = "28800"  # 8 horas - Respuestas LLM costosas
+
+    # Context storage for agent memory
+    "CONTEXT_STORAGE_ACCOUNT"                     = "boatrentalstorage"
+    "CONTEXT_CONTAINER"                           = "agentMemory"
+    "CONTEXT_PREFIX"                              = "memory"
+
     # Dejarlo de último
     "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"
     "CUSTOM_SITE_NAME"                            = "copiloto-semantico-func-us2"
