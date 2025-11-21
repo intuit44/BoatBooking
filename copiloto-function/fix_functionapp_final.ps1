@@ -159,6 +159,8 @@ try {
     "AGENTE_OPENAI_PROJECT_URL"                   = "https://agenteopenai.services.ai.azure.com/api/projects/AgenteOpenAi-project"
     # Embeddings model
     "EMBEDDING_MODEL"                             = "text-embedding-3-large"
+    "INTENT_EMBEDDING_PROVIDER"                   = "openai"
+    "INTENT_EMBEDDING_MODEL"                      = "text-embedding-3-large"
     # Redis (Managed)
     "REDIS_HOST"                                  = "Managed-redis-copiloto.eastus2.redis.azure.net"
     "REDIS_PORT"                                  = "10000"

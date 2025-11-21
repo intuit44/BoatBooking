@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from opentelemetry import metrics, trace
 from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 
 
 _COSMOS_CLIENT = None
@@ -33,10 +34,13 @@ def get_cosmos_client():
     database_name = os.environ.get("COSMOSDB_DATABASE", "agentMemory")
     container_name = os.environ.get("COSMOSDB_CONTAINER", "memory")
 
-    if not key:
-        raise ValueError("COSMOSDB_KEY no configurada")
+    # Permitir autenticación con DefaultAzureCredential si no hay key explícita
+    if key:
+        client = CosmosClient(endpoint, key)
+    else:
+        credential = DefaultAzureCredential()
+        client = CosmosClient(endpoint, credential=credential)
 
-    client = CosmosClient(endpoint, key)
     database = client.get_database_client(database_name)
     container = database.get_container_client(container_name)
 
@@ -124,17 +128,9 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
     """
     Consulta DIRECTAMENTE Cosmos DB para obtener historial de interacciones
     CON DEDUPLICACI├ôN SEM├üNTICA
+    Soporta autenticación con Key o Managed Identity
     """
     try:
-
-        key = os.environ.get("COSMOSDB_KEY")
-
-        if not key:
-
-            logging.warning("COSMOSDB_KEY no configurada")
-
-            return None
-
         # Extraer session_id del request o usar override
         session_id = session_override or extraer_session_id_request(req)
         if not session_id:
@@ -144,16 +140,20 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
         # Extraer agent_id para fallback o usar override
         agent_id = agent_override or extraer_agent_id_request(req)
 
-        # Conectar a Cosmos DB
-
+        # Conectar a Cosmos DB (soporta Key o MI)
         try:
+            key = os.environ.get("COSMOSDB_KEY")
+            endpoint = os.environ.get(
+                "COSMOSDB_ENDPOINT", "https://copiloto-cosmos.documents.azure.com:443/")
+            logging.info(f"🔌 Intentando conectar a Cosmos DB...")
+            logging.info(f"   Endpoint: {endpoint}")
+            logging.info(f"   Auth: {'Key' if key else 'Managed Identity'}")
 
             _, container = get_cosmos_client()
-
+            logging.info("✅ Cosmos DB conectado exitosamente")
         except Exception as e:
-
-            logging.warning(f"⚠️ Cosmos DB no disponible: {e}")
-
+            logging.error(f"❌ Cosmos DB no disponible: {type(e).__name__}")
+            logging.error(f"   Detalle: {str(e)}")
             return None
 
         # ­ƒîì MEMORIA GLOBAL DIRECTA: Solo por agent_id
@@ -162,21 +162,15 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
             logging.info(f"­ƒöº Agent ID forzado a: {agent_id}")
 
         # ­ƒîì MEMORIA GLOBAL CON DEDUPLICACI├ôN SEM├üNTICA
-        # Traer m├ís items para luego deduplicar
+        # Traer más items para luego deduplicar
         query = """
-        SELECT TOP 150 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
+        SELECT TOP 200 c.id, c.agent_id, c.session_id, c.endpoint, c.timestamp,
                        c.event_type, c.texto_semantico, c.contexto_conversacion,
                        c.metadata, c.resumen_conversacion, c.data.respuesta_resumen,
                        c.data.interpretacion_semantica, c.data.contexto_inteligente,
                        c.data.response_data.respuesta_usuario, c._ts
         FROM c
         WHERE IS_DEFINED(c.texto_semantico) 
-          AND LENGTH(c.texto_semantico) > 30
-          AND NOT CONTAINS(c.texto_semantico, 'Evento semantic en sesi')
-          AND NOT CONTAINS(c.texto_semantico, 'CONSULTA DE HISTORIAL')
-          AND NOT CONTAINS(c.texto_semantico, 'Se encontraron')
-          AND NOT CONTAINS(c.texto_semantico, 'interacciones recientes')
-          AND NOT CONTAINS(c.texto_semantico, 'Consulta completada')
           AND NOT CONTAINS(c.endpoint, 'health')
           AND NOT CONTAINS(c.endpoint, 'verificar-')
           AND NOT CONTAINS(c.endpoint, 'historial-interacciones')
@@ -185,15 +179,18 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
         logging.info("­ƒîì Ejecutando memoria con deduplicaci├│n sem├íntica")
         logging.debug(f"­ƒîì Query: {query}")
 
+        logging.info(f"🔍 Ejecutando query en Cosmos DB...")
         raw_items = list(container.query_items(
             query=query,
             enable_cross_partition_query=True
         ))
+        logging.info(
+            f"📊 Query completada: {len(raw_items)} documentos recuperados")
 
         # Ô£à DEDUPLICACI├ôN SEM├üNTICA: Agrupar por endpoint + texto similar
         items = deduplicar_interacciones_semanticas(raw_items, max_items=50)
         logging.info(
-            f"­ƒº╣ Deduplicaci├│n: {len(raw_items)} ÔåÆ {len(items)} interacciones ├║nicas")
+            f"🔹 Deduplicación: {len(raw_items)} → {len(items)} interacciones únicas")
 
         # LOG de aplicaci├│n (aparece en 'traces' table)
         logging.info(
@@ -218,9 +215,15 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
 
         if items:
             logging.info(
-                f"­ƒîì Memoria global: {len(items)} interacciones encontradas")
+                f"🔌 Memoria global: {len(items)} interacciones encontradas")
+            logging.info(
+                f"   Primera: {items[0].get('endpoint', 'N/A')} - {items[0].get('timestamp', 'N/A')}")
         else:
-            logging.warning("­ƒôØ Sin memoria previa encontrada")
+            logging.warning("🚫 Sin memoria previa encontrada")
+            logging.warning(f"   Raw items antes de filtrar: {len(raw_items)}")
+            if len(raw_items) > 0:
+                logging.warning(
+                    f"   Causa: Todos filtrados por deduplicación/exclusión")
 
         if items:
             # Procesar interacciones encontradas CON TEXTO_SEMANTICO
