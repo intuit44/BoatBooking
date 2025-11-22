@@ -9,6 +9,8 @@
     ],
     "python.analysis.diagnosticMode": "openFilesOnly",
     "python.analysis.indexing": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
     "python.languageServer": "Pylance",
     "azureFunctions.projectSubpath": "copiloto-function",
     "azureFunctions.deploySubpath": "copiloto-function",

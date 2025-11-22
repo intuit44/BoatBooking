@@ -43,6 +43,26 @@ def preprocess_text(text: str) -> str:
     return " ".join(filtered)
 
 
+def _looks_like_log_request(cleaned_text: str) -> bool:
+    """Heuristica ligera para detectar intenciones de revisar logs/errores."""
+    if not cleaned_text:
+        return False
+    tokens = set(cleaned_text.split())
+    log_markers = {
+        "log",
+        "logs",
+        "errores",
+        "error",
+        "fallos",
+        "trazas",
+        "traza",
+        "stacktrace",
+        "crash",
+        "exceptions",
+    }
+    return bool(tokens & log_markers)
+
+
 def _hash_embedding(text: str) -> List[float]:
     """Embedding determinista basado en hash (fallback rapido y reproducible)."""
     hash_obj = hashlib.md5((text or "").encode())
@@ -160,6 +180,14 @@ class SemanticIntentClassifier:
                 "comprobar si todo funciona",
                 "analizar estado general"
             ],
+            "revisar_logs": [
+                "ver errores recientes",
+                "revisar logs de la funcion",
+                "muestrame fallos en app insights",
+                "analizar trazas de la aplicacion",
+                "logs de ejecucion con errores",
+                "que paso con la ultima caida"
+            ],
             "ayuda_general": [
                 "no se que hacer",
                 "necesito ayuda con azure",
@@ -177,6 +205,7 @@ class SemanticIntentClassifier:
             "listar_functions": "az functionapp list --output json",
             "listar_resources": "az group list --output json",
             "diagnosticar_sistema": "az resource list --output json",
+            "revisar_logs": "intent:revisar_logs",
             "ayuda_general": "az --help"
         }
 
@@ -222,6 +251,18 @@ class SemanticIntentClassifier:
             }
 
         user_embedding = get_text_embedding(cleaned_text)
+
+        # Heuristica: si el texto parece peticion de logs, favorecer revisar_logs
+        if _looks_like_log_request(cleaned_text):
+            return {
+                "intent": "revisar_logs",
+                "confidence": max(0.8, self.threshold + 0.3),
+                "command": self.intent_to_command["revisar_logs"],
+                "method": "log_heuristic",
+                "all_scores": {"revisar_logs": 1.0},
+                "requires_grounding": False,
+                "preprocessed_input": cleaned_text
+            }
 
         best_intent = None
         best_confidence = 0.0

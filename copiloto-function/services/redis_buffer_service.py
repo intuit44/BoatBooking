@@ -14,7 +14,7 @@ import threading
 import time
 import hashlib
 import ssl
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, cast
 import redis
 
 CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
@@ -40,6 +40,8 @@ CACHE_STRATEGY: Dict[str, Dict[str, int]] = {
     "search": {"ttl": int(os.getenv("REDIS_SEARCH_TTL", "1800"))},
     # 90 min
     "llm": {"ttl": int(os.getenv("REDIS_LLM_TTL", "5400"))},
+    # 15 min
+    "logs_analysis": {"ttl": int(os.getenv("REDIS_LOGS_TTL", "900"))},
 }
 
 
@@ -235,7 +237,8 @@ class RedisBufferService:
             if client:
                 client.expire(key, ttl)
         except Exception:
-            logging.debug(f"[RedisBuffer] No se pudo refrescar TTL de {key}.", exc_info=True)
+            logging.debug(
+                f"[RedisBuffer] No se pudo refrescar TTL de {key}.", exc_info=True)
 
     def _emit_cache_event(self, action: str, bucket: str, key: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """Envía evento estructurado a App Insights para auditoría de caché."""
@@ -257,7 +260,8 @@ class RedisBufferService:
                 extra={"custom_dimensions": dims}
             )
         except Exception:
-            logging.debug("No se pudo emitir evento custom de Redis.", exc_info=True)
+            logging.debug(
+                "No se pudo emitir evento custom de Redis.", exc_info=True)
 
     @staticmethod
     def stable_hash(payload: str) -> str:
@@ -405,7 +409,7 @@ class RedisBufferService:
         except Exception as exc:
             stats["dbsize_error"] = str(exc)
         try:
-            info = client.info()
+            info = cast(Dict[str, Any], client.info())
             stats["used_memory_human"] = info.get("used_memory_human")
             stats["keyspace_hits"] = info.get("keyspace_hits")
             stats["keyspace_misses"] = info.get("keyspace_misses")

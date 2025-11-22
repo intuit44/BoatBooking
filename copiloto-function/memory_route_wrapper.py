@@ -9,11 +9,32 @@ import azure.functions as func
 import json
 import time
 import re
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 from datetime import datetime
 from azure.storage.queue import QueueClient
 
 from services.redis_buffer_service import redis_buffer
+
+try:
+    from semantic_intent_classifier import classify_user_intent, preprocess_text
+except Exception:  # pragma: no cover
+    classify_user_intent = None
+    preprocess_text = None
+
+try:
+    from skills.log_query_skill import (
+        LogQuerySkill,
+        extract_function_hint,
+        analyze_logs_semantic,
+        get_cached_analysis,
+        cache_log_analysis,
+    )
+except Exception:  # pragma: no cover
+    LogQuerySkill = None
+    extract_function_hint = None
+    analyze_logs_semantic = None
+    get_cached_analysis = None
+    cache_log_analysis = None
 
 # Constantes globales de control de tamaño
 MAX_MENSAJE_CHARS = 600
@@ -52,6 +73,69 @@ def _clean_thread_text(texto):
         return re.sub(r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto).strip()
     except re.error:
         return texto
+
+
+def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") -> Optional[Dict[str, Any]]:
+    """
+    Maneja la intencion revisar_logs sin exponer endpoint dedicado.
+    Retorna payload listo para HttpResponse o None si no aplica.
+    """
+    if not user_message or not classify_user_intent:
+        return None
+
+    intent = classify_user_intent(user_message)
+    if intent.get("intent") != "revisar_logs":
+        return None
+
+    funcion = extract_function_hint(user_message) if extract_function_hint else None
+
+    if get_cached_analysis:
+        cached = get_cached_analysis(user_message, funcion)
+        if cached:
+            cached = dict(cached)
+            cached["cached"] = True
+            return {
+                "exito": True,
+                "respuesta_usuario": cached.get("mensaje") or "Analisis de logs recuperado de cache",
+                "analisis": cached,
+                "endpoint": "log_query_skill",
+                "source": "cache",
+            }
+
+    if not LogQuerySkill:
+        return {
+            "exito": False,
+            "error": "LogQuerySkill no disponible (dependencias faltantes)",
+            "endpoint": "log_query_skill",
+        }
+
+    try:
+        skill = LogQuerySkill()
+        logs = skill.query_logs(funcion)
+        analisis = analyze_logs_semantic(logs, funcion) if analyze_logs_semantic else {"exito": False, "error": "Analizador no disponible"}
+
+        if analisis.get("exito") and cache_log_analysis:
+            try:
+                cache_log_analysis(user_message, funcion, analisis)
+            except Exception:
+                logging.debug("[logs-intent] No se pudo cachear analisis.", exc_info=True)
+
+        respuesta = analisis.get("mensaje") or "Analisis de logs completado"
+        return {
+            "exito": analisis.get("exito", False),
+            "respuesta_usuario": respuesta,
+            "analisis": analisis,
+            "endpoint": "log_query_skill",
+            "source": "log_intent",
+        }
+    except Exception as exc:  # pragma: no cover
+        logging.warning(f"[logs-intent] Error ejecutando LogQuerySkill: {exc}")
+        return {
+            "exito": False,
+            "error": str(exc),
+            "endpoint": "log_query_skill",
+            "source": "log_intent",
+        }
 
 
 def _resolver_identificadores_thread(req: func.HttpRequest):
@@ -326,6 +410,17 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                     req, "_ultimo_mensaje_usuario", user_message)
                             except Exception:
                                 pass
+
+                        # Resolver intencion revisar_logs sin depender de /api/logs
+                        if user_message and len(user_message) > 3:
+                            intent_logs = _resolver_intencion_logs(
+                                user_message, route_path)
+                            if intent_logs:
+                                return func.HttpResponse(
+                                    json.dumps(intent_logs, ensure_ascii=False),
+                                    mimetype="application/json",
+                                    status_code=200 if intent_logs.get("exito") else 500
+                                )
 
                         if user_message and len(user_message) > 3:
                             # CAPTURA AUTOMÁTICA DE THREAD

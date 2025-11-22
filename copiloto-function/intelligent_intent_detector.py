@@ -80,6 +80,7 @@ def _map_intent_to_tipo(intent: str) -> Optional[str]:
         "listar_functions": "comando_local",
         "listar_resources": "comando_local",
         "diagnosticar_sistema": "diagnostico",
+        "revisar_logs": "revisar_logs",
         "ayuda_general": "general",
     }
     return intent_map.get(intent)
@@ -316,7 +317,11 @@ def detectar_necesidad_bing_inteligente(consulta: str, contexto: Optional[Dict] 
         score_bing += 0.25
         razones.append("Consulta ambigua, conviene grounding")
 
-    if intencion_principal.get("tipo") in {"comando_local", "diagnostico"}:
+    if intencion_principal.get("tipo") == "revisar_logs":
+        score_bing -= 0.6
+        razones.append("Consulta de logs se resuelve en Log Analytics interno")
+        categoria = "logs"
+    elif intencion_principal.get("tipo") in {"comando_local", "diagnostico"}:
         score_bing -= 0.4
         razones.append("Accion ejecutable sin informacion externa")
         categoria = intencion_principal.get("tipo")

@@ -425,6 +425,27 @@ if not globals().get("_APPINSIGHTS_INITIALIZED", False):
         # Marcar como inicializado para evitar reintentos posteriores en este proceso
         globals()["_APPINSIGHTS_INITIALIZED"] = True
 
+# Enlazar logger de eventos personalizados hacia Application Insights (customEvents)
+if not globals().get("_CUSTOM_EVENTS_LOGGER_BOUND", False):
+    conn_str = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING") or os.environ.get(
+        "APPINSIGHTS_INSTRUMENTATIONKEY")
+    if conn_str:
+        try:
+            from opencensus.ext.azure.log_exporter import AzureLogHandler  # type: ignore
+
+            custom_logger = logging.getLogger("appinsights.customEvents")
+            handler = AzureLogHandler(connection_string=conn_str)
+            custom_logger.setLevel(logging.INFO)
+            custom_logger.addHandler(handler)
+            globals()["_CUSTOM_EVENTS_LOGGER_BOUND"] = True
+            logging.info("✅ Logger appinsights.customEvents enlazado a App Insights.")
+        except Exception as e:
+            logging.warning(
+                f"⚠️ No se pudo enlazar customEvents a App Insights: {e}")
+    else:
+        logging.warning(
+            "⚠️ APPLICATIONINSIGHTS_CONNECTION_STRING no configurado; customEvents no se enviará.")
+
 # --- FunctionApp instance (CREAR PRIMERO) ---
 app = func.FunctionApp()
 sys.path.insert(0, os.path.dirname(__file__))
@@ -537,12 +558,6 @@ try:
     logging.info("✅ Endpoint introspection registrado correctamente")
 except Exception as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint introspection: {e}")
-
-try:
-    import endpoints.logs
-    logging.info("✅ Endpoint logs registrado correctamente")
-except Exception as e:
-    logging.warning(f"⚠️ No se pudo registrar endpoint logs: {e}")
 
 try:
     import endpoints.agent_output
