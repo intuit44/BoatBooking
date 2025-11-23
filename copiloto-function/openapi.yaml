@@ -208,7 +208,7 @@
     "/api/diagnostico-recursos": {
       "get": {
         "summary": "🔍 CONSULTAR PRIMERO - Configuración completa del sistema y recursos Azure",
-        "description": "⭐ ENDPOINT PRIORITARIO: Consultar ANTES de cualquier operación que requiera nombres de recursos, URLs o configuración. Devuelve: FUNCTION_APP_NAME, FUNCTION_APP_URL, RESOURCE_GROUP, STORAGE_ACCOUNT, REDIS_HOST, COSMOS_ENDPOINT, y estado completo de todos los recursos Azure. Incluye métricas de Redis (dbsize, hits/misses, memoria), estado de Function App, Storage Account, y recomendaciones. Usar este endpoint para obtener valores dinámicos en lugar de hardcodear nombres.",
+        "description": "⭐ ENDPOINT PRIORITARIO: Consultar ANTES de cualquier operación que requiera nombres de recursos, URLs o configuración. Devuelve: FUNCTION_APP_NAME, FUNCTION_APP_URL, RESOURCE_GROUP, STORAGE_ACCOUNT, REDIS_HOST, COSMOS_ENDPOINT, y estado completo de todos los recursos Azure. Incluye métricas de Redis (dbsize, hits/misses, memoria), estado de Function App, Storage Account, y recomendaciones. Usar este endpoint para obtener valores dinámicos en lugar de hardcodear nombres. Usa KQL sobre Log Analytics (DefaultWorkspace-380fa841-83f3-42fe-adc4-582a5ebe139b-EUS2 en defaultresourcegroup-eus2) para m?tricas y trazas; requiere identidad con rol Log Analytics Reader en ese workspace.",
         "operationId": "diagnosticoRecursos",
         "x-priority": "critical",
         "x-use-cases": [
@@ -285,6 +285,22 @@
           "400": {
             "description": "Solicitud inválida"
           }
+        },
+        "x-log-analytics": {
+          "workspace": "DefaultWorkspace-380fa841-83f3-42fe-adc4-582a5ebe139b-EUS2",
+          "resource_group": "defaultresourcegroup-eus2",
+          "prerequisitos": [
+            "Identidad con rol Log Analytics Reader en el workspace",
+            "Application Insights 'copiloto-semantico-func-us2' enviando telemetr?a al workspace"
+          ]
+        },
+        "x-cli-fallback": {
+          "descripcion": "Si no se encuentran recursos por SDK, usar /api/ejecutar-cli con Azure CLI.",
+          "comandos": [
+            "az group list --output json",
+            "az group show --name boat-rental-app-group --output json"
+          ],
+          "cuando_usar": "Cuando diagnostico no devuelve recursos o se requiere validar existence de un resource group espec?fico."
         }
       },
       "post": {
@@ -337,6 +353,23 @@
           "400": {
             "description": "Solicitud inválida"
           }
+        },
+        "description": " Usa KQL sobre Log Analytics (DefaultWorkspace-380fa841-83f3-42fe-adc4-582a5ebe139b-EUS2 en defaultresourcegroup-eus2) para m?tricas y trazas; requiere identidad con rol Log Analytics Reader en ese workspace.",
+        "x-log-analytics": {
+          "workspace": "DefaultWorkspace-380fa841-83f3-42fe-adc4-582a5ebe139b-EUS2",
+          "resource_group": "defaultresourcegroup-eus2",
+          "prerequisitos": [
+            "Identidad con rol Log Analytics Reader en el workspace",
+            "Application Insights 'copiloto-semantico-func-us2' enviando telemetr?a al workspace"
+          ]
+        },
+        "x-cli-fallback": {
+          "descripcion": "Si no se encuentran recursos por SDK, usar /api/ejecutar-cli con Azure CLI.",
+          "comandos": [
+            "az group list --output json",
+            "az group show --name boat-rental-app-group --output json"
+          ],
+          "cuando_usar": "Cuando diagnostico no devuelve recursos o se requiere validar existence de un resource group espec?fico."
         }
       }
     },
@@ -2804,8 +2837,8 @@
     },
     "/api/copiloto": {
       "get": {
-        "summary": "🧠 COPILOTO CON MEMORIA Y QUERIES DINÁMICAS - Endpoint principal con historial automático",
-        "description": "Endpoint principal del copiloto que incluye consulta automática de memoria, queries dinámicas para filtrado avanzado, detección de intenciones de historial y respuesta directa con contexto de conversación. Integra automáticamente el sistema de memoria de Cosmos DB. Soporta filtros: tipo, contiene, endpoint, exito, fecha_inicio, fecha_fin, orden, limite.",
+        "summary": "Router sem?ntico con memoria (endpoint principal)",
+        "description": "Endpoint principal/?nico que debe usar el agente. Act?a como router sem?ntico: detectiona intenci?n (ej. revisar_logs, diagnostico, listar_resources, ejecutar CLI), aplica memory_route_wrapper para inyectar memoria (Cosmos/Redis) y decidir si resuelve localmente sin invocar otros endpoints. Usa headers Session-ID y Agent-ID para continuidad. No requiere prompts manuales: env?a la consulta de usuario y el sistema decide si usa Bing Grounding, Log Analytics, Azure CLI, etc. Soporta filtros opcionales por query (tipo, contiene, endpoint, exito, fechas) para b?squeda hist?rica, pero el uso habitual es pasar la consulta del usuario. Usa memoria sem?ntica: historial en Cosmos DB, b?squeda vectorial (AI Search) y cach? Redis para contexto r?pido; enruta autom?ticamente a Log Analytics y diagn?sticos seg?n la intenci?n.",
         "operationId": "copiloto",
         "tags": [
           "🧠 Memoria Integrada"
@@ -2891,6 +2924,48 @@
               }
             }
           }
+        },
+        "x-use-cases": [
+          "Enviar la consulta natural del usuario; el backend detecta intenci?n y responde",
+          "Revisar logs y diagnostico v?a intenci?n (sin llamar /api/logs)",
+          "Listar recursos/Functions/Cosmos/Storage seg?n intenci?n",
+          "Usar memoria sem?ntica para recuperar contexto previo"
+        ],
+        "x-intents-documentation": {
+          "descripcion": "Intents manejados internamente sin requerir otros endpoints",
+          "intents": [
+            {
+              "nombre": "revisar_logs",
+              "accion": "Consulta Log Analytics y devuelve an?lisis",
+              "requiere": "Solo Session-ID/Agent-ID"
+            },
+            {
+              "nombre": "diagnosticar_sistema",
+              "accion": "Diagn?stico de recursos Azure",
+              "requiere": "Session-ID/Agent-ID"
+            },
+            {
+              "nombre": "listar_resources",
+              "accion": "Listar resource groups y recursos",
+              "requiere": "Session-ID/Agent-ID"
+            },
+            {
+              "nombre": "listar_functions",
+              "accion": "Listar Function Apps",
+              "requiere": "Session-ID/Agent-ID"
+            },
+            {
+              "nombre": "listar_storage",
+              "accion": "Listar cuentas de Storage",
+              "requiere": "Session-ID/Agent-ID"
+            }
+          ]
+        },
+        "x-backend-capabilities": {
+          "memoria": "Cosmos DB para historial + AI Search para vectorial",
+          "cache": "Redis para contexto y an?lisis ya calculados (ej. logs)",
+          "observabilidad": "Application Insights/Log Analytics",
+          "router": "memory_route_wrapper decide seg?n intenci?n (ej. revisar_logs, diagnostico, listados)"
         }
       }
     },
@@ -3033,8 +3108,8 @@
     },
     "/api/configurar-app-settings": {
       "get": {
-        "summary": "Leer/Validar App Settings de Function App",
-        "description": "Consulta la configuración actual de una Function App. Permite validar un setting específico o listar todos.",
+        "summary": "Leer/Validar App Settings (paso previo a escribir)",
+        "description": "Lee los app settings actuales de la Function App. ?salo SIEMPRE antes de actualizar para saber qu? claves existen y evitar sobrescribir valores. Si no se pasan function_app/resource_group, el backend intentar? usar WEBSITE_SITE_NAME/RESOURCE_GROUP. Puedes pedir un setting espec?fico (query param 'setting') o todo el mapa de settings.",
         "operationId": "leerAppSettings",
         "tags": [
           "Azure Configuration"
@@ -3106,6 +3181,32 @@
                       "description": "Si el setting existe"
                     }
                   }
+                },
+                "examples": {
+                  "listar_todos": {
+                    "summary": "Listar todos los settings",
+                    "value": {
+                      "ok": true,
+                      "function_app": "copiloto-semantico-func-us2",
+                      "resource_group": "rg-copiloto",
+                      "settings": {
+                        "FEATURE_DEBUG": "false",
+                        "SEMANTIC_TOP_K": "8",
+                        "APPINSIGHTS_INSTRUMENTATIONKEY": "***"
+                      }
+                    }
+                  },
+                  "validar_clave": {
+                    "summary": "Consultar una clave espec?fica",
+                    "value": {
+                      "ok": true,
+                      "function_app": "copiloto-semantico-func-us2",
+                      "resource_group": "rg-copiloto",
+                      "setting": "SEMANTIC_TOP_K",
+                      "value": "8",
+                      "exists": true
+                    }
+                  }
                 }
               }
             }
@@ -3116,11 +3217,28 @@
           "500": {
             "description": "Error del servidor"
           }
+        },
+        "x-use-cases": [
+          "Listar todos los app settings antes de modificarlos",
+          "Validar si una clave existe y su valor actual antes de escribir",
+          "Comparar contra valores que el usuario quiere aplicar"
+        ],
+        "x-guidance": {
+          "antes_de_llamar": [
+            "Si no tienes function_app/resource_group en contexto, llama a /api/diagnostico-recursos primero",
+            "Usa este GET para leer el valor actual antes de proponer un cambio",
+            "No asumas valores; confirma con la lectura"
+          ],
+          "parametros": {
+            "function_app": "Nombre real de la Function App (si no se pasa, usa WEBSITE_SITE_NAME)",
+            "resource_group": "Resource group real (si no se pasa, usa RESOURCE_GROUP)",
+            "setting": "Nombre de la clave a validar; si se omite, devuelve todas"
+          }
         }
       },
       "post": {
-        "summary": "Configurar/Actualizar App Settings de Function App",
-        "description": "Actualiza la configuración de una Function App con nuevos valores.",
+        "summary": "Configurar/Actualizar App Settings (usar valores reales, no placeholders)",
+        "description": "Actualiza app settings de la Function App. Antes de enviar valores: obt?n nombres reales de la app y resource group desde /api/diagnostico-recursos y/o lee los settings actuales con GET /api/configurar-app-settings. No inventes valores: usa los proporcionados por el usuario o los recuperados del sistema. Env?a solo las claves que se deben cambiar.",
         "operationId": "configurarAppSettings",
         "tags": [
           "Azure Configuration"
@@ -3149,6 +3267,28 @@
                 "required": [
                   "settings"
                 ]
+              },
+              "examples": {
+                "actualizar_flag": {
+                  "summary": "Actualizar un flag existente",
+                  "value": {
+                    "function_app": "copiloto-semantico-func-us2",
+                    "resource_group": "rg-copiloto",
+                    "settings": {
+                      "FEATURE_DEBUG": "false"
+                    }
+                  }
+                },
+                "rotar_secret": {
+                  "summary": "Rotar un secreto proporcionado por el usuario",
+                  "value": {
+                    "function_app": "copiloto-semantico-func-us2",
+                    "resource_group": "rg-copiloto",
+                    "settings": {
+                      "API_KEY_SERVICE_X": "<valor_real_proporcionado>"
+                    }
+                  }
+                }
               }
             }
           }
@@ -3162,6 +3302,23 @@
           },
           "500": {
             "description": "Error del servidor"
+          }
+        },
+        "x-use-cases": [
+          "Actualizar un app setting espec?fico con un valor proporcionado por el usuario",
+          "Habilitar/ajustar flags conocidos (ej. FEATURE_X=true) despu?s de validar los existentes",
+          "Rotar credenciales/secrets proporcionados por el usuario"
+        ],
+        "x-guidance": {
+          "antes_de_llamar": [
+            "Llama a /api/diagnostico-recursos para obtener function_app y resource_group si no est?n en el contexto",
+            "Usa GET /api/configurar-app-settings para leer valores actuales y evitar sobrescribir sin contexto",
+            "Solo modifica claves que el usuario indique; no generes valores ficticios"
+          ],
+          "parametros": {
+            "function_app": "Nombre real de la Function App (de diagnostico-recursos)",
+            "resource_group": "Resource group real (de diagnostico-recursos)",
+            "settings": "Objeto clave-valor con los nuevos valores provistos por el usuario"
           }
         }
       }

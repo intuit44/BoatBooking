@@ -34,7 +34,6 @@ from semantic_query_builder import interpretar_intencion_agente, construir_query
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
-from azure.monitor.query import LogsQueryClient
 from azure.cosmos import CosmosClient
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type, NoReturn
 from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
@@ -438,7 +437,8 @@ if not globals().get("_CUSTOM_EVENTS_LOGGER_BOUND", False):
             custom_logger.setLevel(logging.INFO)
             custom_logger.addHandler(handler)
             globals()["_CUSTOM_EVENTS_LOGGER_BOUND"] = True
-            logging.info("✅ Logger appinsights.customEvents enlazado a App Insights.")
+            logging.info(
+                "✅ Logger appinsights.customEvents enlazado a App Insights.")
         except Exception as e:
             logging.warning(
                 f"⚠️ No se pudo enlazar customEvents a App Insights: {e}")
