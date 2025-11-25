@@ -6,7 +6,37 @@ Endpoints de Búsqueda Semántica - Azure AI Search con Managed Identity
 import logging
 import json
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+
+def _sanitize_filter_string(filter_str: Optional[str]) -> Optional[str]:
+    if not filter_str:
+        return None
+    clauses = [clause.strip()
+               for clause in filter_str.split(" and ") if clause.strip()]
+    cleaned = [
+        clause for clause in clauses
+        if "is_synthetic" not in clause.lower()
+        and "document_class" not in clause.lower()
+    ]
+    return " and ".join(cleaned) if cleaned else None
+
+
+def _search_with_fallback(service, query: str, top: int, filter_str: Optional[str]):
+    try:
+        result = service.search(query=query, top=top, filters=filter_str)
+        return result, filter_str
+    except Exception as exc:
+        message = str(exc)
+        if ("is_synthetic" in message or "document_class" in message):
+            clean_filter = _sanitize_filter_string(filter_str)
+            if clean_filter != filter_str:
+                logging.warning(
+                    "⚠️ Campo inexistente en filtro; reintentando búsqueda sin filtros sintéticos")
+                result = service.search(query=query, top=top,
+                                        filters=clean_filter)
+                return result, clean_filter
+        raise
 
 
 def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
@@ -33,6 +63,11 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         GENERIC_SESSIONS = {"assistant", "test_session", "unknown", None, ""}
         
+        base_filters = [
+            "is_synthetic ne true",
+            "(document_class eq 'cognitive_memory' or document_class eq null)"
+        ]
+
         # 🔧 DETECTAR SI ES QUERY TÉCNICA (UUID, Client ID, etc.)
         query_tecnica = detectar_query_tecnica(query)
         
@@ -77,7 +112,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # NIVEL 1: Búsqueda en sesión específica
         if session_id and session_id not in GENERIC_SESSIONS:
-            filters = []
+            filters = list(base_filters)
             safe_sid = str(session_id).replace("'", "''")
             filters.append(f"session_id eq '{safe_sid}'")
             if tipo:
@@ -85,11 +120,12 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 filters.append(f"tipo eq '{safe_tipo}'")
             
             filter_str = " and ".join(filters)
-            resultado = search_service.search(query=query, top=top, filters=filter_str)
+            resultado, filter_str_final = _search_with_fallback(
+                search_service, query, top, filter_str)
             
             if resultado.get("exito") and resultado.get("total", 0) > 0:
                 modo_usado = "session_specific"
-                filtros_usados = filter_str
+                filtros_usados = filter_str_final or "NINGUNO"
                 logging.info(f"✅ Nivel 1: Encontrados {resultado['total']} en sesión {session_id}")
             else:
                 logging.info(f"⚠️ Nivel 1: 0 resultados en sesión {session_id}, escalando...")
@@ -97,7 +133,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # NIVEL 2: Búsqueda por agent_id (todas las sesiones)
         if not resultado and agent_id and agent_id not in GENERIC_SESSIONS:
-            filters = []
+            filters = list(base_filters)
             safe_aid = str(agent_id).replace("'", "''")
             filters.append(f"agent_id eq '{safe_aid}'")
             if tipo:
@@ -105,11 +141,12 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 filters.append(f"tipo eq '{safe_tipo}'")
             
             filter_str = " and ".join(filters)
-            resultado = search_service.search(query=query, top=top, filters=filter_str)
+            resultado, filter_str_final = _search_with_fallback(
+                search_service, query, top, filter_str)
             
             if resultado.get("exito") and resultado.get("total", 0) > 0:
                 modo_usado = "agent_wide"
-                filtros_usados = filter_str
+                filtros_usados = filter_str_final or "NINGUNO"
                 logging.info(f"✅ Nivel 2: Encontrados {resultado['total']} para agent_id {agent_id}")
             else:
                 logging.info(f"⚠️ Nivel 2: 0 resultados para agent_id {agent_id}, escalando...")
@@ -117,15 +154,16 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # NIVEL 3: Búsqueda universal (sin filtros de sesión/agente)
         if not resultado:
-            filters = []
+            filters = list(base_filters)
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
                 filters.append(f"tipo eq '{safe_tipo}'")
             
-            filter_str = " and ".join(filters) if filters else None
-            resultado = search_service.search(query=query, top=top, filters=filter_str)
+            filter_str = " and ".join(filters)
+            resultado, filter_str_final = _search_with_fallback(
+                search_service, query, top, filter_str)
             modo_usado = "universal"
-            filtros_usados = filter_str or "NINGUNO"
+            filtros_usados = filter_str_final or "NINGUNO"
             logging.info(f"✅ Nivel 3: Búsqueda universal → {resultado.get('total', 0)} resultados")
 
         # Agregar metadata explicativa
@@ -168,6 +206,7 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         documentos = req_body.get("documentos")
         if not documentos or not isinstance(documentos, list):
             return {"exito": False, "error": "Campo 'documentos' requerido (array)"}
+        index_name = req_body.get("index_name") or req_body.get("indice_destino")
 
         documentos_con_vectores = []
         duplicados = 0
@@ -227,7 +266,7 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         search_service = get_search_service()
-        resultado = search_service.indexar_documentos(documentos_con_vectores)
+        resultado = search_service.indexar_documentos(documentos_con_vectores, index_name=index_name)
 
         indexados = len(documentos_con_vectores)
 

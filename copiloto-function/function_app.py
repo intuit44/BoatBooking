@@ -14306,14 +14306,18 @@ def _execute_fix(correccion: dict) -> dict:
         try:
             from services.memory_service import memory_service
             if memory_service:
-                memory_service.log_event("correccion_aplicada", {
+                response_data = {
                     "fecha": datetime.now().isoformat(),
                     "origen": correccion["origen"],
                     "target": correccion["target"],
                     "accion": correccion["accion"],
                     "validado_por": correccion["validaciones_requeridas"],
                     "resultado": "exitoso" if resultado["validado"] else "fallido"
-                })
+                }
+                response_data["tipo"] = "correccion"
+                response_data["document_class"] = "cognitive_memory"
+                response_data["is_synthetic"] = False
+                memory_service.log_event("correccion_aplicada", response_data)
         except ImportError:
             pass
 

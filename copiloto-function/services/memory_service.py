@@ -4,10 +4,53 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
+
+COGNITIVE_INDEX_NAME = os.environ.get("AZURE_SEARCH_INDEX", "agent-memory-index")
+LOG_INDEX_NAME = os.environ.get("AZURE_SEARCH_LOG_INDEX", COGNITIVE_INDEX_NAME)
+
+DOC_CLASS_COGNITIVE = "cognitive_memory"
+DOC_CLASS_SYSTEM = "system_log"
+DOC_CLASS_SYNTHETIC = "synthetic_summary"
+
+SYNTHETIC_EVENT_TYPES = {
+    "respuesta_semantica",
+    "conversation_snapshot",
+    "endpoint_call",
+    "agent_snapshot",
+    "context_snapshot"
+}
+
+SYSTEM_ENDPOINT_KEYWORDS = [
+    "historial",
+    "health",
+    "status",
+    "diagnostico",
+    "precalentar",
+    "introspection",
+    "verificar",
+    "heartbeat",
+    "monitor",
+    "cli",
+    "copiloto",
+    "fallback"
+]
+
+SYSTEM_ENDPOINTS = {
+    'historial-interacciones', '/api/historial-interacciones', 'historial_interacciones',
+    'health', '/api/health',
+    'status', '/api/status',
+    'diagnostico', '/api/diagnostico',
+    'precalentar-memoria', '/api/precalentar-memoria',
+    'introspection', '/api/introspection',
+    'verificar-sistema', '/api/verificar-sistema',
+    'verificar-cosmos', '/api/verificar-cosmos',
+    'ejecutar-cli', 'ejecutar_cli', '/api/ejecutar-cli',
+    'dashboard', '/api/dashboard'
+}
 
 
 class MemoryService:
@@ -52,6 +95,13 @@ class MemoryService:
             "event_type": event_type,
             "data": data
         }
+
+        if isinstance(data, dict):
+            event["tipo"] = data.get("tipo") or event_type
+            if data.get("document_class"):
+                event["document_class"] = data["document_class"]
+            if "is_synthetic" in data:
+                event["is_synthetic"] = data["is_synthetic"]
 
         success_local = self._log_local(event)
         success_cosmos = self._log_cosmos(event)
@@ -146,6 +196,19 @@ class MemoryService:
                     event["texto_semantico"] += ids_extra
                     logging.info(f"🔑 IDs técnicos agregados al evento en _log_cosmos")
 
+            # Clasificación de documento (cognitivo vs sintético/log)
+            doc_class_override = event.get("document_class")
+            if doc_class_override:
+                doc_class = doc_class_override
+            else:
+                doc_class = self._classify_event(event)
+                event["document_class"] = doc_class
+
+            if "is_synthetic" not in event:
+                event["is_synthetic"] = doc_class != DOC_CLASS_COGNITIVE
+            target_index = COGNITIVE_INDEX_NAME if doc_class == DOC_CLASS_COGNITIVE else LOG_INDEX_NAME
+            event["indice_destino"] = target_index
+
             # Intentar upsert
             result = self.memory_container.upsert_item(event)
             logging.info(
@@ -184,11 +247,13 @@ class MemoryService:
                 "id": event.get("id"),
                 "session_id": event.get("session_id", "unknown"),
                 "agent_id": event.get("agent_id") or event.get("data", {}).get("agent_id", "unknown"),
-                "endpoint": event.get("data", {}).get("endpoint", "unknown"),
+                "endpoint": event.get("endpoint") or event.get("data", {}).get("endpoint", "unknown"),
                 "texto_semantico": event.get("texto_semantico", ""),
                 "exito": event.get("data", {}).get("success", True),
-                "tipo": event.get("event_type", "interaccion"),
-                "timestamp": event.get("timestamp", datetime.utcnow().isoformat())
+                "tipo": event.get("tipo") or event.get("event_type", "interaccion"),
+                "timestamp": event.get("timestamp", datetime.utcnow().isoformat()),
+                "document_class": event.get("document_class", DOC_CLASS_SYSTEM),
+                "is_synthetic": event.get("is_synthetic", False)
             }
 
             # Solo indexar si hay texto semántico válido
@@ -203,12 +268,19 @@ class MemoryService:
                 logging.info(f"⏭️ Texto muy corto, se omite indexación: {len(texto_sem)} chars")
                 return False
             
-            if self.evento_ya_existe(texto_sem):
+            if documento["document_class"] == DOC_CLASS_COGNITIVE and self.evento_ya_existe(texto_sem):
                 logging.info(f"⏭️ Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
                 return False
 
+            if documento["document_class"] != DOC_CLASS_COGNITIVE:
+                logging.info(
+                    f"⏭️ Registro de clase '{documento['document_class']}' no se indexa (solo memoria cognitiva)")
+                return False
+
+            target_index = event.get("indice_destino") or COGNITIVE_INDEX_NAME
+
             # Llamar al indexador con formato correcto
-            payload = {"documentos": [documento]}
+            payload = {"documentos": [documento], "index_name": target_index}
             result = indexar_memoria_endpoint(payload)
 
             if result.get("exito"):
@@ -283,9 +355,50 @@ class MemoryService:
         logging.warning(
             f"🧩 DEBUG registrar_llamada - headers en memoria: {params.get('headers')}")
 
-        # Extraer session_id y agent_id de params - PRIORIZAR LOS PRESERVADOS
-        session_id = params.get("session_id")
-        agent_id = params.get("agent_id")
+        response_dict = response_data if isinstance(
+            response_data, dict) else {}
+
+        def _extract_from(source: Any, key: str) -> Optional[str]:
+            if not isinstance(source, dict):
+                return None
+            candidates = [
+                key,
+                key.replace("_", "-"),
+                key.replace("-", "_"),
+                key.upper(),
+                key.lower(),
+                key.title()
+            ]
+            for candidate in candidates:
+                value = source.get(candidate)
+                if value:
+                    return str(value)
+            return None
+
+        headers_info = params.get("headers")
+        body_info = params.get("body")
+        metadata = response_dict.get("metadata", {}) if isinstance(
+            response_dict, dict) else {}
+        session_info = metadata.get("session_info", {}) if isinstance(
+            metadata, dict) else {}
+        contexto_convers = response_dict.get(
+            "contexto_conversacion", {}) if isinstance(response_dict, dict) else {}
+
+        session_id = params.get("session_id") or \
+            _extract_from(headers_info, "Session-ID") or \
+            _extract_from(body_info, "session_id") or \
+            _extract_from(response_dict, "session_id") or \
+            _extract_from(contexto_convers, "session_id") or \
+            _extract_from(session_info, "session_id") or \
+            _extract_from(metadata, "session_id")
+
+        agent_id = params.get("agent_id") or \
+            _extract_from(headers_info, "Agent-ID") or \
+            _extract_from(body_info, "agent_id") or \
+            _extract_from(response_dict, "agent_id") or \
+            _extract_from(contexto_convers, "agent_id") or \
+            _extract_from(session_info, "agent_id") or \
+            _extract_from(metadata, "agent_id")
 
         # Solo generar fallback si no hay session_id
         if not session_id:
@@ -296,6 +409,9 @@ class MemoryService:
 
         if not agent_id:
             agent_id = "unknown_agent"
+
+        params["session_id"] = session_id
+        params["agent_id"] = agent_id
 
         # DEBUG: Log session info
         logging.info(
@@ -415,6 +531,60 @@ class MemoryService:
                 campos_unicos = list(dict.fromkeys(campos_extraidos))
                 return "\n🔑 " + "\n🔑 ".join(campos_unicos[:10])  # Máximo 10 campos
             return ""
+        
+        def _inferir_tipo_evento(texto_semantico: str) -> str:
+            """Deriva la intención real del evento para evitar depender de etiquetas externas."""
+            explicitos: List[str] = []
+            if isinstance(response_data, dict):
+                for key in ["tipo", "tipo_evento", "categoria", "category"]:
+                    valor = response_data.get(key)
+                    if isinstance(valor, str) and valor.strip():
+                        explicitos.append(valor.strip().lower())
+                metadata_resp = response_data.get("metadata") or {}
+                if isinstance(metadata_resp, dict):
+                    for key in ["tipo", "categoria"]:
+                        valor = metadata_resp.get(key)
+                        if isinstance(valor, str) and valor.strip():
+                            explicitos.append(valor.strip().lower())
+            if isinstance(params, dict):
+                valor_param = params.get("tipo")
+                if isinstance(valor_param, str) and valor_param.strip():
+                    explicitos.append(valor_param.strip().lower())
+
+            for candidato in explicitos:
+                if candidato:
+                    return candidato
+
+            texto_ref = " ".join(filter(None, [
+                texto_semantico or "",
+                endpoint or "",
+                source or "",
+                str(params.get("comando") or ""),
+                str(params.get("consulta") or ""),
+                str(params.get("query") or ""),
+                str(params.get("operacion") or ""),
+                str(response_dict.get("mensaje")) if isinstance(response_dict, dict) and response_dict.get("mensaje") else ""
+            ])).lower()
+
+            def _contiene(patrones: List[str]) -> bool:
+                return any(p in texto_ref for p in patrones)
+
+            correccion_kw = ["correg", "fix", "ajust", "parche", "patch", "arregl", "solucion", "resolver", "aplicar correccion", "rollback"]
+            diagnostico_kw = ["diagnostico", "diagnóstico", "status", "estado", "health", "metricas", "metrics", "verificar"]
+            archivo_kw = ["archivo", "escribir", "modificar", "contenido", "guardar", "sobrescribir"]
+            cli_kw = ["cli", "command", "powershell", "bash", "script", "ejecutar"]
+
+            if _contiene(correccion_kw):
+                return "correccion"
+            if not success:
+                return "error_endpoint"
+            if _contiene(diagnostico_kw):
+                return "diagnostico"
+            if _contiene(archivo_kw):
+                return "operacion_archivo"
+            if _contiene(cli_kw):
+                return "ejecucion_cli"
+            return "interaccion"
         
         # === 🧠 GENERADOR SEMÁNTICO ENRIQUECIDO ===
         def _construir_texto_semantico_rico(response_data, endpoint, agent_id, success, params):
@@ -538,6 +708,12 @@ class MemoryService:
                 "⚠️ Texto semántico vacío o muy corto, no se guardará.")
             return False  # No guardar eventos sin contenido útil
 
+        tipo_inferido = _inferir_tipo_evento(texto_semantico_final)
+        llamada_data["tipo"] = tipo_inferido
+        if tipo_inferido == "correccion":
+            llamada_data["document_class"] = DOC_CLASS_COGNITIVE
+            llamada_data["is_synthetic"] = False
+
         # Registrar como evento de tipo "endpoint_call" con session_id preservado
         result = self.log_event(
             "endpoint_call", llamada_data, session_id=session_id)
@@ -641,6 +817,29 @@ class MemoryService:
         except Exception as e:
             logging.error(f"Error limpiando memoria: {e}")
             return False
+
+    def _classify_event(self, event: Dict[str, Any]) -> str:
+        """Determina la clase de documento para evitar contaminar la memoria cognitiva."""
+        event_type = str(event.get("event_type") or event.get("tipo") or "").lower()
+        endpoint_raw = str(event.get("endpoint") or event.get("data", {}).get("endpoint", "")).lower()
+        endpoint = endpoint_raw.replace("_", "-")
+
+        if event.get("data", {}).get("from_historial"):
+            return DOC_CLASS_SYNTHETIC
+
+        if event_type in SYNTHETIC_EVENT_TYPES:
+            return DOC_CLASS_SYNTHETIC
+
+        if endpoint in SYSTEM_ENDPOINTS:
+            return DOC_CLASS_SYSTEM
+
+        if any(keyword in endpoint for keyword in SYSTEM_ENDPOINT_KEYWORDS):
+            return DOC_CLASS_SYSTEM
+
+        if "historial" in endpoint or "copiloto" in endpoint:
+            return DOC_CLASS_SYSTEM
+
+        return DOC_CLASS_COGNITIVE
 
     def existe_texto_en_sesion(self, session_id: str, texto_hash: str) -> bool:
         """Verifica si un texto_hash ya existe en la sesión (barrera anti-duplicados)"""

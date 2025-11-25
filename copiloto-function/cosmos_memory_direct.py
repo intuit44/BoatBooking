@@ -79,6 +79,14 @@ def deduplicar_interacciones_semanticas(items: list, max_items: int = 50) -> lis
     for item in items:
         endpoint = item.get('endpoint', '')
         texto = item.get('texto_semantico', '')
+        session_id = item.get('session_id', '')
+
+        if item.get("is_synthetic"):
+            continue
+        if item.get("document_class") and item.get("document_class") != "cognitive_memory":
+            continue
+        if session_id.startswith("fallback_session"):
+            continue
 
         # Excluir endpoints meta-operacionales
         if endpoint in ENDPOINTS_EXCLUIDOS:
@@ -171,6 +179,8 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
                        c.data.response_data.respuesta_usuario, c._ts
         FROM c
         WHERE IS_DEFINED(c.texto_semantico) 
+          AND (NOT IS_DEFINED(c.document_class) OR c.document_class = 'cognitive_memory')
+          AND (NOT IS_DEFINED(c.is_synthetic) OR c.is_synthetic != true)
           AND NOT CONTAINS(c.endpoint, 'health')
           AND NOT CONTAINS(c.endpoint, 'verificar-')
           AND NOT CONTAINS(c.endpoint, 'historial-interacciones')

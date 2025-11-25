@@ -20,7 +20,7 @@ class AzureSearchService:
 
     def __init__(self):
         self.endpoint = os.environ.get("AZURE_SEARCH_ENDPOINT")
-        self.index_name = "agent-memory-index"
+        self.index_name = os.environ.get("AZURE_SEARCH_INDEX", "agent-memory-index")
         if not self.endpoint:
             raise ValueError("AZURE_SEARCH_ENDPOINT no configurado")
 
@@ -33,11 +33,9 @@ class AzureSearchService:
             credential = DefaultAzureCredential()
             logging.info("🔐 Azure Search: Usando Managed Identity")
 
-        self.client = SearchClient(
-            endpoint=self.endpoint,
-            index_name=self.index_name,
-            credential=credential
-        )
+        self._credential = credential
+        self._clients: Dict[str, SearchClient] = {}
+        self.client = self._get_client_for_index(self.index_name)
 
         # Cliente OpenAI para generar embeddings
         openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
@@ -53,6 +51,18 @@ class AzureSearchService:
 
         self.embedding_model = os.environ.get(
             "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+
+    def _get_client_for_index(self, index_name: str) -> SearchClient:
+        """Crea o reutiliza un cliente para el índice solicitado."""
+        if index_name in self._clients:
+            return self._clients[index_name]
+        client = SearchClient(
+            endpoint=self.endpoint,
+            index_name=index_name,
+            credential=self._credential
+        )
+        self._clients[index_name] = client
+        return client
 
     def _generar_embedding(self, texto: str) -> List[float]:
         """Genera embedding vectorial para el texto usando Azure OpenAI"""
@@ -163,10 +173,11 @@ class AzureSearchService:
             logging.error(f"Error en búsqueda vectorial: {e}")
             return {"exito": False, "error": str(e)}
 
-    def upload_documents(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def upload_documents(self, documents: List[Dict[str, Any]], index_name: Optional[str] = None) -> Dict[str, Any]:
         """Subir documentos al índice"""
         try:
-            result = self.client.upload_documents(documents=documents)
+            client = self._get_client_for_index(index_name or self.index_name)
+            result = client.upload_documents(documents=documents)
             return {
                 "exito": True,
                 "documentos_subidos": len(documents),
@@ -177,9 +188,9 @@ class AzureSearchService:
             return {"exito": False, "error": str(e)}
 
     # 🔹 Alias para compatibilidad con el indexador
-    def indexar_documentos(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def indexar_documentos(self, documents: List[Dict[str, Any]], index_name: Optional[str] = None) -> Dict[str, Any]:
         """Alias de upload_documents para compatibilidad con el indexador."""
-        return self.upload_documents(documents)
+        return self.upload_documents(documents, index_name=index_name)
 
     def get_document(self, doc_id: str) -> Dict[str, Any]:
         """Obtener un documento por ID"""
@@ -190,11 +201,12 @@ class AzureSearchService:
             logging.error(f"Error obteniendo documento: {e}")
             return {"exito": False, "error": str(e)}
 
-    def delete_documents(self, doc_ids: List[str]) -> Dict[str, Any]:
+    def delete_documents(self, doc_ids: List[str], index_name: Optional[str] = None) -> Dict[str, Any]:
         """Eliminar documentos del índice"""
         try:
             docs = [{"id": doc_id} for doc_id in doc_ids]
-            result = self.client.delete_documents(documents=docs)
+            client = self._get_client_for_index(index_name or self.index_name)
+            result = client.delete_documents(documents=docs)
             return {"exito": True, "documentos_eliminados": len(doc_ids), "resultado": str(result)}
         except Exception as e:
             logging.error(f"Error eliminando documentos: {e}")

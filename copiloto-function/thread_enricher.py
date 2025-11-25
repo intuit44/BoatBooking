@@ -103,18 +103,34 @@ def _formatear_mensajes(mensajes: List[Dict[str, Any]]) -> List[str]:
     for msg in mensajes:
         if not isinstance(msg, dict):
             continue
-        role = msg.get("role", "unknown")
-        content = msg.get("content", "") or ""
+
+        role = msg.get("role", "usuario")
+        ts = msg.get("created_at", msg.get("timestamp", ""))
+
+        # Priorizar campos interpretativos
+        content = (msg.get("texto_semantico") or
+                   msg.get("respuesta_usuario") or
+                   msg.get("detalle") or
+                   msg.get("contenido", "") or
+                   msg.get("content", ""))
+
         if not isinstance(content, str):
             content = str(content)
+
         content = content.strip()
-        if len(content) > MAX_MENSAJE_CHARS:
-            content = content[:MAX_MENSAJE_CHARS].rstrip() + "…"
-        ts = msg.get("created_at")
-        if ts:
-            result.append(f"[{role} @ {ts}] {content}")
-        else:
-            result.append(f"[{role}] {content}")
+
+        # Excluir líneas con thread_id, rutas o paths
+        lines = [l for l in content.split("\n")
+                 if not any(x in l.lower() for x in ["thread:", "assistant-", "ruta_blob", "c:\\", "/home/", "blob.core"])]
+        content = " ".join(lines).strip()
+
+        # Limitar a 400 caracteres útiles
+        if len(content) > 400:
+            content = content[:400].rstrip() + "…"
+
+        if content:
+            result.append(f"[{role} @ {ts[:19] if ts else 'N/A'}] {content}")
+
     return result
 
 
