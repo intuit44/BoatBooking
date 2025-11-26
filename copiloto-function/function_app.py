@@ -3412,6 +3412,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
     # === 🔍 CONSTRUCCIÓN DE QUERY UNIVERSAL (COMBINA TIPO + QUERY + MENSAJE) ===
     session_id = req.headers.get("Session-ID") or req.params.get("session_id")
+    agent_id_header = req.headers.get("Agent-ID") or req.params.get("agent_id")
     thread_id = req.headers.get(
         "Thread-ID") or req.headers.get("X-Thread-ID") or req.params.get("thread_id")
 
@@ -3419,6 +3420,12 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json() or {}
     except ValueError:
         body = dict(req.params)
+
+    # Actualizar session/agent si vinieron en el body
+    if not session_id:
+        session_id = body.get("session_id") or req.params.get("session_id")
+    agente_from_body = body.get("agent_id") or req.params.get("agent_id")
+    agent_id = agent_id_header or agente_from_body or "unknown_agent"
 
     # 🧠 INTERPRETAR INTENCIÓN PRIMERO
     query_texto = body.get("query") or body.get(
@@ -3435,7 +3442,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             params_completos[key] = req.params.get(key)
 
     params_completos["session_id"] = session_id or "unknown"
+    params_completos["agent_id"] = agent_id or "unknown_agent"
     params_completos["intencion_detectada"] = query_texto
+    hist_limit = int(params_completos.get("limite") or req.params.get(
+        "limite") or body.get("limite") or 10)
 
     logging.info(f"🧠 HISTORIAL: Parámetros interpretados: {params_completos}")
 
@@ -3634,13 +3644,15 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
     # 🔥 MEMORIA DIRECTA - FORZAR FUNCIONAMIENTO
     logging.info("🔥 ENDPOINT EJECUTÁNDOSE CON MEMORIA DIRECTA")
 
-    session_id = None
-    agent_id = None
     memoria_previa = getattr(req, '_memoria_contexto', {})
     response_data = {}
+    resolved_session_id = session_id or req.headers.get(
+        "Session-ID") or req.params.get("session_id") or "test_session"
+    resolved_agent_id = agent_id or req.headers.get(
+        "Agent-ID") or req.params.get("agent_id") or "TestAgent"
     try:
-        session_id = req.headers.get("Session-ID") or "test_session"
-        agent_id = req.headers.get("Agent-ID") or "TestAgent"
+        session_id = resolved_session_id
+        agent_id = resolved_agent_id
 
         logging.info(f"🔍 Headers: Session={session_id}, Agent={agent_id}")
 
@@ -3651,7 +3663,8 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "tiene_historial": len(interacciones) > 0,
                 "interacciones_recientes": interacciones,
                 "total_interacciones": len(interacciones),
-                "session_id": session_id
+                "session_id": session_id,
+                "agent_id": agent_id
             }
             setattr(req, "_memoria_contexto", memoria_previa)
             logging.info(
@@ -3664,6 +3677,59 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         else:
             logging.info(
                 "🧠 Usando memoria previa de Cosmos sin sobrescribirla.")
+
+        # Fallback: si no hubo historial por session_id, intentar agent_id o global
+        if (not memoria_previa or not memoria_previa.get("tiene_historial")):
+            try:
+                fallback_query = None
+                if agent_id and agent_id not in ["unknown_agent", "unknown", "TestAgent"]:
+                    fallback_query = construir_query_dinamica(
+                        session_id=None,
+                        agent_id=agent_id,
+                        limite=hist_limit
+                    )
+                else:
+                    fallback_query = construir_query_dinamica(
+                        session_id=None,
+                        agent_id=None,
+                        limite=hist_limit
+                    )
+
+                if fallback_query:
+                    resultados_fallback = ejecutar_query_cosmos(
+                        fallback_query, memory_service.memory_container)
+                    if resultados_fallback:
+                        interacciones = []
+                        for item in resultados_fallback:
+                            interacciones.append({
+                                "id": item.get("id"),
+                                "session_id": item.get("session_id"),
+                                "agent_id": item.get("agent_id"),
+                                "endpoint": item.get("endpoint"),
+                                "timestamp": item.get("timestamp"),
+                                "texto_semantico": item.get("texto_semantico"),
+                                "exito": item.get("exito", True),
+                                "tipo": item.get("tipo", "interaccion_usuario"),
+                                "data": {
+                                    "endpoint": item.get("endpoint"),
+                                    "timestamp": item.get("timestamp"),
+                                    "success": item.get("exito", True),
+                                    "params": {}
+                                }
+                            })
+                        memoria_previa = {
+                            "tiene_historial": True,
+                            "interacciones_recientes": interacciones,
+                            "total_interacciones": len(interacciones),
+                            "session_id": session_id or interacciones[0].get("session_id"),
+                            "agent_id": agent_id
+                        }
+                        setattr(req, "_memoria_contexto", memoria_previa)
+                        logging.info(
+                            f"🧠 Fallback por agent_id/global: {len(interacciones)} interacciones recuperadas")
+            except Exception as fallback_err:
+                logging.warning(
+                    f"⚠️ Fallback historial por agent_id/global falló: {fallback_err}")
         # Debug: verificar estructura de memoria previa
         if memoria_previa.get("interacciones_recientes"):
             primera = memoria_previa["interacciones_recientes"][0] if memoria_previa["interacciones_recientes"] else {
@@ -3700,9 +3766,12 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         # Combinar parámetros
         params_completos = {**params_agente, **body_agente}
 
-        # Obtener session_id
-        session_id = req.headers.get(
-            "Session-ID") or params_completos.get("session_id")
+        # Obtener identificadores prioritarios
+        session_id = params_completos.get(
+            "session_id") or resolved_session_id
+        agent_id_local = params_completos.get(
+            "agent_id") or resolved_agent_id
+        agent_id = agent_id_local
 
         # 🔍 INTERPRETAR INTENCIÓN DEL AGENTE
         intencion_params = interpretar_intencion_agente(
@@ -3717,8 +3786,9 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
 
         # Asegurar session_id SIEMPRE desde headers/params
         intencion_params["session_id"] = session_id or "unknown"
+        intencion_params["agent_id"] = agent_id_local or "unknown_agent"
 
-        limit = int(intencion_params.get("limite", 10))
+        limit = int(intencion_params.get("limite", hist_limit))
 
         # Initialize validation stats
         validation_stats = {
@@ -3730,7 +3800,7 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
         # === 🔍 USAR DOCS DE AI SEARCH AUTOMÁTICO ===
         docs_sem = docs_search  # Usar los docs ya encontrados en la búsqueda automática
 
-        limit = int(intencion_params.get("limite", 10))
+        limit = int(intencion_params.get("limite", hist_limit))
 
         # 🧠 SI HAY PARÁMETROS AVANZADOS, USAR QUERY BUILDER DINÁMICO
         usar_query_dinamica = any([
@@ -4052,7 +4122,13 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
                 "validation_stats": validation_stats,
                 "fallbacks_generados": fallback_count,
                 "docs_vectoriales": len(docs_para_modelo or []),
-                "resumen_conversacion": resumen
+                "resumen_conversacion": resumen,
+                "filtros_aplicados": {
+                    "session_id": memoria_previa.get("session_id"),
+                    "agent_id": memoria_previa.get("agent_id", agent_id),
+                    "tipo": params_completos.get("tipo"),
+                    "endpoint": params_completos.get("endpoint")
+                }
             }
 
             response_data = build_structured_payload(
@@ -13908,32 +13984,6 @@ def revisar_correcciones(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=500
         )
-
-
-@app.function_name(name="aplicar_correccion_manual")
-@app.route(route="aplicar-correccion", methods=["POST"])
-def aplicar_correccion_manual(req: func.HttpRequest) -> func.HttpResponse:
-    """Permite aplicar manualmente una corrección pendiente por ID."""
-    body = req.get_json()
-    fix_id = body.get("id")
-    fix = next((f for f in _load_pending_fixes() if f["id"] == fix_id), None)
-    if not fix:
-        return func.HttpResponse(
-            json.dumps(
-                {"exito": False, "error": f"Fix {fix_id} no encontrado"}),
-            mimetype="application/json", status_code=404
-        )
-    resultado = _execute_fix(fix)
-    return func.HttpResponse(
-        json.dumps(resultado, ensure_ascii=False, indent=2),
-        mimetype="application/json", status_code=200 if resultado.get("validado") else 400
-    )
-
-
-# Sistema de registro de cambios
-PENDING_FIXES_FILE = Path("scripts/pending_fixes.json")
-CHANGE_LOG_FILE = Path("scripts/change_log.json")
-SEMANTIC_COMMITS_FILE = Path("scripts/semantic_commits.json")
 
 
 @app.function_name(name="autocorregir_http")

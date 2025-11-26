@@ -16,6 +16,7 @@ import hashlib
 import ssl
 from typing import Any, Callable, Dict, Optional, Tuple, cast
 import redis
+from datetime import datetime
 
 CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
 
@@ -94,6 +95,40 @@ class RedisBufferService:
             self._enabled = False
             return
 
+        try:
+            # Obtener password desde REDIS_KEY si existe (fallback)
+            password = os.getenv("REDIS_KEY", None)
+
+            # Crear cliente Redis evitando parámetros obsoletos (p. ej. retry_on_timeout)
+            redis_params = {
+                "host": self._host,
+                "port": self._port,
+                "password": password,
+                "db": self._db,
+                "ssl": self._ssl,
+                "socket_connect_timeout": 2,
+                "socket_timeout": 2,
+                "decode_responses": False,
+                "encoding": "utf-8",
+            }
+
+            if self._ssl:
+                redis_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+
+            self._client = redis.Redis(**redis_params)
+
+            # Probar conexión
+            self._client.ping()
+            self._enabled = True
+            logging.info(
+                f"[RedisBuffer] Conectado: {self._host}:{self._port} (ssl={self._ssl})")
+
+        except Exception as exc:  # pragma: no cover - depende de entorno
+            logging.warning(
+                f"[RedisBuffer] Conexión inicial Redis falló: {exc}")
+            self._client = None
+            self._enabled = False
+
         def _try_token_credential(label: str, credential) -> bool:
             try:
                 token = credential.get_token(self._aad_scope)
@@ -114,7 +149,6 @@ class RedisBufferService:
                     ssl_cert_reqs=ssl.CERT_REQUIRED,
                     socket_timeout=2,
                     socket_connect_timeout=2,
-                    retry_on_timeout=True,
                     health_check_interval=30,
                 )
                 self._client.ping()
@@ -158,10 +192,9 @@ class RedisBufferService:
                 port=self._port,
                 password=key,
                 db=self._db,
-                ssl=ssl_flag,
+                ssl=self._ssl,
                 socket_timeout=2,
                 socket_connect_timeout=2,
-                retry_on_timeout=True,
                 health_check_interval=30,
             )
             self._client.ping()

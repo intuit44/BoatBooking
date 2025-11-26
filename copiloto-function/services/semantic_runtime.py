@@ -8,7 +8,7 @@ import requests
 import threading
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 # Configuración
@@ -117,7 +117,7 @@ class SemanticRuntime:
         """Persiste ciclo en memoria (CosmosDB vía endpoint)"""
         try:
             cycle_data = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "state_snapshot": state,
                 "interpretation": interpretation,
                 "action_taken": action_taken,
@@ -150,7 +150,7 @@ class SemanticRuntime:
                 "memoria": sistema.get("memoria", {}).get("percent", 0),
                 "telemetria_activa": app_insights.get("telemetria_activa", False),
                 "cosmos_conectado": cosmos.get("cosmos_conectado", False),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "ambiente": sistema.get("ambiente", "Unknown")
             }
 

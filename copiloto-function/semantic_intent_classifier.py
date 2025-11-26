@@ -12,7 +12,7 @@ import re
 import unicodedata
 from functools import lru_cache
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Stopwords basicos para reducir ruido en espanol/ingles
 STOPWORDS = {
@@ -86,36 +86,37 @@ def get_text_embedding(text: str) -> List[float]:
     Fallback a hash si falla.
     """
     cleaned_text = text or ""
-    
+
     try:
         from openai import AzureOpenAI
-        
+
         # Soportar ambos formatos de variable
-        api_key = os.getenv("AZURE_OPENAI_API_KEY") or os.getenv("AZURE_OPENAI_KEY")
+        api_key = os.getenv("AZURE_OPENAI_API_KEY") or os.getenv(
+            "AZURE_OPENAI_KEY")
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        
+
         if not api_key or not endpoint:
             return _hash_embedding(cleaned_text)
-        
+
         client = AzureOpenAI(
             api_key=api_key,
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
             azure_endpoint=endpoint
         )
-        
+
         # Usar text-embedding-3-large que ya tienes desplegado
         response = client.embeddings.create(
             model="text-embedding-3-large",
             input=cleaned_text
         )
-        
+
         embedding = response.data[0].embedding
         if embedding:
             return list(embedding)
-            
+
     except Exception as exc:
         logging.debug(f"Fallback a hash embedding: {exc}")
-    
+
     return _hash_embedding(cleaned_text)
 
 
@@ -137,9 +138,86 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 class SemanticIntentClassifier:
     """Clasificador de intencion basado en similitud semantica."""
 
-    def __init__(self, threshold: float = 0.32, high_confidence: float = 0.72):
+    def __init__(self, threshold: float = 0.45, high_confidence: float = 0.75):
         # Intenciones base con ejemplos semanticos diversos
         self.intent_examples = {
+            "correccion": [
+                "aplicar corrección al archivo config.py línea 45",
+                "fix error de tipo en función validate",
+                "arreglar deprecated datetime warning",
+                "corregir import missing en services",
+                "aplicar fix para resolver type annotation error",
+                "reparar función async que no retorna awaitable",
+                "fix error max() argument must be non-empty sequence",
+                "corregir redis connection timeout deprecated parameter",
+                "aplicar corrección para NameError en variable no definida",
+                "fix syntax error en línea 127",
+                "reparar attribute error en objeto response",
+                "corregir logical error en conditional statement",
+                "rollback cambios en archivo main.py",
+                "deshacer modificación incorrecta en config",
+                "parche para el error de indentación",
+                "ajustar parámetros incorrectos en función",
+                "restaurar versión anterior del código",
+                "aplicar hotfix urgente para bug crítico",
+                "resolver issue #123 reportado en GitHub",
+                "arreglar configuración rota en settings.json"
+            ],
+            "diagnostico": [
+                "diagnosticar el sistema completo de la aplicación",
+                "verificar estado de salud de todos los servicios",
+                "comprobar funcionamiento de base de datos",
+                "revisar conectividad con Azure Cosmos DB",
+                "analizar métricas de rendimiento del sistema",
+                "evaluar uso de memoria y CPU",
+                "inspeccionar logs de errores recientes",
+                "validar configuración de servicios Azure",
+                "monitorear recursos activos en la nube",
+                "auditar infraestructura de producción",
+                "verificar status de Azure Functions",
+                "comprobar health check de la API"
+            ],
+            "operacion_archivo": [
+                "escribir archivo de configuración settings.json",
+                "leer contenido del archivo package.json",
+                "modificar archivo requirements.txt",
+                "actualizar archivo .env con nuevas variables",
+                "crear nuevo archivo de configuración",
+                "eliminar archivo temporal logs.txt",
+                "sobrescribir archivo config.yml existente",
+                "copiar archivo de backup a producción",
+                "guardar cambios en documento README.md",
+                "editar archivo de configuración local",
+                "generar nuevo archivo de datos CSV",
+                "actualizar contenido del archivo manifest.json"
+            ],
+            "ejecucion_cli": [
+                "ejecutar comando azure cli",
+                "correr script powershell",
+                "lanzar comando bash",
+                "ejecutar az group list",
+                "correr pipeline automatizado",
+                "usar terminal para comando",
+                "ejecutar script de deploy"
+            ],
+            "boat_management": [
+                "gestionar reserva de embarcación para cliente",
+                "crear nueva reserva de barco para alquiler",
+                "procesar booking de yate premium",
+                "confirmar alquiler de lancha deportiva",
+                "cancelar reserva de embarcación marina",
+                "actualizar datos del cliente en booking",
+                "modificar fecha de alquiler de barco",
+                "procesar pago para reserva de embarcación",
+                "enviar confirmación de booking por email",
+                "verificar disponibilidad de yate en fecha",
+                "generar contrato de alquiler de embarcación",
+                "registrar entrega de barco al cliente",
+                "procesar devolución de embarcación alquilada",
+                "calcular precio total del alquiler",
+                "enviar recordatorio de reserva próxima",
+                "actualizar estado de embarcación en sistema"
+            ],
             "listar_storage": [
                 "mostrar cuentas de almacenamiento",
                 "ver storage accounts",
@@ -200,6 +278,11 @@ class SemanticIntentClassifier:
 
         # Mapeo de intenciones a comandos Azure CLI
         self.intent_to_command = {
+            "correccion": "intent:aplicar_correccion",
+            "diagnostico": "intent:diagnosticar_sistema",
+            "operacion_archivo": "intent:operacion_archivo",
+            "ejecucion_cli": "intent:ejecutar_cli",
+            "boat_management": "intent:gestionar_embarcaciones",
             "listar_storage": "az storage account list --output json",
             "listar_cosmos": "az cosmosdb list --output json",
             "listar_functions": "az functionapp list --output json",
@@ -240,6 +323,51 @@ class SemanticIntentClassifier:
             }
 
         threshold = self.threshold if threshold is None else threshold
+
+        # 🔥 DETECCIÓN PREVIA DE PALABRAS CLAVE SÓLIDAS
+        input_lower = user_input.lower()
+
+        # Palabras clave de diagnóstico (PRIORIDAD ALTA - antes que corrección)
+        if any(kw in input_lower for kw in ["diagnosticar", "diagnóstico", "verificar estado", "comprobar funcionamiento", "revisar salud"]):
+            if any(kw in input_lower for kw in ["sistema", "completo", "servicios", "salud", "recursos", "infraestructura"]):
+                return {
+                    "intent": "diagnostico",
+                    "confidence": 0.96,
+                    "command": self.intent_to_command.get("diagnostico", "run_diagnostic"),
+                    "method": "keyword_detection_diagnostic",
+                    "requires_grounding": False
+                }
+
+        # Palabras clave de corrección muy específicas
+        if any(kw in input_lower for kw in ["corrección", "corregir", "fix", "arreglar", "reparar", "aplicar fix", "aplicar corrección"]):
+            if any(kw in input_lower for kw in ["archivo", "línea", "config", "error", "bug", "código"]):
+                return {
+                    "intent": "correccion",
+                    "confidence": 0.95,
+                    "command": self.intent_to_command.get("correccion", "apply_fix"),
+                    "method": "keyword_detection_strong",
+                    "requires_grounding": False
+                }        # Palabras clave de boat management específicas
+        if any(kw in input_lower for kw in ["reserva", "booking", "alquiler", "embarcación", "barco", "yate", "lancha"]):
+            if any(kw in input_lower for kw in ["gestionar", "crear", "procesar", "confirmar", "cancelar", "cliente"]):
+                return {
+                    "intent": "boat_management",
+                    "confidence": 0.90,
+                    "command": self.intent_to_command.get("boat_management", "manage_boat"),
+                    "method": "keyword_detection_boat",
+                    "requires_grounding": False
+                }
+
+        # Palabras clave de operación archivo específicas
+        if any(kw in input_lower for kw in ["escribir archivo", "leer archivo", "archivo de configuración", "settings.json", "package.json", "requirements.txt"]):
+            return {
+                "intent": "operacion_archivo",
+                "confidence": 0.88,
+                "command": self.intent_to_command.get("operacion_archivo", "file_operation"),
+                "method": "keyword_detection_file",
+                "requires_grounding": False
+            }
+
         cleaned_text = preprocess_text(user_input)
         if not cleaned_text:
             return {
@@ -342,6 +470,11 @@ class SemanticIntentClassifier:
 # Instancia global del clasificador
 semantic_classifier = SemanticIntentClassifier()
 
+# Forzar regeneración de embeddings con los nuevos ejemplos
+logging.info("🔄 Regenerando embeddings con ejemplos mejorados...")
+semantic_classifier._precompute_embeddings()
+logging.info("✅ Embeddings regenerados con nuevos ejemplos específicos")
+
 
 def classify_user_intent(user_input: str) -> Dict[str, Any]:
     """
@@ -352,7 +485,7 @@ def classify_user_intent(user_input: str) -> Dict[str, Any]:
 
         # Anadir metadata
         result.update({
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "input_length": len(user_input),
             "classification_method": "semantic_embeddings"
         })
@@ -415,3 +548,71 @@ def enhance_with_context(classification: Dict[str, Any], context: Optional[Dict[
         ]
 
     return classification
+
+
+def classify_text(text: str, endpoint: str = "", response_data: Optional[Dict[str, Any]] = None, success: bool = True) -> Dict[str, Any]:
+    """
+    Función de compatibilidad para memory_service - clasifica texto con contexto adicional.
+    """
+    try:
+        # Usar el clasificador principal
+        result = classify_user_intent(text)
+
+        # Ajustar intención basado en contexto del endpoint y éxito
+        if not success:
+            # Si la operación falló, probablemente sea un error
+            result["intent"] = "error_endpoint"
+            result["confidence"] = 0.9
+            result["method"] = "failure_context_override"
+
+        # Contexto del endpoint para mejor clasificación
+        if endpoint:
+            endpoint_lower = endpoint.lower()
+            if "correccion" in endpoint_lower or "fix" in endpoint_lower:
+                if result["confidence"] < 0.8:  # Solo si no estamos muy seguros
+                    result["intent"] = "correccion"
+                    result["confidence"] = max(result["confidence"], 0.7)
+                    result["method"] = "endpoint_context_boost"
+            elif "diagnostico" in endpoint_lower or "health" in endpoint_lower:
+                if result["confidence"] < 0.8:
+                    result["intent"] = "diagnostico"
+                    result["confidence"] = max(result["confidence"], 0.7)
+                    result["method"] = "endpoint_context_boost"
+
+        # Información adicional del response_data
+        if response_data and isinstance(response_data, dict):
+            # Buscar señales en la respuesta
+            response_text = str(response_data.get(
+                "respuesta_usuario", "")).lower()
+            metadata_text = str(response_data.get("metadata", {})).lower()
+            combined_text = f"{response_text} {metadata_text}"
+
+            # Detección específica de correcciones (alta prioridad)
+            correction_signals = ["corrección", "fix", "arreglar",
+                                  "corregir", "solucionar", "reparar", "rollback", "revertir"]
+            if any(signal in combined_text for signal in correction_signals):
+                result["intent"] = "correccion"
+                result["confidence"] = max(result["confidence"], 0.85)
+                result["method"] = "response_correction_boost"
+
+            # Detección de diagnósticos
+            elif any(signal in combined_text for signal in ["diagnóstico", "estado", "salud", "verificar", "comprobar", "analizar"]):
+                result["intent"] = "diagnostico"
+                result["confidence"] = max(result["confidence"], 0.8)
+                result["method"] = "response_diagnostic_boost"
+
+        return {
+            "tipo": result["intent"],
+            "confianza": result["confidence"],
+            "metodo": result.get("method", "semantic_classification"),
+            "clasificacion_completa": result
+        }
+
+    except Exception as e:
+        logging.error(f"Error en classify_text: {e}")
+        return {
+            "tipo": "interaccion",
+            "confianza": 0.1,
+            "metodo": "error_fallback",
+            "error": str(e)
+        }

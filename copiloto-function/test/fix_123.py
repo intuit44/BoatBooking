@@ -1,2 +1,2 @@
 # -*- coding: utf-8 -*-
-print('Este contenido ha sido corregido a través de fix_456.')
+print('Este contenido ha sido modificado para registrar una correcciÃ³n.')

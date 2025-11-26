@@ -2,14 +2,15 @@ import os
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
 
-COGNITIVE_INDEX_NAME = os.environ.get("AZURE_SEARCH_INDEX", "agent-memory-index")
+COGNITIVE_INDEX_NAME = os.environ.get(
+    "AZURE_SEARCH_INDEX", "agent-memory-index")
 LOG_INDEX_NAME = os.environ.get("AZURE_SEARCH_LOG_INDEX", COGNITIVE_INDEX_NAME)
 
 DOC_CLASS_COGNITIVE = "cognitive_memory"
@@ -84,12 +85,12 @@ class MemoryService:
 
     def log_event(self, event_type: str, data: Dict[str, Any], session_id: Optional[str] = None) -> bool:
         """Registra evento en local + Cosmos DB"""
-        timestamp = datetime.utcnow().isoformat()
-        session_id = session_id or f"session_{int(datetime.utcnow().timestamp())}"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        session_id = session_id or f"session_{int(datetime.now(timezone.utc).timestamp())}"
 
         # Estructura unificada
         event = {
-            "id": f"{session_id}_{event_type}_{int(datetime.utcnow().timestamp())}",
+            "id": f"{session_id}_{event_type}_{int(datetime.now(timezone.utc).timestamp())}",
             "session_id": session_id,
             "timestamp": timestamp,
             "event_type": event_type,
@@ -102,6 +103,17 @@ class MemoryService:
                 event["document_class"] = data["document_class"]
             if "is_synthetic" in data:
                 event["is_synthetic"] = data["is_synthetic"]
+
+            # ✅ EXTRAER DATOS DE CONVERSACIÓN AL NIVEL RAÍZ
+            if "conversacion_humana" in data:
+                event["conversacion_humana"] = data["conversacion_humana"]
+                logging.info(
+                    f"[CONVERSATION] Extrayendo conversacion_humana al nivel raíz: {list(data['conversacion_humana'].keys())}")
+
+            if "es_conversacion_humana" in data:
+                event["es_conversacion_humana"] = data["es_conversacion_humana"]
+                logging.info(
+                    f"[CONVERSATION] Extrayendo es_conversacion_humana: {data['es_conversacion_humana']}")
 
         success_local = self._log_local(event)
         success_cosmos = self._log_cosmos(event)
@@ -134,21 +146,23 @@ class MemoryService:
 
             # Asegurar que el ID es único
             if "id" not in event or not event["id"]:
-                event["id"] = f"{event['session_id']}_{event.get('event_type', 'unknown')}_{int(datetime.utcnow().timestamp())}"
-            
-            # 🔥 BARRERA ANTI-DUPLICADOS: Calcular hash y verificar antes de guardar
+                event["id"] = f"{event['session_id']}_{event.get('event_type', 'unknown')}_{int(datetime.now(timezone.utc).timestamp())}"
+
+            # BARRERA ANTI-DUPLICADOS: Calcular hash y verificar antes de guardar
             texto_semantico = event.get("texto_semantico", "")
             if texto_semantico:
                 import hashlib
-                texto_hash = hashlib.sha256(texto_semantico.strip().lower().encode('utf-8')).hexdigest()
+                texto_hash = hashlib.sha256(
+                    texto_semantico.strip().lower().encode('utf-8')).hexdigest()
                 event["texto_hash"] = texto_hash
-                
+
                 # Verificar si ya existe
                 if self.existe_texto_en_sesion(event["session_id"], texto_hash):
-                    logging.info(f"⏭️ Texto duplicado detectado en sesión; se omite registro: {event['id']}")
+                    logging.info(
+                        f"[SKIP] Texto duplicado detectado en sesión; se omite registro: {event['id']}")
                     return False
-            
-            # 🔥 CLASIFICACIÓN SEMÁNTICA DE ERRORES
+
+            # CLASIFICACIÓN SEMÁNTICA DE ERRORES
             texto = str(texto_semantico).lower()
             if "no such file" in texto or "no se pudo leer" in texto or "archivo no encontrado" in texto:
                 event["tipo_error"] = "archivo_no_encontrado"
@@ -163,23 +177,21 @@ class MemoryService:
                 event["categoria"] = event.get("event_type", "interaccion")
 
             logging.info(
-                f"💾 Guardando en Cosmos: {event.get('id', 'N/A')} - Session: {event.get('session_id', 'N/A')}")
+                f"[COSMOS] Guardando en Cosmos: {event.get('id', 'N/A')} - Session: {event.get('session_id', 'N/A')}")
             logging.info(
-                f"📄 Evento: {event.get('event_type', 'unknown')} - Tamaño: {len(str(event))} chars")
+                f"[EVENT] Evento: {event.get('event_type', 'unknown')} - Tamaño: {len(str(event))} chars")
 
             # Mover texto_semantico al nivel raíz si está en data
             if "texto_semantico" in event.get("data", {}):
                 event["texto_semantico"] = event["data"]["texto_semantico"]
-                logging.info(
-                    f"📝 Moviendo texto_semantico al nivel raíz: {event['texto_semantico'][:100]}...")
-
-            # Asegurar que siempre hay texto_semantico en el nivel raíz
+            logging.info(
+                f"[SEMANTIC] Moviendo texto_semantico al nivel raíz: {event['texto_semantico'][:100]}...")            # Asegurar que siempre hay texto_semantico en el nivel raíz
             if not event.get("texto_semantico"):
                 # Generar uno básico si no existe
                 event["texto_semantico"] = f"Evento {event.get('event_type', 'unknown')} en sesión {event.get('session_id', 'unknown')}"
                 logging.warning(
-                    f"⚠️ Generando texto_semantico de fallback: {event['texto_semantico']}")
-            
+                    f"[WARN] Generando texto_semantico de fallback: {event['texto_semantico']}")
+
             # 🔧 ENRIQUECER texto_semantico con campos técnicos si no fueron agregados antes
             if "🔑" not in event.get("texto_semantico", ""):
                 def _extraer_ids_evento(evt):
@@ -190,11 +202,12 @@ class MemoryService:
                             if data.get(key):
                                 ids.append(f"{key}: {data[key]}")
                     return "\n🔑 " + "\n🔑 ".join(ids) if ids else ""
-                
+
                 ids_extra = _extraer_ids_evento(event)
                 if ids_extra:
                     event["texto_semantico"] += ids_extra
-                    logging.info(f"🔑 IDs técnicos agregados al evento en _log_cosmos")
+                    logging.info(
+                        f"🔑 IDs técnicos agregados al evento en _log_cosmos")
 
             # Clasificación de documento (cognitivo vs sintético/log)
             doc_class_override = event.get("document_class")
@@ -212,26 +225,26 @@ class MemoryService:
             # Intentar upsert
             result = self.memory_container.upsert_item(event)
             logging.info(
-                f"✅ Guardado exitoso en Cosmos DB - ID: {result.get('id', 'unknown')}")
+                f"[OK] Guardado exitoso en Cosmos DB - ID: {result.get('id', 'unknown')}")
             # Log detallado del texto semántico
             texto_guardado = event.get('texto_semantico', '')
             logging.info(
-                f"🧠 Texto semántico guardado (longitud: {len(texto_guardado)}): {texto_guardado[:200]}")
+                f"[SEMANTIC] Texto semántico guardado (longitud: {len(texto_guardado)}): {texto_guardado[:200]}")
 
             # Verificar también si está en data
             texto_en_data = event.get('data', {}).get('texto_semantico', '')
             if texto_en_data:
                 logging.info(
-                    f"📄 Texto semántico también en data: {texto_en_data[:100]}...")
+                    f"[SEMANTIC] Texto semántico también en data: {texto_en_data[:100]}...")
 
-            # 🔥 INDEXAR AUTOMÁTICAMENTE EN AI SEARCH
+            # INDEXAR AUTOMÁTICAMENTE EN AI SEARCH
             self._indexar_en_ai_search(event)
 
             return True
         except Exception as e:
-            logging.error(f"❌ Error escribiendo en Cosmos memory: {e}")
+            logging.error(f"[ERROR] Error escribiendo en Cosmos memory: {e}")
             logging.error(
-                f"📄 Evento que falló: {json.dumps(event, ensure_ascii=False)[:500]}...")
+                f"[ERROR] Evento que falló: {json.dumps(event, ensure_ascii=False)[:500]}...")
             print(f"DEBUG Cosmos error: {e}")
             print(
                 f"DEBUG Event keys: {list(event.keys()) if isinstance(event, dict) else 'not dict'}")
@@ -251,7 +264,7 @@ class MemoryService:
                 "texto_semantico": event.get("texto_semantico", ""),
                 "exito": event.get("data", {}).get("success", True),
                 "tipo": event.get("tipo") or event.get("event_type", "interaccion"),
-                "timestamp": event.get("timestamp", datetime.utcnow().isoformat()),
+                "timestamp": event.get("timestamp", datetime.now(timezone.utc).isoformat()),
                 "document_class": event.get("document_class", DOC_CLASS_SYSTEM),
                 "is_synthetic": event.get("is_synthetic", False)
             }
@@ -259,22 +272,24 @@ class MemoryService:
             # Solo indexar si hay texto semántico válido
             if not documento["texto_semantico"] or len(documento["texto_semantico"]) < 10:
                 logging.info(
-                    "⏭️ Saltando indexación en AI Search: texto semántico vacío o muy corto")
+                    "[SKIP] Saltando indexación en AI Search: texto semántico vacío o muy corto")
                 return False
 
             # Validar duplicados y calidad ANTES de generar embedding
             texto_sem = documento["texto_semantico"]
             if len(texto_sem) < 40:
-                logging.info(f"⏭️ Texto muy corto, se omite indexación: {len(texto_sem)} chars")
+                logging.info(
+                    f"[SKIP] Texto muy corto, se omite indexación: {len(texto_sem)} chars")
                 return False
-            
+
             if documento["document_class"] == DOC_CLASS_COGNITIVE and self.evento_ya_existe(texto_sem):
-                logging.info(f"⏭️ Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
+                logging.info(
+                    f"[SKIP] Duplicado detectado, se omite indexación (sin generar embedding): {documento['id']}")
                 return False
 
             if documento["document_class"] != DOC_CLASS_COGNITIVE:
                 logging.info(
-                    f"⏭️ Registro de clase '{documento['document_class']}' no se indexa (solo memoria cognitiva)")
+                    f"[SKIP] Registro de clase '{documento['document_class']}' no se indexa (solo memoria cognitiva)")
                 return False
 
             target_index = event.get("indice_destino") or COGNITIVE_INDEX_NAME
@@ -285,16 +300,16 @@ class MemoryService:
 
             if result.get("exito"):
                 logging.info(
-                    f"🔍 Indexado automáticamente en AI Search: {documento['id']}")
+                    f"[AI_SEARCH] Indexado automáticamente en AI Search: {documento['id']}")
                 return True
             else:
                 logging.warning(
-                    f"⚠️ Error indexando en AI Search: {result.get('error')}")
+                    f"[WARN] Error indexando en AI Search: {result.get('error')}")
                 return False
 
         except Exception as e:
             logging.warning(
-                f"⚠️ Error en indexación automática AI Search: {e}")
+                f"[WARN] Error en indexación automática AI Search: {e}")
             # No fallar el guardado en Cosmos si falla la indexación
             return False
 
@@ -332,10 +347,10 @@ class MemoryService:
         """Registra interacción de agente"""
         document = {
             "id": str(uuid.uuid4()),
-            "session_id": input_data.get("session_id") or f"agent_{agent_id}_{int(datetime.utcnow().timestamp())}",
+            "session_id": input_data.get("session_id") or f"agent_{agent_id}_{int(datetime.now(timezone.utc).timestamp())}",
             "agent_id": agent_id,
             "source": source,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "endpoint": input_data.get("endpoint", source),
             "params": input_data,
             # ← Aquí aseguramos que el contenido de output_data se incluya dentro de "data"
@@ -351,9 +366,9 @@ class MemoryService:
         """Método requerido por memory_decorator.py para registrar llamadas a endpoints"""
 
         logging.warning(
-            f"🧩 DEBUG registrar_llamada - params keys: {list(params.keys())}")
+            f"[DEBUG] registrar_llamada - params keys: {list(params.keys())}")
         logging.warning(
-            f"🧩 DEBUG registrar_llamada - headers en memoria: {params.get('headers')}")
+            f"[DEBUG] registrar_llamada - headers en memoria: {params.get('headers')}")
 
         response_dict = response_data if isinstance(
             response_data, dict) else {}
@@ -402,10 +417,9 @@ class MemoryService:
 
         # Solo generar fallback si no hay session_id
         if not session_id:
-            import time
             session_id = "fallback_session"
             logging.warning(
-                f"⚠️ Session ID no encontrado en params, generando fallback: {session_id}")
+                f"[WARN] Session ID no encontrado en params, generando fallback: {session_id}")
 
         if not agent_id:
             agent_id = "unknown_agent"
@@ -415,9 +429,7 @@ class MemoryService:
 
         # DEBUG: Log session info
         logging.info(
-            f"📝 Registrando llamada - Session: {session_id}, Agent: {agent_id}, Source: {source}")
-
-        # ✅ Extraer respuesta_usuario antes del truncamiento, para reinyectarlo
+            f"[MEMORY] Registrando llamada - Session: {session_id}, Agent: {agent_id}, Source: {source}")        # ✅ Extraer respuesta_usuario antes del truncamiento, para reinyectarlo
         respuesta_usuario_completa = None
         if isinstance(response_data, dict) and response_data.get("respuesta_usuario"):
             respuesta_usuario_completa = str(
@@ -443,26 +455,119 @@ class MemoryService:
             if isinstance(cleaned_response, dict):
                 cleaned_response["respuesta_usuario"] = respuesta_usuario_completa
 
+        # ✅ Use timezone-aware datetime
+
+        timestamp_utc = datetime.now(timezone.utc).isoformat()
+
+        # Debug params before filtering
+        logging.info(
+            f"[PARAMS_DEBUG] Original params keys: {list(params.keys())}")
+        logging.info(
+            f"[PARAMS_DEBUG] thread_id in original: {params.get('thread_id')}")
+        logging.info(
+            f"[PARAMS_DEBUG] Thread-ID in original: {params.get('Thread-ID')}")
+
+        filtered_params = {k: v for k, v in params.items() if k not in [
+            "body"]}
+        logging.info(
+            f"[PARAMS_DEBUG] Filtered params keys: {list(filtered_params.keys())}")
+        logging.info(
+            f"[PARAMS_DEBUG] thread_id in filtered: {filtered_params.get('thread_id')}")
+        logging.info(
+            f"[PARAMS_DEBUG] Thread-ID in filtered: {filtered_params.get('Thread-ID')}")
+
         llamada_data = {
             "source": source,
             "endpoint": endpoint,
             "method": method,
             # Excluir body grande
-            "params": {k: v for k, v in params.items() if k not in ["body"]},
+            "params": filtered_params,
             "response_data": cleaned_response,
             "success": success,
             "agent_id": agent_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": timestamp_utc  # ✅ Updated to use timezone-aware timestamp
         }
+
+        # Conversaciones humanas y contexto de Foundry
+        mensaje_usuario = (
+            params.get("mensaje_usuario")
+            or params.get("mensaje")
+            or params.get("query")
+            or params.get("consulta")
+            or response_dict.get("mensaje_usuario")
+            or response_dict.get("mensaje_original")
+        )
+
+        mensaje_asistente = None
+        if isinstance(response_dict, dict):
+            mensaje_asistente = (
+                response_dict.get("respuesta_usuario")
+                or response_dict.get("texto_semantico")
+                or response_dict.get("mensaje_asistente")
+            )
+
+        # Capturar thread_id con múltiples variaciones
+
+        # Extract thread_id from various sources - fixed logic
+        thread_foundry = None
+        if params.get("thread_id"):
+            thread_foundry = str(params.get("thread_id")).strip()
+        elif params.get("Thread-ID"):
+            thread_foundry = str(params.get("Thread-ID")).strip()
+        elif response_dict.get("thread_id"):
+            thread_foundry = str(response_dict.get("thread_id")).strip()
+        elif contexto_convers.get("thread_id"):
+            thread_foundry = str(contexto_convers.get("thread_id")).strip()
+
+        # Ensure empty strings become None
+        if not thread_foundry:
+            thread_foundry = None
+
+        instrucciones_humanas = (
+            params.get("instrucciones")
+            or response_dict.get("instrucciones_humanas")
+            or contexto_convers.get("mensaje")
+        )
+
+        contexto_conversacional = contexto_convers or response_dict.get(
+            "contexto_inteligente") or {}
+
+        flujo_dialogo: List[Dict[str, Any]] = []
+        posibles_interacciones = (
+            response_dict.get("interacciones")
+            or response_dict.get("extras", {}).get("interacciones")
+            or []
+        )
+        if isinstance(posibles_interacciones, list):
+            for item in posibles_interacciones[:10]:
+                if isinstance(item, dict):
+                    flujo_dialogo.append({
+                        "timestamp": item.get("timestamp"),
+                        "endpoint": item.get("endpoint"),
+                        "texto": item.get("texto_semantico") or item.get("consulta"),
+                        "exito": item.get("exito", True)
+                    })
+
+        llamada_data["conversacion_humana"] = {
+            "mensaje_usuario": mensaje_usuario or "",
+            "mensaje_asistente": mensaje_asistente or "",
+            "thread_id": thread_foundry or "",
+            "contexto_conversacional": contexto_conversacional,
+            "instrucciones_humanas": instrucciones_humanas or "",
+            "flujo_dialogo": flujo_dialogo
+        }
+        llamada_data["es_conversacion_humana"] = bool(
+            mensaje_usuario or mensaje_asistente)
 
         # ❌ FILTRAR EVENTOS BASURA: No guardar eventos genéricos sin valor
         if endpoint == "unknown" and not params.get("respuesta_usuario"):
             if isinstance(response_data, dict):
                 msg = str(response_data.get("mensaje", ""))
                 if "Evento semantic" in msg or not msg.strip():
-                    logging.info("🚫 Evento basura filtrado: sin contenido útil")
+                    logging.info(
+                        "🚫 Evento basura filtrado: sin contenido útil")
                     return False
-        
+
         # 🔥 DETECTAR EVENTOS REPETITIVOS
         if self._es_evento_repetitivo(endpoint, response_data, session_id):
             llamada_data["es_repetido"] = True
@@ -490,50 +595,56 @@ class MemoryService:
                 logging.info(
                     f"📊 Resumen enriquecido: {respuesta_resumen[:100]}...")
 
-        # === 🔧 EXTRACTOR DE CAMPOS TÉCNICOS ===
+        # === EXTRACTOR DE CAMPOS TÉCNICOS ===
         def _extraer_campos_tecnicos(data: Any) -> str:
             """Extrae IDs técnicos (UUIDs, Client ID, etc.) de JSONs para búsqueda literal."""
             campos_extraidos = []
-            
+
             def _buscar_recursivo(obj, profundidad=0):
                 if profundidad > 3:  # Limitar recursión
                     return
-                
+
                 if isinstance(obj, dict):
                     for key, value in obj.items():
                         key_lower = str(key).lower()
-                        
+
                         # Detectar campos de IDs
                         if any(id_key in key_lower for id_key in ['principalid', 'clientid', 'tenantid', 'subscriptionid', 'applicationid', 'resourceid']):
                             if value and isinstance(value, str):
                                 # Formatear para búsqueda
-                                campo_nombre = key.replace('_', ' ').replace('-', ' ').title()
-                                campos_extraidos.append(f"{campo_nombre}: {value}")
-                        
+                                campo_nombre = key.replace(
+                                    '_', ' ').replace('-', ' ').title()
+                                campos_extraidos.append(
+                                    f"{campo_nombre}: {value}")
+
                         # Buscar UUIDs en valores
                         if isinstance(value, str) and len(value) == 36 and value.count('-') == 4:
                             import re
                             if re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', value, re.IGNORECASE):
-                                campo_nombre = key.replace('_', ' ').replace('-', ' ').title()
-                                campos_extraidos.append(f"{campo_nombre}: {value}")
-                        
+                                campo_nombre = key.replace(
+                                    '_', ' ').replace('-', ' ').title()
+                                campos_extraidos.append(
+                                    f"{campo_nombre}: {value}")
+
                         # Recursión
                         _buscar_recursivo(value, profundidad + 1)
-                
+
                 elif isinstance(obj, (list, tuple)) and profundidad < 2:
                     for item in obj[:5]:  # Limitar a primeros 5 elementos
                         _buscar_recursivo(item, profundidad + 1)
-            
+
             _buscar_recursivo(data)
-            
+
             if campos_extraidos:
                 # Deduplicar
                 campos_unicos = list(dict.fromkeys(campos_extraidos))
-                return "\n🔑 " + "\n🔑 ".join(campos_unicos[:10])  # Máximo 10 campos
+                # Máximo 10 campos
+                return "\n🔑 " + "\n🔑 ".join(campos_unicos[:10])
             return ""
-        
+
         def _inferir_tipo_evento(texto_semantico: str) -> str:
-            """Deriva la intención real del evento para evitar depender de etiquetas externas."""
+            """Deriva la intención real del evento usando clasificador semántico avanzado."""
+            # 1️⃣ PRIORIDAD: Tipos explícitos en response_data/params
             explicitos: List[str] = []
             if isinstance(response_data, dict):
                 for key in ["tipo", "tipo_evento", "categoria", "category"]:
@@ -555,38 +666,99 @@ class MemoryService:
                 if candidato:
                     return candidato
 
-            texto_ref = " ".join(filter(None, [
-                texto_semantico or "",
-                endpoint or "",
-                source or "",
-                str(params.get("comando") or ""),
-                str(params.get("consulta") or ""),
-                str(params.get("query") or ""),
-                str(params.get("operacion") or ""),
-                str(response_dict.get("mensaje")) if isinstance(response_dict, dict) and response_dict.get("mensaje") else ""
-            ])).lower()
+            # 2️⃣ CLASIFICACIÓN SEMÁNTICA PRINCIPAL
+            try:
+                from semantic_intent_classifier import classify_text
 
-            def _contiene(patrones: List[str]) -> bool:
-                return any(p in texto_ref for p in patrones)
+                # Construir texto completo para clasificación
+                texto_completo = " ".join(filter(None, [
+                    texto_semantico or "",
+                    str(response_data.get("respuesta_usuario", "")
+                        ) if isinstance(response_data, dict) else "",
+                    str(params.get("consulta", "")) if isinstance(
+                        params, dict) else "",
+                    str(params.get("mensaje", "")) if isinstance(
+                        params, dict) else ""
+                ])).strip()
 
-            correccion_kw = ["correg", "fix", "ajust", "parche", "patch", "arregl", "solucion", "resolver", "aplicar correccion", "rollback"]
-            diagnostico_kw = ["diagnostico", "diagnóstico", "status", "estado", "health", "metricas", "metrics", "verificar"]
-            archivo_kw = ["archivo", "escribir", "modificar", "contenido", "guardar", "sobrescribir"]
-            cli_kw = ["cli", "command", "powershell", "bash", "script", "ejecutar"]
+                if texto_completo:
+                    response_dict_safe = response_data if isinstance(
+                        response_data, dict) else {}
+                    clasificacion = classify_text(
+                        text=texto_completo,
+                        endpoint=endpoint or "",
+                        response_data=response_dict_safe,
+                        success=success
+                    )
 
+                    tipo_semantico = clasificacion.get("tipo")
+                    confianza = clasificacion.get("confianza", 0.0)
+                    metodo = clasificacion.get("metodo", "semantic")
+
+                    # Usar resultado semántico si hay confianza razonable
+                    if tipo_semantico and confianza >= 0.4:  # Umbral más bajo para mayor cobertura
+                        logging.info(
+                            f"[SEMANTIC] Tipo inferido semánticamente: {tipo_semantico} (confianza: {confianza:.2f}, método: {metodo})")
+                        return tipo_semantico
+
+            except Exception as e:
+                logging.debug(
+                    f"Fallback a clasificación por palabras clave: {e}")
+
+            # 3️⃣ FALLBACK MÍNIMO: Solo para casos extremos
+            for candidato in explicitos:
+                if candidato:
+                    return candidato
+
+            # 4️⃣ FALLBACK PALABRAS CLAVE: Definir listas y función auxiliar
+            def _contiene(keywords):
+                texto_ref = " ".join(filter(None, [
+                    texto_semantico or "",
+                    endpoint or "",
+                    source or "",
+                    str(params.get("comando") or ""),
+                    str(params.get("consulta") or ""),
+                    str(params.get("query") or ""),
+                    str(params.get("operacion") or ""),
+                    str(response_dict.get("mensaje")) if isinstance(
+                        response_dict, dict) and response_dict.get("mensaje") else ""
+                ])).lower()
+                return any(kw in texto_ref for kw in keywords)
+
+            # Definir listas de palabras clave
+            correccion_kw = ["corregir", "reparar", "fix",
+                             "arreglar", "aplicar", "correccion"]
+            diagnostico_kw = ["diagnostico", "status",
+                              "health", "verificar", "comprobar"]
+            boat_kw = ["boat", "embarcacion", "reserva",
+                       "booking", "alquiler", "rental"]
+            archivo_kw = ["archivo", "file",
+                          "escribir", "leer", "crear", "eliminar"]
+            cli_kw = ["az ", "cli", "comando", "ejecutar"]
+
+            # Clasificación por palabras clave
             if _contiene(correccion_kw):
                 return "correccion"
             if not success:
                 return "error_endpoint"
             if _contiene(diagnostico_kw):
                 return "diagnostico"
+            if _contiene(boat_kw):
+                return "boat_management"
             if _contiene(archivo_kw):
                 return "operacion_archivo"
             if _contiene(cli_kw):
                 return "ejecucion_cli"
+
+            # Análisis contextual adicional
+            if endpoint and any(word in endpoint.lower() for word in ["boat", "rental", "booking"]):
+                return "boat_management"
+            if source and "copiloto" in source.lower():
+                return "consulta_general"
+
             return "interaccion"
-        
-        # === 🧠 GENERADOR SEMÁNTICO ENRIQUECIDO ===
+
+        # === GENERADOR SEMÁNTICO ENRIQUECIDO ===
         def _construir_texto_semantico_rico(response_data, endpoint, agent_id, success, params):
             """Construye texto semántico útil, contextual y rico como lo haría un asistente inteligente."""
 
@@ -606,7 +778,7 @@ class MemoryService:
                 if response_data.get("mensaje"):
                     msg = str(response_data["mensaje"]).strip()
                     if len(msg) > 50 and "CONSULTA DE HISTORIAL" not in msg:
-                        bloques.append(f"📝 {msg[:400]}")
+                        bloques.append(f"MENSAJE: {msg[:400]}")
 
                 # Interpretación semántica
                 if response_data.get("interpretacion_semantica"):
@@ -684,12 +856,13 @@ class MemoryService:
         texto_semantico_final, auto_generated = _construir_texto_semantico_rico(
             response_data, endpoint, agent_id, success, params
         )
-        
+
         # 🔧 ENRIQUECER con campos técnicos extraídos
         campos_tecnicos = _extraer_campos_tecnicos(response_data)
         if campos_tecnicos:
             texto_semantico_final = f"{texto_semantico_final}\n{campos_tecnicos}"
-            logging.info(f"🔑 Campos técnicos extraídos y agregados al texto semántico")
+            logging.info(
+                f"🔑 Campos técnicos extraídos y agregados al texto semántico")
 
         if auto_generated:
             logging.info(
@@ -820,8 +993,10 @@ class MemoryService:
 
     def _classify_event(self, event: Dict[str, Any]) -> str:
         """Determina la clase de documento para evitar contaminar la memoria cognitiva."""
-        event_type = str(event.get("event_type") or event.get("tipo") or "").lower()
-        endpoint_raw = str(event.get("endpoint") or event.get("data", {}).get("endpoint", "")).lower()
+        event_type = str(event.get("event_type")
+                         or event.get("tipo") or "").lower()
+        endpoint_raw = str(event.get("endpoint") or event.get(
+            "data", {}).get("endpoint", "")).lower()
         endpoint = endpoint_raw.replace("_", "-")
 
         if event.get("data", {}).get("from_historial"):
@@ -846,7 +1021,7 @@ class MemoryService:
         try:
             if not self.cosmos_available or not self.memory_container:
                 return False
-            
+
             query = "SELECT TOP 1 c.id FROM c WHERE c.session_id = @session_id AND c.texto_hash = @hash"
             items = list(self.memory_container.query_items(
                 query,
@@ -856,18 +1031,18 @@ class MemoryService:
                 ],
                 enable_cross_partition_query=True
             ))
-            
+
             return len(items) > 0
         except Exception as e:
             logging.warning(f"Error verificando duplicado por hash: {e}")
             return False
-    
+
     def _es_evento_repetitivo(self, endpoint: str, response_data: Any, session_id: str, ventana: int = 5) -> bool:
         """Detecta si el mismo endpoint se ejecutó recientemente con respuesta similar"""
         try:
             if not self.cosmos_available or not self.memory_container:
                 return False
-            
+
             query = f"SELECT TOP {ventana} * FROM c WHERE c.session_id = @session_id AND c.data.endpoint = @endpoint ORDER BY c.timestamp DESC"
             items = list(self.memory_container.query_items(
                 query,
@@ -877,13 +1052,13 @@ class MemoryService:
                 ],
                 enable_cross_partition_query=True
             ))
-            
+
             if len(items) >= 3:
                 return True
             return False
         except:
             return False
-    
+
     def evento_ya_existe(self, texto_semantico: str) -> bool:
         """Verifica si un evento con texto similar ya existe en AI Search."""
         try:
