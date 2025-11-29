@@ -14,6 +14,7 @@ import os
 AGENT_REGISTRY = {
     "correccion": {
         "agent_id": "Agent975",  # Agente corrector de código
+        "model": "mistral-large-2411",  # Excelente para código y precisión técnica
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_MAIN", "yellowstone413g-9987"),
         "capabilities": ["code_fixing", "syntax_correction", "file_editing"],
@@ -21,6 +22,8 @@ AGENT_REGISTRY = {
     },
     "diagnostico": {
         "agent_id": "Agent914",  # Agente de diagnóstico
+        # Excelente para análisis y razonamiento complejo
+        "model": "claude-3-5-sonnet-20241022",
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_MAIN", "yellowstone413g-9987"),
         "capabilities": ["system_diagnosis", "health_check", "monitoring"],
@@ -28,6 +31,8 @@ AGENT_REGISTRY = {
     },
     "boat_management": {
         "agent_id": "BookingAgent",  # Agente de gestión de embarcaciones
+        # Excelente para interacción con clientes y gestión de reservas
+        "model": "gpt-4o-2024-11-20",
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_BOOKING", "booking-agents"),
         "capabilities": ["booking", "reservation", "boat_info", "availability"],
@@ -35,6 +40,7 @@ AGENT_REGISTRY = {
     },
     "ejecucion_cli": {
         "agent_id": "Agent975",  # Reutilizar agente executor
+        "model": "gpt-4-2024-11-20",  # Sólido para comandos CLI y Azure tooling
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_MAIN", "yellowstone413g-9987"),
         "capabilities": ["cli_execution", "command_line", "azure_cli"],
@@ -42,6 +48,8 @@ AGENT_REGISTRY = {
     },
     "operacion_archivo": {
         "agent_id": "Agent975",  # Reutilizar agente corrector para archivos
+        # Especializado en operaciones con archivos y código
+        "model": "codestral-2024-10-29",
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_MAIN", "yellowstone413g-9987"),
         "capabilities": ["file_operations", "read_write", "file_management"],
@@ -49,6 +57,7 @@ AGENT_REGISTRY = {
     },
     "conversacion_general": {
         "agent_id": "Agent914",  # Agente general por defecto
+        "model": "gpt-4o-mini-2024-07-18",  # Eficiente y rápido para conversación general
         "endpoint": os.getenv("AI_FOUNDRY_ENDPOINT", "https://boatRentalFoundry-dev.services.ai.azure.com"),
         "project_id": os.getenv("AI_PROJECT_ID_MAIN", "yellowstone413g-9987"),
         "capabilities": ["general_chat", "information", "assistance"],
@@ -98,11 +107,15 @@ class AgentRouter:
                 "agent_id": agent_info["agent_id"],
                 "endpoint": agent_info["endpoint"],
                 "project_id": agent_info["project_id"],
+                # Modelo asignado o fallback
+                "model": agent_info.get("model", "gpt-4o-mini-2024-07-18"),
                 "capabilities": agent_info["capabilities"],
                 "description": agent_info["description"],
                 "routing_metadata": {
                     "intent": intent,
                     "confidence": confidence,
+                    # Modelo para trazabilidad
+                    "model": agent_info.get("model", "gpt-4o-mini-2024-07-18"),
                     "routing_timestamp": datetime.now(timezone.utc).isoformat(),
                     "user_message_length": len(user_message) if user_message else 0,
                     "session_id": session_id,
@@ -133,15 +146,19 @@ class AgentRouter:
         except Exception as e:
             logging.error(f"[AgentRouter] Error en routing: {e}")
             # Fallback de emergencia
+            fallback_model = self.agent_registry.get(
+                "conversacion_general", {}).get("model", "gpt-4o-mini-2024-07-18")
             return {
                 "agent_id": "Agent914",
                 "endpoint": self.agent_registry.get("conversacion_general", {}).get("endpoint", ""),
                 "project_id": self.agent_registry.get("conversacion_general", {}).get("project_id", ""),
+                "model": fallback_model,
                 "capabilities": ["fallback"],
                 "description": "Agente de emergencia por error en routing",
                 "routing_metadata": {
                     "intent": intent,
                     "confidence": 0.0,
+                    "model": fallback_model,
                     "routing_timestamp": datetime.now(timezone.utc).isoformat(),
                     "error": str(e),
                     "emergency_fallback": True
@@ -232,13 +249,17 @@ def route_by_semantic_intent(user_message: str, session_id: Optional[str] = None
     except Exception as e:
         logging.error(f"[SemanticRouter] Error en routing semántico: {e}")
         # Fallback de emergencia
+        fallback_model = AGENT_REGISTRY.get("conversacion_general", {}).get(
+            "model", "gpt-4o-mini-2024-07-18")
         return {
             "agent_id": "Agent914",
             "endpoint": AGENT_REGISTRY.get("conversacion_general", {}).get("endpoint", ""),
             "project_id": AGENT_REGISTRY.get("conversacion_general", {}).get("project_id", ""),
+            "model": fallback_model,
             "capabilities": ["emergency_fallback"],
             "description": "Routing de emergencia",
             "routing_metadata": {
+                "model": fallback_model,
                 "error": str(e),
                 "emergency_fallback": True
             }

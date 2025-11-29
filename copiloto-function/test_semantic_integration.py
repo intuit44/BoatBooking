@@ -192,6 +192,7 @@ def test_agent_routing() -> float:
             "user_message": "Corrige fix_123.py línea 45",
             "expected_intent": "correccion",
             "expected_agent": "Agent975",
+            "expected_model": "mistral-large-2411",
             "expected_capabilities": ["code_fixing", "syntax_correction", "file_editing"]
         },
         {
@@ -199,6 +200,7 @@ def test_agent_routing() -> float:
             "user_message": "Diagnostica el sistema completo",
             "expected_intent": "diagnostico",
             "expected_agent": "Agent914",
+            "expected_model": "claude-3-5-sonnet-20241022",
             "expected_capabilities": ["system_diagnosis", "health_check", "monitoring"]
         },
         {
@@ -206,6 +208,7 @@ def test_agent_routing() -> float:
             "user_message": "Gestionar reserva de embarcación para mañana",
             "expected_intent": "boat_management",
             "expected_agent": "BookingAgent",
+            "expected_model": "gpt-4o-2024-11-20",
             "expected_capabilities": ["booking", "reservation", "boat_info", "availability"]
         },
         {
@@ -213,6 +216,7 @@ def test_agent_routing() -> float:
             "user_message": "Ejecutar az group list --output table",
             "expected_intent": "ejecucion_cli",
             "expected_agent": "Agent975",
+            "expected_model": "gpt-4-2024-11-20",
             "expected_capabilities": ["cli_execution", "command_line", "azure_cli"]
         },
         {
@@ -220,6 +224,7 @@ def test_agent_routing() -> float:
             "user_message": "Escribir archivo de configuración config.json",
             "expected_intent": "operacion_archivo",
             "expected_agent": "Agent975",
+            "expected_model": "codestral-2024-10-29",
             "expected_capabilities": ["file_operations", "read_write", "file_management"]
         },
         {
@@ -227,6 +232,7 @@ def test_agent_routing() -> float:
             "user_message": "Hola, ¿cómo estás?",
             "expected_intent": "conversacion_general",  # Fallback intent
             "expected_agent": "Agent914",  # Agente general
+            "expected_model": "gpt-4o-mini-2024-07-18",
             "expected_capabilities": ["general_chat", "information", "assistance"]
         }
     ]
@@ -250,20 +256,36 @@ def test_agent_routing() -> float:
             detected_intent = routing_metadata.get("intent") or routing_result.get(
                 "intent_classification", {}).get("intent")
             capabilities = routing_result.get("capabilities", [])
+            assigned_model = routing_metadata.get(
+                "model") or routing_result.get("model")
 
             # Checks principales
             agent_correct = selected_agent == case["expected_agent"]
             intent_match = detected_intent == case["expected_intent"]
+            model_correct = assigned_model == case["expected_model"]
             has_required_capabilities = any(
                 cap in capabilities for cap in case["expected_capabilities"])
 
-            if agent_correct and (intent_match or case["name"] == "Routing Fallback") and has_required_capabilities:
+            if agent_correct and (intent_match or case["name"] == "Routing Fallback") and model_correct and has_required_capabilities:
                 print(
-                    f"[OK] {case['name']}: Intent '{detected_intent}' → Agent '{selected_agent}' ✓")
+                    f"[OK] {case['name']}: Intent '{detected_intent}' → Agent '{selected_agent}' → Model '{assigned_model}' ✓")
                 passed += 1
             else:
-                print(
-                    f"[FAIL] {case['name']}: Expected agent '{case['expected_agent']}', got '{selected_agent}'. Intent: '{detected_intent}'")
+                error_details = []
+                if not agent_correct:
+                    error_details.append(
+                        f"Agent: expected '{case['expected_agent']}', got '{selected_agent}'")
+                if not intent_match and case["name"] != "Routing Fallback":
+                    error_details.append(
+                        f"Intent: expected '{case['expected_intent']}', got '{detected_intent}'")
+                if not model_correct:
+                    error_details.append(
+                        f"Model: expected '{case['expected_model']}', got '{assigned_model}'")
+                if not has_required_capabilities:
+                    error_details.append(
+                        f"Capabilities: missing from {capabilities}")
+
+                print(f"[FAIL] {case['name']}: {'; '.join(error_details)}")
 
             # Test de función helper simple
             simple_agent = get_agent_for_message(user_message, session_id)
