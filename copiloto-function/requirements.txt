@@ -40,4 +40,4 @@ azure-search-documents>=11.4.0
 psutil==5.9.8
 
 # Added per request
-redis[hiredis,json]
+redis[hiredis,json]==7.1.0

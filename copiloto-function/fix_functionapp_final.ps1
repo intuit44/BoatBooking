@@ -170,6 +170,7 @@ try {
     "REDIS_USE_MANAGED_IDENTITY"                  = "true"
     "REDIS_JSON"                                  = "1"
     "REDIS_DB"                                    = "0"
+    "REDIS_VERSION"                               = "7.1.0"
     # Redis TTLs
     "REDIS_MEMORIA_TTL"                           = "7200"   # 2 horas - Memoria de sesión activa
     "REDIS_THREAD_TTL"                            = "14400"  # 4 horas - Threads de conversación
