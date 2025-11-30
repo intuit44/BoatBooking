@@ -15,6 +15,13 @@ from azure.storage.queue import QueueClient
 
 from services.redis_buffer_service import redis_buffer
 
+# Importar interceptor inteligente pre-respuesta
+try:
+    from pre_response_intelligence import enrich_user_query_before_response, get_intelligence_context
+except Exception:
+    enrich_user_query_before_response = None
+    get_intelligence_context = None
+
 try:
     from semantic_intent_classifier import classify_user_intent, preprocess_text
 except Exception:  # pragma: no cover
@@ -445,9 +452,67 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             except Exception:
                                 pass
 
-                        # 🔄 INYECCIÓN AUTOMÁTICA DE CONTINUIDAD CONVERSACIONAL
+                        # 🧠 PRE-RESPONSE INTELLIGENCE: Interceptor universal que reutiliza TODA la lógica existente
+                        intelligence_context = None
+                        if user_message and len(user_message) > 5 and enrich_user_query_before_response and get_intelligence_context:
+                            try:
+                                # CAPTURA AUTOMÁTICA DE THREAD para Pre-Intelligence
+                                _, session_id, agent_id = _hydrate_request_identificadores(
+                                    req)
+                                agente_asignado = routing_result.get(
+                                    "agent_id") if routing_result else (agent_id or "foundry_user")
+
+                                # Obtener contexto completo de inteligencia (con validaciones)
+                                intelligence_context = get_intelligence_context(
+                                    user_query=user_message,
+                                    session_id=session_id or "fallback_session",
+                                    agent_id=agente_asignado
+                                )                                # Si hay un prompt enriquecido, actualizar el body
+                                if intelligence_context and intelligence_context.enriched_prompt:
+                                    enriched_prompt = intelligence_context.enriched_prompt
+
+                                    # IMPORTANTE: Reemplazar el input del usuario con el prompt enriquecido
+                                    if "input" in body:
+                                        body["input"] = enriched_prompt
+                                    elif "mensaje" in body:
+                                        body["mensaje"] = enriched_prompt
+                                    elif "query" in body:
+                                        body["query"] = enriched_prompt
+                                    elif "prompt" in body:
+                                        body["prompt"] = enriched_prompt
+
+                                    # Override del método get_json para devolver el body enriquecido
+                                    original_get_json = req.get_json
+
+                                    def get_intelligently_enriched_json():
+                                        return body
+
+                                    req.get_json = get_intelligently_enriched_json
+
+                                    # Marcar que se aplicó inteligencia pre-respuesta
+                                    setattr(
+                                        req, "_pre_response_intelligence_applied", True)
+                                    setattr(req, "_intelligence_context",
+                                            intelligence_context)
+                                    setattr(req, "_original_message",
+                                            user_message)
+                                    setattr(req, "_enriched_message",
+                                            enriched_prompt)
+
+                                    logging.info(
+                                        f"🧠 [PreIntelligence] Contexto inteligente inyectado para sesión {session_id[:8]}... (acción: {intelligence_context.recommended_action})")
+                                else:
+                                    logging.debug(
+                                        f"🧠 [PreIntelligence] Sin enriquecimiento necesario para sesión {session_id[:8]}...")
+
+                            except Exception as e:
+                                logging.warning(
+                                    f"⚠️ Error en Pre-Response Intelligence: {e}")
+                                intelligence_context = None
+
+                        # 🔄 INYECCIÓN AUTOMÁTICA DE CONTINUIDAD CONVERSACIONAL (Solo si no se aplicó Pre-Intelligence)
                         conversational_context = None
-                        if user_message and len(user_message) > 5:
+                        if user_message and len(user_message) > 5 and not getattr(req, "_pre_response_intelligence_applied", False):
                             try:
                                 from conversational_continuity_middleware import inject_conversational_context, build_context_enriched_prompt
 
@@ -456,7 +521,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 agente_asignado = routing_result.get(
                                     "agent_id") if routing_result else agent_id
 
-                                # Inyectar contexto conversacional automáticamente
+                                # Inyectar contexto conversacional automáticamente (FALLBACK si no hay Pre-Intelligence)
                                 conversational_context = inject_conversational_context(
                                     user_message=user_message,
                                     session_id=session_id,
@@ -1074,3 +1139,45 @@ def wrap_function_app_with_memory(app: func.FunctionApp) -> func.FunctionApp:
     apply_memory_wrapper(app)
     logging.info("🚀 FunctionApp envuelta con sistema de memoria automática")
     return app
+
+
+def apply_pre_response_intelligence(request) -> Optional[Dict[str, Any]]:
+    """
+    Función de test para validar Pre-Response Intelligence
+
+    Simula la aplicación del interceptor para pruebas unitarias
+    """
+    try:
+        if not enrich_user_query_before_response or not get_intelligence_context:
+            return None
+
+        # Extraer query de request
+        if hasattr(request, 'get_json') and callable(request.get_json):
+            data = request.get_json()
+            if isinstance(data, dict):
+                query = data.get("query", "")
+                session_id = data.get("session_id", f"test_{int(time.time())}")
+            else:
+                return None
+        else:
+            return None
+
+        if not query or len(query) < 5:
+            return None
+
+        # Aplicar intelligence
+        context = get_intelligence_context(query, session_id, "test_agent")
+
+        return {
+            "original_query": query,
+            "enriched_prompt": context.enriched_prompt,
+            "recommended_action": context.recommended_action,
+            "has_conversation_context": bool(context.conversation_context),
+            "has_github_context": bool(context.github_context),
+            "has_semantic_results": bool(context.semantic_results),
+            "session_id": session_id
+        }
+
+    except Exception as e:
+        logging.warning(f"Error en apply_pre_response_intelligence: {e}")
+        return None

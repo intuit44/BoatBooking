@@ -479,6 +479,41 @@ class RedisBufferService:
         """Alias para get_cache_stats para compatibilidad."""
         return self.get_cache_stats()
 
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+        """
+        Método directo para set (compatibilidad con tests)
+        """
+        if not self.is_enabled:
+            return False
+
+        try:
+            if isinstance(value, (dict, list)):
+                # Para objetos JSON, usar JSON.SET si está disponible
+                self._json_set(key, value, ttl=ex)
+            else:
+                # Para strings/datos simples
+                if self._client:
+                    self._client.set(key, value, ex=ex)
+            return True
+        except Exception as e:
+            logging.error(f"[RedisBuffer] Error en set({key}): {e}")
+            return False
+
+    def delete(self, key: str) -> bool:
+        """
+        Método directo para delete (compatibilidad con tests)
+        """
+        if not self.is_enabled:
+            return False
+
+        try:
+            if self._client:
+                return bool(self._client.delete(key))
+            return False
+        except Exception as e:
+            logging.error(f"[RedisBuffer] Error en delete({key}): {e}")
+            return False
+
 
 # Instancia global para importar como redis_buffer
 redis_buffer = RedisBufferService()
