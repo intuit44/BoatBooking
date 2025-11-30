@@ -445,6 +445,71 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             except Exception:
                                 pass
 
+                        # 🔄 INYECCIÓN AUTOMÁTICA DE CONTINUIDAD CONVERSACIONAL
+                        conversational_context = None
+                        if user_message and len(user_message) > 5:
+                            try:
+                                from conversational_continuity_middleware import inject_conversational_context, build_context_enriched_prompt
+
+                                _, session_id, agent_id = _hydrate_request_identificadores(
+                                    req)
+                                agente_asignado = routing_result.get(
+                                    "agent_id") if routing_result else agent_id
+
+                                # Inyectar contexto conversacional automáticamente
+                                conversational_context = inject_conversational_context(
+                                    user_message=user_message,
+                                    session_id=session_id,
+                                    agent_id=agente_asignado
+                                )
+
+                                # Si hay contexto significativo, enriquecer el prompt del usuario
+                                if conversational_context.get("has_context", False):
+                                    enriched_prompt = build_context_enriched_prompt(
+                                        original_prompt=user_message,
+                                        user_message=user_message,
+                                        session_id=session_id,
+                                        agent_id=agente_asignado
+                                    )
+
+                                    # IMPORTANTE: Reemplazar el input/mensaje del usuario con el prompt enriquecido
+                                    if "input" in body:
+                                        body["input"] = enriched_prompt
+                                    elif "mensaje" in body:
+                                        body["mensaje"] = enriched_prompt
+                                    elif "query" in body:
+                                        body["query"] = enriched_prompt
+                                    elif "prompt" in body:
+                                        body["prompt"] = enriched_prompt
+
+                                    # Actualizar el request con el body modificado
+                                    setattr(req, "_json_body", body)
+                                    setattr(
+                                        req, "_conversational_context_injected", True)
+                                    setattr(req, "_original_message",
+                                            user_message)
+                                    setattr(req, "_enriched_message",
+                                            enriched_prompt)
+
+                                    # Override del método get_json para devolver el body enriquecido
+                                    original_get_json = req.get_json
+
+                                    def get_enriched_json():
+                                        return body
+
+                                    req.get_json = get_enriched_json
+
+                                    logging.info(
+                                        f"🔄 [ConversationalContinuity] Contexto inyectado automáticamente para sesión {session_id[:8]}...")
+                                else:
+                                    logging.debug(
+                                        f"🔄 [ConversationalContinuity] Sin contexto suficiente para sesión {session_id[:8]}...")
+
+                            except Exception as e:
+                                logging.warning(
+                                    f"⚠️ Error en inyección de continuidad conversacional: {e}")
+                                conversational_context = None
+
                         # Resolver intencion revisar_logs sin depender de /api/logs
                         if user_message and len(user_message) > 3:
                             intent_logs = _resolver_intencion_logs(

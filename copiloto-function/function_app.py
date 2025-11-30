@@ -12931,35 +12931,41 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     # 🧠 INFERENCIA INTELIGENTE PARA BODY VACÍO O INCOMPLETO
     # Si el body está vacío pero hay intención de deploy de modelos, construir payload automáticamente
     if not body or (not body.get("models") and not body.get("resourceGroup") and not body.get("template")):
-        # Intentar obtener intención del memory wrapper o headers
         user_message = req.headers.get("X-User-Message", "")
-        intent_keywords = ["deploy", "desplegar",
-                           "model", "modelo", "foundry", "ai"]
+        intent_keywords = ["deploy", "desplegar", "model", "modelo", "foundry", "ai"]
 
-        # Si hay indicios de deployment de modelos, construir payload por defecto
         if any(keyword in user_message.lower() for keyword in intent_keywords) or not body:
-            logging.info(
-                "🧠 [DEPLOY] Body vacío detectado, aplicando inferencia inteligente para deployment de modelos")
-
-            # Obtener modelos por defecto del AGENT_REGISTRY
+            logging.info("🧠 [DEPLOY] Body vacío detectado, aplicando inferencia inteligente para deployment de modelos")
             try:
                 from router_agent import AGENT_REGISTRY
-                # Obtener modelos únicos como lista para poder hacer slice
-                unique_models = set(
-                    agent_config.get("model")
-                    for agent_config in AGENT_REGISTRY.values()
-                    if agent_config.get("model")
-                )
-                default_models = list(unique_models)
 
-                # Si había algo en el body original, preservarlo y complementarlo
+                # Flatten de modelos, aceptando str o lista, ignorando tipos no hashable
+                unique_models = []
+                for agent_config in AGENT_REGISTRY.values():
+                    model_entry = agent_config.get("model")
+                    if isinstance(model_entry, str):
+                        unique_models.append(model_entry)
+                    elif isinstance(model_entry, (list, tuple)):
+                        for m in model_entry:
+                            if isinstance(m, str):
+                                unique_models.append(m)
+
+                # Deduplicar preservando orden
+                seen = set()
+                default_models = []
+                for m in unique_models:
+                    if m not in seen:
+                        seen.add(m)
+                        default_models.append(m)
+
+                if not default_models:
+                    raise ValueError("AGENT_REGISTRY no contiene modelos válidos")
+
                 inferred_body = {
                     "action": "deployModels",
-                    # Usar solo 2 por defecto para no saturar
-                    "models": body.get("models", default_models[:2])
+                    "models": body.get("models") or default_models[:2]
                 }
 
-                # Mantener otros campos si existían
                 for key, value in body.items():
                     if key not in inferred_body:
                         inferred_body[key] = value
@@ -12968,9 +12974,7 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                 logging.info(f"🧠 [DEPLOY] Payload inferido: {body}")
 
             except Exception as e:
-                logging.warning(
-                    f"⚠️ [DEPLOY] No se pudo inferir payload de modelos: {e}")
-                # Si falla la inferencia, devolver error descriptivo
+                logging.warning(f"⚠️ [DEPLOY] No se pudo inferir payload de modelos: {e}")
                 res = {
                     "ok": False,
                     "error_code": "INVALID_PAYLOAD",
@@ -12987,12 +12991,11 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                     source="deploy_inference_failed",
                     endpoint="/api/deploy",
                     method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
+                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
                     response_data=res,
                     success=False
                 )
-                return func.HttpResponse(json.dumps(res, ensure_ascii=False), status_code=400, mimetype="application/json")
+                return func.HttpResponse(json.dumps(res, ensure_ascii=False), status_code=200, mimetype="application/json")
 
     # 🤖 DETECCIÓN DE TIPO DE DEPLOYMENT
     # Si contiene 'models' o action='deployModels' → Foundry Models
@@ -13043,7 +13046,7 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
             response_data=res,
             success=res.get("ok", False)
         )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+        return func.HttpResponse(json.dumps(res), status_code=200, mimetype="application/json")
 
     if not (template or template_uri):
         res = {
@@ -13067,7 +13070,7 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
             response_data=res,
             success=res.get("ok", False)
         )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+        return func.HttpResponse(json.dumps(res), status_code=200, mimetype="application/json")
 
     # Validación más flexible del template para permitir templates básicos
     if template is not None:
@@ -13093,7 +13096,7 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                 response_data=res,
                 success=res.get("ok", False)
             )
-            return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+            return func.HttpResponse(json.dumps(res), status_code=200, mimetype="application/json")
         # Si no tiene resources, agregamos un array vacío para hacer el template válido
         if not template.get("resources"):
             logging.info(

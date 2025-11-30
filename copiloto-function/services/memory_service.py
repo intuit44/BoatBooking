@@ -277,7 +277,7 @@ class MemoryService:
 
             # Validar duplicados y calidad ANTES de generar embedding
             texto_sem = documento["texto_semantico"]
-            if len(texto_sem) < 40:
+            if len(texto_sem) < 10:
                 logging.info(
                     f"[SKIP] Texto muy corto, se omite indexación: {len(texto_sem)} chars")
                 return False

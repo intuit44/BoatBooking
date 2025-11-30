@@ -95,40 +95,42 @@ class RedisBufferService:
             self._enabled = False
             return
 
-        try:
-            # Obtener password desde REDIS_KEY si existe (fallback)
-            password = os.getenv("REDIS_KEY", None)
+        # Intentar primero con REDIS_KEY (fallback más directo)
+        key = os.getenv("REDIS_KEY")
+        if key:
+            try:
+                ssl_flag = bool(int(os.getenv("REDIS_SSL", "1")))
+                logging.info(
+                    f"[RedisBuffer] Intentando conexión con REDIS_KEY (host={self._host}, ssl={ssl_flag})")
 
-            # Crear cliente Redis evitando parámetros obsoletos (p. ej. retry_on_timeout)
-            redis_params = {
-                "host": self._host,
-                "port": self._port,
-                "password": password,
-                "db": self._db,
-                "ssl": self._ssl,
-                "socket_connect_timeout": 2,
-                "socket_timeout": 2,
-                "decode_responses": False,
-                "encoding": "utf-8",
-            }
+                redis_params = {
+                    "host": self._host,
+                    "port": self._port,
+                    "password": key,
+                    "db": self._db,
+                    "ssl": ssl_flag,
+                    "socket_timeout": 5,
+                    "socket_connect_timeout": 5,
+                    "decode_responses": False,
+                    "encoding": "utf-8",
+                }
 
-            if self._ssl:
-                redis_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+                if ssl_flag:
+                    redis_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
 
-            self._client = redis.Redis(**redis_params)
+                self._client = redis.Redis(**redis_params)
+                self._client.ping()
+                self._enabled = True
+                logging.info(
+                    f"[RedisBuffer] ✅ Conectado usando REDIS_KEY: {self._host}:{self._port} (ssl={ssl_flag})")
+                return
 
-            # Probar conexión
-            self._client.ping()
-            self._enabled = True
-            logging.info(
-                f"[RedisBuffer] Conectado: {self._host}:{self._port} (ssl={self._ssl})")
+            except Exception as exc:
+                logging.warning(
+                    f"[RedisBuffer] ⚠️ Falló conexión con REDIS_KEY: {exc}")
+                self._client = None
 
-        except Exception as exc:  # pragma: no cover - depende de entorno
-            logging.warning(
-                f"[RedisBuffer] Conexión inicial Redis falló: {exc}")
-            self._client = None
-            self._enabled = False
-
+        # Si REDIS_KEY falló, intentar AAD
         def _try_token_credential(label: str, credential) -> bool:
             try:
                 token = credential.get_token(self._aad_scope)
@@ -147,65 +149,39 @@ class RedisBufferService:
                     db=self._db,
                     ssl=self._ssl,
                     ssl_cert_reqs=ssl.CERT_REQUIRED,
-                    socket_timeout=2,
-                    socket_connect_timeout=2,
+                    socket_timeout=5,
+                    socket_connect_timeout=5,
                     health_check_interval=30,
                 )
                 self._client.ping()
                 self._enabled = True
                 logging.info(
-                    f"[RedisBuffer] Conectado a {self._host}:{self._port} usando {label} (ssl={self._ssl})")
+                    f"[RedisBuffer] ✅ Conectado usando {label}: {self._host}:{self._port}")
                 return True
             except Exception as exc:
                 logging.warning(
-                    f"[RedisBuffer] {label} no pudo obtener token para Redis: {exc}")
+                    f"[RedisBuffer] ⚠️ {label} falló: {exc}")
                 self._client = None
                 return False
 
-        # Intentar DefaultAzureCredential (incluye MSI y otros proveedores AAD)
+        # Intentar DefaultAzureCredential
         if DefaultAzureCredential:
             credential = DefaultAzureCredential(
                 exclude_interactive_browser_credential=True)
             if _try_token_credential("DefaultAzureCredential", credential):
                 return
 
-        # Intentar Azure CLI explícitamente para escenarios locales
+        # Intentar Azure CLI para desarrollo local
         if AzureCliCredential:
             credential = AzureCliCredential()
             if _try_token_credential("AzureCliCredential", credential):
                 return
 
-        # Fallback: usar REDIS_KEY / REDIS_SSL si AAD no está disponible
-        key = os.getenv("REDIS_KEY")
-        if not key:
-            logging.error(
-                "[RedisBuffer] No se pudo obtener token AAD y no hay REDIS_KEY configurada; Redis quedará inhabilitado.")
-            self._client = None
-            self._enabled = False
-            return
-        try:
-            ssl_flag = bool(int(os.getenv("REDIS_SSL", "0")))
-            logging.info(
-                f"[RedisBuffer] Usando fallback REDIS_KEY (host={self._host}, ssl={ssl_flag})")
-            self._client = redis.Redis(
-                host=self._host,
-                port=self._port,
-                password=key,
-                db=self._db,
-                ssl=self._ssl,
-                socket_timeout=2,
-                socket_connect_timeout=2,
-                health_check_interval=30,
-            )
-            self._client.ping()
-            self._enabled = True
-            logging.info(
-                f"[RedisBuffer] Conectado a {self._host}:{self._port} usando REDIS_KEY/REDIS_SSL (ssl={ssl_flag})")
-        except Exception as exc:  # pragma: no cover - depende de entorno
-            logging.warning(
-                f"[RedisBuffer] No se pudo conectar (AAD y fallback): {exc}")
-            self._client = None
-            self._enabled = False
+        # Si todo falló, deshabilitar Redis
+        logging.error(
+            "[RedisBuffer] ❌ No se pudo conectar con ningún método; Redis inhabilitado.")
+        self._client = None
+        self._enabled = False
 
     @property
     def is_enabled(self) -> bool:
@@ -446,9 +422,62 @@ class RedisBufferService:
             stats["used_memory_human"] = info.get("used_memory_human")
             stats["keyspace_hits"] = info.get("keyspace_hits")
             stats["keyspace_misses"] = info.get("keyspace_misses")
+            if stats["keyspace_hits"] and stats["keyspace_misses"]:
+                total = stats["keyspace_hits"] + stats["keyspace_misses"]
+                stats["hit_ratio"] = stats["keyspace_hits"] / \
+                    total if total > 0 else 0
         except Exception as exc:
             stats["info_error"] = str(exc)
         return stats
+
+    def keys(self, pattern: str = "*") -> list:
+        """Retorna lista de claves que coinciden con el patrón."""
+        if not self.is_enabled or not self._client:
+            return []
+
+        try:
+            result = cast(list, self._client.keys(pattern))
+            return result if result else []
+        except Exception as e:
+            logging.error(
+                f"[RedisBuffer] Error obteniendo keys con patrón '{pattern}': {e}")
+            return []
+
+    def get(self, key: str) -> Optional[Any]:
+        """Obtiene un valor directo desde Redis."""
+        if not self.is_enabled or not self._client:
+            return None
+
+        try:
+            # Intentar RedisJSON primero
+            if hasattr(self._client, 'json') and callable(getattr(self._client, 'json', None)):
+                try:
+                    return self._client.json().get(key, '.')
+                except Exception:
+                    pass
+
+            # Fallback a GET normal con deserialización JSON
+            raw_value = cast(Optional[bytes], self._client.get(key))
+            if raw_value is None:
+                return None
+
+            # Si es bytes, decodificar
+            decoded_value = raw_value.decode(
+                'utf-8') if isinstance(raw_value, bytes) else str(raw_value)
+
+            # Intentar deserializar JSON
+            try:
+                return json.loads(decoded_value)
+            except (json.JSONDecodeError, TypeError):
+                return decoded_value
+
+        except Exception as e:
+            logging.error(f"[RedisBuffer] Error obteniendo clave '{key}': {e}")
+            return None
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Alias para get_cache_stats para compatibilidad."""
+        return self.get_cache_stats()
 
 
 # Instancia global para importar como redis_buffer

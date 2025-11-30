@@ -20,11 +20,42 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
 def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
-    """Ejecuta comando del sistema según su tipo de manera dinámica y adaptable"""
+    """
+    Ejecuta comando del sistema según su tipo de manera dinámica y adaptable.
+
+    CURL EXCEPTION: Los comandos curl con payloads JSON no deben ser normalizados
+    porque rompe las comillas y corrompe el JSON.
+    """
 
     start_time = time.time()
 
     try:
+        # 🔧 CURL EXCEPTION: Detectar comandos curl con JSON payload
+        if (comando.strip().lower().startswith('curl') and
+                ('-d ' in comando or '--data ' in comando)):
+            logging.info(
+                "🔧 [CLI] Detectado comando CURL con payload, ejecutando directamente sin normalización")
+            # Ejecutar directamente sin parsear argumentos para preservar JSON
+            resultado = subprocess.run(
+                comando,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            duration = time.time() - start_time
+
+            return {
+                "exito": resultado.returncode == 0,
+                "codigo_salida": resultado.returncode,
+                "salida": resultado.stdout,
+                "error": resultado.stderr,
+                "comando_ejecutado": comando,
+                "duracion": duration,
+                "metodo_ejecucion": "curl_direct"
+            }
+
         # 🔥 APLICAR AUTO-FIXES ANTES DE CUALQUIER EJECUCIÓN
         try:
             from command_fixers.auto_fixers import apply_auto_fixes
@@ -62,18 +93,24 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
             env['PYTHONUNBUFFERED'] = '1'
 
         elif tipo == "powershell":
-            # 🔥 SOLUCIÓN: Envolver comando en & { } para ejecutar dentro de PowerShell
-            comando_wrapped = f"& {{ {comando} }}"
+            # 🔥 SOLUCIÓN MEJORADA: Detectar cmdlets específicos y manejar Test-Path
+            powershell_cmdlets_all = [
+                "Get-", "Set-", "New-", "Remove-", "Invoke-", "Add-", "Clear-",
+                "Copy-", "Export-", "Import-", "Move-", "Select-", "Test-",
+                "Where-", "ForEach-", "Start-", "Stop-", "Out-"
+            ]
 
-            # PowerShell con detección de cmdlets
-            if any(comando.startswith(prefix) for prefix in ["Get-", "Set-", "New-", "Remove-", "Invoke-"]):
-                # Cmdlet nativo
-                cmd_args = ["powershell", "-NoProfile",
-                            "-Command", comando_wrapped]
+            # 🔥 FIX ESPECÍFICO: Test-Path y otros cmdlets requieren manejo especial
+            if any(comando.startswith(prefix) for prefix in powershell_cmdlets_all):
+                # Cmdlet nativo - NO envolver con & { }
+                cmd_args = ["powershell", "-NoProfile", "-Command", comando]
+                logging.info(f"🔧 Cmdlet PowerShell detectado: {comando}")
             else:
-                # Comando o script PowerShell
+                # Script o expresión PowerShell - SÍ envolver
+                comando_wrapped = f"& {{ {comando} }}"
                 cmd_args = ["powershell", "-NoProfile",
                             "-ExecutionPolicy", "Bypass", "-Command", comando_wrapped]
+                logging.info(f"🔧 Script PowerShell wrapped: {comando_wrapped}")
 
             env['POWERSHELL_TELEMETRY_OPTOUT'] = '1'
             shell = False
@@ -99,6 +136,37 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
             else:
                 cmd_args = ["docker"] + comando.split()
             shell = False
+
+        elif tipo == "redis":
+            # 🔥 REDIS: Ejecutar comandos Redis usando el servicio interno
+            logging.info(f"🔧 Ejecutando comando Redis: {comando}")
+            try:
+                from services.redis_buffer_service import redis_buffer
+
+                # Determinar si es un comando directo Redis o redis-cli
+                if comando.lower().startswith('redis-cli '):
+                    # Extraer el comando después de "redis-cli "
+                    redis_command = comando[10:].strip()
+                else:
+                    # Es un comando Redis directo
+                    redis_command = comando.strip()
+
+                # Ejecutar comando usando el cliente Redis
+                resultado_redis = _ejecutar_comando_redis(
+                    redis_command, redis_buffer)
+                return resultado_redis
+
+            except Exception as e:
+                return {
+                    "exito": False,
+                    "salida": "",
+                    "error": f"Error ejecutando comando Redis: {str(e)}",
+                    "codigo_salida": 1,
+                    "comando_ejecutado": comando,
+                    "tipo_comando": tipo,
+                    "metodo_ejecucion": "redis_service_error",
+                    "timestamp": datetime.now().isoformat()
+                }
 
         elif tipo == "azure_cli":
             # Azure CLI
@@ -293,12 +361,14 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
                     logging.warning(f"PowerShell variable forzada falló: {e}")
         # --- FIN NORMALIZADOR ---
 
-        # ✅ MEJORADO: Más información de debugging
+        # ✅ MEJORADO: Más información de debugging con formato consistente
         resultado = {
             "exito": result.returncode == 0,
-            "output": result.stdout,
+            "salida": result.stdout,  # Usar "salida" para consistencia
+            "output": result.stdout,  # Mantener para compatibilidad
             "error": result.stderr if result.stderr else None,
             "return_code": result.returncode,
+            "codigo_salida": result.returncode,  # Alias para consistencia
             "duration": f"{duration:.2f}s",
             "comando_ejecutado": comando,
             "tipo_comando": tipo,
@@ -731,12 +801,28 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         # 🔥 DETECCIÓN AUTOMÁTICA DE TIPO DE COMANDO
         tipo_comando = "generic"
         if comando:
-            # Detectar comandos PowerShell
-            powershell_cmdlets = ['Get-', 'Set-', 'New-', 'Remove-', 'Invoke-', 'Add-', 'Clear-',
-                                  'Copy-', 'Export-', 'Import-', 'Move-', 'Select-', 'Test-', 'Where-', 'ForEach-']
+            # Detectar comandos PowerShell - Lista completa de cmdlets
+            powershell_cmdlets = [
+                'Get-', 'Set-', 'New-', 'Remove-', 'Invoke-', 'Add-', 'Clear-',
+                'Copy-', 'Export-', 'Import-', 'Move-', 'Select-', 'Test-',
+                'Where-', 'ForEach-', 'Start-', 'Stop-', 'Out-', 'Write-',
+                'Read-', 'Find-', 'Convert-', 'Measure-', 'Compare-'
+            ]
             if any(comando.startswith(cmdlet) for cmdlet in powershell_cmdlets):
                 tipo_comando = "powershell"
                 logging.info(f"✅ Comando PowerShell detectado: {comando}")
+            # Detectar comandos Redis
+            elif comando.lower().startswith('redis-cli ') or any(comando.upper().startswith(cmd + ' ') or comando.upper() == cmd for cmd in [
+                'PING', 'SET', 'GET', 'DEL', 'EXISTS', 'KEYS', 'FLUSHDB', 'FLUSHALL',
+                'HGET', 'HSET', 'HGETALL', 'HDEL', 'HEXISTS', 'HKEYS', 'HVALS',
+                'LPUSH', 'RPUSH', 'LPOP', 'RPOP', 'LRANGE', 'LLEN',
+                'SADD', 'SREM', 'SMEMBERS', 'SCARD', 'SISMEMBER',
+                'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
+                'TTL', 'EXPIRE', 'EXPIREAT', 'PERSIST', 'PTTL',
+                'INFO', 'DBSIZE', 'CONFIG', 'CLIENT', 'MONITOR', 'BUFFER_STATS'
+            ]):
+                tipo_comando = "redis"
+                logging.info(f"✅ Comando Redis detectado: {comando}")
             # Detectar comandos Python
             elif comando.startswith('python ') or comando.startswith('pip '):
                 tipo_comando = "python"
@@ -919,7 +1005,18 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             detection = detect_and_normalize_command(comando)
             command_type = detection.get("type", "generic")
 
-            logging.info(f"Comando detectado como: {command_type}")
+            # 🔥 OVERRIDE: Si ya detectamos PowerShell o Redis internamente, usar eso en lugar del detector externo
+            if tipo_comando == "powershell":
+                command_type = "powershell"
+                logging.info(
+                    f"🔧 Override: Usando detección interna PowerShell sobre detector externo")
+            elif tipo_comando == "redis":
+                command_type = "redis"
+                logging.info(
+                    f"🔧 Override: Usando detección interna Redis sobre detector externo")
+
+            logging.info(
+                f"Comando detectado como: {command_type} (interno: {tipo_comando})")
 
             # Si NO es comando Azure CLI, redirigir automáticamente
             if command_type != "azure_cli":
@@ -963,7 +1060,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             # Fallback: si no parece Azure CLI, ejecutar como comando genérico
             if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
                 logging.info(
-                    "Ejecutando comando no-Azure con fallback genérico")
+                    f"Ejecutando comando no-Azure con fallback usando tipo interno: {tipo_comando}")
                 # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
                 comando_normalizado = comando  # NO normalizar
                 logging.info(
@@ -1542,6 +1639,206 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             mimetype="application/json",
             status_code=200  # ✅ CAMBIO: 200 en lugar de 500
         )
+
+
+def _ejecutar_comando_redis(comando: str, redis_service) -> Dict[str, Any]:
+    """
+    Ejecuta comandos Redis usando el servicio redis_buffer_service.
+    Soporte para comandos de diagnóstico, configuración y operaciones básicas.
+    """
+    start_time = time.time()
+
+    try:
+        if not redis_service.is_enabled:
+            return {
+                "exito": False,
+                "salida": "",
+                "error": "Redis no está habilitado o no se pudo conectar",
+                "codigo_salida": 1,
+                "comando_ejecutado": comando,
+                "tipo_comando": "redis",
+                "metodo_ejecucion": "redis_disabled",
+                "diagnostico": {
+                    "redis_enabled": redis_service.is_enabled,
+                    "client_exists": redis_service._client is not None
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+        client = redis_service._client
+        if not client:
+            return {
+                "exito": False,
+                "salida": "",
+                "error": "Cliente Redis no disponible",
+                "codigo_salida": 1,
+                "comando_ejecutado": comando,
+                "tipo_comando": "redis",
+                "metodo_ejecucion": "redis_no_client",
+                "timestamp": datetime.now().isoformat()
+            }
+
+        # Parsear comando Redis
+        parts = comando.strip().split()
+        if not parts:
+            return {
+                "exito": False,
+                "salida": "",
+                "error": "Comando Redis vacío",
+                "codigo_salida": 1,
+                "comando_ejecutado": comando,
+                "tipo_comando": "redis",
+                "metodo_ejecucion": "redis_empty_command",
+                "timestamp": datetime.now().isoformat()
+            }
+
+        redis_cmd = parts[0].upper()
+        args = parts[1:] if len(parts) > 1 else []
+
+        # Ejecutar comando Redis específico
+        resultado = None
+
+        # Comandos básicos de información
+        if redis_cmd == "PING":
+            resultado = client.ping()
+        elif redis_cmd == "INFO":
+            if args:
+                resultado = client.info(args[0])
+            else:
+                resultado = client.info()
+        elif redis_cmd == "DBSIZE":
+            resultado = client.dbsize()
+        elif redis_cmd == "CONFIG" and len(args) >= 1:
+            if args[0].upper() == "GET" and len(args) >= 2:
+                resultado = client.config_get(args[1])
+            else:
+                resultado = f"CONFIG subcomando no soportado: {args[0]}"
+
+        # Comandos de claves
+        elif redis_cmd == "KEYS":
+            pattern = args[0] if args else "*"
+            resultado = client.keys(pattern)
+        elif redis_cmd == "EXISTS" and args:
+            resultado = client.exists(*args)
+        elif redis_cmd == "GET" and len(args) >= 1:
+            resultado = client.get(args[0])
+        elif redis_cmd == "SET" and len(args) >= 2:
+            resultado = client.set(args[0], args[1])
+        elif redis_cmd == "DEL" and args:
+            resultado = client.delete(*args)
+        elif redis_cmd == "TTL" and len(args) >= 1:
+            resultado = client.ttl(args[0])
+        elif redis_cmd == "EXPIRE" and len(args) >= 2:
+            resultado = client.expire(args[0], int(args[1]))
+
+        # Comandos Hash
+        elif redis_cmd == "HGET" and len(args) >= 2:
+            resultado = client.hget(args[0], args[1])
+        elif redis_cmd == "HGETALL" and len(args) >= 1:
+            resultado = client.hgetall(args[0])
+        elif redis_cmd == "HSET" and len(args) >= 3:
+            resultado = client.hset(args[0], args[1], args[2])
+        elif redis_cmd == "HKEYS" and len(args) >= 1:
+            resultado = client.hkeys(args[0])
+        elif redis_cmd == "HEXISTS" and len(args) >= 2:
+            resultado = client.hexists(args[0], args[1])
+
+        # Comandos de limpieza (usar con precaución)
+        elif redis_cmd == "FLUSHDB":
+            resultado = client.flushdb()
+        elif redis_cmd == "FLUSHALL":
+            resultado = client.flushall()
+
+        # Comando personalizado para obtener estadísticas del buffer service
+        elif redis_cmd == "BUFFER_STATS":
+            resultado = redis_service.get_cache_stats()
+
+        else:
+            # Para otros comandos, intentar ejecución genérica
+            try:
+                resultado = client.execute_command(redis_cmd, *args)
+            except Exception as e:
+                return {
+                    "exito": False,
+                    "salida": "",
+                    "error": f"Comando Redis no soportado o error: {str(e)}",
+                    "codigo_salida": 1,
+                    "comando_ejecutado": comando,
+                    "tipo_comando": "redis",
+                    "metodo_ejecucion": "redis_unsupported",
+                    "comandos_soportados": [
+                        "PING", "INFO", "DBSIZE", "CONFIG GET", "KEYS", "EXISTS",
+                        "GET", "SET", "DEL", "TTL", "EXPIRE",
+                        "HGET", "HGETALL", "HSET", "HKEYS", "HEXISTS",
+                        "BUFFER_STATS"  # Comando personalizado
+                    ],
+                    "timestamp": datetime.now().isoformat()
+                }
+
+        # Formatear resultado
+        if isinstance(resultado, dict):
+            salida_formateada = json.dumps(
+                resultado, indent=2, ensure_ascii=False)
+        elif isinstance(resultado, list):
+            if all(isinstance(x, (str, bytes)) for x in resultado):
+                salida_formateada = "\n".join(str(x) for x in resultado)
+            else:
+                salida_formateada = json.dumps(
+                    resultado, indent=2, ensure_ascii=False)
+        elif isinstance(resultado, bytes):
+            try:
+                salida_formateada = resultado.decode('utf-8')
+            except UnicodeDecodeError:
+                salida_formateada = str(resultado)
+        else:
+            salida_formateada = str(resultado)
+
+        duration = time.time() - start_time
+
+        return {
+            "exito": True,
+            "salida": salida_formateada,
+            "output": salida_formateada,  # Para compatibilidad
+            "error": None,
+            "codigo_salida": 0,
+            "return_code": 0,
+            "comando_ejecutado": comando,
+            "tipo_comando": "redis",
+            "metodo_ejecucion": "redis_service",
+            "duration": f"{duration:.3f}s",
+            "redis_info": {
+                "enabled": redis_service.is_enabled,
+                "host": redis_service._host,
+                "port": redis_service._port,
+                "db": redis_service._db
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        duration = time.time() - start_time
+        logging.error(f"Error ejecutando comando Redis '{comando}': {e}")
+
+        return {
+            "exito": False,
+            "salida": "",
+            "error": f"Error interno ejecutando comando Redis: {str(e)}",
+            "codigo_salida": 1,
+            "comando_ejecutado": comando,
+            "tipo_comando": "redis",
+            "metodo_ejecucion": "redis_exception",
+            "duration": f"{duration:.3f}s",
+            "diagnostico": {
+                "tipo_excepcion": type(e).__name__,
+                "mensaje_completo": str(e)
+            },
+            "sugerencias": [
+                "Verificar que Redis esté funcionando",
+                "Comprobar credenciales y conexión",
+                "Revisar sintaxis del comando Redis"
+            ],
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 def _extraer_ids_de_comando(body: dict, req: func.HttpRequest) -> None:

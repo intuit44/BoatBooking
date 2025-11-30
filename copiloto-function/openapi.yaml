@@ -1006,11 +1006,12 @@
     },
     "/api/gestionar-despliegue": {
       "post": {
-        "summary": "🚀 ENDPOINT ROBUSTO Y SEMÁNTICO PARA GESTIÓN DE DESPLIEGUES",
-        "description": "⭐ Sistema completamente adaptativo que acepta cualquier formato de payload y se adapta dinámicamente sin rechazar requests. Características: ✅ Validador dinámico que acepta múltiples formatos ✅ Detección automática de acción, entorno, target ✅ Respuestas estructuradas con sugerencias adaptativas ✅ Compatible con Foundry, CodeGPT, CLI sin conflictos ✅ Tolerante al desorden de parámetros ✅ Manejo de errores que guía a agentes para autocorrección. SIEMPRE retorna éxito=true para compatibilidad con agentes.",
+        "summary": "(Deprecado) Usa /api/deploy para nuevos despliegues",
+        "description": "⚠️ Este endpoint se mantiene solo por compatibilidad. Para cualquier despliegue de modelos o ARM usa /api/deploy (operationId deployHybrid).",
+        "deprecated": true,
         "operationId": "gestionarDespliegue",
         "tags": [
-          "🚀 Despliegues Robustos",
+          "Deprecated",
           "Azure Deployment"
         ],
         "security": [],

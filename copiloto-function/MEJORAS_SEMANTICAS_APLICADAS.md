@@ -44,7 +44,7 @@ if self._es_evento_repetitivo(endpoint, response_data, session_id):
 **Ubicación**: `_indexar_en_ai_search()` línea ~145
 
 ```python
-if len(texto_sem) < 40:
+if len(texto_sem) < 10:
     logging.info(f"⏭️ Texto muy corto, se omite indexación")
     return False
 ```

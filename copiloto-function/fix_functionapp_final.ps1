@@ -8,7 +8,8 @@ param(
   [string]$FunctionApp = "copiloto-semantico-func-us2",
   [string]$ACR = "boatrentalacr",
   [string]$ImageTag = "",  # Ahora vacío por defecto para usar auto-incremento
-  [switch]$Force
+  [switch]$Force,
+  [switch]$SkipContainerConfig  # Nueva opción para evitar reconfigurar el contenedor
 )
 
 # Colores para output
@@ -56,8 +57,17 @@ if ([string]::IsNullOrEmpty($ImageTag)) {
 # FASE 1: VALIDACIÓN INICIAL
 # ==========================================
 Write-Host "`n========================================" -ForegroundColor Magenta
-Write-Host "CORRECCIÓN DEFINITIVA FUNCTION APP v3.0" -ForegroundColor Magenta
+Write-Host "CORRECCIÓN DEFINITIVA FUNCTION APP v3.1" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
+
+if ($SkipContainerConfig) {
+  Write-Host "🔒 MODO SEGURO: Configuración de contenedor OMITIDA" -ForegroundColor Yellow
+  Write-Host "Solo se actualizarán AppSettings y validaciones" -ForegroundColor Yellow
+}
+else {
+  Write-Host "⚠️ MODO COMPLETO: SE VA A RECONFIGURAR EL CONTENEDOR" -ForegroundColor Red
+  Write-Host "Usa -SkipContainerConfig para evitar cambios al contenedor" -ForegroundColor Red
+}
 
 Write-Step "FASE 1: VALIDACIÓN INICIAL" 1
 
@@ -364,73 +374,97 @@ chmod 600 ~/.git-credentials
 
 
   # ==========================================
-  # FASE 4: CONFIGURAR CONTENEDOR CON CREDENCIALES
+  # FASE 4: CONFIGURAR CONTENEDOR CON CREDENCIALES (OPCIONAL)
   # ==========================================
-  Write-Step "FASE 4: CONFIGURAR CONTENEDOR" 4
-
-  $fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
-  Write-Info "Configurando imagen: $fullImage"
-
-  # Validar que la imagen existe en ACR
-  Write-Info "Verificando que la imagen existe en ACR..."
-  $tagExists = az acr repository show-tags -n $ACR --repository copiloto-func-azcli --query "[?@ == '$ImageTag']" -o tsv
-  if (-not $tagExists) {
-    Write-Error "La imagen $fullImage no existe en ACR"
-    if (-not $Force) { exit 1 }
-  }
-  Write-Success "Imagen encontrada en ACR: $ImageTag"
-
-  # Verificación opcional del contenido de la imagen Docker
-  Write-Info "Verificando contenido de la imagen Docker..."
-  try {
-    $dockerContent = docker run --rm $fullImage ls -la /home/site/wwwroot 2>&1
-    if ($LASTEXITCODE -eq 0) {
-      Write-Success "Contenido de la imagen verificado"
-      Write-Info "Archivos en /home/site/wwwroot:"
-      $dockerContent | ForEach-Object { Write-Info "  $_" }
+  
+  if ($SkipContainerConfig) {
+    Write-Step "FASE 4: SALTANDO CONFIGURACIÓN DE CONTENEDOR (SkipContainerConfig)" 4
+    Write-Warning "🔒 Configuración del contenedor omitida por parámetro -SkipContainerConfig"
+    Write-Info "La configuración actual del contenedor se mantiene intacta"
+    
+    # Mostrar configuración actual sin cambiarla
+    Write-Info "Configuración actual del contenedor:"
+    try {
+      $currentConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp 2>$null | ConvertFrom-Json
+      $currentImage = ($currentConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }).value
+      if ($currentImage) {
+        Write-Success "Imagen actual: $currentImage"
+      } else {
+        Write-Info "No hay imagen de contenedor configurada (modo Code deployment)"
+      }
     }
-    else {
-      Write-Warning "No se pudo verificar el contenido de la imagen Docker"
-      Write-Info "Error: $dockerContent"
+    catch {
+      Write-Warning "No se pudo obtener configuración actual del contenedor"
     }
   }
-  catch {
-    Write-Warning "Docker no disponible o imagen no accesible localmente"
-  }
+  else {
+    Write-Step "FASE 4: CONFIGURAR CONTENEDOR" 4
 
-  # Intentar configurar con credenciales explícitas
-  $containerResult = az functionapp config container set `
-    -g $ResourceGroup `
-    -n $FunctionApp `
-    --image $fullImage `
-    --registry-server "https://$ACR.azurecr.io" `
-    --registry-username $acrUsername `
-    --registry-password $acrPassword 2>&1
+    $fullImage = "$ACR.azurecr.io/copiloto-func-azcli:$ImageTag"
+    Write-Info "Configurando imagen: $fullImage"
+    Write-Warning "⚠️ ESTO VA A CAMBIAR LA CONFIGURACIÓN DEL CONTENEDOR ACTUAL"
 
-  if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Primer intento falló, reintentando sin https..."
-        
+    # Validar que la imagen existe en ACR
+    Write-Info "Verificando que la imagen existe en ACR..."
+    $tagExists = az acr repository show-tags -n $ACR --repository copiloto-func-azcli --query "[?@ == '$ImageTag']" -o tsv
+    if (-not $tagExists) {
+      Write-Error "La imagen $fullImage no existe en ACR"
+      if (-not $Force) { exit 1 }
+    }
+    Write-Success "Imagen encontrada en ACR: $ImageTag"
+
+    # Verificación opcional del contenido de la imagen Docker
+    Write-Info "Verificando contenido de la imagen Docker..."
+    try {
+      $dockerContent = docker run --rm $fullImage ls -la /home/site/wwwroot 2>&1
+      if ($LASTEXITCODE -eq 0) {
+        Write-Success "Contenido de la imagen verificado"
+        Write-Info "Archivos en /home/site/wwwroot:"
+        $dockerContent | ForEach-Object { Write-Info "  $_" }
+      }
+      else {
+        Write-Warning "No se pudo verificar el contenido de la imagen Docker"
+        Write-Info "Error: $dockerContent"
+      }
+    }
+    catch {
+      Write-Warning "Docker no disponible o imagen no accesible localmente"
+    }
+
+    # Intentar configurar con credenciales explícitas
     $containerResult = az functionapp config container set `
       -g $ResourceGroup `
       -n $FunctionApp `
-      --docker-custom-image-name $fullImage `
-      --docker-registry-server-url "$ACR.azurecr.io" `
-      --docker-registry-server-username $acrUsername `
-      --docker-registry-server-password $acrPassword 2>&1
-  }
+      --image $fullImage `
+      --registry-server "https://$ACR.azurecr.io" `
+      --registry-username $acrUsername `
+      --registry-password $acrPassword 2>&1
 
-  Write-Success "Contenedor configurado"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "Primer intento falló, reintentando sin https..."
+          
+      $containerResult = az functionapp config container set `
+        -g $ResourceGroup `
+        -n $FunctionApp `
+        --docker-custom-image-name $fullImage `
+        --docker-registry-server-url "$ACR.azurecr.io" `
+        --docker-registry-server-username $acrUsername `
+        --docker-registry-server-password $acrPassword 2>&1
+    }
 
-  # Verificar que se aplicó
-  $containerConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp | ConvertFrom-Json
-  $dockerImageSetting = $containerConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }
+    Write-Success "Contenedor configurado"
 
-  if ($dockerImageSetting.value -like "*$ImageTag*") {
-    Write-Success "Imagen verificada: $($dockerImageSetting.value)"
-  }
-  else {
-    Write-Error "La imagen no se configuró correctamente"
-    if (-not $Force) { exit 1 }
+    # Verificar que se aplicó
+    $containerConfig = az functionapp config container show -g $ResourceGroup -n $FunctionApp | ConvertFrom-Json
+    $dockerImageSetting = $containerConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }
+
+    if ($dockerImageSetting.value -like "*$ImageTag*") {
+      Write-Success "Imagen verificada: $($dockerImageSetting.value)"
+    }
+    else {
+      Write-Error "La imagen no se configuró correctamente"
+      if (-not $Force) { exit 1 }
+    }
   }
 
   # ==========================================
