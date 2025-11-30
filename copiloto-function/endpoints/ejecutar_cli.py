@@ -62,12 +62,6 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
             env['PYTHONUNBUFFERED'] = '1'
 
         elif tipo == "powershell":
-            # 🔥 AUTO-FIX: Agregar | Out-String si hay pipes pero no está presente
-            if '|' in comando and '| Out-String' not in comando and '| out-string' not in comando.lower():
-                comando = f"{comando} | Out-String"
-                logging.info(
-                    f"PowerShell: Auto-agregado | Out-String para convertir objetos a texto")
-
             # 🔥 SOLUCIÓN: Envolver comando en & { } para ejecutar dentro de PowerShell
             comando_wrapped = f"& {{ {comando} }}"
 
@@ -724,6 +718,15 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         comando = body.get("comando")
+
+        # 🔥 DECODIFICAR HTML ENTITIES (corrige &#39; -> ')
+        if comando:
+            import html
+            comando_original = comando
+            comando = html.unescape(comando)
+            if comando != comando_original:
+                logging.info(
+                    f"🔧 HTML entities decodificadas: {comando_original} -> {comando}")
 
         # 🔥 DETECCIÓN AUTOMÁTICA DE TIPO DE COMANDO
         tipo_comando = "generic"

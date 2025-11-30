@@ -2117,10 +2117,12 @@
     },
     "/api/deploy": {
       "post": {
-        "summary": "Desplegar recursos Azure usando ARM templates",
-        "operationId": "deployARM",
+        "summary": "Desplegar modelos AI o recursos ARM",
+        "description": "Endpoint híbrido para desplegar modelos de AI en Microsoft Foundry o recursos mediante plantilla ARM. Para modelos: incluye 'action': 'deployModels' y 'models'. Para ARM: incluye 'resourceGroup' y 'template'.",
+        "operationId": "deployHybrid",
         "tags": [
-          "Azure Deployment"
+          "Azure Deployment",
+          "AI Models"
         ],
         "security": [],
         "requestBody": {
@@ -2128,46 +2130,244 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "resourceGroup": {
-                    "type": "string",
-                    "description": "Nombre del resource group"
-                  },
-                  "template": {
+                "oneOf": [
+                  {
                     "type": "object",
-                    "description": "ARM template JSON"
+                    "title": "Model Deployment",
+                    "description": "Deploy AI models to Microsoft Foundry",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": ["deployModels"],
+                        "description": "Action to deploy models"
+                      },
+                      "models": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "mistral-large-2411",
+                            "claude-3-5-sonnet-20241022",
+                            "gpt-4o-2024-11-20",
+                            "gpt-4-2024-11-20",
+                            "codestral-2024-10-29",
+                            "gpt-4o-mini-2024-07-18"
+                          ]
+                        },
+                        "description": "List of AI models to deploy",
+                        "minItems": 1
+                      }
+                    },
+                    "required": ["action", "models"]
                   },
-                  "parameters": {
+                  {
                     "type": "object",
-                    "description": "Parámetros del template"
+                    "title": "ARM Deployment",
+                    "description": "Deploy resources using ARM template",
+                    "properties": {
+                      "resourceGroup": {
+                        "type": "string",
+                        "description": "Nombre del resource group"
+                      },
+                      "template": {
+                        "type": "object",
+                        "description": "ARM template JSON"
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "description": "Parámetros del template"
+                      },
+                      "location": {
+                        "type": "string",
+                        "default": "eastus",
+                        "description": "Azure region for deployment"
+                      },
+                      "validate_only": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Only validate template without deploying"
+                      }
+                    },
+                    "required": ["resourceGroup", "template"]
+                  }
+                ]
+              },
+              "examples": {
+                "deployModels": {
+                  "summary": "Deploy AI models to Foundry",
+                  "description": "Example of deploying multiple AI models",
+                  "value": {
+                    "action": "deployModels",
+                    "models": [
+                      "mistral-large-2411",
+                      "claude-3-5-sonnet-20241022"
+                    ]
                   }
                 },
-                "required": [
-                  "resourceGroup",
-                  "template"
-                ]
+                "deployAllModels": {
+                  "summary": "Deploy all available models",
+                  "description": "Deploy all models from AGENT_REGISTRY",
+                  "value": {
+                    "action": "deployModels",
+                    "models": [
+                      "mistral-large-2411",
+                      "claude-3-5-sonnet-20241022",
+                      "gpt-4o-2024-11-20",
+                      "gpt-4-2024-11-20",
+                      "codestral-2024-10-29",
+                      "gpt-4o-mini-2024-07-18"
+                    ]
+                  }
+                },
+                "deployARMTemplate": {
+                  "summary": "Deploy ARM template",
+                  "description": "Example of ARM resource deployment",
+                  "value": {
+                    "resourceGroup": "boat-rental-app-group",
+                    "location": "eastus",
+                    "template": {
+                      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                      "contentVersion": "1.0.0.0",
+                      "resources": []
+                    },
+                    "parameters": {}
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Deployment iniciado exitosamente",
+            "description": "Deployment completado exitosamente",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "title": "Model Deployment Response",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": ["deployModels"]
+                        },
+                        "models_deployed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Modelos desplegados exitosamente"
+                        },
+                        "already_active": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Modelos que ya estaban activos"
+                        },
+                        "failed": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "error": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "description": "Modelos que fallaron al desplegar"
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "total_requested": {
+                              "type": "integer"
+                            },
+                            "deployed": {
+                              "type": "integer"
+                            },
+                            "already_active": {
+                              "type": "integer"
+                            },
+                            "failed": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "deployment_details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "model": {
+                                "type": "string"
+                              },
+                              "intent": {
+                                "type": "string"
+                              },
+                              "agent": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["deployed", "already_active"]
+                              },
+                              "endpoint": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "title": "ARM Deployment Response",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "deployment_name": {
+                          "type": "string"
+                        },
+                        "resource_group": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "outputs": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Resultados mixtos - algunos modelos desplegados, otros fallaron",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDeploymentResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Solicitud inválida"
+            "description": "Solicitud inválida - parámetros faltantes o incorrectos"
           },
           "500": {
-            "description": "Error del servidor"
+            "description": "Error del servidor durante el deployment"
           }
         }
       }
@@ -2900,68 +3100,6 @@
           },
           "400": {
             "description": "Solicitud inválida"
-          }
-        }
-      }
-    },
-    "/api/proxy-local": {
-      "post": {
-        "summary": "Endpoint interno de proxy",
-        "operationId": "proxyLocal",
-        "tags": [
-          "Internal"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "description": "URL de destino"
-                  },
-                  "method": {
-                    "type": "string",
-                    "enum": [
-                      "GET",
-                      "POST",
-                      "PUT",
-                      "DELETE"
-                    ],
-                    "default": "GET"
-                  },
-                  "data": {
-                    "type": "object",
-                    "description": "Datos a enviar"
-                  }
-                },
-                "required": [
-                  "url"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Proxy ejecutado correctamente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Solicitud inválida"
-          },
-          "500": {
-            "description": "Error del servidor"
           }
         }
       }
@@ -4641,6 +4779,111 @@
         "required": [
           "error"
         ]
+      },
+      "ModelDeploymentResponse": {
+        "type": "object",
+        "title": "Model Deployment Response",
+        "description": "Response structure for AI model deployment operations",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Overall success status"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["deployModels"],
+            "description": "Type of deployment action"
+          },
+          "models_deployed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Models successfully deployed"
+          },
+          "already_active": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Models that were already active"
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Models that failed to deploy"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total_requested": {
+                "type": "integer"
+              },
+              "deployed": {
+                "type": "integer"
+              },
+              "already_active": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            }
+          },
+          "deployment_details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                },
+                "agent": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["deployed", "already_active"]
+                },
+                "endpoint": {
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                },
+                "deployment_time": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "foundry_endpoint": {
+            "type": "string",
+            "description": "Main Foundry endpoint URL"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["ok", "action", "models_deployed", "already_active", "failed", "summary"]
       }
     }
   }

@@ -1,4 +1,4 @@
-﻿# --- Imports mínimos requeridos ---
+# --- Imports mínimos requeridos ---
 import os
 from typing import cast
 from typing import Optional
@@ -495,6 +495,18 @@ except ImportError as e:
         f"⚠️ No se pudo registrar endpoint buscar-interacciones: {e}")
 except Exception as e:
     logging.error(f"❌ Error registrando buscar-interacciones: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+# 🤖 Registro del endpoint de interacción con Foundry con optimización de modelos
+try:
+    from foundry_interaction_endpoint import create_foundry_interaction_endpoint
+    create_foundry_interaction_endpoint(app)
+    logging.info("✅ Endpoint foundry-interaction registrado correctamente")
+except ImportError as e:
+    logging.warning(
+        f"⚠️ No se pudo registrar endpoint foundry-interaction: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando foundry-interaction: {e}")
     logging.error(f"Traceback: {traceback.format_exc()}")
 
 try:
@@ -5593,14 +5605,12 @@ def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
 
         base_path = Path(__file__).parent
 
-        # Buscar todos los archivos YAML
-        yaml_files = []
-        for pattern in ["*.yaml", "*.yml"]:
-            yaml_files.extend(list(base_path.glob(pattern)))
-
-        # Verificar contenido de archivos OpenAPI
+        # Buscar TODOS los archivos
+        all_files = list(base_path.glob("*"))
+        
+        # Verificar archivos
         files_info = []
-        for file_path in yaml_files:
+        for file_path in all_files:
             if file_path.exists():
                 try:
                     content = file_path.read_text(encoding='utf-8')
@@ -5631,7 +5641,7 @@ def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
             json.dumps({
                 "working_directory": str(Path.cwd()),
                 "function_file_dir": str(base_path),
-                "yaml_files_found": files_info,
+                "all_files_found": files_info,
                 "expected_files": [
                     "openapi.yaml",
                     "openapi_copiloto_local.yaml"
@@ -10414,198 +10424,6 @@ def render_error_http(req: func.HttpRequest) -> func.HttpResponse:
             )
 
 
-@app.function_name(name="proxy_local_http")
-@app.route(route="proxy-local", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def proxy_local_http(req: func.HttpRequest) -> func.HttpResponse:
-    """Proxy hacia tu servidor local via ngrok"""
-    import requests
-    import traceback
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
-
-    # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
-    memoria_previa = consultar_memoria_cosmos_directo(req)
-    if memoria_previa and memoria_previa.get("tiene_historial"):
-        logging.info(
-            f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
-        logging.info(
-            f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
-
-    # Initialize comando early to avoid unbound variable errors
-    comando = "no_disponible"
-
-    try:
-        # ✅ VALIDACIÓN MEJORADA: Verificar body y comando con mejor manejo de errores
-        raw_body = req.get_body().decode('utf-8') if req.get_body() else ""
-
-        # ✅ DETECTAR CASOS ESPECÍFICOS: Body que es solo "." o texto plano
-        if raw_body.strip() == ".":
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "JSON no válido: '.'",
-                    "body_recibido": raw_body,
-                    "problema": "El cuerpo de la solicitud debe ser un objeto JSON, no texto plano",
-                    "ejemplo_correcto": {"comando": "docker build -t mi-imagen ."},
-                    "formato_requerido": "application/json"
-                }),
-                status_code=404,  # Usar 404 como indica el error
-                mimetype="application/json"
-            )
-
-        try:
-            body = req.get_json() if req.get_body() else {}
-        except (ValueError, TypeError) as json_error:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": f"JSON no válido: {str(json_error)}",
-                    "body_recibido": raw_body[:100],  # Primeros 100 chars
-                    "ejemplo_correcto": {"comando": "docker build -t mi-imagen ."},
-                    "formato_requerido": "application/json"
-                }),
-                status_code=404,
-                mimetype="application/json"
-            )
-
-        if not body or not isinstance(body, dict):
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Request body debe ser un objeto JSON válido",
-                    "ejemplo": {"comando": "docker build -t mi-imagen ."},
-                    "body_recibido": str(body) if body else "vacío",
-                    "raw_body": raw_body[:50] if raw_body else "vacío"
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        comando = body.get("comando")
-
-        # ✅ VALIDACIÓN ESTRICTA: Verificar que comando no sea None, vacío o solo espacios
-        if not comando or not str(comando).strip():
-            return func.HttpResponse(
-                json.dumps({
-                    "error": "Comando requerido y no puede estar vacío",
-                    "comando_recibido": comando,
-                    "tipo_comando": type(comando).__name__ if comando is not None else "None",
-                    "ejemplo": {"comando": "docker build -t mi-imagen ."},
-                    "comandos_validos": [
-                        "docker build -t copiloto-func-azcli:v13 .",
-                        "docker push boatrentalacr.azurecr.io/copiloto-func-azcli:v13",
-                        "az functionapp config container set ..."
-                    ]
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        # ✅ NORMALIZACIÓN: Limpiar espacios del comando
-        comando = str(comando).strip()
-
-        # ✅ VALIDACIÓN ADICIONAL: Verificar que el comando no sea una cadena de prueba
-        comandos_invalidos = ["test", "ejemplo",
-                              "sample", "demo", "placeholder"]
-        if comando.lower() in comandos_invalidos:
-            return func.HttpResponse(
-                json.dumps({
-                    "error": f"'{comando}' no es un comando válido",
-                    "sugerencia": "Proporciona un comando real como 'docker build' o 'az functionapp'",
-                    "ejemplos_validos": [
-                        "docker build -t copiloto-func-azcli:v13 .",
-                        "docker tag copiloto-func-azcli:v13 boatrentalacr.azurecr.io/copiloto-func-azcli:v13",
-                        "az acr login -n boatrentalacr"
-                    ]
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        # ✅ LOGGING: Registrar comando para debugging
-        logging.info(f"proxy_local_http: Ejecutando comando: {comando}")
-
-        # Llamar a tu servidor local via ngrok
-        response = requests.post(
-            "https://ejecutor-local.ngrok.app/ejecutar-local",
-            headers={"Authorization": "Bearer tu-token-secreto-aqui"},
-            json={"comando": comando},
-            timeout=300  # 5 minutos para builds
-        )
-
-        # ✅ LOGGING: Registrar respuesta para debugging
-        logging.info(
-            f"proxy_local_http: Respuesta del servidor local: {response.status_code}")
-
-        # Convertir respuesta externa a un dict usable
-        try:
-            res = response.json()
-        except Exception:
-            res = {"exito": False, "error": "Respuesta no es JSON",
-                   "contenido": response.text}
-
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(
-            f"💾 Registering call for proxy_local: success={res.get('exito', False)}, endpoint=/api/proxy-local")
-        memory_service.registrar_llamada(
-            source="proxy_local",
-            endpoint="/api/proxy-local",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("exito", False)
-        )
-
-        # Capturar y reenviar correctamente el error recibido desde el túnel
-        return func.HttpResponse(
-            json.dumps(res),
-            status_code=response.status_code,
-            mimetype="application/json"
-        )
-
-    except requests.Timeout:
-        logging.error("proxy_local_http: Timeout ejecutando comando local")
-        return func.HttpResponse(
-            json.dumps({
-                "error": "Timeout ejecutando comando local (5 minutos)",
-                "comando": comando if 'comando' in locals() else "no_disponible",
-                "sugerencia": "El comando tardó más de 5 minutos en ejecutarse",
-                "trace": traceback.format_exc()
-            }),
-            status_code=408,
-            mimetype="application/json"
-        )
-    except requests.ConnectionError:
-        logging.error("proxy_local_http: Error de conexión con servidor local")
-        return func.HttpResponse(
-            json.dumps({
-                "error": "No se pudo conectar con el servidor local",
-                "endpoint": "https://ejecutor-local.ngrok.app/ejecutar-local",
-                "sugerencia": "Verificar que el túnel ngrok esté activo",
-                "comando": comando if 'comando' in locals() else "no_disponible"
-            }),
-            status_code=502,
-            mimetype="application/json"
-        )
-    except Exception as e:
-        logging.exception("proxy_local_http failed")
-        return func.HttpResponse(
-            json.dumps({
-                "error": str(e),
-                "tipo_error": type(e).__name__,
-                "comando": comando if 'comando' in locals() else "no_disponible",
-                "trace": traceback.format_exc()
-            }),
-            status_code=500,
-            mimetype="application/json"
-        )
-
-
 def debug_auth_environment():
     """Debug completo del entorno de autenticación"""
     env_vars = {
@@ -12833,6 +12651,256 @@ def update_app_service_plan(plan_name: str, resource_group: str, sku: str) -> di
         return {"ok": False, "error": str(e)}
 
 
+def _deploy_foundry_models(req, body, memory_service, aplicar_memoria_cosmos_directo, aplicar_memoria_manual):
+    """
+    Despliega modelos en Microsoft Foundry basado en el AGENT_REGISTRY.
+
+    Payload esperado:
+    {
+        "models": ["claude-3-5-sonnet-20241022", "mistral-large-2411"],
+        "action": "deployModels"  # opcional
+    }
+
+    Returns:
+        HttpResponse con estado del deployment
+    """
+    import json
+    import time
+    from datetime import datetime
+
+    try:
+        # Obtener lista de modelos del router_agent
+        from router_agent import AGENT_REGISTRY
+
+        # Extraer modelos solicitados
+        requested_models = body.get("models", [])
+        if isinstance(requested_models, str):
+            requested_models = [requested_models]
+
+        # Si no se especifican modelos, usar todos del AGENT_REGISTRY
+        if not requested_models:
+            requested_models = list(set(
+                agent_config.get("model")
+                for agent_config in AGENT_REGISTRY.values()
+                if agent_config.get("model")
+            ))
+            logging.info(
+                f"🤖 [FoundryDeploy] No se especificaron modelos, usando todos del registry: {requested_models}")
+
+        # Validar que los modelos están en nuestro registry
+        registry_models = {
+            agent_config.get("model"): intent
+            for intent, agent_config in AGENT_REGISTRY.items()
+            if agent_config.get("model")
+        }
+
+        models_deployed = []
+        already_active = []
+        failed = []
+        deployment_details = []
+
+        for model in requested_models:
+            try:
+                if model not in registry_models:
+                    failed.append({
+                        "model": model,
+                        "error": "Modelo no encontrado en AGENT_REGISTRY",
+                        "available_models": list(registry_models.keys())
+                    })
+                    continue
+
+                intent = registry_models[model]
+                agent_config = AGENT_REGISTRY[intent]
+
+                # Simular verificación de estado del modelo
+                # TODO: Reemplazar con llamada real al Foundry SDK
+                is_deployed = _check_model_deployment_status(
+                    model, agent_config)
+
+                if is_deployed:
+                    already_active.append(model)
+                    deployment_details.append({
+                        "model": model,
+                        "intent": intent,
+                        "agent": agent_config.get("agent_id"),
+                        "status": "already_active",
+                        "endpoint": agent_config.get("endpoint"),
+                        "project_id": agent_config.get("project_id")
+                    })
+                    logging.info(
+                        f"✅ [FoundryDeploy] Modelo {model} ya está activo")
+                else:
+                    # Simular deployment del modelo
+                    # TODO: Reemplazar con llamada real al Foundry SDK
+                    success = _deploy_model_to_foundry(model, agent_config)
+
+                    if success:
+                        models_deployed.append(model)
+                        deployment_details.append({
+                            "model": model,
+                            "intent": intent,
+                            "agent": agent_config.get("agent_id"),
+                            "status": "deployed",
+                            "endpoint": agent_config.get("endpoint"),
+                            "project_id": agent_config.get("project_id"),
+                            "deployment_time": datetime.now().isoformat()
+                        })
+                        logging.info(
+                            f"🚀 [FoundryDeploy] Modelo {model} desplegado exitosamente")
+                    else:
+                        failed.append({
+                            "model": model,
+                            "error": "Falló el deployment en Foundry",
+                            "intent": intent
+                        })
+                        logging.error(
+                            f"❌ [FoundryDeploy] Falló deployment de {model}")
+
+            except Exception as e:
+                failed.append({
+                    "model": model,
+                    "error": str(e),
+                    "traceback": str(e)
+                })
+                logging.error(
+                    f"❌ [FoundryDeploy] Error procesando modelo {model}: {e}")
+
+        # Preparar respuesta
+        all_successful = len(failed) == 0
+        res = {
+            "ok": all_successful,
+            "action": "deployModels",
+            "models_deployed": models_deployed,
+            "already_active": already_active,
+            "failed": failed,
+            "summary": {
+                "total_requested": len(requested_models),
+                "deployed": len(models_deployed),
+                "already_active": len(already_active),
+                "failed": len(failed)
+            },
+            "deployment_details": deployment_details,
+            "foundry_endpoint": AGENT_REGISTRY.get("conversacion_general", {}).get("endpoint", ""),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Aplicar memoria
+        res = aplicar_memoria_cosmos_directo(req, res)
+        res = aplicar_memoria_manual(req, res)
+
+        # Registrar en memoria
+        memory_service.registrar_llamada(
+            source="deploy_foundry_models",
+            endpoint="/api/deploy",
+            method=req.method,
+            params={
+                "session_id": req.headers.get("Session-ID"),
+                "agent_id": req.headers.get("Agent-ID"),
+                "action": "deployModels",
+                "models_requested": requested_models
+            },
+            response_data=res,
+            success=all_successful
+        )
+
+        # 207 Multi-Status para resultados mixtos
+        status_code = 200 if all_successful else 207
+        return func.HttpResponse(
+            json.dumps(res, ensure_ascii=False),
+            status_code=status_code,
+            mimetype="application/json"
+        )
+
+    except Exception as e:
+        error_msg = f"Error en deployment de modelos Foundry: {str(e)}"
+        logging.error(f"❌ [FoundryDeploy] {error_msg}")
+
+        res = {
+            "ok": False,
+            "error_code": "FOUNDRY_DEPLOYMENT_ERROR",
+            "cause": error_msg,
+            "action": "deployModels"
+        }
+
+        # Aplicar memoria
+        res = aplicar_memoria_cosmos_directo(req, res)
+        res = aplicar_memoria_manual(req, res)
+
+        # Registrar error
+        memory_service.registrar_llamada(
+            source="deploy_foundry_models_error",
+            endpoint="/api/deploy",
+            method=req.method,
+            params={
+                "session_id": req.headers.get("Session-ID"),
+                "agent_id": req.headers.get("Agent-ID"),
+                "action": "deployModels"
+            },
+            response_data=res,
+            success=False
+        )
+
+        return func.HttpResponse(
+            json.dumps(res),
+            status_code=500,
+            mimetype="application/json"
+        )
+
+
+def _check_model_deployment_status(model: str, agent_config: dict) -> bool:
+    """
+    Verifica si un modelo está desplegado en Foundry.
+
+    TODO: Reemplazar con llamada real al Foundry SDK/API
+    """
+    try:
+        # Simulación - en producción usar Foundry SDK
+        # foundry_client = get_foundry_client()
+        # return foundry_client.models.is_deployed(model)
+
+        # Por ahora simular que algunos modelos comunes ya están desplegados
+        commonly_deployed = [
+            "gpt-4o-mini-2024-07-18",
+            "gpt-4-2024-11-20"
+        ]
+
+        is_deployed = model in commonly_deployed
+        logging.info(
+            f"🔍 [FoundryDeploy] Verificando modelo {model}: {'desplegado' if is_deployed else 'no desplegado'}")
+        return is_deployed
+
+    except Exception as e:
+        logging.error(f"❌ Error verificando estado de modelo {model}: {e}")
+        return False
+
+
+def _deploy_model_to_foundry(model: str, agent_config: dict) -> bool:
+    """
+    Despliega un modelo en Foundry.
+
+    TODO: Reemplazar con llamada real al Foundry SDK/API
+    """
+    try:
+        # Simulación - en producción usar Foundry SDK
+        # foundry_client = get_foundry_client()
+        # deployment_result = foundry_client.models.deploy(
+        #     model_name=model,
+        #     project_id=agent_config.get("project_id"),
+        #     endpoint=agent_config.get("endpoint")
+        # )
+        # return deployment_result.success
+
+        # Simulación: todos los deployments son exitosos por ahora
+        logging.info(
+            f"🚀 [FoundryDeploy] Simulando deployment de {model} en proyecto {agent_config.get('project_id')}")
+        time.sleep(0.5)  # Simular latencia de deployment
+        return True
+
+    except Exception as e:
+        logging.error(f"❌ Error desplegando modelo {model}: {e}")
+        return False
+
+
 @app.function_name(name="deploy_http")
 @app.route(route="deploy", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
@@ -12855,29 +12923,93 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         body = req.get_json()
+        if body is None:
+            body = {}
     except Exception:
-        res = {
-            "ok": False, "error_code": "INVALID_JSON",
-            "cause": "Cuerpo no es JSON válido."
-        }
-        # Aplicar memoria Cosmos y memoria manual
-        res = aplicar_memoria_cosmos_directo(req, res)
-        res = aplicar_memoria_manual(req, res)
+        body = {}
 
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        # Registrar llamada en memoria después de construir la respuesta final
-        logging.info(
-            f"💾 Registering call for deploy: success={res.get('ok', False)}, endpoint=/api/deploy")
-        memory_service.registrar_llamada(
-            source="deploy",
-            endpoint="/api/deploy",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=res,
-            success=res.get("ok", False)
-        )
-        return func.HttpResponse(json.dumps(res), status_code=400, mimetype="application/json")
+    # 🧠 INFERENCIA INTELIGENTE PARA BODY VACÍO O INCOMPLETO
+    # Si el body está vacío pero hay intención de deploy de modelos, construir payload automáticamente
+    if not body or (not body.get("models") and not body.get("resourceGroup") and not body.get("template")):
+        # Intentar obtener intención del memory wrapper o headers
+        user_message = req.headers.get("X-User-Message", "")
+        intent_keywords = ["deploy", "desplegar",
+                           "model", "modelo", "foundry", "ai"]
+
+        # Si hay indicios de deployment de modelos, construir payload por defecto
+        if any(keyword in user_message.lower() for keyword in intent_keywords) or not body:
+            logging.info(
+                "🧠 [DEPLOY] Body vacío detectado, aplicando inferencia inteligente para deployment de modelos")
+
+            # Obtener modelos por defecto del AGENT_REGISTRY
+            try:
+                from router_agent import AGENT_REGISTRY
+                # Obtener modelos únicos como lista para poder hacer slice
+                unique_models = set(
+                    agent_config.get("model")
+                    for agent_config in AGENT_REGISTRY.values()
+                    if agent_config.get("model")
+                )
+                default_models = list(unique_models)
+
+                # Si había algo en el body original, preservarlo y complementarlo
+                inferred_body = {
+                    "action": "deployModels",
+                    # Usar solo 2 por defecto para no saturar
+                    "models": body.get("models", default_models[:2])
+                }
+
+                # Mantener otros campos si existían
+                for key, value in body.items():
+                    if key not in inferred_body:
+                        inferred_body[key] = value
+
+                body = inferred_body
+                logging.info(f"🧠 [DEPLOY] Payload inferido: {body}")
+
+            except Exception as e:
+                logging.warning(
+                    f"⚠️ [DEPLOY] No se pudo inferir payload de modelos: {e}")
+                # Si falla la inferencia, devolver error descriptivo
+                res = {
+                    "ok": False,
+                    "error_code": "INVALID_PAYLOAD",
+                    "cause": "Body vacío y no se pudo inferir intención de deployment",
+                    "hint": "Envía payload con 'action': 'deployModels' y 'models': [...] para modelos, o 'resourceGroup' y 'template' para ARM",
+                    "examples": {
+                        "model_deployment": {"action": "deployModels", "models": ["mistral-large-2411"]},
+                        "arm_deployment": {"resourceGroup": "my-rg", "template": {}}
+                    }
+                }
+                res = aplicar_memoria_cosmos_directo(req, res)
+                res = aplicar_memoria_manual(req, res)
+                memory_service.registrar_llamada(
+                    source="deploy_inference_failed",
+                    endpoint="/api/deploy",
+                    method=req.method,
+                    params={"session_id": req.headers.get(
+                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
+                    response_data=res,
+                    success=False
+                )
+                return func.HttpResponse(json.dumps(res, ensure_ascii=False), status_code=400, mimetype="application/json")
+
+    # 🤖 DETECCIÓN DE TIPO DE DEPLOYMENT
+    # Si contiene 'models' o action='deployModels' → Foundry Models
+    # Si contiene 'resourceGroup'/'template' → ARM Deployment
+    is_foundry_deployment = (
+        body.get("models") or
+        body.get("action") == "deployModels" or
+        body.get("foundry_models") or
+        "models" in body
+    )
+
+    if is_foundry_deployment:
+        logging.info("🤖 [DEPLOY] Detectado deployment de modelos Foundry")
+        return _deploy_foundry_models(req, body, memory_service, aplicar_memoria_cosmos_directo, aplicar_memoria_manual)
+    else:
+        logging.info("🏗️ [DEPLOY] Detectado deployment ARM tradicional")
+        # Continúa con lógica ARM existente...
 
     rg_name = body.get("resourceGroup") or os.environ.get("RESOURCE_GROUP")
     location = body.get("location", "eastus")

@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/azure-functions/python:4-python3.11
 # 🔧 Herramientas esenciales de diagnóstico y operaciones
 RUN apt-get update && \
   apt-get install -y \
+  bash \
   iproute2 \
   traceroute \
   tcpdump \

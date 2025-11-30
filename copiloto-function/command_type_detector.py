@@ -92,9 +92,9 @@ class CommandTypeDetector:
         elif any(normalized_command.lower().startswith(p) for p in ["python ", "pip ", "conda ", "poetry "]):
             cmd_type = "python"
             confidence = 0.8
-        elif any(normalized_command.lower().startswith(p.lower()) for p in ["powershell ", "pwsh ", "Get-", "Set-", "New-", "Remove-", "Invoke-"]):
+        elif any(normalized_command.lower().startswith(p.lower()) for p in ["powershell ", "pwsh ", "Get-", "Set-", "New-", "Remove-", "Invoke-"]) or self._is_powershell_syntax(normalized_command):
             cmd_type = "powershell"
-            confidence = 0.8
+            confidence = 0.9
         elif any(normalized_command.lower().startswith(p) for p in ["bash ", "sh ", "chmod ", "ls ", "cd ", "mkdir ", "rm "]):
             # 🔥 FIX: En Windows, convertir comandos Unix a PowerShell
             if platform.system() == "Windows":
@@ -257,6 +257,43 @@ class CommandTypeDetector:
                 matched.append(f"indicator: {indicator}")
 
         return matched
+
+    def _is_powershell_syntax(self, command: str) -> bool:
+        """
+        Detecta si un comando usa sintaxis específica de PowerShell
+        """
+        powershell_indicators = [
+            '$',  # Variables PowerShell
+            'Where-Object',  # Cmdlets de filtrado
+            'ForEach-Object',
+            'Select-Object',
+            'Write-Host',
+            'Write-Output',
+            'Invoke-RestMethod',
+            'Invoke-WebRequest',
+            '| Where-Object',
+            '| ForEach-Object',
+            '| Select-Object',
+            '-eq', '-ne', '-like', '-match',  # Operadores PowerShell
+            '.file', '.name', '.length',  # Propiedades de objetos
+            '$_.',  # Variable de pipeline
+        ]
+        
+        command_lower = command.lower()
+        
+        # Contar indicadores encontrados
+        indicators_found = sum(1 for indicator in powershell_indicators 
+                             if indicator.lower() in command_lower)
+        
+        # Si tiene variables $ y operadores/cmdlets, es PowerShell
+        has_variables = '$' in command
+        has_cmdlets = any(cmdlet in command for cmdlet in ['Where-Object', 'ForEach-Object', 'Select-Object', 'Write-Host', 'Invoke-RestMethod'])
+        has_operators = any(op in command for op in ['-eq', '-ne', '-like', '-match'])
+        
+        # Es PowerShell si:
+        # 1. Tiene variables $ y cmdlets/operadores
+        # 2. Tiene múltiples indicadores PowerShell
+        return (has_variables and (has_cmdlets or has_operators)) or indicators_found >= 2
 
 
 # Instancia global del detector

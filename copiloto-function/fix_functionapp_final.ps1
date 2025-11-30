@@ -127,7 +127,7 @@ try {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
     "WEBSITES_PORT"                               = "80"
     "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
-    "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot/copiloto-function"
+    "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot"
     "AzureWebJobsDisableHomepage"                 = "false"
     "WEBSITE_MOUNT_ENABLED"                       = "1"
     "DOCKER_ENABLE_CI"                            = "true"

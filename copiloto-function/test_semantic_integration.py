@@ -769,9 +769,62 @@ def main():
     agent_routing_score = test_agent_routing()  # NUEVO test Agent Router
     redis_score = test_redis_integration()  # NUEVO test Redis
 
-    # Calcular puntuación general
+    # [FOUNDRY-INTERACTION] Test del nuevo endpoint con optimización de modelos
+    print(f"\n[FOUNDRY-INTERACTION] Testing endpoint foundry-interaction...")
+    foundry_score = 0.0
+    try:
+        # Test de configuración del endpoint
+        from foundry_interaction_endpoint import create_foundry_interaction_endpoint
+        print(f"[OK] Endpoint foundry-interaction importado correctamente")
+
+        # Test de routing con diferentes intenciones para Foundry
+        test_cases_foundry = [
+            {
+                "input": "Corrige el archivo config.py línea 25",
+                "expected_model": "mistral-large-2411",
+                "expected_agent": "Agent975",
+                "name": "Foundry Corrección"
+            },
+            {
+                "input": "Diagnostica el rendimiento del sistema",
+                "expected_model": "claude-3-5-sonnet-20241022",
+                "expected_agent": "Agent914",
+                "name": "Foundry Diagnóstico"
+            },
+            {
+                "input": "Reservar embarcación para mañana",
+                "expected_model": "gpt-4o-2024-11-20",
+                "expected_agent": "BookingAgent",
+                "name": "Foundry Reserva"
+            }
+        ]
+
+        from router_agent import route_by_semantic_intent
+
+        foundry_passed = 0
+        for case in test_cases_foundry:
+            routing = route_by_semantic_intent(case["input"])
+            model_correct = routing.get("model") == case["expected_model"]
+            agent_correct = routing.get("agent_id") == case["expected_agent"]
+
+            if model_correct and agent_correct:
+                print(
+                    f"[OK] {case['name']}: '{case['input'][:40]}...' → Model: {case['expected_model']}, Agent: {case['expected_agent']}")
+                foundry_passed += 1
+            else:
+                print(f"[FAIL] {case['name']}: Expected Model: {case['expected_model']}, Got: {routing.get('model')} | Expected Agent: {case['expected_agent']}, Got: {routing.get('agent_id')}")
+
+        foundry_score = foundry_passed / len(test_cases_foundry)
+        print(
+            f"[FOUNDRY-INTERACTION] Routing para Foundry: {foundry_passed}/{len(test_cases_foundry)} casos correctos ({foundry_score*100:.1f}%)")
+
+    except Exception as e:
+        print(f"[ERROR] Error testing foundry-interaction: {e}")
+        foundry_score = 0.0
+
+    # Calcular puntuación general incluyendo Foundry
     overall_score = (classifier_score + integration_score + conversation_score +
-                     wrapper_integration_score + agent_routing_score + redis_score) / 6
+                     wrapper_integration_score + agent_routing_score + redis_score + foundry_score) / 7
 
     print(f"\n" + "="*70)
     print(f"[SEMANTIC] RESULTADO FINAL:")
@@ -783,6 +836,7 @@ def main():
         f"   🔄 Pipeline completo (NUEVO):   {wrapper_integration_score*100:6.1f}%")
     print(f"   🤖 Router multi-agente (NUEVO): {agent_routing_score*100:6.1f}%")
     print(f"   📦 Integración Redis (NUEVO):   {redis_score*100:6.1f}%")
+    print(f"   🚀 Endpoint Foundry (NUEVO):    {foundry_score*100:6.1f}%")
     print(f"   {'-'*50}")
     print(f"   🎯 Puntuación general:          {overall_score*100:6.1f}%")
     print(f"="*70)

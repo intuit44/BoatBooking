@@ -21,6 +21,13 @@ except Exception:  # pragma: no cover
     classify_user_intent = None
     preprocess_text = None
 
+# Importar router de agentes para optimización de modelos
+try:
+    from router_agent import route_by_semantic_intent, get_agent_for_message
+except Exception:  # pragma: no cover
+    route_by_semantic_intent = None
+    get_agent_for_message = None
+
 try:
     from skills.log_query_skill import (
         LogQuerySkill,
@@ -87,7 +94,8 @@ def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") 
     if intent.get("intent") != "revisar_logs":
         return None
 
-    funcion = extract_function_hint(user_message) if extract_function_hint else None
+    funcion = extract_function_hint(
+        user_message) if extract_function_hint else None
 
     if get_cached_analysis:
         cached = get_cached_analysis(user_message, funcion)
@@ -112,13 +120,15 @@ def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") 
     try:
         skill = LogQuerySkill()
         logs = skill.query_logs(funcion)
-        analisis = analyze_logs_semantic(logs, funcion) if analyze_logs_semantic else {"exito": False, "error": "Analizador no disponible"}
+        analisis = analyze_logs_semantic(logs, funcion) if analyze_logs_semantic else {
+            "exito": False, "error": "Analizador no disponible"}
 
         if analisis.get("exito") and cache_log_analysis:
             try:
                 cache_log_analysis(user_message, funcion, analisis)
             except Exception:
-                logging.debug("[logs-intent] No se pudo cachear analisis.", exc_info=True)
+                logging.debug(
+                    "[logs-intent] No se pudo cachear analisis.", exc_info=True)
 
         respuesta = analisis.get("mensaje") or "Analisis de logs completado"
         return {
@@ -404,6 +414,30 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         user_message = user_message_raw.strip(
                         ) if isinstance(user_message_raw, str) else None
 
+                        # 🤖 ROUTING SEMÁNTICO - Determinar agente y modelo óptimo
+                        routing_result = None
+                        if user_message and route_by_semantic_intent:
+                            try:
+                                _, session_id, _ = _hydrate_request_identificadores(
+                                    req)
+                                routing_result = route_by_semantic_intent(
+                                    user_message, session_id=session_id
+                                )
+
+                                # Agregar información de routing al request para uso posterior
+                                setattr(req, "_routing_result", routing_result)
+                                setattr(req, "_selected_model",
+                                        routing_result.get("model"))
+                                setattr(req, "_selected_agent",
+                                        routing_result.get("agent_id"))
+
+                                logging.info(
+                                    f"🤖 [Router] '{user_message[:50]}...' → Agent: {routing_result.get('agent_id')} → Model: {routing_result.get('model')}")
+                            except Exception as e:
+                                logging.warning(
+                                    f"⚠️ Error en routing semántico: {e}")
+                                routing_result = None
+
                         if user_message:
                             try:
                                 setattr(
@@ -417,9 +451,11 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                 user_message, route_path)
                             if intent_logs:
                                 return func.HttpResponse(
-                                    json.dumps(intent_logs, ensure_ascii=False),
+                                    json.dumps(
+                                        intent_logs, ensure_ascii=False),
                                     mimetype="application/json",
-                                    status_code=200 if intent_logs.get("exito") else 500
+                                    status_code=200 if intent_logs.get(
+                                        "exito") else 500
                                 )
 
                         if user_message and len(user_message) > 3:
@@ -427,18 +463,33 @@ def memory_route(app: func.FunctionApp) -> Callable:
                             _, session_id, agent_id = _hydrate_request_identificadores(
                                 req)
 
-                            # Crear evento completo
+                            # Crear evento completo con información de routing
+                            routing_metadata = routing_result.get(
+                                "routing_metadata", {}) if routing_result else {}
+                            modelo_asignado = routing_result.get(
+                                "model") if routing_result else None
+                            agente_asignado = routing_result.get(
+                                "agent_id") if routing_result else agent_id
+
                             evento = {
                                 "id": f"{session_id}_user_input_{int(datetime.utcnow().timestamp())}",
                                 "session_id": session_id,
-                                "agent_id": agent_id,
+                                "agent_id": agente_asignado,
                                 "endpoint": route_path or "input-ui",
                                 "event_type": "user_input",
                                 "texto_semantico": user_message.strip(),
                                 "timestamp": datetime.utcnow().isoformat() + "Z",
                                 "exito": True,
                                 "tipo": "user_input",
-                                "data": {"origen": "foundry_ui", "tipo": "user_input"}
+                                "model_usado": modelo_asignado,  # 🎯 MODELO ASIGNADO
+                                "routing_metadata": routing_metadata,  # 🎯 METADATA DE ROUTING
+                                "data": {
+                                    "origen": "foundry_ui",
+                                    "tipo": "user_input",
+                                    "intent": routing_metadata.get("intent"),
+                                    "confidence": routing_metadata.get("confidence"),
+                                    "model": modelo_asignado
+                                }
                             }
 
                             # Guardar en Cosmos + AI Search (flujo completo automático)
@@ -856,10 +907,25 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                     if len(texto_limpio.strip()) > 20:
                                         logging.info(
                                             f"[BLOQUE 6] Llamando registrar_respuesta_semantica...")
+
+                                        # 🤖 Obtener información de routing si está disponible
+                                        routing_result = getattr(
+                                            req, '_routing_result', None)
+                                        modelo_usado = getattr(
+                                            req, '_selected_model', None)
+                                        agente_usado = getattr(
+                                            req, '_selected_agent', None) or agent_id
+
+                                        # Registrar con información de modelo para auditoría
                                         registrar_respuesta_semantica(
-                                            texto_limpio, session_id, agent_id, route_path)
+                                            texto_limpio, session_id, agente_usado, route_path,
+                                            model_usado=modelo_usado,
+                                            routing_metadata=routing_result.get(
+                                                'routing_metadata', {}) if routing_result else {}
+                                        )
+
                                         logging.info(
-                                            f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars")
+                                            f"[Foundry] Respuesta capturada: {len(texto_limpio)} chars, Model: {modelo_usado}, Agent: {agente_usado}")
 
                                 elif response_data_for_semantic.get("interacciones"):
                                     interacciones = response_data_for_semantic.get(
