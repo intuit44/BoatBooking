@@ -20,7 +20,8 @@ class AzureSearchService:
 
     def __init__(self):
         self.endpoint = os.environ.get("AZURE_SEARCH_ENDPOINT")
-        self.index_name = os.environ.get("AZURE_SEARCH_INDEX", "agent-memory-index")
+        self.index_name = os.environ.get(
+            "AZURE_SEARCH_INDEX", "agent-memory-index-optimized")
         if not self.endpoint:
             raise ValueError("AZURE_SEARCH_ENDPOINT no configurado")
 
@@ -139,7 +140,7 @@ class AzureSearchService:
             vector_query = VectorizedQuery(
                 vector=query_vector,
                 k_nearest_neighbors=top,
-                fields="vector"
+                fields="vector_semantico"
             )
 
             # 3. Ejecutar búsqueda vectorial

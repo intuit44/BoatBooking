@@ -10,7 +10,7 @@ from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
 
 COGNITIVE_INDEX_NAME = os.environ.get(
-    "AZURE_SEARCH_INDEX", "agent-memory-index")
+    "AZURE_SEARCH_INDEX", "agent-memory-index-optimized")
 LOG_INDEX_NAME = os.environ.get("AZURE_SEARCH_LOG_INDEX", COGNITIVE_INDEX_NAME)
 
 DOC_CLASS_COGNITIVE = "cognitive_memory"

@@ -5607,7 +5607,7 @@ def debug_openapi(req: func.HttpRequest) -> func.HttpResponse:
 
         # Buscar TODOS los archivos
         all_files = list(base_path.glob("*"))
-        
+
         # Verificar archivos
         files_info = []
         for file_path in all_files:
@@ -12932,10 +12932,12 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
     # Si el body está vacío pero hay intención de deploy de modelos, construir payload automáticamente
     if not body or (not body.get("models") and not body.get("resourceGroup") and not body.get("template")):
         user_message = req.headers.get("X-User-Message", "")
-        intent_keywords = ["deploy", "desplegar", "model", "modelo", "foundry", "ai"]
+        intent_keywords = ["deploy", "desplegar",
+                           "model", "modelo", "foundry", "ai"]
 
         if any(keyword in user_message.lower() for keyword in intent_keywords) or not body:
-            logging.info("🧠 [DEPLOY] Body vacío detectado, aplicando inferencia inteligente para deployment de modelos")
+            logging.info(
+                "🧠 [DEPLOY] Body vacío detectado, aplicando inferencia inteligente para deployment de modelos")
             try:
                 from router_agent import AGENT_REGISTRY
 
@@ -12959,7 +12961,8 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                         default_models.append(m)
 
                 if not default_models:
-                    raise ValueError("AGENT_REGISTRY no contiene modelos válidos")
+                    raise ValueError(
+                        "AGENT_REGISTRY no contiene modelos válidos")
 
                 inferred_body = {
                     "action": "deployModels",
@@ -12974,7 +12977,8 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                 logging.info(f"🧠 [DEPLOY] Payload inferido: {body}")
 
             except Exception as e:
-                logging.warning(f"⚠️ [DEPLOY] No se pudo inferir payload de modelos: {e}")
+                logging.warning(
+                    f"⚠️ [DEPLOY] No se pudo inferir payload de modelos: {e}")
                 res = {
                     "ok": False,
                     "error_code": "INVALID_PAYLOAD",
@@ -12991,7 +12995,8 @@ def deploy_http(req: func.HttpRequest) -> func.HttpResponse:
                     source="deploy_inference_failed",
                     endpoint="/api/deploy",
                     method=req.method,
-                    params={"session_id": req.headers.get("Session-ID"), "agent_id": req.headers.get("Agent-ID")},
+                    params={"session_id": req.headers.get(
+                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
                     response_data=res,
                     success=False
                 )

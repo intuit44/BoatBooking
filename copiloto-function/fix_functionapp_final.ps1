@@ -165,7 +165,7 @@ try {
     "BING_SEARCH_ENDPOINT"                        = "https://api.bing.microsoft.com"
     # Azure Cognitive Search (added)
     "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch-s1.search.windows.net"
-    "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index"
+    "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index-optimized"
     "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
     "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
     "AGENTE_OPENAI_PROJECT_URL"                   = "https://agenteopenai.services.ai.azure.com/api/projects/AgenteOpenAi-project"

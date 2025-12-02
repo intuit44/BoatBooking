@@ -103,9 +103,9 @@ def indexador_semantico(msg: func.QueueMessage) -> None:
             "session_id": session_id,
             "endpoint": endpoint,
             "timestamp": timestamp_str,
-            "tipo": tipo,
+            "tipo_interaccion": tipo,
             "texto_semantico": texto_semantico[:10000],
-            "vector": vector,
+            "vector_semantico": vector,
             "exito": exito
         }
 

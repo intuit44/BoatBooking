@@ -62,7 +62,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         tipo = req_body.get("tipo")
 
         GENERIC_SESSIONS = {"assistant", "test_session", "unknown", None, ""}
-        
+
         base_filters = [
             "is_synthetic ne true",
             "(document_class eq 'cognitive_memory' or document_class eq null)"
@@ -70,22 +70,23 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # 🔧 DETECTAR SI ES QUERY TÉCNICA (UUID, Client ID, etc.)
         query_tecnica = detectar_query_tecnica(query)
-        
+
         if query_tecnica:
             # Usar búsqueda LITERAL en Cosmos DB
-            logging.info(f"🔧 Query técnica detectada: {query_tecnica['tipo']} → búsqueda literal")
+            logging.info(
+                f"🔧 Query técnica detectada: {query_tecnica['tipo']} → búsqueda literal")
             try:
                 cosmos_store = CosmosMemoryStore()
                 if not cosmos_store.enabled or not cosmos_store.container:
                     raise Exception("Cosmos DB no disponible")
-                
+
                 documentos = buscar_literal_cosmos(
                     query_tecnica=query_tecnica,
                     cosmos_container=cosmos_store.container,
                     session_id=session_id,
                     agent_id=agent_id
                 )
-                
+
                 return {
                     "exito": True,
                     "total": len(documentos),
@@ -99,12 +100,13 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                     }
                 }
             except Exception as cosmos_err:
-                logging.warning(f"⚠️ Búsqueda literal falló: {cosmos_err}, fallback a vectorial")
+                logging.warning(
+                    f"⚠️ Búsqueda literal falló: {cosmos_err}, fallback a vectorial")
                 # Continuar con búsqueda vectorial como fallback
-        
+
         # Búsqueda VECTORIAL normal (Azure AI Search)
         search_service = get_search_service()
-        
+
         # 🔄 CASCADA DE BÚSQUEDA
         resultado = None
         modo_usado = None
@@ -118,17 +120,19 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
                 filters.append(f"tipo eq '{safe_tipo}'")
-            
+
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
                 search_service, query, top, filter_str)
-            
+
             if resultado.get("exito") and resultado.get("total", 0) > 0:
                 modo_usado = "session_specific"
                 filtros_usados = filter_str_final or "NINGUNO"
-                logging.info(f"✅ Nivel 1: Encontrados {resultado['total']} en sesión {session_id}")
+                logging.info(
+                    f"✅ Nivel 1: Encontrados {resultado['total']} en sesión {session_id}")
             else:
-                logging.info(f"⚠️ Nivel 1: 0 resultados en sesión {session_id}, escalando...")
+                logging.info(
+                    f"⚠️ Nivel 1: 0 resultados en sesión {session_id}, escalando...")
                 resultado = None
 
         # NIVEL 2: Búsqueda por agent_id (todas las sesiones)
@@ -139,17 +143,19 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
                 filters.append(f"tipo eq '{safe_tipo}'")
-            
+
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
                 search_service, query, top, filter_str)
-            
+
             if resultado.get("exito") and resultado.get("total", 0) > 0:
                 modo_usado = "agent_wide"
                 filtros_usados = filter_str_final or "NINGUNO"
-                logging.info(f"✅ Nivel 2: Encontrados {resultado['total']} para agent_id {agent_id}")
+                logging.info(
+                    f"✅ Nivel 2: Encontrados {resultado['total']} para agent_id {agent_id}")
             else:
-                logging.info(f"⚠️ Nivel 2: 0 resultados para agent_id {agent_id}, escalando...")
+                logging.info(
+                    f"⚠️ Nivel 2: 0 resultados para agent_id {agent_id}, escalando...")
                 resultado = None
 
         # NIVEL 3: Búsqueda universal (sin filtros de sesión/agente)
@@ -158,13 +164,14 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
                 filters.append(f"tipo eq '{safe_tipo}'")
-            
+
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
                 search_service, query, top, filter_str)
             modo_usado = "universal"
             filtros_usados = filter_str_final or "NINGUNO"
-            logging.info(f"✅ Nivel 3: Búsqueda universal → {resultado.get('total', 0)} resultados")
+            logging.info(
+                f"✅ Nivel 3: Búsqueda universal → {resultado.get('total', 0)} resultados")
 
         # Agregar metadata explicativa
         if resultado and resultado.get("exito"):
@@ -172,7 +179,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                 "query_original": query,
                 "filtros_aplicados": {
                     "session_id": session_id if session_id and session_id not in GENERIC_SESSIONS else "no aplicado",
-                    "tipo": tipo,
+                    "tipo_interaccion": tipo,
                     "agent_id": agent_id if agent_id and agent_id not in GENERIC_SESSIONS else "no aplicado"
                 },
                 "modo_busqueda": modo_usado,
@@ -182,7 +189,8 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         if resultado:
-            logging.info(f"🔍 Búsqueda '{query}' → {resultado.get('total', 0)} resultados [modo: {modo_usado}]")
+            logging.info(
+                f"🔍 Búsqueda '{query}' → {resultado.get('total', 0)} resultados [modo: {modo_usado}]")
         return resultado or {"exito": False, "error": "No se pudo completar la búsqueda"}
 
     except Exception as e:
@@ -206,7 +214,8 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         documentos = req_body.get("documentos")
         if not documentos or not isinstance(documentos, list):
             return {"exito": False, "error": "Campo 'documentos' requerido (array)"}
-        index_name = req_body.get("index_name") or req_body.get("indice_destino")
+        index_name = req_body.get(
+            "index_name") or req_body.get("indice_destino")
 
         documentos_con_vectores = []
         duplicados = 0
@@ -266,7 +275,8 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         search_service = get_search_service()
-        resultado = search_service.indexar_documentos(documentos_con_vectores, index_name=index_name)
+        resultado = search_service.indexar_documentos(
+            documentos_con_vectores, index_name=index_name)
 
         indexados = len(documentos_con_vectores)
 
