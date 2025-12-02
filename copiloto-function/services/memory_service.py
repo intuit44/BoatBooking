@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
+from services.redis_buffer_service import redis_buffer
 
 COGNITIVE_INDEX_NAME = os.environ.get(
     "AZURE_SEARCH_INDEX", "agent-memory-index-optimized")
@@ -326,7 +327,20 @@ class MemoryService:
         return self.log_event("semantic", event_data)
 
     def get_session_history(self, session_id: str, limit: int = 100) -> list:
-        """Obtiene historial de sesión desde Cosmos"""
+        """Obtiene historial de sesión, priorizando Redis como caché antes de Cosmos."""
+        cache_key = None
+        if redis_buffer and getattr(redis_buffer, "is_enabled", False):
+            try:
+                cache_key = redis_buffer._format_key("historial", session_id)
+                cached = redis_buffer._json_get(cache_key)
+                if cached:
+                    logging.info(
+                        f"[CACHE HIT] Historial sesión {session_id}: {len(cached)} items desde Redis")
+                    redis_buffer._refresh_ttl(cache_key, "memoria")
+                    return cached
+            except Exception as e:
+                logging.warning(f"[CACHE ERROR] Redis no disponible: {e}")
+
         if not self.cosmos_available or not self.memory_container:
             return []
 
@@ -338,6 +352,18 @@ class MemoryService:
                 max_item_count=limit,
                 enable_cross_partition_query=True
             ))
+
+            # Guardar en Redis para próximos accesos si está habilitado
+            if cache_key and items:
+                try:
+                    redis_buffer._json_set(
+                        cache_key, items, ttl=redis_buffer._get_ttl("memoria"))
+                    redis_buffer._emit_cache_event(
+                        "write", "memoria", cache_key, {"items": len(items)})
+                except Exception as e:
+                    logging.debug(
+                        f"[CACHE WRITE] No se pudo cachear historial en Redis: {e}", exc_info=True)
+
             return items
         except Exception as e:
             logging.error(f"Error consultando historial: {e}")

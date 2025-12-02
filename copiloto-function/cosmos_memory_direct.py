@@ -97,7 +97,7 @@ def deduplicar_interacciones_semanticas(items: list, max_items: int = 50) -> lis
             continue
 
         # Excluir texto muy corto
-        if len(texto.strip()) < 30:
+        if len(texto.strip()) < 10:
             continue
 
         items_filtrados.append(item)

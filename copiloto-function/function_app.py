@@ -78,7 +78,6 @@ auto_state = os.environ.get("SEMANTIC_AUTOPILOT", "off")
 if auto_state == "on":
     print("[*] Autopilot activado")
 
-
 # Validation helpers
 
 def _resolver_placeholders_dinamico(comando: str, memoria=None) -> str:
@@ -476,6 +475,18 @@ except ImportError as e:
     logging.warning(f"⚠️ No se pudo registrar endpoint msearch: {e}")
 except Exception as e:
     logging.error(f"❌ Error registrando msearch: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+# Endpoints Redis Admin (en endpoints/redis_admin.py)
+try:
+    from endpoints.redis_admin import register_redis_admin_routes
+
+    register_redis_admin_routes(app)
+    logging.info("✅ Endpoints redis-admin registrados correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar redis-admin: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando redis-admin: {e}")
     logging.error(f"Traceback: {traceback.format_exc()}")
 
 try:
