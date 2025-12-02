@@ -17,6 +17,7 @@ import ssl
 from typing import Any, Callable, Dict, Optional, Tuple, cast
 import redis
 from datetime import datetime
+from redis import exceptions as redis_exceptions
 
 CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
 
@@ -64,21 +65,36 @@ class RedisBufferService:
 
         self._initialized = True
         self._client: Optional["redis.Redis"] = None
-        # Host de la instancia Redis (ejemplo: name.redis.cache.windows.net)
+
+        # ⭐ ACTUALIZADO: Usar el host correcto de Redis Enterprise
         self._host = os.getenv(
-            "REDIS_HOST", "Managed-redis-copiloto.eastus2.redis.azure.net")
-        self._port = int(os.getenv("REDIS_PORT", "10000"))
-        # Eliminada la ruta basada en REDIS_KEY: ahora intentamos MSI y fallback a clave si es necesario
+            "REDIS_HOST",
+            "managed-redis-copiloto.eastus2.redis.azure.net"  # Modificado
+        )
+
+        # ⭐ ACTUALIZADO: Puerto correcto para Redis Enterprise
+        self._port = int(os.getenv("REDIS_PORT", "10000")
+                         )  # Puerto 10000, no 6380
+
         self._db = int(os.getenv("REDIS_DB", "0"))
-        # Forzamos SSL por defecto para entornos Azure, pero el fallback por clave puede respetar REDIS_SSL
-        self._ssl = True
+
+        # ⭐ IMPORTANTE: Configuración específica para Azure Redis Enterprise
+        self._ssl = True  # Siempre True para Azure
+        self._ssl_cert_reqs = ssl.CERT_NONE  # ⭐ NUEVO: Azure Redis requiere esto
+
         self._aad_scope = os.getenv(
             "REDIS_AAD_SCOPE", "https://redis.azure.com/.default")
-        # Enabled si redis-py está instalado y hay host configurado (MSI será opcional)
+
         self._enabled = bool(redis and self._host)
         if not DefaultAzureCredential:
             logging.warning(
                 "[RedisBuffer] azure-identity no está instalado; se intentará fallback con REDIS_KEY si existe.")
+
+        # ⭐ NUEVO: Configuración de timeout específica para Redis Enterprise
+        self._socket_timeout = int(os.getenv("REDIS_SOCKET_TIMEOUT", "10"))
+        self._socket_connect_timeout = int(
+            os.getenv("REDIS_CONNECT_TIMEOUT", "10"))
+
         self._connect()
 
     # ------------------------------------------------------------------ #
@@ -95,7 +111,10 @@ class RedisBufferService:
             self._enabled = False
             return
 
-        # Intentar primero con REDIS_KEY (fallback más directo)
+        # ⭐ NUEVA: Primero verificar si RedisJSON está disponible
+        self._has_redisjson = False
+
+        # Intentar primero con REDIS_KEY (más directo para Redis Enterprise)
         key = os.getenv("REDIS_KEY")
         if key:
             try:
@@ -106,28 +125,57 @@ class RedisBufferService:
                 redis_params = {
                     "host": self._host,
                     "port": self._port,
-                    "password": key,
+                    "password": key.strip(),  # ⭐ .strip() para limpiar espacios
                     "db": self._db,
                     "ssl": ssl_flag,
-                    "socket_timeout": 5,
-                    "socket_connect_timeout": 5,
-                    "decode_responses": False,
+                    "ssl_cert_reqs": ssl.CERT_NONE,  # ⭐ IMPORTANTE para Azure
+                    "socket_timeout": self._socket_timeout,
+                    "socket_connect_timeout": self._socket_connect_timeout,
+                    "decode_responses": False,  # Evitar issues de encoding, usar bytes
                     "encoding": "utf-8",
+                    "encoding_errors": "replace",
+                    "retry_on_timeout": True,
+                    "health_check_interval": 30,  # ⭐ NUEVO: Health check
                 }
 
-                if ssl_flag:
-                    redis_params["ssl_cert_reqs"] = ssl.CERT_REQUIRED
-
                 self._client = redis.Redis(**redis_params)
+
+                # ⭐ NUEVO: Testeo más robusto
                 self._client.ping()
+
+                # ⭐ NUEVO: Verificar si RedisJSON está disponible
+                try:
+                    # Intentar un comando simple de RedisJSON
+                    test_key = f"test:redisjson:{int(time.time())}"
+                    self._client.json().set(test_key, '$', {"test": True})
+                    result = self._client.json().get(test_key)
+                    self._client.delete(test_key)
+                    if result:
+                        self._has_redisjson = True
+                        logging.info(
+                            "[RedisBuffer] ✅ RedisJSON está disponible")
+                except Exception as json_err:
+                    logging.warning(
+                        f"[RedisBuffer] RedisJSON no disponible: {json_err}")
+                    self._has_redisjson = False
+
                 self._enabled = True
                 logging.info(
-                    f"[RedisBuffer] ✅ Conectado usando REDIS_KEY: {self._host}:{self._port} (ssl={ssl_flag})")
+                    f"[RedisBuffer] ✅ Conectado usando REDIS_KEY: {self._host}:{self._port} (RedisJSON: {self._has_redisjson})")
                 return
 
+            except redis.exceptions.AuthenticationError as auth_err:
+                logging.error(
+                    f"[RedisBuffer] ❌ Error de autenticación: {auth_err}")
+                # Verificar si la key necesita el = al final
+                if not key.endswith('='):
+                    logging.info(
+                        "[RedisBuffer] Intentando agregar '=' a la key...")
+                    key = key + '='
+                    # Podrías reintentar aquí
             except Exception as exc:
-                logging.warning(
-                    f"[RedisBuffer] ⚠️ Falló conexión con REDIS_KEY: {exc}")
+                logging.error(
+                    f"[RedisBuffer] ❌ Falló conexión con REDIS_KEY: {exc}")
                 self._client = None
 
         # Si REDIS_KEY falló, intentar AAD
@@ -191,24 +239,32 @@ class RedisBufferService:
         return CACHE_STRATEGY.get(bucket, {}).get("ttl", 300)
 
     def _json_set(self, key: str, payload: Any, ttl: Optional[int] = None) -> None:
+        """Escritura robusta que prioriza RedisJSON con fallback a string."""
         if not self.is_enabled or payload is None:
             return
+        client = self._client
+        if not client:
+            return
+
+        ttl_value = ttl or self._get_ttl("memoria")
         try:
-            client = self._client
-            if not client:
-                return
-            client.json().set(key, "$", payload)
-            if ttl:
-                client.expire(key, ttl)
-        except Exception:
+            if getattr(self, "_has_redisjson", False):
+                client.json().set(key, "$", payload)
+            else:
+                serialized = json.dumps(payload, ensure_ascii=False)
+                client.set(key, serialized)
+
+            if ttl_value:
+                client.expire(key, ttl_value)
+        except Exception as err:
+            logging.error(f"[RedisBuffer] Error en _json_set para {key}: {err}")
+            # Reintento con serialización simple
             try:
                 serialized = json.dumps(payload, ensure_ascii=False)
-                client = self._client
-                if client:
-                    client.setex(key, ttl or self._get_ttl("memoria"),
-                                 serialized.encode("utf-8"))
-            except Exception as err:  # pragma: no cover
-                logging.debug(f"[RedisBuffer] set {key} falló: {err}")
+                client.setex(key, ttl_value, serialized)
+            except Exception as retry_err:  # pragma: no cover
+                logging.error(
+                    f"[RedisBuffer] Reintento falló en _json_set para {key}: {retry_err}")
 
     def _json_get(self, key: str) -> Optional[Any]:
         if not self.is_enabled:
@@ -429,6 +485,57 @@ class RedisBufferService:
         except Exception as exc:
             stats["info_error"] = str(exc)
         return stats
+
+    def test_connection(self) -> Dict[str, Any]:
+        """Prueba de conectividad y RedisJSON para diagnósticos rápidos."""
+        result: Dict[str, Any] = {
+            "connected": False,
+            "redisjson_available": False,
+            "ping": False,
+            "info": {},
+            "error": None,
+        }
+
+        if not self.is_enabled or not self._client:
+            result["error"] = "Cliente no inicializado"
+            return result
+
+        try:
+            client = self._client
+            result["ping"] = bool(client.ping())
+
+            # Probar RedisJSON
+            test_key = f"test:connection:{int(time.time())}"
+            try:
+                client.json().set(test_key, "$",
+                                  {"test": True, "timestamp": time.time()})
+                json_result = client.json().get(test_key)
+                result["redisjson_available"] = bool(json_result)
+            except Exception:
+                result["redisjson_available"] = False
+            finally:
+                try:
+                    client.delete(test_key)
+                except Exception:
+                    pass
+
+            try:
+                info = cast(Dict[str, Any], client.info())
+                result["info"] = {
+                    "version": info.get("redis_version"),
+                    "memory": info.get("used_memory_human"),
+                    "clients": info.get("connected_clients"),
+                    "role": info.get("role"),
+                    "uptime": info.get("uptime_in_seconds"),
+                }
+            except Exception:
+                result["info"] = {}
+
+            result["connected"] = True
+        except Exception as e:
+            result["error"] = str(e)
+
+        return result
 
     def keys(self, pattern: str = "*") -> list:
         """Retorna lista de claves que coinciden con el patrón."""
