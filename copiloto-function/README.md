@@ -129,12 +129,14 @@ Este sistema utiliza memoria persistente en Cosmos DB para dar continuidad a int
 ## Ejecución local
 
 1. Instalar dependencias de la Function App:
+
    ```bash
    cd copiloto-function
    npm install  # para tooling local
    pip install -r requirements.txt
    func start
    ```
+
 2. Configurar variables necesarias (`COSMOSDB_ENDPOINT`, `BLOB_CONNECTION_STRING`, credenciales Azure) antes de iniciar para habilitar memoria persistente y acceso a storage.【F:copiloto-function/services/memory_service.py†L12-L78】【F:copiloto-function/function_app.py†L4437-L4476】
 3. Validar salud inicial visitando `GET /api/health` y `GET /api/status`; luego ejecutar `GET /api/verificar-cosmos` para confirmar persistencia de memoria.【F:copiloto-function/function_app.py†L4179-L4201】【F:copiloto-function/function_app.py†L6487-L6514】【F:copiloto-function/function_app.py†L14729-L14796】
 

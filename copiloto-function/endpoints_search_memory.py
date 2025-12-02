@@ -119,7 +119,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             filters.append(f"session_id eq '{safe_sid}'")
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
-                filters.append(f"tipo eq '{safe_tipo}'")
+                filters.append(f"tipo_interaccion eq '{safe_tipo}'")
 
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
@@ -142,7 +142,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             filters.append(f"agent_id eq '{safe_aid}'")
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
-                filters.append(f"tipo eq '{safe_tipo}'")
+                filters.append(f"tipo_interaccion eq '{safe_tipo}'")
 
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
@@ -163,7 +163,7 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
             filters = list(base_filters)
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
-                filters.append(f"tipo eq '{safe_tipo}'")
+                filters.append(f"tipo_interaccion eq '{safe_tipo}'")
 
             filter_str = " and ".join(filters)
             resultado, filter_str_final = _search_with_fallback(
@@ -252,7 +252,8 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                     f"⚠️ No se pudo generar embedding para {doc['id']}, omitido")
                 continue
 
-            doc["vector"] = vector
+            # Ajustar al esquema del índice: el campo vectorial es vector_semantico
+            doc["vector_semantico"] = vector
 
             if "timestamp" in doc:
                 ts = doc["timestamp"]

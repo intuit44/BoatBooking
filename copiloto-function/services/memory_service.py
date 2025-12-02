@@ -263,7 +263,7 @@ class MemoryService:
                 "endpoint": event.get("endpoint") or event.get("data", {}).get("endpoint", "unknown"),
                 "texto_semantico": event.get("texto_semantico", ""),
                 "exito": event.get("data", {}).get("success", True),
-                "tipo": event.get("tipo") or event.get("event_type", "interaccion"),
+                "tipo_interaccion": event.get("tipo") or event.get("event_type", "interaccion"),
                 "timestamp": event.get("timestamp", datetime.now(timezone.utc).isoformat()),
                 "document_class": event.get("document_class", DOC_CLASS_SYSTEM),
                 "is_synthetic": event.get("is_synthetic", False)
