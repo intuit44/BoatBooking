@@ -133,7 +133,6 @@ try {
   $settings = @{
     "FUNCTIONS_WORKER_RUNTIME"                    = "python"
     "FUNCTIONS_EXTENSION_VERSION"                 = "~4"
-    "AzureWebJobsStorage"                         = "..."
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
     "WEBSITES_PORT"                               = "80"
     "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
@@ -143,6 +142,8 @@ try {
     "DOCKER_ENABLE_CI"                            = "true"
     "FUNCTION_BASE_URL"                           = "https://copiloto-semantico-func-us2.azurewebsites.net"
     "AZURE_SUBSCRIPTION_ID"                       = "380fa841-83f3-42fe-adc4-582a5ebe139b"
+    # Storage connection string for Azure Functions runtime
+    "AzureWebJobsStorage"                         = "DefaultEndpointsProtocol=https;AccountName=boatrentalstorage;AccountKey=$storageKey;EndpointSuffix=core.windows.net"
     # Variables de Voice Live
     "AZURE_VOICE_LIVE_ENDPOINT"                   = "https://yellowstone413g-9987-resource.cognitiveservices.azure.com"
     "AZURE_VOICE_LIVE_DEPLOYMENT"                 = "gpt-4o-mini"
@@ -389,7 +390,8 @@ chmod 600 ~/.git-credentials
       $currentImage = ($currentConfig | Where-Object { $_.name -eq "DOCKER_CUSTOM_IMAGE_NAME" }).value
       if ($currentImage) {
         Write-Success "Imagen actual: $currentImage"
-      } else {
+      }
+      else {
         Write-Info "No hay imagen de contenedor configurada (modo Code deployment)"
       }
     }

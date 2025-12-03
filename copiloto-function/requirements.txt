@@ -41,3 +41,5 @@ psutil==5.9.8
 
 # Added per request
 redis[hiredis,json]==7.1.0
+# YAML parsing for endpoints/introspection
+PyYAML>=6.0

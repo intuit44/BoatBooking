@@ -11,7 +11,6 @@ import json
 import logging
 import azure.functions as func
 from typing import Any
-
 from services.redis_cli_service import get_redis_cli_service
 
 logger = logging.getLogger(__name__)
@@ -37,13 +36,15 @@ def register_redis_admin_routes(app: Any) -> None:
 
         if not command:
             return func.HttpResponse(
-                json.dumps({"success": False, "error": 'Parámetro "command" requerido'}, ensure_ascii=False),
+                json.dumps(
+                    {"success": False, "error": 'Parámetro "command" requerido'}, ensure_ascii=False),
                 status_code=400,
                 mimetype="application/json",
             )
 
         result = redis_cli_service.execute_command(command, agent_id, confirm)
-        status = 200 if result.get("success") else (400 if result.get("confirmation_required") else 500)
+        status = 200 if result.get("success") else (
+            400 if result.get("confirmation_required") else 500)
 
         return func.HttpResponse(
             json.dumps(result, ensure_ascii=False),
@@ -58,7 +59,8 @@ def register_redis_admin_routes(app: Any) -> None:
         diagnostic = redis_cli_service.run_diagnostic()
         status = 200 if diagnostic.get("overall") != "FAILED" else 500
         return func.HttpResponse(
-            json.dumps({"success": diagnostic.get("overall") != "FAILED", "diagnostic": diagnostic}, ensure_ascii=False),
+            json.dumps({"success": diagnostic.get("overall") !=
+                       "FAILED", "diagnostic": diagnostic}, ensure_ascii=False),
             status_code=status,
             mimetype="application/json",
         )
@@ -74,7 +76,8 @@ def register_redis_admin_routes(app: Any) -> None:
 
         audit_log = redis_cli_service.get_audit_log(limit)
         return func.HttpResponse(
-            json.dumps({"success": True, "audit_log": audit_log, "count": len(audit_log)}, ensure_ascii=False),
+            json.dumps({"success": True, "audit_log": audit_log,
+                       "count": len(audit_log)}, ensure_ascii=False),
             mimetype="application/json",
         )
 
@@ -84,6 +87,7 @@ def register_redis_admin_routes(app: Any) -> None:
         """Lista comandos permitidos (allowlist) para UI o agentes Foundry."""
         commands = redis_cli_service.get_allowed_commands()
         return func.HttpResponse(
-            json.dumps({"success": True, "commands": commands, "count": len(commands)}, ensure_ascii=False),
+            json.dumps({"success": True, "commands": commands,
+                       "count": len(commands)}, ensure_ascii=False),
             mimetype="application/json",
         )

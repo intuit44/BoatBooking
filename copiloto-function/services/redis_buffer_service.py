@@ -85,6 +85,11 @@ class RedisBufferService:
         self._aad_scope = os.getenv(
             "REDIS_AAD_SCOPE", "https://redis.azure.com/.default")
 
+        # Cluster awareness y control de fallos RedisJSON
+        self._is_cluster = False
+        self._cluster_mode = os.getenv("REDIS_CLUSTER_MODE", "oss").lower()
+        self._json_failures: Dict[str, int] = {}
+
         self._enabled = bool(redis and self._host)
         if not DefaultAzureCredential:
             logging.warning(
@@ -142,6 +147,19 @@ class RedisBufferService:
 
                 # ⭐ NUEVO: Testeo más robusto
                 self._client.ping()
+
+                # Detectar si hay cluster habilitado
+                try:
+                    info_cluster = self._client.info("cluster")
+                    try:
+                        self._is_cluster = int(
+                            info_cluster.get("cluster_enabled", 0)) == 1
+                    except (ValueError, TypeError):
+                        self._is_cluster = False
+                    logging.info(
+                        f"[RedisBuffer] Cluster mode detected: {self._is_cluster}")
+                except Exception:
+                    self._is_cluster = False
 
                 # ⭐ NUEVO: Verificar si RedisJSON está disponible
                 try:
@@ -239,32 +257,55 @@ class RedisBufferService:
         return CACHE_STRATEGY.get(bucket, {}).get("ttl", 300)
 
     def _json_set(self, key: str, payload: Any, ttl: Optional[int] = None) -> None:
-        """Escritura robusta que prioriza RedisJSON con fallback a string."""
+        """Escritura robusta: intenta RedisJSON, maneja cluster y hace fallback serializado."""
         if not self.is_enabled or payload is None:
             return
         client = self._client
         if not client:
             return
 
+        processed_key = self._prepare_cluster_key(key)
         ttl_value = ttl or self._get_ttl("memoria")
-        try:
-            if getattr(self, "_has_redisjson", False):
-                client.json().set(key, "$", payload)
-            else:
-                serialized = json.dumps(payload, ensure_ascii=False)
-                client.set(key, serialized)
 
-            if ttl_value:
-                client.expire(key, ttl_value)
-        except Exception as err:
-            logging.error(f"[RedisBuffer] Error en _json_set para {key}: {err}")
-            # Reintento con serialización simple
+        failure_count = self._json_failures.get(processed_key, 0)
+        redisjson_failed = False
+
+        if getattr(self, "_has_redisjson", False) and failure_count < 3:
             try:
-                serialized = json.dumps(payload, ensure_ascii=False)
-                client.setex(key, ttl_value, serialized)
-            except Exception as retry_err:  # pragma: no cover
-                logging.error(
-                    f"[RedisBuffer] Reintento falló en _json_set para {key}: {retry_err}")
+                client.json().set(processed_key, "$", payload)
+                if ttl_value:
+                    client.expire(processed_key, ttl_value)
+                if processed_key in self._json_failures:
+                    del self._json_failures[processed_key]
+                return
+            except redis.exceptions.ResponseError as e:
+                msg = str(e)
+                redisjson_failed = True
+                self._json_failures[processed_key] = failure_count + 1
+                if failure_count == 0 or "MOVED" in msg or "ASK" in msg or "4200" in msg or "8501" in msg:
+                    logging.warning(
+                        f"[RedisBuffer] RedisJSON falló para {processed_key}: {msg}")
+            except Exception as e:
+                redisjson_failed = True
+                self._json_failures[processed_key] = failure_count + 1
+                if failure_count == 0:
+                    logging.warning(
+                        f"[RedisBuffer] RedisJSON error para {processed_key}: {e}")
+        else:
+            redisjson_failed = True
+
+        # Fallback serializado
+        try:
+            serialized = json.dumps(payload, ensure_ascii=False,
+                                    separators=(",", ":"), default=str)
+            encoded = serialized.encode("utf-8", "replace")
+            client.setex(processed_key, ttl_value, encoded)
+            if failure_count == 0:
+                logging.info(
+                    f"[RedisBuffer] Fallback serializado aplicado para {processed_key}")
+        except Exception as err:  # pragma: no cover
+            logging.error(
+                f"[RedisBuffer] setex fallback falló para {processed_key}: {err}")
 
     def _json_get(self, key: str) -> Optional[Any]:
         if not self.is_enabled:
@@ -290,6 +331,26 @@ class RedisBufferService:
     def _format_key(self, prefix: str, *parts: str) -> str:
         norm_parts = [p for p in parts if p]
         return f"{prefix}:{':'.join(norm_parts)}" if norm_parts else prefix
+
+    def _prepare_cluster_key(self, key: str) -> str:
+        """Para cluster OSS, agrupa claves relacionadas con hash tags."""
+        if not self._is_cluster:
+            return key
+        if "{" in key and "}" in key:
+            return key
+        if key.startswith("memoria:"):
+            parts = key.split(":")
+            if len(parts) >= 2:
+                return f"{{memoria}}:{':'.join(parts[1:])}"
+        if key.startswith("thread:"):
+            parts = key.split(":")
+            if len(parts) >= 2:
+                return f"{{thread}}:{':'.join(parts[1:])}"
+        if key.startswith("narrativa:"):
+            parts = key.split(":")
+            if len(parts) >= 2:
+                return f"{{narrativa}}:{':'.join(parts[1:])}"
+        return key
 
     def _refresh_ttl(self, key: str, bucket: str) -> None:
         if not self.is_enabled:

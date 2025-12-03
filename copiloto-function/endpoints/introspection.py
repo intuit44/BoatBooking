@@ -7,12 +7,14 @@ import json
 import os
 import sys
 import yaml
-from pathlib import Path
-from datetime import datetime
 import azure.functions as func
 
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from pathlib import Path
+from datetime import datetime
 from function_app import app
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 
 @app.function_name(name="introspection")
 @app.route(route="introspection", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -20,27 +22,28 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
     """
     Endpoint de autopercepción: devuelve estructura interna del sistema
     """
-    
+
     try:
-        categoria = req.params.get("categoria")  # monitoreo, correccion, diagnostico, etc.
-        
+        # monitoreo, correccion, diagnostico, etc.
+        categoria = req.params.get("categoria")
+
         # Leer openapi.yaml para obtener todos los endpoints
         openapi_path = Path(__file__).parent.parent / "openapi.yaml"
-        
+
         endpoints_map = {}
-        
+
         if openapi_path.exists():
             with open(openapi_path, 'r', encoding='utf-8') as f:
                 openapi_spec = yaml.safe_load(f)
-                
+
             paths = openapi_spec.get("paths", {})
-            
+
             for path, methods in paths.items():
                 for method, details in methods.items():
                     if method in ["get", "post", "put", "delete", "patch"]:
                         tags = details.get("tags", ["Sin categoría"])
                         summary = details.get("summary", "")
-                        
+
                         # Categorizar endpoints
                         categoria_endpoint = "general"
                         if any(k in summary.lower() for k in ["diagnóstico", "diagnostico", "validar", "verificar"]):
@@ -53,10 +56,10 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
                             categoria_endpoint = "memoria"
                         elif any(k in summary.lower() for k in ["configurar", "settings", "app settings"]):
                             categoria_endpoint = "configuracion"
-                        
+
                         if categoria_endpoint not in endpoints_map:
                             endpoints_map[categoria_endpoint] = []
-                        
+
                         endpoints_map[categoria_endpoint].append({
                             "path": path,
                             "method": method.upper(),
@@ -64,12 +67,12 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
                             "tags": tags,
                             "operationId": details.get("operationId", "")
                         })
-        
+
         # Si se solicita una categoría específica
         if categoria:
             categoria_lower = categoria.lower()
             endpoints_categoria = endpoints_map.get(categoria_lower, [])
-            
+
             return func.HttpResponse(
                 json.dumps({
                     "exito": True,
@@ -82,11 +85,12 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
                 mimetype="application/json",
                 status_code=200
             )
-        
+
         # Devolver resumen completo con respuesta_usuario clara
         total_eps = sum(len(v) for v in endpoints_map.values())
-        capacidades_activas = [k for k, v in endpoints_map.items() if len(v) > 0]
-        
+        capacidades_activas = [
+            k for k, v in endpoints_map.items() if len(v) > 0]
+
         respuesta_usuario = f"""🧠 AUTOPERCEPCIÓN ESTRUCTURAL COMPLETADA
 
 📊 INVENTARIO DEL SISTEMA:
@@ -95,7 +99,7 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
 
 ✅ CAPACIDADES CONFIRMADAS:
 """
-        
+
         for cat, eps in endpoints_map.items():
             if len(eps) > 0:
                 respuesta_usuario += f"\n• {cat.upper()}: {len(eps)} endpoints disponibles"
@@ -103,9 +107,9 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
                     respuesta_usuario += f"\n  - {ep['method']} {ep['path']}"
                 if len(eps) > 2:
                     respuesta_usuario += f"\n  ... y {len(eps)-2} más"
-        
+
         respuesta_usuario += "\n\n🎯 PRÓXIMOS PASOS: Usar estos endpoints para validaciones específicas."
-        
+
         resumen = {
             "exito": True,
             "respuesta_usuario": respuesta_usuario,
@@ -124,13 +128,13 @@ def introspection_http(req: func.HttpRequest) -> func.HttpResponse:
             },
             "mensaje": "Autopercepción estructural completada"
         }
-        
+
         return func.HttpResponse(
             json.dumps(resumen, ensure_ascii=False),
             mimetype="application/json",
             status_code=200
         )
-        
+
     except Exception as e:
         logging.error(f"Error en introspection: {e}")
         return func.HttpResponse(

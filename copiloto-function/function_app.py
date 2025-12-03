@@ -6209,6 +6209,7 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Hybrid (semantico inteligente) activado')
 
     # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
+    from memory_manual import aplicar_memoria_manual  # asegura disponibilidad en este scope
     memoria_previa = getattr(req, '_memoria_contexto', {})
     if memoria_previa and memoria_previa.get("contexto_recuperado"):
         logging.info(
