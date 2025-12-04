@@ -80,6 +80,7 @@ if auto_state == "on":
 
 # Validation helpers
 
+
 def _resolver_placeholders_dinamico(comando: str, memoria=None) -> str:
     """
     Reemplaza dinámicamente cualquier placeholder del tipo <nombre_de_recurso>
@@ -707,15 +708,44 @@ def _fn_to_route(name: str):
 
 def _discover_endpoints():
     routes = set()
-    # 1) Derivación por convención de nombre
-    for n, obj in globals().items():
-        if callable(obj) and n.endswith("_http"):
-            r = _fn_to_route(n)
-            if r:
-                routes.add(r)
-    # 2) Suma la "fuente de verdad" (OpenAPI esperado)
-    routes |= _EXPECTED_ENDPOINTS
-    return sorted(routes)
+
+    # Usar app.get_functions() para obtener la lista real de funciones registradas
+    try:
+        for func_obj in app.get_functions():
+            func_name = getattr(func_obj, 'name', None)
+            if func_name:
+                # Extraer rutas de los decoradores @app.route
+                bindings = getattr(func_obj, 'get_bindings', lambda: [])()
+                for binding in bindings:
+                    if hasattr(binding, 'route') and binding.route:
+                        route = binding.route
+                        if not route.startswith('/'):
+                            route = '/' + route
+                        if not route.startswith('/api/'):
+                            route = '/api' + route
+                        routes.add(route)
+
+                # Fallback: convertir nombre de función a ruta
+                if func_name.endswith('_http'):
+                    r = _fn_to_route(func_name)
+                    if r:
+                        routes.add(r)
+                else:
+                    # Para funciones sin sufijo _http (timers, etc.), inferir ruta
+                    kebab = func_name.replace("_", "-")
+                    routes.add(f"/api/{kebab}")
+    except Exception as e:
+        logging.warning(
+            f"Error descubriendo endpoints desde app.get_functions(): {e}")
+        # Fallback a método original si hay error
+        for n, obj in globals().items():
+            if callable(obj) and n.endswith("_http"):
+                r = _fn_to_route(n)
+                if r:
+                    routes.add(r)
+        routes |= _EXPECTED_ENDPOINTS
+
+    return sorted(list(routes))
 
 
 # Función para configurar diagnósticos de Azure Monitor
@@ -6209,7 +6239,8 @@ def hybrid(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Hybrid (semantico inteligente) activado')
 
     # 🧠 OBTENER CONTEXTO DEL WRAPPER AUTOMÁTICO
-    from memory_manual import aplicar_memoria_manual  # asegura disponibilidad en este scope
+    # asegura disponibilidad en este scope
+    from memory_manual import aplicar_memoria_manual
     memoria_previa = getattr(req, '_memoria_contexto', {})
     if memoria_previa and memoria_previa.get("contexto_recuperado"):
         logging.info(
@@ -7006,13 +7037,17 @@ def precalentar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
 
     redis_snapshot = {
         "enabled": redis_buffer.is_enabled,
-        "cached": False
+        "cached": False,
     }
 
     if redis_buffer.is_enabled:
-        redis_buffer.cache_memoria_contexto(
+        cache_ok = redis_buffer.cache_memoria_contexto(
             redis_session_key, memoria, thread_id=thread_id)
-        redis_snapshot["cached"] = True
+        redis_snapshot["cached"] = bool(cache_ok)
+        if not cache_ok:
+            redis_snapshot["error"] = getattr(
+                redis_buffer, "last_error", None)
+            redis_snapshot["disabled"] = not redis_buffer.is_enabled
 
     total_interacciones = memoria.get("total_interacciones", 0)
 
@@ -7024,7 +7059,11 @@ def precalentar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
         "interacciones_cacheadas": total_interacciones,
         "redis": redis_snapshot,
         "fuente": "cosmos",
-        "mensaje": "Memoria precalentada y enviada a Redis" if redis_snapshot["cached"] else "Memoria recuperada. Redis no disponible."
+        "mensaje": (
+            "Memoria precalentada y enviada a Redis"
+            if redis_snapshot["cached"]
+            else "Memoria recuperada. Redis no disponible o caché fallida."
+        )
     }
 
     return func.HttpResponse(
