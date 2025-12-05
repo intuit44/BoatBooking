@@ -22,6 +22,27 @@ def _sanitize_filter_string(filter_str: Optional[str]) -> Optional[str]:
     return " and ".join(cleaned) if cleaned else None
 
 
+def _doc_es_ruido(doc: Any) -> bool:
+    """Descarta documentos de hilos asistente (assistant-*.json) o threads/* que contaminan contexto inicial."""
+    if not isinstance(doc, dict):
+        return False
+    campos = ("id", "ruta", "ruta_blob", "blob_path",
+              "nombre", "name", "archivo", "path")
+    for campo in campos:
+        val = doc.get(campo)
+        if isinstance(val, str):
+            low = val.lower()
+            if "assistant-" in low or "threads/" in low:
+                return True
+    return False
+
+
+def _filtrar_ruido_docs(docs: Any) -> list:
+    if not isinstance(docs, list):
+        return []
+    return [d for d in docs if not _doc_es_ruido(d)]
+
+
 def _search_with_fallback(service, query: str, top: int, filter_str: Optional[str]):
     try:
         result = service.search(query=query, top=top, filters=filter_str)
@@ -61,7 +82,10 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         top = int(req_body.get("top", 10))
         tipo = req_body.get("tipo")
 
-        GENERIC_SESSIONS = {"assistant", "test_session", "unknown", None, ""}
+        GENERIC_SESSIONS = {"assistant", "test_session", "unknown",
+                            "agent-default", "fallback_session", None, ""}
+        GENERIC_AGENTS = {"foundry_user", "default",
+                          "assistant", "unknown", None, ""}
 
         base_filters = [
             "is_synthetic ne true",
@@ -160,6 +184,22 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # NIVEL 3: Búsqueda universal (sin filtros de sesión/agente)
         if not resultado:
+            # Si el session_id y agent_id son genéricos, no escalar a universal para evitar ruido cruzado
+            if (session_id in GENERIC_SESSIONS) and (agent_id in GENERIC_AGENTS):
+                logging.info(
+                    "⚠️ Búsqueda universal omitida por session/agent genéricos")
+                return {"exito": True, "total": 0, "documentos": [], "metadata": {
+                    "modo_busqueda": "omitido_por_generico",
+                    "query_original": query,
+                    "filtros_aplicados": {
+                        "session_id": "generico",
+                        "agent_id": "generico",
+                        "tipo_interaccion": tipo
+                    },
+                    "session_widening_activo": False,
+                    "filtros_odata": "omitido",
+                    "tiempo_busqueda": datetime.utcnow().isoformat()
+                }}
             filters = list(base_filters)
             if tipo:
                 safe_tipo = str(tipo).replace("'", "''")
@@ -175,6 +215,12 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
 
         # Agregar metadata explicativa
         if resultado and resultado.get("exito"):
+            # Filtrar ruido (threads/assistant-*.json) antes de devolver
+            docs_filtrados = _filtrar_ruido_docs(
+                resultado.get("documentos", []))
+            resultado["documentos"] = docs_filtrados
+            resultado["total"] = len(docs_filtrados)
+
             resultado["metadata"] = {
                 "query_original": query,
                 "filtros_aplicados": {

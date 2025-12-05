@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-12-04T00:43:25.767025",
+  "summary": {
+    "total_tests": 5,
+    "passed": 4,
+    "failed": 1
+  },
+  "results": [
+    {
+      "test": "initialization",
+      "passed": true,
+      "is_enabled": true,
+      "client_exists": true,
+      "enabled_flag": true
+    },
+    {
+      "test": "connection",
+      "passed": true,
+      "client_exists": true,
+      "is_enabled": true,
+      "ping_successful": true
+    },
+    {
+      "test": "disabled_behavior",
+      "passed": true,
+      "operations_failed_gracefully": true
+    },
+    {
+      "test": "real_operations",
+      "passed": false,
+      "error": "'RedisBufferService' object has no attribute 'get_memoria_contexto'"
+    },
+    {
+      "test": "error_handling",
+      "passed": true,
+      "has_reconnect": false,
+      "has_events": false
+    }
+  ]
+}

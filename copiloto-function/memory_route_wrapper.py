@@ -198,13 +198,15 @@ def _resolver_identificadores_thread(req: func.HttpRequest):
         elif agent_id:
             session_id = f"agent-{agent_id}"
 
-    session_id = session_id or "fallback_session"
+    # Si sigue vacío, asignar uno estable por agente para evitar fallback aleatorio
+    session_id = session_id or f"agent-{agent_id or 'default'}"
 
     if not thread_id and session_id and session_id.startswith("assistant-"):
         thread_id = session_id
 
+    # Si no hay thread_id, reutilizar session_id para mantener estabilidad
     if not thread_id:
-        thread_id = raw_thread_id or f"thread_fallback_session_{int(time.time())}"
+        thread_id = raw_thread_id or session_id or f"thread_fallback_session_{int(time.time())}"
 
     return thread_id, session_id, agent_id or "foundry_user"
 

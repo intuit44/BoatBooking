@@ -39,12 +39,13 @@ RUN apt-get update && \
   curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
   az version
 
-# Variables obligatorias de Azure Functions + Application Insights
+# Variables base de Azure Functions + MCP (sin credenciales embebidas)
 ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
   AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
   WEBSITES_PORT=80 \
-  APPLICATIONINSIGHTS_CONNECTION_STRING="InstrumentationKey=bc768980-75a6-4f2d-b6dd-fcb1e524f1ed;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=35e88cd8-54da-4b1d-9946-f98855374d53" \
-  APPINSIGHTS_INSTRUMENTATIONKEY="bc768980-75a6-4f2d-b6dd-fcb1e524f1ed"
+  MCP_TRANSPORT=http \
+  MCP_HOST=0.0.0.0 \
+  MCP_PORT=8000
 
 EXPOSE 80
 WORKDIR /home/site/wwwroot
@@ -52,11 +53,21 @@ WORKDIR /home/site/wwwroot
 # Copiar todo el proyecto
 COPY . /home/site/wwwroot
 
+# Script de arranque combinado (Functions + MCP)
+RUN echo '#!/bin/bash' > /start.sh && \
+    echo 'set -e' >> /start.sh && \
+    echo '/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost & ' >> /start.sh && \
+    echo 'python /home/site/wwwroot/mcp_redis_wrapper_server.py' >> /start.sh && \
+    chmod +x /start.sh
+
 # Instalar dependencias Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Asegurar permisos
 RUN chmod -R 755 /home/site/wwwroot
 
-# Comando de inicio para Azure Functions
-CMD ["/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost"]
+# Exponer puertos Functions (80) y MCP (8000)
+EXPOSE 80 8000
+
+# Comando de inicio combinado
+CMD ["/bin/bash", "/start.sh"]

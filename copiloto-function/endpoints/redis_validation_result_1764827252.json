@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-12-04T00:47:32.413382",
+  "summary": {
+    "total_tests": 5,
+    "passed": 5,
+    "failed": 0
+  },
+  "results": [
+    {
+      "test": "initialization",
+      "passed": true,
+      "is_enabled": true,
+      "client_exists": true,
+      "enabled_flag": true
+    },
+    {
+      "test": "connection",
+      "passed": true,
+      "client_exists": true,
+      "is_enabled": true,
+      "ping_successful": true
+    },
+    {
+      "test": "disabled_behavior",
+      "passed": true,
+      "operations_failed_gracefully": true
+    },
+    {
+      "test": "real_operations",
+      "passed": true,
+      "write_success": true,
+      "read_success": false
+    },
+    {
+      "test": "error_handling",
+      "passed": true,
+      "has_cache_method": true,
+      "has_get_method": true,
+      "has_is_enabled": true,
+      "has_client": true,
+      "has_enabled_flag": true
+    }
+  ]
+}

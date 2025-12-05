@@ -4,7 +4,7 @@ Herramientas para enriquecer threads guardados en Blob Storage.
 Genera resúmenes semánticos y consulta memoria adicional (Cosmos DB).
 """
 from __future__ import annotations
-
+import os
 import json
 import logging
 from datetime import datetime
@@ -318,6 +318,12 @@ def _cargar_thread_desde_blob(
     """
     Intenta cargar un thread almacenado en Blob Storage priorizando coincidencias con thread_id/session_id.
     """
+    # Permitir desactivar preload de threads desde blob para evitar contaminar nuevas sesiones
+    if os.getenv("DISABLE_BLOB_THREAD_PRELOAD", "").strip().lower() in ("1", "true", "yes", "on"):
+        return None, None
+    # Si el session_id es genérico/fallback, no listar blobs
+    if not session_id or session_id.startswith("agent-default") or session_id.startswith("fallback"):
+        return None, None
     candidatos = []
     for raw in (thread_id, session_id):
         nombre = _normalizar_nombre_blob(raw)

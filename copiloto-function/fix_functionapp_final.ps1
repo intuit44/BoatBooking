@@ -167,8 +167,9 @@ try {
     # Azure Cognitive Search (added)
     "AZURE_SEARCH_ENDPOINT"                       = "https://boatrentalfoundrysearch-s1.search.windows.net"
     "AZURE_SEARCH_INDEX_NAME"                     = "agent-memory-index-optimized"
-    "AZURE_OPENAI_ENDPOINT"                       = "https://boatrentalfoundry-openai.openai.azure.com/"
-    "AZURE_OPENAI_KEY"                            = "FtrcUPizj8Tu9EEzbCeJwL4qtZbWNJ8SMwQTDfy0SF2AE7zfXoskJQQJ99BJACYeBjFXJ3w3AAABACOGin7P"
+    "AZURE_OPENAI_ENDPOINT"                       = "https://agenteopenai.cognitiveservices.azure.com/"
+    "AZURE_OPENAI_KEY"                            = "6FtCRInWi1CCoKECFLFFy0eIdDFRta75nG0iomtNA9UIcRhvQcC9JQQJ99BJACHYHv6XJ3w3AAABACOGCrcs"
+    "AZURE_OPENAI_DEPLOYMENT_NAME"                = "gpt-4o-mini"
     "AGENTE_OPENAI_PROJECT_URL"                   = "https://agenteopenai.services.ai.azure.com/api/projects/AgenteOpenAi-project"
     # Embeddings model
     "EMBEDDING_MODEL"                             = "text-embedding-3-large"
@@ -182,6 +183,7 @@ try {
     "REDIS_JSON"                                  = "1"
     "REDIS_DB"                                    = "0"
     "REDIS_VERSION"                               = "7.1.0"
+    "REDIS_AAD_SCOPE"                             = "https://redis.azure.com/.default"
     # Redis TTLs
     "REDIS_MEMORIA_TTL"                           = "7200"   # 2 horas - Memoria de sesión activa
     "REDIS_THREAD_TTL"                            = "14400"  # 4 horas - Threads de conversación
@@ -194,6 +196,9 @@ try {
     "CONTEXT_STORAGE_ACCOUNT"                     = "boatrentalstorage"
     "CONTEXT_CONTAINER"                           = "agentMemory"
     "CONTEXT_PREFIX"                              = "memory"
+
+    # Blob preload control
+    "DISABLE_BLOB_THREAD_PRELOAD"                 = "1"
 
     # Dejarlo de último
     "AzureWebJobsFeatureFlags"                    = "EnableWorkerIndexing"

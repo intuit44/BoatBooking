@@ -14,7 +14,7 @@ import threading
 import time
 import hashlib
 import ssl
-from typing import Any, Callable, Dict, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
 import redis
 from redis.cluster import RedisCluster
 from datetime import datetime
@@ -65,7 +65,8 @@ class RedisBufferService:
             return
 
         self._initialized = True
-        self._client: Optional["redis.Redis"] = None
+        # Usamos Any para compatibilidad de tipado (RedisCluster no expone json() en stubs)
+        self._client: Optional[Any] = None
 
         # ⭐ ACTUALIZADO: Usar el host correcto de Redis Enterprise
         self._host = os.getenv(
@@ -160,7 +161,8 @@ class RedisBufferService:
                     self._is_cluster = True
                     self._failure_streak = 0
                     self._last_error = None
-                    logging.info("[RedisBuffer] ✅ Conectado como RedisCluster (OSS)")
+                    logging.info(
+                        "[RedisBuffer] ✅ Conectado como RedisCluster (OSS)")
                 except Exception as cluster_err:
                     logging.error(
                         f"[RedisBuffer] ❌ Falló RedisCluster: {cluster_err}")

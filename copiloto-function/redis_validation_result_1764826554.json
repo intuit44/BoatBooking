@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-12-04T00:35:54.190198",
+  "summary": {
+    "total_tests": 5,
+    "passed": 3,
+    "failed": 2
+  },
+  "results": [
+    {
+      "test": "initialization",
+      "passed": true,
+      "is_enabled": false,
+      "client_exists": false,
+      "enabled_flag": false
+    },
+    {
+      "test": "connection",
+      "passed": false,
+      "client_exists": false,
+      "is_enabled": false,
+      "ping_successful": false
+    },
+    {
+      "test": "disabled_behavior",
+      "passed": true,
+      "operations_failed_gracefully": true
+    },
+    {
+      "test": "real_operations",
+      "passed": false,
+      "reason": "redis_not_enabled"
+    },
+    {
+      "test": "error_handling",
+      "passed": true,
+      "has_reconnect": false,
+      "has_events": false
+    }
+  ]
+}

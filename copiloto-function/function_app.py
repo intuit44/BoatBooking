@@ -491,6 +491,15 @@ except Exception as e:
     logging.error(f"Traceback: {traceback.format_exc()}")
 
 try:
+    import endpoints.redis_model_wrapper
+    logging.info("✅ Endpoint redis-model-wrapper registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar redis-model-wrapper: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando redis-model-wrapper: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
     import endpoints.guardar_memoria
     logging.info("✅ Endpoint guardar_memoria registrado correctamente")
 except ImportError as e:

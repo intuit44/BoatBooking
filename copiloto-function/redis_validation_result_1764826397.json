@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-12-04T00:33:17.284186",
+  "summary": {
+    "total_tests": 5,
+    "passed": 0,
+    "failed": 5
+  },
+  "results": [
+    {
+      "test": "initialization",
+      "passed": false,
+      "error": "'bool' object is not callable"
+    },
+    {
+      "test": "connection",
+      "passed": false,
+      "error": "'bool' object is not callable"
+    },
+    {
+      "test": "disabled_behavior",
+      "passed": false,
+      "error": "'bool' object is not callable"
+    },
+    {
+      "test": "real_operations",
+      "passed": false,
+      "error": "'bool' object is not callable"
+    },
+    {
+      "test": "error_handling",
+      "passed": false,
+      "error": "'bool' object is not callable"
+    }
+  ]
+}
