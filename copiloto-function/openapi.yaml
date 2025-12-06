@@ -4460,6 +4460,166 @@
           }
         }
       }
+    },
+    "/api/redis-cache-monitor": {
+      "get": {
+        "operationId": "getRedisCacheMonitor",
+        "summary": "Obtiene métricas detalladas de la estrategia de cache dual Redis",
+        "description": "Retorna estadísticas específicas de la estrategia de cache dual (sesión + global), incluyendo conteos por patrón, hit ratio, issues detectados y recomendaciones. El sistema implementa una estrategia de cache en dos niveles: Cache de Sesión (llm:{agent}:session:{session_id}:model:{model}:msg:{hash}) y Cache Global (llm:{agent}:model:{model}:msg:{hash}) cross-sesión. Los agentes pueden usar este endpoint para verificar que Redis está funcionando, monitorear hit ratio de cache, detectar problemas automáticamente y tomar decisiones basadas en métricas.",
+        "tags": [
+          "Redis Cache",
+          "Monitoring"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Métricas de cache obtenidas exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedisCacheMonitorResponse"
+                },
+                "examples": {
+                  "healthy": {
+                    "summary": "Cache funcionando correctamente",
+                    "value": {
+                      "cache_strategy": "dual_cache_session_global",
+                      "redis_enabled": true,
+                      "timestamp": "2025-12-05T20:30:45.123Z",
+                      "key_counts": {
+                        "llm_session_keys": 125,
+                        "llm_global_keys": 89,
+                        "llm_auto_sessions": 7,
+                        "memoria_keys": 23,
+                        "thread_keys": 15
+                      },
+                      "cache_effectiveness": {
+                        "hit_ratio": "74.2%",
+                        "hits": 892,
+                        "misses": 310,
+                        "total_operations": 1202
+                      },
+                      "issues": [],
+                      "issues_count": 0,
+                      "recommendations": [
+                        "Cache dual funcionando correctamente",
+                        "Hit ratio óptimo: 74.2%"
+                      ]
+                    }
+                  },
+                  "with_issues": {
+                    "summary": "Cache con problemas detectados",
+                    "value": {
+                      "cache_strategy": "dual_cache_session_global",
+                      "redis_enabled": true,
+                      "timestamp": "2025-12-05T20:30:45.123Z",
+                      "key_counts": {
+                        "llm_session_keys": 450,
+                        "llm_global_keys": 0,
+                        "llm_auto_sessions": 210
+                      },
+                      "cache_effectiveness": {
+                        "hit_ratio": "22.5%",
+                        "hits": 45,
+                        "misses": 155,
+                        "total_operations": 200
+                      },
+                      "issues": [
+                        "Cache global no está siendo escrita (solo session cache)",
+                        "Muchas sesiones auto-generadas: 210",
+                        "Hit ratio bajo: 22.5%"
+                      ],
+                      "issues_count": 3,
+                      "recommendations": [
+                        "Verificar escritura en cache global",
+                        "Revisar generación de session_id en agentes"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Redis cache está deshabilitado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "Redis cache disabled - check REDIS_KEY configuration"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-cache-health": {
+      "get": {
+        "operationId": "getRedisCacheHealth",
+        "summary": "Health check rápido del sistema de cache Redis",
+        "description": "Verificación rápida del estado de Redis cache. Incluye ping básico, conteo de claves LLM y detección de sesiones auto-generadas. Estados posibles: healthy (Redis responde y tiene datos cacheados), no_data (Redis responde pero sin datos aún), unhealthy (Redis no responde al ping), disabled (Redis cache está deshabilitado), error (Error inesperado).",
+        "tags": [
+          "Redis Cache",
+          "Health"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Estado de health obtenido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedisCacheHealthResponse"
+                },
+                "examples": {
+                  "healthy": {
+                    "summary": "Cache saludable",
+                    "value": {
+                      "status": "healthy",
+                      "redis_enabled": true,
+                      "timestamp": "2025-12-05T20:30:45.123Z",
+                      "message": "Cache activa y con datos",
+                      "checks": {
+                        "ping": true,
+                        "has_llm_keys": true,
+                        "llm_keys_count": 80,
+                        "auto_sessions_count": 5
+                      }
+                    }
+                  },
+                  "no_data": {
+                    "summary": "Redis funciona pero sin datos",
+                    "value": {
+                      "status": "no_data",
+                      "redis_enabled": true,
+                      "timestamp": "2025-12-05T20:30:45.123Z",
+                      "message": "Redis responde, sin datos cacheados aún",
+                      "checks": {
+                        "ping": true,
+                        "has_llm_keys": false,
+                        "llm_keys_count": 0,
+                        "auto_sessions_count": 0
+                      }
+                    }
+                  },
+                  "disabled": {
+                    "summary": "Redis deshabilitado",
+                    "value": {
+                      "status": "disabled",
+                      "redis_enabled": false,
+                      "timestamp": "2025-12-05T20:30:45.123Z",
+                      "message": "Redis cache is disabled"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -4518,6 +4678,10 @@
     {
       "name": "🔍 Análisis Semántico",
       "description": "Análisis semántico avanzado de código Python: detección de clases, funciones, duplicados, errores lógicos, problemas de indentación y conflictos de imports"
+    },
+    {
+      "name": "Redis Cache",
+      "description": "Monitoreo y health check del sistema de cache Redis dual (sesión + global) para optimización de rendimiento"
     }
   ],
   "components": {
@@ -4780,6 +4944,192 @@
         "required": [
           "error"
         ]
+      },
+      "RedisCacheMonitorResponse": {
+        "type": "object",
+        "properties": {
+          "cache_strategy": {
+            "type": "string",
+            "example": "dual_cache_session_global",
+            "description": "Estrategia de cache implementada"
+          },
+          "redis_enabled": {
+            "type": "boolean",
+            "description": "Si Redis está habilitado"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "key_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "string" }
+              ]
+            },
+            "example": {
+              "llm_session_keys": 42,
+              "llm_global_keys": 38,
+              "llm_auto_sessions": 5,
+              "memoria_keys": 12
+            }
+          },
+          "total_llm_keys": {
+            "type": "integer",
+            "example": 80,
+            "description": "Conteo total de claves LLM (sesión + global)"
+          },
+          "session_vs_global_ratio": {
+            "type": "string",
+            "example": "42:38",
+            "description": "Proporción de claves de sesión vs global"
+          },
+          "cache_effectiveness": {
+            "$ref": "#/components/schemas/CacheEffectiveness"
+          },
+          "sample_keys": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "description": "Muestra de claves encontradas por patrón",
+            "example": {
+              "llm_session_keys": ["llm:agent:session:sess-1:model:gpt-4o-mini:msg:abcd1234"],
+              "llm_global_keys": ["llm:agent:model:gpt-4o-mini:msg:abcd1234"]
+            }
+          },
+          "ttl_samples": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "integer" },
+                { "type": "string" }
+              ]
+            },
+            "description": "TTLs de claves de ejemplo",
+            "example": {
+              "llm:agent:session:sess-1:model:gpt-4o-mini:msg:abcd1234": 5340,
+              "llm:agent:model:gpt-4o-mini:msg:abcd1234": 82800
+            }
+          },
+          "redis_stats": {
+            "type": "object",
+            "properties": {
+              "used_memory": { "type": "string", "example": "12.5M" },
+              "dbsize": { "oneOf": [ { "type": "integer" }, { "type": "string" } ], "example": 1520 },
+              "connected_clients": { "type": "integer", "example": 12 },
+              "failure_streak": { "type": "integer", "example": 0 }
+            },
+            "description": "Estadísticas básicas reportadas por Redis"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Hit ratio bajo: 25.0%",
+              "Muchas sesiones auto-generadas: 150"
+            ]
+          },
+          "issues_count": {
+            "type": "integer",
+            "example": 2
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Cache dual activa: session + global keys",
+              "Hit ratio objetivo: >60% (actual: 25.0%)"
+            ]
+          }
+        }
+      },
+      "RedisCacheHealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy", "unhealthy", "disabled", "no_data", "error", "unknown"],
+            "example": "healthy"
+          },
+          "redis_enabled": {
+            "type": "boolean"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string",
+            "example": "Cache activa y con datos"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/HealthChecks"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Solo presente si status=error"
+          }
+        }
+      },
+      "CacheEffectiveness": {
+        "type": "object",
+        "properties": {
+          "hit_ratio": {
+            "type": "string",
+            "example": "64.7%"
+          },
+          "hits": {
+            "type": "integer",
+            "example": 124
+          },
+          "misses": {
+            "type": "integer",
+            "example": 68
+          },
+          "total_operations": {
+            "type": "integer",
+            "example": 192
+          }
+        }
+      },
+      "HealthChecks": {
+        "type": "object",
+        "properties": {
+          "ping": {
+            "type": "boolean",
+            "example": true
+          },
+          "has_llm_keys": {
+            "type": "boolean",
+            "example": true
+          },
+          "llm_keys_count": {
+            "type": "integer",
+            "example": 80
+          },
+          "auto_sessions_count": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Redis cache disabled"
+          }
+        }
       },
       "ModelDeploymentResponse": {
         "type": "object",

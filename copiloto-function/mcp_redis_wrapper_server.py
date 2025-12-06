@@ -29,7 +29,8 @@ DEFAULT_AGENT = os.getenv("MCP_DEFAULT_AGENT", "mcp-agent")
 
 # Ajustamos host/port en settings para el transporte HTTP; mantenemos
 # streamable_http_path=/mcp para handshake.
-mcp = FastMCP("redis-wrapper", host=MCP_HOST, port=MCP_PORT, streamable_http_path="/mcp")
+mcp = FastMCP("redis-wrapper", host=MCP_HOST,
+              port=MCP_PORT, streamable_http_path="/mcp")
 logging.basicConfig(level=logging.INFO)
 
 
@@ -86,7 +87,8 @@ def main() -> None:
     - HTTP (streamable-http): establece MCP_TRANSPORT=http y opcional MCP_HOST/MCP_PORT.
     """
     if MCP_TRANSPORT == "http":
-        logging.info(f"Iniciando MCP HTTP (streamable) en {MCP_HOST}:{MCP_PORT} path=/mcp")
+        logging.info(
+            f"Iniciando MCP HTTP (streamable) en {MCP_HOST}:{MCP_PORT} path=/mcp")
         # FastMCP usa "streamable-http" como nombre de transporte HTTP
         mcp.run(transport="streamable-http")
     else:

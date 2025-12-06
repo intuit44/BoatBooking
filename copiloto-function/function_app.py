@@ -12,9 +12,7 @@ from azure.mgmt.resource.resources.models import (
 from command_fixers.auto_fixers import apply_auto_fixes
 from services.memory_service import memory_service
 from services.redis_buffer_service import redis_buffer
-from azure.monitor.query import LogsQueryClient, LogsTable
 from azure.monitor.query._models import LogsQueryResult
-from azure.cosmos import CosmosClient
 from hybrid_processor import process_hybrid_request
 from azure.mgmt.resource import ResourceManagementClient
 from bing_grounding_fallback import ejecutar_bing_grounding_fallback
@@ -34,7 +32,6 @@ from semantic_query_builder import interpretar_intencion_agente, construir_query
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
-from azure.cosmos import CosmosClient
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type, NoReturn
 from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
@@ -1205,7 +1202,34 @@ SEMANTIC_CAPABILITIES = {
 }
 
 
+# === Clientes Lazy Loading ===
 BLOB_CLIENT = None
+_cosmos_client = None
+_logs_query_client = None
+
+
+def get_cosmos_client():
+    """Lazy getter para CosmosClient"""
+    global _cosmos_client
+    if _cosmos_client is None:
+        from azure.cosmos import CosmosClient
+        endpoint = os.environ.get("COSMOSDB_ENDPOINT")
+        key = os.environ.get("COSMOSDB_KEY")
+        if not endpoint or not key:
+            raise RuntimeError(
+                "COSMOSDB_ENDPOINT y COSMOSDB_KEY son requeridas para CosmosClient")
+        _cosmos_client = CosmosClient(endpoint, key)
+    return _cosmos_client
+
+
+def get_logs_query_client():
+    """Lazy getter para LogsQueryClient"""
+    global _logs_query_client
+    if _logs_query_client is None:
+        from azure.monitor.query import LogsQueryClient
+        from azure.identity import DefaultAzureCredential
+        _logs_query_client = LogsQueryClient(DefaultAzureCredential())
+    return _logs_query_client
 
 
 def get_blob_client():
@@ -14669,8 +14693,7 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     try:
-        credential = DefaultAzureCredential()
-        client = LogsQueryClient(credential)
+        client = get_logs_query_client()
         query = "Usage | take 5"
         response = client.query_workspace(
             workspace_id=workspace_id,
@@ -14758,6 +14781,7 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="verificar-cosmos", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
     from memory_manual import aplicar_memoria_manual
+    from azure.cosmos import CosmosClient
     """Verifica conectividad y escrituras en CosmosDB usando clave o MI"""
     endpoint = os.environ.get("COSMOSDB_ENDPOINT")
     key = os.environ.get("COSMOSDB_KEY")

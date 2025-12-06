@@ -53,11 +53,10 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             body = {}
 
-        session_id = (
+        raw_session = (
             req.headers.get("Session-ID")
             or req.headers.get("X-Session-ID")
             or body.get("session_id")
-            or "agent-default"
         )
         agent_id = (
             req.headers.get("Agent-ID")
@@ -68,6 +67,17 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
         mensaje = _extraer_texto(body)
         model = body.get("model") or DEFAULT_MODEL
 
+        # Si no viene session_id, generamos una sesión estable derivada del prompt + agente
+        # para evitar caer siempre en "agent-default".
+        if raw_session and str(raw_session).strip():
+            session_id = str(raw_session).strip()
+        else:
+            session_hash = redis_buffer.stable_hash(f"{agent_id}|{mensaje}")
+            session_id = f"auto-{session_hash}"
+            logging.info(
+                f"[RedisWrapper] Auto-generated session_id: {session_id} (hash: {session_hash[:8]})"
+            )
+
         if not mensaje:
             return func.HttpResponse(
                 json.dumps(
@@ -76,8 +86,10 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400,
             )
 
-        material = f"{session_id}|{agent_id}|{mensaje}"
-        key_hash = redis_buffer.stable_hash(material)
+        # ⭐ NUEVO: Logging detallado al inicio
+        logging.info(
+            f"[RedisWrapper] 📥 Request: agent={agent_id}, session={session_id}, msg_len={len(mensaje)}")
+
         bucket = "llm"
 
         start = time.perf_counter()
@@ -85,33 +97,60 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
         origen = "model"
         ttl_restante = None
         respuesta_texto = None
+        cache_source = "miss"
 
+        # ⭐ NUEVO: Logging de cache hits/misses detallado
         if redis_buffer.is_enabled:
-            cached = redis_buffer.get_cached_payload(bucket, key_hash)
+            cached, cache_source = redis_buffer.get_llm_cached_response(
+                agent_id=agent_id,
+                session_id=session_id,
+                message=mensaje,
+                model=model,
+                use_global_cache=True,
+            )
             if cached:
                 cache_hit = True
-                origen = "redis"
+                origen = f"redis_{cache_source}"
                 respuesta_texto = cached.get(
                     "respuesta") if isinstance(cached, dict) else cached
+                logging.info(
+                    f"[RedisWrapper] ✅ Cache HIT from {cache_source}: session_id={session_id}"
+                )
+            else:
+                logging.info(
+                    f"[RedisWrapper] ⚠️ CACHE MISS: agent={agent_id}, session={session_id}, model={model}")
+
         # MISS: invocar modelo
         if not cache_hit:
             try:
+                logging.info(f"[RedisWrapper] 🤖 Calling model: {model}")
                 completion = openai_client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": mensaje}],
                 )
                 respuesta_texto = completion.choices[0].message.content
+
                 if redis_buffer.is_enabled:
-                    redis_buffer.cache_response(
-                        bucket,
-                        key_hash,
-                        {
-                            "respuesta": respuesta_texto,
-                            "session_id": session_id,
-                            "agent_id": agent_id,
-                            "model": model,
-                        },
-                    )
+                    try:
+                        redis_buffer.cache_llm_response(
+                            agent_id=agent_id,
+                            session_id=session_id,
+                            message=mensaje,
+                            model=model,
+                            response_data={
+                                "respuesta": respuesta_texto,
+                                "session_id": session_id,
+                                "agent_id": agent_id,
+                                "model": model,
+                            },
+                            use_global_cache=True,
+                        )
+                        logging.info(
+                            f"[RedisWrapper] 💾 Cache write successful: session={session_id}")
+                    except Exception as cache_err:
+                        logging.error(
+                            f"[RedisWrapper] ❌ Cache write error: {cache_err}")
+
             except Exception as e:
                 logging.error(
                     f"[redis-model-wrapper] Error invocando modelo: {e}")
@@ -132,8 +171,16 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
             "session_id": session_id,
             "agent_id": agent_id,
             "model": model,
-            "key_hash": key_hash,
+            "cache_source": cache_source,
+            "is_auto_session": session_id.startswith("auto-"),
+            "redis_enabled": redis_buffer.is_enabled,
+            "cache_strategy": "dual_session_global"
         }
+
+        # ⭐ NUEVO: Logging de respuesta final
+        logging.info(
+            f"[RedisWrapper] 📤 Response: cache_hit={cache_hit}, duration={dur_ms:.0f}ms, auto_session={session_id.startswith('auto-')}")
+
         return func.HttpResponse(
             json.dumps(result, ensure_ascii=False), mimetype="application/json", status_code=200
         )

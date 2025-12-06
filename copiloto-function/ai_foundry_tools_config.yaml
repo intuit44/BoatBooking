@@ -1,3 +1,5 @@
+# Configuraci贸n de herramientas y agentes para Foundry
+
 tools:
   - name: azure_cli_executor
     type: http
@@ -12,11 +14,11 @@ tools:
               type: string
               required: true
               description: Comando a ejecutar (sin 'az' al inicio)
-        
+
         - path: /api/status
           method: GET
           description: Verifica el estado del sistema
-        
+
         - path: /api/listar-blobs
           method: GET
           description: Lista archivos en blob storage
@@ -25,15 +27,15 @@ tools:
               type: string
               required: false
               description: Prefijo para filtrar archivos
-        
+
         - path: /api/copiloto
           method: POST
-          description: Router sem醤tico principal (usa memoria y decide la acci髇 adecuada)
+          description: Router sem谩ntico principal (usa memoria y decide la acci贸n adecuada)
           parameters:
             mensaje:
               type: string
               required: false
-              description: Mensaje natural o intenci髇 a resolver
+              description: Mensaje natural o intenci贸n a resolver
             consulta:
               type: string
               required: false
@@ -41,8 +43,8 @@ tools:
             session_id:
               type: string
               required: false
-              description: ID de sesi髇 para mantener contexto
-        
+              description: ID de sesi贸n para mantener contexto
+
         - path: /api/diagnostico-recursos
           method: GET
           description: Diagn贸stico completo de recursos Azure
@@ -59,7 +61,7 @@ tools:
               type: string
               required: false
               description: Recurso espec铆fico a diagnosticar
-        
+
         - path: /api/crear-contenedor
           method: POST
           description: Crear contenedor en Blob Storage
@@ -203,4 +205,22 @@ agents:
       risk_tolerance: "low"
       approval_required: true
 
-  
+mcpServers:
+  redis-cached-chat:
+    command: python
+    args: ["mcp_redis_wrapper_server.py"]
+    env:
+      MCP_TRANSPORT: "http"
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+    description: "Chat con cache Redis para respuestas LLM r谩pidas"
+
+  redis-diagnostics:
+    command: python
+    args: ["mcp_redis_diagnostic_server.py"]
+    env:
+      MCP_TRANSPORT: "http"
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8001"
+      FUNCTION_APP_URL: "https://copiloto-semantico-func-us2.azurewebsites.net"
+    description: "Diagn贸stico y monitoreo de Redis Cache (solo para debugging)"

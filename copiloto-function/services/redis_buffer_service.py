@@ -6,6 +6,10 @@ Singleton ligero que mantiene un cliente Redis TLS y helpers de caché para
 memoria semántica, threads y resultados pesados (narrativas, respuestas, LLM).
 
 Se prioriza RedisJSON cuando está disponible.
+
+Type checking notes:
+- redis.exceptions is available at runtime but may not be recognized by static analysis
+- Using explicit imports from redis.exceptions for better IDE support
 """
 import json
 import logging
@@ -19,6 +23,7 @@ import redis
 from redis.cluster import RedisCluster
 from datetime import datetime
 from redis import exceptions as redis_exceptions
+from redis.exceptions import ResponseError, AuthenticationError, ConnectionError as RedisConnectionError
 
 CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
 
@@ -66,7 +71,7 @@ class RedisBufferService:
 
         self._initialized = True
         # Usamos Any para compatibilidad de tipado (RedisCluster no expone json() en stubs)
-        self._client: Optional[Any] = None
+        self._client: Optional[Union[redis.Redis, RedisCluster]] = None
 
         # ⭐ ACTUALIZADO: Usar el host correcto de Redis Enterprise
         self._host = os.getenv(
@@ -199,7 +204,7 @@ class RedisBufferService:
                     f"[RedisBuffer] ✅ Conectado usando REDIS_KEY: {self._host}:{self._port} (RedisJSON: {self._has_redisjson})")
                 return
 
-            except redis.exceptions.AuthenticationError as auth_err:
+            except AuthenticationError as auth_err:
                 logging.error(
                     f"[RedisBuffer] ❌ Error de autenticación: {auth_err}")
                 # Verificar si la key necesita el = al final
@@ -288,7 +293,7 @@ class RedisBufferService:
         return CACHE_STRATEGY.get(bucket, {}).get("ttl", 300)
 
     def _json_set(self, key: str, payload: Any, ttl: Optional[int] = None) -> bool:
-        """Escritura robusta: intenta RedisJSON, maneja cluster y hace fallback serializado."""
+        """Escritura robusta con mejor logging: intenta RedisJSON, maneja cluster y hace fallback serializado."""
         if not self.is_enabled or payload is None:
             return False
         client = self._client
@@ -298,6 +303,13 @@ class RedisBufferService:
         # Evitar spam si ya falló este key recientemente
         if key in self._errored_keys:
             return False
+
+        # ⭐ NUEVO: Logging específico para llm cache
+        is_llm_cache = key.startswith("llm:")
+
+        if is_llm_cache:
+            logging.debug(
+                f"[RedisBuffer] 📝 LLM cache write attempt: {key[:100]}...")
 
         # Validar tamaño del payload
         try:
@@ -342,8 +354,15 @@ class RedisBufferService:
                     self._reset_failures()
                     if processed_key in self._errored_keys:
                         self._errored_keys.discard(processed_key)
+                    write_ok = True
+
+                    # ⭐ NUEVO: Logging de éxito para LLM cache
+                    if is_llm_cache:
+                        logging.debug(
+                            f"[RedisBuffer] ✅ LLM cache write success (RedisJSON): {key[:80]}... (ttl: {ttl_value}s)")
+
                     return True
-                except redis.exceptions.ResponseError as e:
+                except ResponseError as e:
                     msg = str(e)
                     redisjson_failed = True
                     self._json_failures[processed_key] = failure_count + 1
@@ -376,11 +395,27 @@ class RedisBufferService:
             if failure_count == 0 and redisjson_failed:
                 logging.info(
                     f"[RedisBuffer] Fallback serializado aplicado para {processed_key} (RedisJSON no disponible)")
-        except Exception as err:  # pragma: no cover
+
+            # ⭐ NUEVO: Logging de éxito para LLM cache (fallback)
+            if write_ok and is_llm_cache:
+                logging.debug(
+                    f"[RedisBuffer] ✅ LLM cache write success (fallback): {key[:80]}... (ttl: {ttl_value}s)")
+
+        except (redis_exceptions.RedisError, ConnectionError, TimeoutError) as err:  # pragma: no cover
             self._register_failure(err)
             logging.error(
                 f"[RedisBuffer] setex fallback falló para {processed_key}: {err}")
             self._errored_keys.add(processed_key)
+        except Exception as err:  # pragma: no cover
+            self._register_failure(err)
+            logging.error(
+                f"[RedisBuffer] setex fallback falló para {processed_key} (unexpected): {err}")
+            self._errored_keys.add(processed_key)
+
+        # ⭐ NUEVO: Logging de fallo para LLM cache
+        if not write_ok and is_llm_cache:
+            logging.warning(
+                f"[RedisBuffer] ❌ LLM cache write failed: {key[:80]}...")
 
         return write_ok
 
@@ -475,6 +510,71 @@ class RedisBufferService:
         if not payload:
             return "empty"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    # ------------------------------------------------------------------ #
+    # LLM cache (sesión + global)
+    # ------------------------------------------------------------------ #
+    def _normalize_str(self, value: Optional[str]) -> str:
+        return (value or "").strip()
+
+    def build_llm_session_key(self, agent_id: str, session_id: str, message: str, model: str) -> str:
+        msg_hash = self.stable_hash(self._normalize_str(message))
+        return f"session:{self._normalize_str(agent_id) or 'anon'}:{self._normalize_str(session_id) or 'default'}:model:{self._normalize_str(model) or 'default'}:msg:{msg_hash}"
+
+    def build_llm_global_key(self, agent_id: str, message: str, model: str) -> str:
+        msg_hash = self.stable_hash(self._normalize_str(message))
+        return f"global:{self._normalize_str(agent_id) or 'anon'}:model:{self._normalize_str(model) or 'default'}:msg:{msg_hash}"
+
+    def get_llm_cached_response(
+        self,
+        agent_id: str,
+        session_id: str,
+        message: str,
+        model: str,
+        use_global_cache: bool = True,
+    ) -> Tuple[Optional[Any], str]:
+        """
+        Lee primero cache de sesión y luego cache global.
+        Retorna (payload, origen): origen en {"session", "global", "miss"}.
+        """
+        session_key = self.build_llm_session_key(
+            agent_id, session_id, message, model)
+        cached = self.get_cached_payload("llm", session_key)
+        if cached is not None:
+            return cached, "session"
+
+        if use_global_cache:
+            global_key = self.build_llm_global_key(agent_id, message, model)
+            cached = self.get_cached_payload("llm", global_key)
+            if cached is not None:
+                return cached, "global"
+
+        return None, "miss"
+
+    def cache_llm_response(
+        self,
+        agent_id: str,
+        session_id: str,
+        message: str,
+        model: str,
+        response_data: Any,
+        use_global_cache: bool = True,
+    ) -> Tuple[bool, bool]:
+        """
+        Guarda la respuesta en caché de sesión y, opcionalmente, en caché global.
+        Retorna (session_success, global_success).
+        """
+        session_key = self.build_llm_session_key(
+            agent_id, session_id, message, model)
+        self.cache_response("llm", session_key, response_data)
+
+        global_success = False
+        if use_global_cache:
+            global_key = self.build_llm_global_key(agent_id, message, model)
+            self.cache_response("llm", global_key, response_data)
+            global_success = True
+
+        return True, global_success
 
     # ------------------------------------------------------------------ #
     # Memoria y threads

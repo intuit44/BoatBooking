@@ -28,7 +28,6 @@ azure-mgmt-web>=9.0.0
 azure-mgmt-storage>=21.0.0,<22.0.0
 azure-mgmt-monitor>=6.0.0,<7.0.0
 azure-mgmt-authorization>=2.0.0,<3.0.0
-azure-mgmt-compute
 azure-mgmt-network
 
 # Cosmos DB support
