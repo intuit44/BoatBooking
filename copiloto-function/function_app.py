@@ -607,32 +607,51 @@ except Exception as e:
 # --- Cerebro Semántico Autónomo ---
 try:
     from services.semantic_runtime import start_semantic_loop
-    # Iniciar cerebro semántico en segundo plano
-    start_semantic_loop()
-    logging.info("🧠 Cerebro semántico autónomo iniciado")
 except Exception as e:
-    logging.warning(f"⚠️ No se pudo iniciar cerebro semántico: {e}")
+    start_semantic_loop = None
+    logging.warning(f"⚠️ No se pudo importar start_semantic_loop: {e}")
 
 # --- Configuración de Storage ---
 STORAGE_CONNECTION_STRING = os.getenv("AzureWebJobsStorage", "")
 
 # --- Configuración Semántica ---
-# Forcing semantic autopilot ON and disabling any semantic rate/period limits.
-# This ensures semantic logic runs without periodic or hourly action constraints.
-SEMANTIC_AUTOPILOT = "on"
-# Use None to indicate "no limit" / always-available for period and max actions.
-SEMANTIC_PERIOD_SEC = None
-SEMANTIC_MAX_ACTIONS_PER_HOUR = None
-
-# Persist environment flag for compatibility with other modules that read env vars.
-os.environ["SEMANTIC_AUTOPILOT"] = "on"
-# Remove or unset limiting env vars if present to avoid accidental enforcement.
-os.environ.pop("SEMANTIC_PERIOD_SEC", None)
-os.environ.pop("SEMANTIC_MAX_ACTIONS_PER_HOUR", None)
+# Respetar la configuración de entorno; no forzar valores que el usuario haya definido.
+SEMANTIC_AUTOPILOT = os.getenv("SEMANTIC_AUTOPILOT", "on").lower()
+SEMANTIC_PERIOD_SEC = os.getenv("SEMANTIC_PERIOD_SEC")
+SEMANTIC_MAX_ACTIONS_PER_HOUR = os.getenv("SEMANTIC_MAX_ACTIONS_PER_HOUR")
+SEMANTIC_LOOP_DELAY_SEC = float(os.getenv("SEMANTIC_LOOP_DELAY_SEC", "15"))
 
 logging.info(
-    f"🧠 Configuración semántica: AUTOPILOT={SEMANTIC_AUTOPILOT}, PERIOD={'UNLIMITED' if SEMANTIC_PERIOD_SEC is None else SEMANTIC_PERIOD_SEC}, MAX_HOURLY={'UNLIMITED' if SEMANTIC_MAX_ACTIONS_PER_HOUR is None else SEMANTIC_MAX_ACTIONS_PER_HOUR}"
+    f"🧠 Configuración semántica: AUTOPILOT={SEMANTIC_AUTOPILOT}, "
+    f"PERIOD={SEMANTIC_PERIOD_SEC or 'default'}, "
+    f"MAX_HOURLY={SEMANTIC_MAX_ACTIONS_PER_HOUR or 'default'}, "
+    f"DELAY={SEMANTIC_LOOP_DELAY_SEC}s"
 )
+
+
+def _boot_semantic_loop():
+    """Arranca el cerebro semántico respetando la configuración y aplicando retardo."""
+    if not start_semantic_loop:
+        return
+    if SEMANTIC_AUTOPILOT == "off":
+        logging.info(
+            "🧠 Semantic autopilot desactivado por configuración; no se inicia loop.")
+        return
+
+    def _runner():
+        try:
+            if SEMANTIC_LOOP_DELAY_SEC > 0:
+                time.sleep(SEMANTIC_LOOP_DELAY_SEC)
+            start_semantic_loop()
+            logging.info(
+                "🧠 Cerebro semántico autónomo iniciado (con retardo controlado)")
+        except Exception as e:
+            logging.warning(f"⚠️ No se pudo iniciar cerebro semántico: {e}")
+    threading.Thread(target=_runner, daemon=True).start()
+
+
+# Iniciar loop semántico en segundo plano con retardo respetando configuración.
+_boot_semantic_loop()
 
 
 def _json_body(req):
