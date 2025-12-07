@@ -113,6 +113,46 @@ Listar archivos Python en proyecto:
 3. SIEMPRE prefiere comandos PowerShell nativos (`type`, `Get-Content`, `Select-String`, `Get-ChildItem`).  
 4. NUNCA uses comandos Unix (`cat`, `grep`, `ls`) en entornos Windows.
 
+## 🚀 Redis Cache Monitoring para Agentes Foundry
+
+### Endpoints Disponibles
+
+#### 1. Health Check Rápido
+
+**GET** `/api/redis-cache-health`
+
+Uso: Verificar estado básico antes de operaciones críticas.
+
+#### 2. Monitor Detallado  
+
+**GET** `/api/redis-cache-monitor`
+
+Uso: Análisis periódico de efectividad de cache.
+
+### Flujo Recomendado para Agentes
+
+```python
+# Ejemplo de uso en agentes Foundry
+async def agent_cache_monitoring():
+    # 1. Health check antes de usar cache
+    health = await get("/api/redis-cache-health")
+    
+    if health["status"] != "healthy":
+        # Redis tiene problemas, omitir cache
+        return await fallback_to_direct_model_call()
+    
+    # 2. Usar cache normalmente
+    response = await post("/api/redis-model-wrapper", {
+        "agent_id": "my_agent",
+        "mensaje": user_message
+    })
+    
+    # 3. Monitoreo periódico (ej: cada 100 requests)
+    if request_count % 100 == 0:
+        metrics = await get("/api/redis-cache-monitor")
+        log_cache_metrics(metrics)
+```
+
 ## Timeouts y Respuestas
 
 - Timeouts: Lectura 10–15s, Escritura 20s, CLI 60s.  

@@ -135,6 +135,8 @@ try {
     "FUNCTIONS_EXTENSION_VERSION"                 = "~4"
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE"         = "false"
     "WEBSITES_PORT"                               = "80"
+    # Para contenedor personalizado se debe desactivar Run-From-Package
+    "WEBSITE_RUN_FROM_PACKAGE"                    = "0"
     "FUNCTIONS_CUSTOM_CONTAINER_USE_DEFAULT_PORT" = "1"
     "AzureWebJobsScriptRoot"                      = "/home/site/wwwroot"
     "AzureWebJobsDisableHomepage"                 = "false"

@@ -1,11 +1,21 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Health check ligero para la caché Redis (más específico que el diagnóstico general).
 """
-import json
-import azure.functions as func
 
 from function_app import app
+import logging
+import json
+import os
+import sys
+import re
+from pathlib import Path
+from datetime import datetime
+import azure.functions as func
 from services.redis_buffer_service import redis_buffer
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 
 @app.function_name(name="redis_cache_health")

@@ -497,6 +497,24 @@ except Exception as e:
     logging.error(f"Traceback: {traceback.format_exc()}")
 
 try:
+    import endpoints.redis_cache_monitor
+    logging.info("✅ Endpoint redis-cache-monitor registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar redis-cache-monitor: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando redis-cache-monitor: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
+    import endpoints.redis_cache_health
+    logging.info("✅ Endpoint redis-cache-health registrado correctamente")
+except ImportError as e:
+    logging.warning(f"⚠️ No se pudo registrar redis-cache-health: {e}")
+except Exception as e:
+    logging.error(f"❌ Error registrando redis-cache-health: {e}")
+    logging.error(f"Traceback: {traceback.format_exc()}")
+
+try:
     import endpoints.guardar_memoria
     logging.info("✅ Endpoint guardar_memoria registrado correctamente")
 except ImportError as e:
