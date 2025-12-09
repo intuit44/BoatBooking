@@ -53,25 +53,30 @@ ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
 EXPOSE 80
 WORKDIR /home/site/wwwroot
 
-# Copiar todo el proyecto
+# Primero copiar solo requirements.txt para aprovechar cache de Docker
+COPY requirements.txt /home/site/wwwroot/
+
+# Instalar dependencias Python ANTES de copiar todo el código
+RUN pip install --upgrade pip && \
+  pip install --no-cache-dir -r requirements.txt && \
+  pip list | grep -E "(azure|redis|openai)" || echo "⚠️ Verificar dependencias"
+
+# Ahora copiar el resto del proyecto
 COPY . /home/site/wwwroot
 
 # Script de arranque combinado (Functions + MCP wrapper + MCP diagnóstico)
 RUN echo '#!/bin/bash' > /start.sh && \
-    echo 'set -e' >> /start.sh && \
-    echo 'trap "kill 0" EXIT' >> /start.sh && \
-    echo 'echo "[start] Azure Functions Host..."' >> /start.sh && \
-    echo '/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost & ' >> /start.sh && \
-    echo 'FUNC_PID=$!' >> /start.sh && \
-    echo 'echo "[start] MCP Redis Diagnostic server en puerto ${MCP_DIAG_PORT:-8001}..."' >> /start.sh && \
-    echo 'MCP_PORT=${MCP_DIAG_PORT:-8001} python /home/site/wwwroot/mcp_redis_diagnostic_server.py & ' >> /start.sh && \
-    echo 'DIAG_PID=$!' >> /start.sh && \
-    echo 'echo "[start] MCP Redis Wrapper server en puerto ${MCP_PORT:-8000}..."' >> /start.sh && \
-    echo 'python /home/site/wwwroot/mcp_redis_wrapper_server.py' >> /start.sh && \
-    chmod +x /start.sh
-
-# Instalar dependencias Python
-RUN pip install --no-cache-dir -r requirements.txt
+  echo 'set -e' >> /start.sh && \
+  echo 'trap "kill 0" EXIT' >> /start.sh && \
+  echo 'echo "[start] Azure Functions Host..."' >> /start.sh && \
+  echo '/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost & ' >> /start.sh && \
+  echo 'FUNC_PID=$!' >> /start.sh && \
+  echo 'echo "[start] MCP Redis Diagnostic server en puerto ${MCP_DIAG_PORT:-8001}..."' >> /start.sh && \
+  echo 'MCP_PORT=${MCP_DIAG_PORT:-8001} python /home/site/wwwroot/mcp_redis_diagnostic_server.py & ' >> /start.sh && \
+  echo 'DIAG_PID=$!' >> /start.sh && \
+  echo 'echo "[start] MCP Redis Wrapper server en puerto ${MCP_PORT:-8000}..."' >> /start.sh && \
+  echo 'python /home/site/wwwroot/mcp_redis_wrapper_server.py' >> /start.sh && \
+  chmod +x /start.sh
 
 # Asegurar permisos
 RUN chmod -R 755 /home/site/wwwroot

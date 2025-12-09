@@ -32,6 +32,7 @@ from semantic_query_builder import interpretar_intencion_agente, construir_query
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import AzureError, ResourceNotFoundError, HttpResponseError
 from azure.identity import DefaultAzureCredential, ManagedIdentityCredential, AzureCliCredential
+from azure.cosmos import CosmosClient
 from typing import Optional, Dict, Any, List, Tuple, Union, TypeVar, Type, NoReturn
 from utils_semantic import _find_script_dynamically, _generate_smart_suggestions
 from pathlib import Path
@@ -66,7 +67,6 @@ import azure.functions as func
 import json
 from datetime import datetime
 from azure.functions import HttpRequest, HttpResponse
-from endpoints_search_memory import buscar_memoria_endpoint, indexar_memoria_endpoint
 from thread_enricher import generar_narrativa_contextual
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "services"))
@@ -447,6 +447,8 @@ if not globals().get("_CUSTOM_EVENTS_LOGGER_BOUND", False):
 app = func.FunctionApp()
 sys.path.insert(0, os.path.dirname(__file__))
 
+# --- Import endpoints DESPUÉS de crear app para evitar importación circular ---
+
 # --- Semantic utilities ---
 try:
     from utils_semantic import render_tool_response
@@ -646,7 +648,7 @@ logging.info(
 
 def _boot_semantic_loop():
     """Arranca el cerebro semántico respetando la configuración y aplicando retardo."""
-    if not start_semantic_loop:
+    if not start_semantic_loop or not callable(start_semantic_loop):
         return
     if SEMANTIC_AUTOPILOT == "off":
         logging.info(
@@ -657,9 +659,10 @@ def _boot_semantic_loop():
         try:
             if SEMANTIC_LOOP_DELAY_SEC > 0:
                 time.sleep(SEMANTIC_LOOP_DELAY_SEC)
-            start_semantic_loop()
-            logging.info(
-                "🧠 Cerebro semántico autónomo iniciado (con retardo controlado)")
+            if callable(start_semantic_loop):
+                start_semantic_loop()
+                logging.info(
+                    "🧠 Cerebro semántico autónomo iniciado (con retardo controlado)")
         except Exception as e:
             logging.warning(f"⚠️ No se pudo iniciar cerebro semántico: {e}")
     threading.Thread(target=_runner, daemon=True).start()
@@ -1124,6 +1127,7 @@ TMP_SCRIPTS_DIR = Path(tempfile.gettempdir()) / \
 # Define PROJECT_ROOT before using it
 PROJECT_ROOT = Path("C:/ProyectosSimbolicos/boat-rental-app")
 ALT_SCRIPTS = PROJECT_ROOT / "copiloto-function" / "scripts"
+PENDING_FIXES_FILE = Path("scripts/pending_fixes.json")
 
 
 def _resolve_local_script_path(nombre_script: str) -> Optional[Path]:
@@ -1230,7 +1234,6 @@ def get_cosmos_client():
     """Lazy getter para CosmosClient"""
     global _cosmos_client
     if _cosmos_client is None:
-        from azure.cosmos import CosmosClient
         endpoint = os.environ.get("COSMOSDB_ENDPOINT")
         key = os.environ.get("COSMOSDB_KEY")
         if not endpoint or not key:
@@ -3701,9 +3704,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             }
             logging.info(
                 f"   Primera interacción keys: {list(primera.keys())}")
-            if "texto_semantico" in primera:
+            texto_semantico = primera.get("texto_semantico", "")
+            if texto_semantico:
                 logging.info(
-                    f"   Texto semántico encontrado: '{_preview(primera['texto_semantico'], 500)}'")
+                    f"   Texto semántico encontrado: '{_preview(texto_semantico, 500)}'")
         logging.info(
             f"📝 Historial: {_preview(memoria_previa.get('resumen_conversacion', ''), 500)}")
 
@@ -3859,9 +3863,10 @@ def historial_interacciones(req: func.HttpRequest) -> func.HttpResponse:
             }
             logging.info(
                 f"   Primera interacción de Cosmos keys: {list(primera.keys())}")
-            if "texto_semantico" in primera:
+            texto_semantico = primera.get("texto_semantico", "")
+            if texto_semantico:
                 logging.info(
-                    f"   Texto semántico de Cosmos: '{_preview(primera['texto_semantico'], 500)}'")
+                    f"   Texto semántico de Cosmos: '{_preview(texto_semantico, 500)}'")
             else:
                 logging.warning(
                     f"   ⚠️ No hay texto_semantico en interacción de Cosmos")
@@ -7425,118 +7430,6 @@ def interpretar_intencion_http(req: func.HttpRequest) -> func.HttpResponse:
                 "exito": False,
                 "error": str(e),
                 "mensaje": "Error procesando la consulta"
-            }),
-            mimetype="application/json",
-            status_code=500
-        )
-
-
-@app.function_name(name="bing_grounding_http")
-@app.route(route="bing-grounding", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def bing_grounding_http(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    """Endpoint robusto para Bing Grounding que resuelve consultas ambiguas"""
-    try:
-        # Validación flexible del body
-        body = req.get_json() if req.get_body() else {}
-
-        # Extraer query de múltiples formatos posibles
-        query = (
-            body.get("query") or
-            body.get("consulta") or
-            body.get("pregunta") or
-            body.get("texto") or
-            body.get("message") or
-            body.get("agent_response") or
-            ""
-        ).strip()
-
-        # Si no hay query, usar todo el body como query
-        if not query and body:
-            query = json.dumps(body, ensure_ascii=False)
-
-        # Si aún no hay query, error
-        if not query:
-            return func.HttpResponse(
-                json.dumps({
-                    "exito": False,
-                    "error": "Se requiere una consulta para procesar",
-                    "formatos_aceptados": [
-                        '{"query": "cómo listar cosmos db"}',
-                        '{"consulta": "ayuda con storage"}',
-                        '{"agent_response": "no sé cómo hacer esto"}'
-                    ]
-                }),
-                status_code=400,
-                mimetype="application/json"
-            )
-
-        # Extraer contexto
-        contexto = body.get("contexto", "azure_cli_help")
-        prioridad = body.get("prioridad", "alta")
-
-        logging.info(f"🔍 Bing Grounding procesando: {query[:50]}...")
-
-        # Ejecutar Bing Grounding con manejo robusto
-        try:
-            resultado = ejecutar_bing_grounding_fallback(query, contexto, {
-                "prioridad": prioridad,
-                "timestamp": datetime.now().isoformat(),
-                "endpoint_origen": "bing-grounding"
-            })
-
-            # Enriquecer respuesta
-            if resultado.get("exito"):
-                # Si hay comando sugerido, ofrecer ejecutarlo
-                if "comando_sugerido" in resultado:
-                    resultado["acciones_disponibles"] = [
-                        "ejecutar_comando_automaticamente",
-                        "mostrar_comando_solamente",
-                        "obtener_mas_informacion"
-                    ]
-                    resultado["endpoint_ejecucion"] = "/api/ejecutar-cli"
-
-            resultado = aplicar_memoria_manual(req, resultado)
-            return func.HttpResponse(
-                json.dumps(resultado, ensure_ascii=False, indent=2),
-                mimetype="application/json",
-                status_code=200
-            )
-
-        except Exception as grounding_error:
-            logging.error(f"Error en Bing Grounding: {grounding_error}")
-
-            # Fallback local robustoP
-            fallback_result = {
-                "exito": True,
-                "fuente": "fallback_local",
-                "query_original": query,
-                "mensaje": f"No pude procesar '{query}' con Bing, pero aquí tienes sugerencias locales:",
-                "sugerencias": generar_sugerencias_locales(query),
-                "error_grounding": str(grounding_error),
-                "accion_sugerida": "revisar_sugerencias_locales"
-            }
-
-            fallback_result = aplicar_memoria_manual(req, fallback_result)
-            return func.HttpResponse(
-                json.dumps(fallback_result, ensure_ascii=False, indent=2),
-                mimetype="application/json",
-                status_code=200
-            )
-
-    except Exception as e:
-        logging.error(f"Error crítico en bing-grounding: {e}")
-        return func.HttpResponse(
-            json.dumps({
-                "exito": False,
-                "error": str(e),
-                "tipo_error": type(e).__name__,
-                "mensaje": "Error procesando consulta, pero el sistema sigue operativo",
-                "sugerencias_alternativas": [
-                    "Intenta reformular tu consulta",
-                    "Usa /api/ejecutar-cli directamente si conoces el comando",
-                    "Consulta /api/status para verificar el estado del sistema"
-                ]
             }),
             mimetype="application/json",
             status_code=500
@@ -11219,7 +11112,7 @@ def _buscar_en_memoria(campo_faltante: str) -> Optional[str]:
 
 
 def _resolve_windows_absolute_path(raw_path: str, root_path: Path) -> Optional[Path]:
-    """
+    r"""
     Convierte rutas absolutas estilo Windows (C:\...) a rutas dentro del proyecto actual.
     Permite ejecutar comandos que envían rutas de su máquina local dentro de entornos Linux.
     """
@@ -11336,14 +11229,23 @@ def _auto_resolve_file_paths(comando: str) -> str:
     for referenced_path in matches:
         resolved_path = _locate_file_in_root(referenced_path, root_path)
         if resolved_path:
-            if platform.system() == "Windows":
-                comando = comando.replace(
-                    referenced_path, f'"{resolved_path}"')
-            else:
-                comando = comando.replace(referenced_path, str(
-                    resolved_path).replace(' ', '\\ '))
             logging.info(
                 f"✅ Ruta resuelta: {referenced_path} -> {resolved_path}")
+            if platform.system() == "Windows":
+                double_quoted = f'"{referenced_path}"'
+                single_quoted = f"'{referenced_path}'"
+                replacement = f'"{resolved_path}"'
+
+                if double_quoted in comando:
+                    comando = comando.replace(double_quoted, replacement)
+                elif single_quoted in comando:
+                    comando = comando.replace(
+                        single_quoted, f"'{resolved_path}'")
+                else:
+                    comando = comando.replace(referenced_path, replacement)
+            else:
+                comando = comando.replace(
+                    referenced_path, str(resolved_path).replace(' ', '\\ '))
         else:
             logging.warning(
                 f"⚠️ No existe (ni en raíz ni subdirectorios): {referenced_path}")
@@ -14669,7 +14571,10 @@ def verificar_estado_sistema(req: func.HttpRequest) -> func.HttpResponse:
         }
 
         # 👉 Registrar evento de monitoreo solo si no hubo error
-        memory_service.log_semantic_event({"tipo": "monitoring_event"})
+        memory_service.log_semantic_event({
+            "tipo": "monitoring_event",
+            "texto_semantico": "Monitoreo verificar-sistema OK - Sistema funcionando correctamente"
+        })
 
         return func.HttpResponse(
             json.dumps(estado, indent=2),
@@ -14699,7 +14604,10 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
     workspace_id = os.environ.get("APPINSIGHTS_WORKSPACE_ID")
 
     if not workspace_id:
-        memory_service.log_semantic_event({"tipo": "monitoring_event"})
+        memory_service.log_semantic_event({
+            "tipo": "monitoring_event",
+            "texto_semantico": "Monitoreo verificar-app-insights ERROR - APPINSIGHTS_WORKSPACE_ID no configurado"
+        })
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
@@ -14753,9 +14661,15 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
             eventos_count = -1  # Indica error en parsing
             has_data = False
             metodo_parseo = "error_parsing"
-            memory_service.log_semantic_event({"tipo": "monitoring_event"})
+            memory_service.log_semantic_event({
+                "tipo": "monitoring_event",
+                "texto_semantico": f"Monitoreo verificar-app-insights PARSE_ERROR - {parse_error_msg}"
+            })
 
-        memory_service.log_semantic_event({"tipo": "monitoring_event"})
+        memory_service.log_semantic_event({
+            "tipo": "monitoring_event",
+            "texto_semantico": f"Monitoreo verificar-app-insights OK - {eventos_count} eventos usando {metodo_parseo}"
+        })
         return func.HttpResponse(
             json.dumps({
                 "exito": True,
@@ -14780,7 +14694,10 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except Exception as e:
-        memory_service.log_semantic_event({"tipo": "monitoring_event"})
+        memory_service.log_semantic_event({
+            "tipo": "monitoring_event",
+            "texto_semantico": f"Monitoreo verificar-app-insights ERROR - {type(e).__name__}: {str(e)}"
+        })
         return func.HttpResponse(
             json.dumps({
                 "exito": False,
@@ -14798,8 +14715,6 @@ def verificar_app_insights(req: func.HttpRequest) -> func.HttpResponse:
 @app.function_name(name="verificar_cosmos")
 @app.route(route="verificar-cosmos", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
-    from memory_manual import aplicar_memoria_manual
-    from azure.cosmos import CosmosClient
     """Verifica conectividad y escrituras en CosmosDB usando clave o MI"""
     endpoint = os.environ.get("COSMOSDB_ENDPOINT")
     key = os.environ.get("COSMOSDB_KEY")
@@ -14829,8 +14744,12 @@ def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
                 auth_method = "clave"
                 db = client.get_database_client(database)
                 container = db.get_container_client(container_name)
-                list(container.query_items("SELECT TOP 1 * FROM c",
-                     enable_cross_partition_query=True))
+                # Test query más simple y segura
+                test_items = list(container.query_items(
+                    "SELECT VALUE COUNT(1) FROM c",
+                    enable_cross_partition_query=True,
+                    max_item_count=1
+                ))
             except Exception:
                 client = None
 
@@ -14842,9 +14761,11 @@ def verificar_cosmos(req: func.HttpRequest) -> func.HttpResponse:
             container = db.get_container_client(container_name)
 
         if container:
+            # Query más eficiente y con límites apropiados
             items = list(container.query_items(
-                "SELECT TOP 5 * FROM c ORDER BY c._ts DESC",
-                enable_cross_partition_query=True
+                "SELECT c.id, c._ts, c.session_id FROM c ORDER BY c._ts DESC OFFSET 0 LIMIT 5",
+                enable_cross_partition_query=True,
+                max_item_count=5
             ))
         else:
             items = []
@@ -15429,6 +15350,7 @@ def historial_directo(req: func.HttpRequest) -> func.HttpResponse:
 def buscar_memoria(req: func.HttpRequest) -> func.HttpResponse:
     """Buscar en memoria semántica"""
     try:
+        from endpoints_search_memory import buscar_memoria_endpoint
         req_body = req.get_json()
         resultado = buscar_memoria_endpoint(req_body)
         return func.HttpResponse(
@@ -15449,6 +15371,7 @@ def buscar_memoria(req: func.HttpRequest) -> func.HttpResponse:
 def indexar_memoria(req: func.HttpRequest) -> func.HttpResponse:
     """Indexar documentos en memoria semántica"""
     try:
+        from endpoints_search_memory import indexar_memoria_endpoint
         req_body = req.get_json()
         resultado = indexar_memoria_endpoint(req_body)
         return func.HttpResponse(

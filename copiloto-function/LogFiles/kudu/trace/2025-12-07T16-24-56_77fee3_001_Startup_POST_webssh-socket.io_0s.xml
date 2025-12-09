@@ -1,0 +1,5 @@
+<step title="Startup Request" date="2025-12-07T16:24:56.048" instance="77fee3" url="/webssh/socket.io/?EIO=4&amp;transport=polling&amp;t=PhveMDx&amp;sid=Dk6-veTahB2kZVC6AAAA" method="POST" type="request" pid="768,1,5" SCM_DO_BUILD_DURING_DEPLOYMENT="true" ScmType="None" >
+  <step title="Cleanup Xml Logs" date="2025-12-07T16:24:56.051" >
+    <step title="Cleanup Infos" date="2025-12-07T16:24:56.184" totalFiles="1905" totalCleanup="1745" /><!-- duration: 6ms -->
+  </step><!-- duration: 144ms -->
+</step><!-- duration: 150ms -->

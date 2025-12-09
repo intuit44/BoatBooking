@@ -1,0 +1,5 @@
+<step title="Incoming Request" date="2025-09-01T08:24:14.730" instance="80fa37" url="/logstream" method="GET" type="request" pid="770,1,7" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="AZURECLI/2.76.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="febc330e-870c-11f0-ac53-4438e8af59b4" X-ARR-LOG-ID="febc330e-870c-11f0-ac53-4438e8af59b4" CLIENT-IP="75.51.31.10:65032" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="75.51.31.10" X-Client-Port="65032" >
+  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-09-01T08:24:14.761" /><!-- duration: 1309ms -->
+  <step title="Error occurred" date="2025-09-01T08:35:16.120" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 70ms -->
+  <step title="Outgoing response" date="2025-09-01T08:35:16.238" type="response" statusCode="200" statusText="OK" /><!-- duration: 4ms -->
+</step><!-- duration: 661515ms -->

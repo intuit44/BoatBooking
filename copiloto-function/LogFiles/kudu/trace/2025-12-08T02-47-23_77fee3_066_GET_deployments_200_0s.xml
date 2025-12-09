@@ -1,0 +1,12 @@
+<step title="Incoming Request" date="2025-12-08T02:47:23.467" instance="77fee3" url="/deployments" method="GET" type="request" pid="768,1,19" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="functions-core-tools/4.3.0" Authorization="Bea..." Cookie="ARRAffinity=77fee32440e9061dfe6537dabb6df219da60ec2c2376309508fab39db606b397; ARRAffinitySameSite=77fee32440e9061dfe6537dabb6df219da60ec2c2376309508fab39db606b397" X-ARR-LOG-ID="6246c7f0-da9a-4655-85de-aafeaa8a6e65" CLIENT-IP="75.51.31.10:61958" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/deployments" X-Client-IP="75.51.31.10" X-Client-Port="61958" >
+  <step title="Cleanup Xml Logs" date="2025-12-08T02:47:23.505" >
+    <step title="Cleanup Infos" date="2025-12-08T02:47:23.613" totalFiles="2030" totalCleanup="1870" /><!-- duration: 5ms -->
+  </step><!-- duration: 116ms -->
+  <step title="DeploymentService.GetCurrentEtag" date="2025-12-08T02:47:23.653" >
+    <step title="Current Etag: &quot;8de36045e354b4b&quot;, Cached Etag: &quot;8de3604593285f3&quot;" date="2025-12-08T02:47:23.676" /><!-- duration: 2ms -->
+  </step><!-- duration: 27ms -->
+  <step title="DeploymentService.GetDeployResults" date="2025-12-08T02:47:23.682" >
+    <step title="DeploymentManager.GetResults" date="2025-12-08T02:47:23.685" /><!-- duration: 183ms -->
+  </step><!-- duration: 193ms -->
+  <step title="Outgoing response" date="2025-12-08T02:47:23.881" type="response" statusCode="200" statusText="OK" /><!-- duration: 2ms -->
+</step><!-- duration: 425ms -->

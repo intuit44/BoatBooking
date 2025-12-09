@@ -1,0 +1,20 @@
+<step title="Incoming Request" date="2025-12-08T02:46:42.958" instance="77fee3" url="/api/zipdeploy?isAsync=true&amp;author=ALIENWARE-SIMB%C3%93" method="POST" type="request" pid="768,1,19" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="functions-core-tools/4.3.0" Authorization="Bea..." Content-Type="application/zip" If-Match="*" Content-Length="255554603" X-ARR-LOG-ID="201699be-1ce8-4190-8257-86cca27e285c" CLIENT-IP="75.51.31.10:61958" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/zipdeploy?isAsync=true&amp;author=ALIENWARE-SIMB%C3%93" X-Client-IP="75.51.31.10" X-Client-Port="61958" >
+  <step title="Cleanup Xml Logs" date="2025-12-08T02:46:42.962" >
+    <step title="Cleanup Infos" date="2025-12-08T02:46:42.986" totalFiles="2022" totalCleanup="1862" /><!-- duration: 4ms -->
+  </step><!-- duration: 31ms -->
+  <step title="ZipPushDeploy" date="2025-12-08T02:46:43.031" >
+    <step title="Functions App ZipDeploy. Extract zip. Remote build." date="2025-12-08T02:46:43.037" /><!-- duration: 2ms -->
+    <step title="None repository commit" date="2025-12-08T02:46:43.044" >
+      <step title="Commit id: 210dc04a-056a-4443-8fb1-db8b188d95c5" date="2025-12-08T02:46:43.049" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 2ms -->
+    </step><!-- duration: 12ms -->
+    <step title="Starting PushDeployAsync" date="2025-12-08T02:46:43.058" /><!-- duration: 2ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/ee3662f3-71c1-4475-b00f-86a6dd6f8b6a.zip" date="2025-12-08T02:46:43.069" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/ee3662f3-71c1-4475-b00f-86a6dd6f8b6a.zip" date="2025-12-08T02:46:43.072" /><!-- duration: 4ms -->
+    </step><!-- duration: 19864ms -->
+    <step title="Start deployment in the background" date="2025-12-08T02:47:02.951" >
+      <step title="Acquiring Deployment Lock" date="2025-12-08T02:47:03.030" /><!-- duration: 2ms -->
+      <step title="Acquired Deployment Lock" date="2025-12-08T02:47:03.073" /><!-- duration: 2ms -->
+    </step><!-- duration: 376ms -->
+  </step><!-- duration: 20301ms -->
+  <step title="Outgoing response" date="2025-12-08T02:47:03.337" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 2ms -->
+</step><!-- duration: 20383ms -->

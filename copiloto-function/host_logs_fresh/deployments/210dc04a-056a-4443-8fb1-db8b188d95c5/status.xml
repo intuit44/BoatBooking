@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>210dc04a-056a-4443-8fb1-db8b188d95c5</id>
+  <author>ALIENWARE-SIMB</author>
+  <deployer>Push-Deployer</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>Created via a push deployment</message>
+  <progress></progress>
+  <status>Failed</status>
+  <statusText></statusText>
+  <lastSuccessEndTime />
+  <receivedTime>2025-12-08T02:47:19.8303533Z</receivedTime>
+  <startTime>2025-12-08T02:47:21.1372523Z</startTime>
+  <endTime>2025-12-08T02:47:24.5904684Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>

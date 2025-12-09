@@ -1,0 +1,5 @@
+<step title="LogStreamManager: Dispose() called" date="2025-10-26T05:21:46.604" instance="df5035" >
+  <step title="Cleanup Xml Logs" date="2025-10-26T05:21:46.607" >
+    <step title="Cleanup Infos" date="2025-10-26T05:21:46.664" totalFiles="1463" totalCleanup="1303" /><!-- duration: 7ms -->
+  </step><!-- duration: 67ms -->
+</step><!-- duration: 73ms -->

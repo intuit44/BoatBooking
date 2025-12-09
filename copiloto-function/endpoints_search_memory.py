@@ -280,7 +280,7 @@ def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
                     f"Documento {doc.get('id')} omitido: falta 'texto_semantico'")
                 continue
 
-            texto = doc["texto_semantico"]
+            texto = doc.get("texto_semantico", "")
 
             try:
                 if memory_service.evento_ya_existe(texto):

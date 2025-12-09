@@ -1,0 +1,5 @@
+<step title="Process Shutdown" date="2025-11-01T08:29:57.262" instance="df5035" pid="768,1,2" uptime="-00:00:00.0008005" lastrequesttime="739555.08:29:57.2621964" >
+  <step title="Cleanup Xml Logs" date="2025-11-01T08:29:57.266" >
+    <step title="Cleanup Infos" date="2025-11-01T08:29:57.358" totalFiles="1644" totalCleanup="1484" /><!-- duration: 9ms -->
+  </step><!-- duration: 107ms -->
+</step><!-- duration: 114ms -->

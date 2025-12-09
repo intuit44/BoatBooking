@@ -423,7 +423,7 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
         # Si tiene wildcard, buscar archivos con glob recursivo
         if '*' in file_path:
             import glob
-            
+
             # Convertir patrón a recursivo si no lo es
             patron_recursivo = file_path
             if '**' not in file_path:
@@ -433,10 +433,11 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
                     patron_recursivo = f"{partes[0]}/**/{partes[1]}"
                 else:
                     patron_recursivo = f"**/{file_path}"
-            
+
             archivos_encontrados = glob.glob(patron_recursivo, recursive=True)
-            logging.info(f"📁 Patrón {patron_recursivo} → {len(archivos_encontrados)} archivos")
-            
+            logging.info(
+                f"📁 Patrón {patron_recursivo} → {len(archivos_encontrados)} archivos")
+
             if archivos_encontrados:
                 return {
                     "exito": True,
@@ -481,7 +482,7 @@ def process_msearch_request(body: Dict[str, Any]) -> Dict[str, Any]:
                 cmd = f'findstr "{pattern or ""}" "{file_path}"' if pattern else f'type "{file_path}"'
 
                 # Invocar ejecutar-cli internamente
-                from function_app import ejecutar_cli_http
+                from endpoints.ejecutar_cli import ejecutar_cli_http
                 mock_req = func.HttpRequest(
                     method="POST",
                     url="http://localhost/api/ejecutar-cli",

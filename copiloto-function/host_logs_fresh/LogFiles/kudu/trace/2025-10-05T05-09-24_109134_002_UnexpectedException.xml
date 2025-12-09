@@ -1,0 +1,4 @@
+<exception>System.IO.FileNotFoundException: Could not find file &apos;/home/LogFiles/kudu/trace/2025-10-05T05-09-24_109134_001_Shutdown_pending.xml&apos;.
+File name: &apos;/home/LogFiles/kudu/trace/2025-10-05T05-09-24_109134_001_Shutdown_pending.xml&apos;
+   at System.IO.File.Move(String sourceFileName, String destFileName, Boolean overwrite)
+   at Kudu.Core.Tracing.XmlTracer.WriteEndTrace() in /tmp/KuduLite/Kudu.Core/Tracing/XmlTracer.cs:line 204</exception>

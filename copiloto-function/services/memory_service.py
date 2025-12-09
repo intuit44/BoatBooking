@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import timezone, datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Sequence
 from azure.cosmos import CosmosClient
 from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
@@ -116,6 +116,12 @@ class MemoryService:
                 logging.info(
                     f"[CONVERSATION] Extrayendo es_conversacion_humana: {data['es_conversacion_humana']}")
 
+            # ✅ EXTRAER TEXTO_SEMANTICO AL NIVEL RAÍZ (CRÍTICO)
+            if "texto_semantico" in data:
+                event["texto_semantico"] = data["texto_semantico"]
+                logging.info(
+                    f"[SEMANTIC] Extrayendo texto_semantico al nivel raíz: {data['texto_semantico'][:100]}...")
+
         success_local = self._log_local(event)
         success_cosmos = self._log_cosmos(event)
 
@@ -141,6 +147,21 @@ class MemoryService:
             return False
 
         try:
+            # 🚨 PASO 1: GARANTIZAR texto_semantico INMEDIATAMENTE
+            # Mover texto_semantico al nivel raíz si está en data
+            if "texto_semantico" in event.get("data", {}):
+                event["texto_semantico"] = event["data"]["texto_semantico"]
+                logging.info(
+                    f"[SEMANTIC] Movido texto_semantico de data al nivel raíz")
+
+            # Asegurar que siempre hay texto_semantico en el nivel raíz
+            if not event.get("texto_semantico"):
+                # Generar uno básico si no existe
+                fallback_text = f"Evento {event.get('event_type', 'unknown')} en sesión {event.get('session_id', 'unknown')}"
+                event["texto_semantico"] = fallback_text
+                logging.warning(
+                    f"[WARN] Generando texto_semantico de fallback: {fallback_text}")
+
             # Asegurar que el evento tiene partition key (session_id)
             if "session_id" not in event:
                 event["session_id"] = "fallback_session"
@@ -182,17 +203,6 @@ class MemoryService:
             logging.info(
                 f"[EVENT] Evento: {event.get('event_type', 'unknown')} - Tamaño: {len(str(event))} chars")
 
-            # Mover texto_semantico al nivel raíz si está en data
-            if "texto_semantico" in event.get("data", {}):
-                event["texto_semantico"] = event["data"]["texto_semantico"]
-            logging.info(
-                f"[SEMANTIC] Moviendo texto_semantico al nivel raíz: {event['texto_semantico'][:100]}...")            # Asegurar que siempre hay texto_semantico en el nivel raíz
-            if not event.get("texto_semantico"):
-                # Generar uno básico si no existe
-                event["texto_semantico"] = f"Evento {event.get('event_type', 'unknown')} en sesión {event.get('session_id', 'unknown')}"
-                logging.warning(
-                    f"[WARN] Generando texto_semantico de fallback: {event['texto_semantico']}")
-
             # 🔧 ENRIQUECER texto_semantico con campos técnicos si no fueron agregados antes
             if "🔑" not in event.get("texto_semantico", ""):
                 def _extraer_ids_evento(evt):
@@ -206,7 +216,8 @@ class MemoryService:
 
                 ids_extra = _extraer_ids_evento(event)
                 if ids_extra:
-                    event["texto_semantico"] += ids_extra
+                    texto_actual = event.get("texto_semantico", "")
+                    event["texto_semantico"] = texto_actual + ids_extra
                     logging.info(
                         f"🔑 IDs técnicos agregados al evento en _log_cosmos")
 
@@ -271,13 +282,14 @@ class MemoryService:
             }
 
             # Solo indexar si hay texto semántico válido
-            if not documento["texto_semantico"] or len(documento["texto_semantico"]) < 10:
+            texto_semantico = documento.get("texto_semantico", "")
+            if not texto_semantico or len(texto_semantico) < 10:
                 logging.info(
                     "[SKIP] Saltando indexación en AI Search: texto semántico vacío o muy corto")
                 return False
 
             # Validar duplicados y calidad ANTES de generar embedding
-            texto_sem = documento["texto_semantico"]
+            texto_sem = documento.get("texto_semantico", "")
             if len(texto_sem) < 10:
                 logging.info(
                     f"[SKIP] Texto muy corto, se omite indexación: {len(texto_sem)} chars")
@@ -328,6 +340,14 @@ class MemoryService:
 
     def get_session_history(self, session_id: str, limit: int = 100) -> list:
         """Obtiene historial de sesión, priorizando Redis como caché antes de Cosmos."""
+        # Validar session_id para evitar consultas inválidas
+        if not session_id or not isinstance(session_id, str) or len(session_id.strip()) == 0:
+            logging.warning(
+                f"[COSMOS] session_id inválido: {repr(session_id)}")
+            return []
+
+        session_id = session_id.strip()
+
         cache_key = None
         if redis_buffer and getattr(redis_buffer, "is_enabled", False):
             try:
@@ -344,11 +364,17 @@ class MemoryService:
         if not self.cosmos_available or not self.memory_container:
             return []
 
+        query = "SELECT * FROM c WHERE c.session_id = @session_id ORDER BY c._ts DESC"
         try:
-            query = "SELECT * FROM c WHERE c.session_id = @session_id ORDER BY c._ts DESC"
+            parameters: List[Dict[str, Any]] = [
+                {"name": "@session_id", "value": session_id}]
+
+            logging.debug(
+                f"[COSMOS] Ejecutando consulta con session_id: {repr(session_id)}")
+
             items = list(self.memory_container.query_items(
-                query,
-                parameters=[{"name": "@session_id", "value": session_id}],
+                query=query,
+                parameters=parameters,
                 max_item_count=limit,
                 enable_cross_partition_query=True
             ))
@@ -366,7 +392,13 @@ class MemoryService:
 
             return items
         except Exception as e:
-            logging.error(f"Error consultando historial: {e}")
+            # Manejo específico para errores de consulta Cosmos DB
+            error_msg = str(e)
+            if "1004" in error_msg or "400" in error_msg:
+                logging.error(
+                    f"[COSMOS] Error 400/1004 en consulta historial - session_id: {repr(session_id)}, query: {query}, error: {error_msg}")
+            else:
+                logging.error(f"[COSMOS] Error consultando historial: {e}")
             return []
 
     def record_interaction(self, agent_id: str, source: str, input_data: Any, output_data: Any) -> bool:
@@ -935,14 +967,14 @@ class MemoryService:
 
             # Consultar estadísticas desde Cosmos DB
             query = "SELECT * FROM c WHERE c.event_type = 'endpoint_call'"
-            params = []
+            params: List[Dict[str, Any]] = []
 
             if source_name:
                 query += " AND c.data.source = @source_name"
                 params.append({"name": "@source_name", "value": source_name})
 
             items = list(self.memory_container.query_items(
-                query,
+                query=query,
                 parameters=params,
                 enable_cross_partition_query=True
             ))
@@ -986,14 +1018,14 @@ class MemoryService:
 
             # Consultar elementos a eliminar
             query = "SELECT c.id, c.session_id FROM c WHERE c.event_type = 'endpoint_call'"
-            params = []
+            params: List[Dict[str, Any]] = []
 
             if source_name:
                 query += " AND c.data.source = @source_name"
                 params.append({"name": "@source_name", "value": source_name})
 
             items = list(self.memory_container.query_items(
-                query,
+                query=query,
                 parameters=params,
                 enable_cross_partition_query=True
             ))
@@ -1049,12 +1081,13 @@ class MemoryService:
                 return False
 
             query = "SELECT TOP 1 c.id FROM c WHERE c.session_id = @session_id AND c.texto_hash = @hash"
+            parameters: List[Dict[str, Any]] = [
+                {"name": "@session_id", "value": session_id},
+                {"name": "@hash", "value": texto_hash}
+            ]
             items = list(self.memory_container.query_items(
-                query,
-                parameters=[
-                    {"name": "@session_id", "value": session_id},
-                    {"name": "@hash", "value": texto_hash}
-                ],
+                query=query,
+                parameters=parameters,
                 enable_cross_partition_query=True
             ))
 
@@ -1070,12 +1103,13 @@ class MemoryService:
                 return False
 
             query = f"SELECT TOP {ventana} * FROM c WHERE c.session_id = @session_id AND c.data.endpoint = @endpoint ORDER BY c.timestamp DESC"
+            parameters: List[Dict[str, Any]] = [
+                {"name": "@session_id", "value": session_id},
+                {"name": "@endpoint", "value": endpoint}
+            ]
             items = list(self.memory_container.query_items(
-                query,
-                parameters=[
-                    {"name": "@session_id", "value": session_id},
-                    {"name": "@endpoint", "value": endpoint}
-                ],
+                query=query,
+                parameters=parameters,
                 enable_cross_partition_query=True
             ))
 

@@ -1,0 +1,7 @@
+<step title="Incoming Request" date="2025-09-02T21:24:53.004" instance="80fa37" url="/logstream" method="GET" type="request" pid="772,1,21" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="AZURECLI/2.76.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="3dd38d16-8843-11f0-9121-4438e8af59b4" X-ARR-LOG-ID="3dd38d16-8843-11f0-9121-4438e8af59b4" CLIENT-IP="75.51.31.10:52335" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="75.51.31.10" X-Client-Port="52335" >
+  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-09-02T21:24:53.050" /><!-- duration: 2060ms -->
+  <step title="Error occurred" date="2025-09-02T23:24:53.261" type="error" text="LogStreamManager: Inside TerminateClient" /><!-- duration: 43ms -->
+  <step title="Error occurred" date="2025-09-02T23:24:53.321" type="error" text="LogStreamManager: Inside Reset" /><!-- duration: 5ms -->
+  <step title="Error occurred" date="2025-09-03T01:20:55.735" type="error" text="LogStreamManager: ProcessRequest end due to timeout" /><!-- duration: 106ms -->
+  <step title="Outgoing response" date="2025-09-03T01:20:56.098" type="response" statusCode="200" statusText="OK" /><!-- duration: 6ms -->
+</step><!-- duration: 14163111ms -->

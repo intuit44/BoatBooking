@@ -488,6 +488,113 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
         }
 
 
+def _detectar_tipo_comando(comando: Optional[str]) -> Tuple[str, Dict[str, Any]]:
+    """
+    Detecta una sola vez el tipo de comando combinando heurísticas propias y el detector externo.
+    Devuelve el tipo final y los metadatos del detector (si existen).
+    """
+    if not comando:
+        return "generic", {}
+
+    tipo_manual = "generic"
+    detection_data: Dict[str, Any] = {}
+
+    powershell_cmdlets = [
+        'Get-', 'Set-', 'New-', 'Remove-', 'Invoke-', 'Add-', 'Clear-',
+        'Copy-', 'Export-', 'Import-', 'Move-', 'Select-', 'Test-',
+        'Where-', 'ForEach-', 'Start-', 'Stop-', 'Out-', 'Write-',
+        'Read-', 'Find-', 'Convert-', 'Measure-', 'Compare-'
+    ]
+    redis_commands = [
+        'PING', 'SET', 'GET', 'DEL', 'EXISTS', 'KEYS', 'FLUSHDB', 'FLUSHALL',
+        'HGET', 'HSET', 'HGETALL', 'HDEL', 'HEXISTS', 'HKEYS', 'HVALS',
+        'LPUSH', 'RPUSH', 'LPOP', 'RPOP', 'LRANGE', 'LLEN',
+        'SADD', 'SREM', 'SMEMBERS', 'SCARD', 'SISMEMBER',
+        'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
+        'TTL', 'EXPIRE', 'EXPIREAT', 'PERSIST', 'PTTL',
+        'INFO', 'DBSIZE', 'CONFIG', 'CLIENT', 'MONITOR', 'BUFFER_STATS'
+    ]
+
+    comando_lower = comando.lower()
+    comando_upper = comando.upper()
+
+    if any(comando.startswith(cmdlet) for cmdlet in powershell_cmdlets):
+        tipo_manual = "powershell"
+        logging.info(f"✅ Comando PowerShell detectado: {comando}")
+    elif comando_lower.startswith('redis-cli ') or any(
+            comando_upper.startswith(f"{cmd} ") or comando_upper == cmd for cmd in redis_commands):
+        tipo_manual = "redis"
+        logging.info(f"✅ Comando Redis detectado: {comando}")
+    elif comando.startswith('python ') or comando.startswith('pip '):
+        tipo_manual = "python"
+    elif comando.startswith('az '):
+        tipo_manual = "azure_cli"
+    elif comando.startswith('docker '):
+        tipo_manual = "docker"
+    elif comando.startswith('npm '):
+        tipo_manual = "npm"
+
+    necesita_detector = tipo_manual in ("generic", "azure_cli")
+    detector_type = "generic"
+
+    if necesita_detector:
+        try:
+            from command_type_detector import detect_and_normalize_command
+            detection_data = detect_and_normalize_command(comando) or {}
+            detector_type = detection_data.get("type", "generic")
+            logging.info(
+                f"Comando detectado por detector externo como: {detector_type}")
+        except ImportError as exc:
+            logging.warning(
+                f"No se pudo importar command_type_detector: {exc}")
+            detection_data = {}
+            detector_type = "generic"
+            azure_keywords = ["storage", "group", "functionapp", "webapp", "cosmosdb"]
+            if tipo_manual == "generic" and any(keyword in comando_lower for keyword in azure_keywords):
+                tipo_manual = "azure_cli"
+
+    final_type = tipo_manual if tipo_manual != "generic" else detector_type
+    if final_type == "generic" and detector_type != "generic":
+        final_type = detector_type
+
+    if not detection_data:
+        detection_data = {"type": final_type}
+    else:
+        detection_data.setdefault("type", final_type)
+
+    return final_type, detection_data
+
+
+def _responder_json(req: func.HttpRequest, payload: Dict[str, Any], status_code: int = 200) -> func.HttpResponse:
+    """Aplica memorias, registra la llamada y construye la HttpResponse."""
+    from memory_manual import aplicar_memoria_manual
+    from cosmos_memory_direct import aplicar_memoria_cosmos_directo
+    from services.memory_service import memory_service
+
+    payload = aplicar_memoria_cosmos_directo(req, payload)
+    payload = aplicar_memoria_manual(req, payload)
+
+    logging.info(
+        f"💾 Registering call for ejecutar_cli: success={payload.get('exito', False)}, endpoint=/api/ejecutar-cli")
+    memory_service.registrar_llamada(
+        source="ejecutar_cli",
+        endpoint="/api/ejecutar-cli",
+        method=req.method,
+        params={
+            "session_id": req.headers.get("Session-ID"),
+            "agent_id": req.headers.get("Agent-ID")
+        },
+        response_data=payload,
+        success=payload.get("exito", False)
+    )
+
+    return func.HttpResponse(
+        json.dumps(payload, ensure_ascii=False),
+        mimetype="application/json",
+        status_code=status_code
+    )
+
+
 def _normalizar_findstr(comando: str) -> str:
     """
     Convierte comandos findstr con múltiples /C: a forma segura usando pipe con type.
@@ -733,10 +840,8 @@ def _verificar_archivos_en_comando(comando: str) -> dict:
 @app.route(route="ejecutar-cli", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
     """Endpoint UNIVERSAL - Ejecuta CUALQUIER comando sin validaciones previas"""
-    from function_app import PROJECT_ROOT, _auto_resolve_file_paths, IS_AZURE, _locate_file_in_root, _locate_file_in_root
-    from memory_manual import aplicar_memoria_manual
-    from cosmos_memory_direct import consultar_memoria_cosmos_directo, aplicar_memoria_cosmos_directo
-    from services.memory_service import memory_service
+    from function_app import _auto_resolve_file_paths, IS_AZURE
+    from cosmos_memory_direct import consultar_memoria_cosmos_directo
 
     # 🧠 CONSULTAR MEMORIA COSMOS DB DIRECTAMENTE
     memoria_previa = consultar_memoria_cosmos_directo(req)
@@ -745,7 +850,6 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             f"🧠 Modificar-archivo: {memoria_previa['total_interacciones']} interacciones encontradas")
         logging.info(
             f"📝 Historial: {memoria_previa.get('resumen_conversacion', '')[:100]}...")
-    advertencias = []
 
     """Endpoint UNIVERSAL para ejecutar comandos - NUNCA falla con HTTP 400"""
     comando = None
@@ -765,29 +869,10 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 "ejemplo": {"comando": "storage account list"},
                 "accion_requerida": "Proporciona un comando válido en el campo 'comando'"
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=200,  # ✅ SIEMPRE 200
-                mimetype="application/json"
-            )
+            return _responder_json(req, resultado)
 
         comando = body.get("comando")
+        comando_original = comando
 
         # 🔥 DECODIFICAR HTML ENTITIES (corrige &#39; -> ')
         if comando:
@@ -797,44 +882,6 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             if comando != comando_original:
                 logging.info(
                     f"🔧 HTML entities decodificadas: {comando_original} -> {comando}")
-
-        # 🔥 DETECCIÓN AUTOMÁTICA DE TIPO DE COMANDO
-        tipo_comando = "generic"
-        if comando:
-            # Detectar comandos PowerShell - Lista completa de cmdlets
-            powershell_cmdlets = [
-                'Get-', 'Set-', 'New-', 'Remove-', 'Invoke-', 'Add-', 'Clear-',
-                'Copy-', 'Export-', 'Import-', 'Move-', 'Select-', 'Test-',
-                'Where-', 'ForEach-', 'Start-', 'Stop-', 'Out-', 'Write-',
-                'Read-', 'Find-', 'Convert-', 'Measure-', 'Compare-'
-            ]
-            if any(comando.startswith(cmdlet) for cmdlet in powershell_cmdlets):
-                tipo_comando = "powershell"
-                logging.info(f"✅ Comando PowerShell detectado: {comando}")
-            # Detectar comandos Redis
-            elif comando.lower().startswith('redis-cli ') or any(comando.upper().startswith(cmd + ' ') or comando.upper() == cmd for cmd in [
-                'PING', 'SET', 'GET', 'DEL', 'EXISTS', 'KEYS', 'FLUSHDB', 'FLUSHALL',
-                'HGET', 'HSET', 'HGETALL', 'HDEL', 'HEXISTS', 'HKEYS', 'HVALS',
-                'LPUSH', 'RPUSH', 'LPOP', 'RPOP', 'LRANGE', 'LLEN',
-                'SADD', 'SREM', 'SMEMBERS', 'SCARD', 'SISMEMBER',
-                'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
-                'TTL', 'EXPIRE', 'EXPIREAT', 'PERSIST', 'PTTL',
-                'INFO', 'DBSIZE', 'CONFIG', 'CLIENT', 'MONITOR', 'BUFFER_STATS'
-            ]):
-                tipo_comando = "redis"
-                logging.info(f"✅ Comando Redis detectado: {comando}")
-            # Detectar comandos Python
-            elif comando.startswith('python ') or comando.startswith('pip '):
-                tipo_comando = "python"
-            # Detectar comandos Azure CLI
-            elif comando.startswith('az '):
-                tipo_comando = "azure_cli"
-            # Detectar comandos Docker
-            elif comando.startswith('docker '):
-                tipo_comando = "docker"
-            # Detectar comandos NPM
-            elif comando.startswith('npm '):
-                tipo_comando = "npm"
 
         # 🔥 NORMALIZAR COMANDOS AWK AUTOMÁTICAMENTE
         if comando and 'awk' in comando.lower():
@@ -846,9 +893,11 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     f"✅ AWK normalizado: {comando_original} -> {comando}")
 
         # 🔍 AUTO-RESOLVER RUTAS DE ARCHIVOS EN EL COMANDO (ANTES DE CUALQUIER VALIDACIÓN)
+        comando_resuelto = comando
         if comando:
-            comando = _auto_resolve_file_paths(comando)
-            logging.info(f"✅ Comando con rutas resueltas: {comando}")
+            comando_resuelto = _auto_resolve_file_paths(comando)
+            logging.info(f"✅ Comando con rutas resueltas: {comando_resuelto}")
+            comando = comando_resuelto
 
         if not comando:
             if body.get("intencion"):
@@ -860,27 +909,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "alternativa": "O proporciona un comando CLI directo",
                     "ejemplo": {"comando": "storage account list"}
                 }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado),
-                    status_code=200,  # ✅ SIEMPRE 200
-                    mimetype="application/json"
-                )
+                return _responder_json(req, resultado)
 
             # ✅ CAMBIO: HTTP 200 con solicitud de comando
             resultado = {
@@ -895,33 +924,38 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "storage container list --account-name <nombre>"
                 ]
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
+            return _responder_json(req, resultado)
 
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=200,  # ✅ SIEMPRE 200
-                mimetype="application/json"
-            )
+        # 🔍 Detectar tipo solo una vez (manual + detector externo)
+        tipo_comando, detection_data = _detectar_tipo_comando(comando_original)
+
+        # Para PowerShell usamos el comando original sin auto-resolver para evitar doble comillado
+        if tipo_comando == "powershell":
+            comando = comando_original
+        else:
+            comando = comando_resuelto
 
         # 🔧 Forzar cwd real al del proyecto
         project_root = os.path.dirname(os.path.abspath(__file__))
         os.chdir(project_root)
 
-        # DETECCIÓN ROBUSTA DE AZURE CLI
+        # ✅ VERIFICACIÓN PREVIA: Comprobar existencia de archivos si el comando los referencia
+        archivo_verificado = _verificar_archivos_en_comando(comando)
+        if not archivo_verificado["exito"]:
+            return _responder_json(req, archivo_verificado)
+
+        if tipo_comando != "azure_cli":
+            logging.info(
+                f"Redirigiendo comando tipo {tipo_comando} a ejecutor genérico")
+            resultado = ejecutar_comando_sistema(comando, tipo_comando)
+            return _responder_json(req, resultado)
+
+        # Normalizar comando Azure CLI usando el detector externo si dio datos
+        comando = detection_data.get("normalized_command", comando)
+        if not comando.startswith("az "):
+            comando = f"az {comando}"
+
+        # DETECCIÓN ROBUSTA DE AZURE CLI (solo cuando se requiere)
         az_paths = [
             shutil.which("az"),
             shutil.which("az.cmd"),
@@ -948,151 +982,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     "ambiente": "Azure" if IS_AZURE else "Local"
                 }
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado = aplicar_memoria_cosmos_directo(req, resultado)
-            resultado = aplicar_memoria_manual(req, resultado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado,
-                success=resultado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado),
-                status_code=503,
-                mimetype="application/json"
-            )
-
-        # ✅ VERIFICACIÓN PREVIA: Comprobar existencia de archivos si el comando los referencia
-        archivo_verificado = _verificar_archivos_en_comando(comando)
-        if not archivo_verificado["exito"]:
-            # Aplicar memoria Cosmos y memoria manual
-            archivo_verificado = aplicar_memoria_cosmos_directo(
-                req, archivo_verificado)
-            archivo_verificado = aplicar_memoria_manual(
-                req, archivo_verificado)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={archivo_verificado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=archivo_verificado,
-                success=archivo_verificado.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(archivo_verificado, ensure_ascii=False),
-                mimetype="application/json",
-                status_code=200  # 200 para que Foundry pueda procesar el error
-            )
-
-        # REDIRECCIÓN AUTOMÁTICA: Si no es comando Azure CLI, redirigir a ejecutor genérico
-        try:
-            from command_type_detector import detect_and_normalize_command
-
-            # Detectar tipo de comando dinámicamente
-            detection = detect_and_normalize_command(comando)
-            command_type = detection.get("type", "generic")
-
-            # 🔥 OVERRIDE: Si ya detectamos PowerShell o Redis internamente, usar eso en lugar del detector externo
-            if tipo_comando == "powershell":
-                command_type = "powershell"
-                logging.info(
-                    f"🔧 Override: Usando detección interna PowerShell sobre detector externo")
-            elif tipo_comando == "redis":
-                command_type = "redis"
-                logging.info(
-                    f"🔧 Override: Usando detección interna Redis sobre detector externo")
-
-            logging.info(
-                f"Comando detectado como: {command_type} (interno: {tipo_comando})")
-
-            # Si NO es comando Azure CLI, redirigir automáticamente
-            if command_type != "azure_cli":
-                logging.info(
-                    f"Redirigiendo comando {command_type} a ejecutor genérico")
-
-                # 🔧 NORMALIZACIÓN ROBUSTA para comandos no-Azure CLI
-                comando_normalizado = comando  # NO normalizar
-                logging.info(f"Comando normalizado: {comando_normalizado}")
-
-                # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(
-                    comando_normalizado, command_type)
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=200  # ✅ CAMBIO: Siempre 200
-                )
-
-            # Normalizar comando Azure CLI
-            comando = detection.get("normalized_command", comando)
-
-        except ImportError as e:
-            logging.warning(f"No se pudo importar command_type_detector: {e}")
-            # Fallback: si no parece Azure CLI, ejecutar como comando genérico
-            if not (comando.startswith("az ") or any(keyword in comando.lower() for keyword in ["storage", "group", "functionapp", "webapp", "cosmosdb"])):
-                logging.info(
-                    f"Ejecutando comando no-Azure con fallback usando tipo interno: {tipo_comando}")
-                # 🔧 NORMALIZACIÓN ROBUSTA para fallback genérico
-                comando_normalizado = comando  # NO normalizar
-                logging.info(
-                    f"Comando fallback normalizado: {comando_normalizado}")
-                # Usar la función ejecutar_comando_sistema directamente
-                resultado = ejecutar_comando_sistema(
-                    comando_normalizado, tipo_comando)
-                # Aplicar memoria Cosmos y memoria manual
-                resultado = aplicar_memoria_cosmos_directo(req, resultado)
-                resultado = aplicar_memoria_manual(req, resultado)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado,
-                    success=resultado.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado, ensure_ascii=False),
-                    mimetype="application/json",
-                    status_code=200 if resultado.get("exito") else 500
-                )
-
-            # Agregar prefijo az si no lo tiene (se mantiene)
-            if not comando.startswith("az "):
-                comando = f"az {comando}"
+            return _responder_json(req, resultado, status_code=503)
 
         # 🔧 NORMALIZACIÓN ROBUSTA: Manejar rutas con espacios y caracteres especiales
         comando = comando  # NO normalizar
@@ -1289,29 +1179,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                         "resultado": output_json,
                         "codigo_salida": result.returncode
                     }
-                    # Aplicar memoria Cosmos y memoria manual
-                    resultado_temp = aplicar_memoria_cosmos_directo(
-                        req, resultado_temp)
-                    resultado_temp = aplicar_memoria_manual(
-                        req, resultado_temp)
-
-                    # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                    logging.info(
-                        f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                    memory_service.registrar_llamada(
-                        source="ejecutar_cli",
-                        endpoint="/api/ejecutar-cli",
-                        method=req.method,
-                        params={"session_id": req.headers.get(
-                            "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                        response_data=resultado_temp,
-                        success=resultado_temp.get("exito", False)
-                    )
-                    return func.HttpResponse(
-                        json.dumps(resultado_temp),
-                        mimetype="application/json",
-                        status_code=200
-                    )
+                    return _responder_json(req, resultado_temp)
                 except json.JSONDecodeError:
                     pass
 
@@ -1323,28 +1191,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 "codigo_salida": result.returncode,
                 "formato": "texto"
             }
-            # Aplicar memoria Cosmos y memoria manual
-            resultado_temp = aplicar_memoria_cosmos_directo(
-                req, resultado_temp)
-            resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=resultado_temp,
-                success=resultado_temp.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(resultado_temp),
-                mimetype="application/json",
-                status_code=200
-            )
+            return _responder_json(req, resultado_temp)
         else:
             # 🔍 DETECCIÓN DE ARGUMENTOS FALTANTES
             error_msg = result.stderr or "Comando falló sin mensaje de error"
@@ -1407,29 +1254,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                                     },
                                     "mensaje": f"✅ Comando autocorregido usando memoria: --{missing_arg_info['argumento']} {valor_memoria}"
                                 }
-                                # Aplicar memoria Cosmos y memoria manual
-                                resultado_temp = aplicar_memoria_cosmos_directo(
-                                    req, resultado_temp)
-                                resultado_temp = aplicar_memoria_manual(
-                                    req, resultado_temp)
-
-                                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                                logging.info(
-                                    f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                                memory_service.registrar_llamada(
-                                    source="ejecutar_cli",
-                                    endpoint="/api/ejecutar-cli",
-                                    method=req.method,
-                                    params={"session_id": req.headers.get(
-                                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                                    response_data=resultado_temp,
-                                    success=resultado_temp.get("exito", False)
-                                )
-                                return func.HttpResponse(
-                                    json.dumps(resultado_temp),
-                                    mimetype="application/json",
-                                    status_code=200
-                                )
+                                return _responder_json(req, resultado_temp)
                 except Exception as e:
                     logging.warning(f"Error en autocorrección: {e}")
 
@@ -1455,28 +1280,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                     ],
                     "ejemplo_corregido": f"{comando} --{missing_arg_info['argumento']} <valor>"
                 }
-                # Aplicar memoria Cosmos y memoria manual
-                resultado_temp = aplicar_memoria_cosmos_directo(
-                    req, resultado_temp)
-                resultado_temp = aplicar_memoria_manual(req, resultado_temp)
-
-                # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-                logging.info(
-                    f"💾 Registering call for ejecutar_cli: success={resultado_temp.get('exito', False)}, endpoint=/api/ejecutar-cli")
-                memory_service.registrar_llamada(
-                    source="ejecutar_cli",
-                    endpoint="/api/ejecutar-cli",
-                    method=req.method,
-                    params={"session_id": req.headers.get(
-                        "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                    response_data=resultado_temp,
-                    success=resultado_temp.get("exito", False)
-                )
-                return func.HttpResponse(
-                    json.dumps(resultado_temp),
-                    mimetype="application/json",
-                    status_code=200  # ✅ SIEMPRE 200, NUNCA 400
-                )
+                return _responder_json(req, resultado_temp)
 
             # Error normal sin argumentos faltantes detectados - MEJORADO
             error_result = {
@@ -1500,27 +1304,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
                 ],
                 "timestamp": datetime.now().isoformat()
             }
-            # Aplicar memoria Cosmos y memoria manual
-            error_result = aplicar_memoria_cosmos_directo(req, error_result)
-            error_result = aplicar_memoria_manual(req, error_result)
-
-            # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-            logging.info(
-                f"💾 Registering call for ejecutar_cli: success={error_result.get('exito', False)}, endpoint=/api/ejecutar-cli")
-            memory_service.registrar_llamada(
-                source="ejecutar_cli",
-                endpoint="/api/ejecutar-cli",
-                method=req.method,
-                params={"session_id": req.headers.get(
-                    "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-                response_data=error_result,
-                success=error_result.get("exito", False)
-            )
-            return func.HttpResponse(
-                json.dumps(error_result),
-                mimetype="application/json",
-                status_code=200  # ✅ CAMBIO: Siempre 200 para que Foundry pueda procesar
-            )
+            return _responder_json(req, error_result)
 
     except subprocess.TimeoutExpired:
         resultado = {
@@ -1539,27 +1323,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             ],
             "timestamp": datetime.now().isoformat()
         }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
-        )
+        return _responder_json(req, resultado)
     except FileNotFoundError as e:
         resultado = {
             "exito": False,
@@ -1578,27 +1342,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             ],
             "timestamp": datetime.now().isoformat()
         }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 503
-        )
+        return _responder_json(req, resultado)
     except Exception as e:
         logging.error(f"Error en ejecutar_cli_http: {str(e)}")
         resultado = {
@@ -1618,27 +1362,7 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
             "timestamp": datetime.now().isoformat(),
             "ambiente": "Azure" if IS_AZURE else "Local"
         }
-        # Aplicar memoria Cosmos y memoria manual
-        resultado = aplicar_memoria_cosmos_directo(req, resultado)
-        resultado = aplicar_memoria_manual(req, resultado)
-
-        # REGISTRAR LLAMADA PARA TEXTO SEMANTICO
-        logging.info(
-            f"💾 Registering call for ejecutar_cli: success={resultado.get('exito', False)}, endpoint=/api/ejecutar-cli")
-        memory_service.registrar_llamada(
-            source="ejecutar_cli",
-            endpoint="/api/ejecutar-cli",
-            method=req.method,
-            params={"session_id": req.headers.get(
-                "Session-ID"), "agent_id": req.headers.get("Agent-ID")},
-            response_data=resultado,
-            success=resultado.get("exito", False)
-        )
-        return func.HttpResponse(
-            json.dumps(resultado),
-            mimetype="application/json",
-            status_code=200  # ✅ CAMBIO: 200 en lugar de 500
-        )
+        return _responder_json(req, resultado)
 
 
 def _ejecutar_comando_redis(comando: str, redis_service) -> Dict[str, Any]:

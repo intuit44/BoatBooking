@@ -1,0 +1,6 @@
+<step title="Incoming Request" date="2025-10-02T00:27:39.922" instance="109134" url="/api/settings" method="GET" type="request" pid="768,1,7" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="functions-core-tools/4.2.2" Authorization="Bea..." X-ARR-LOG-ID="67cce7f5-b240-4d5f-ac04-1b1c3a4c572e" CLIENT-IP="75.51.31.10:54772" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/settings" X-Client-IP="75.51.31.10" X-Client-Port="54772" >
+  <step title="Cleanup Xml Logs" date="2025-10-02T00:27:39.924" >
+    <step title="Cleanup Infos" date="2025-10-02T00:27:39.968" totalFiles="539" totalCleanup="379" /><!-- duration: 3ms -->
+  </step><!-- duration: 49ms -->
+  <step title="Outgoing response" date="2025-10-02T00:27:39.978" type="response" statusCode="200" statusText="OK" /><!-- duration: 3ms -->
+</step><!-- duration: 60ms -->

@@ -1,0 +1,5 @@
+<step title="Incoming Request" date="2025-12-08T04:23:08.507" instance="77fee3" url="/logstream" method="GET" type="request" pid="769,1,22" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="AZURECLI/2.81.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="94a47adf-d3ed-11f0-9c34-00155de90bfe" X-ARR-LOG-ID="94a47adf-d3ed-11f0-9c34-00155de90bfe" CLIENT-IP="75.51.31.10:58071" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="75.51.31.10" X-Client-Port="58071" >
+  <step title="Cleanup Xml Logs" date="2025-12-08T04:23:08.517" >
+    <step title="Cleanup Infos" date="2025-12-08T04:23:08.544" totalFiles="2046" totalCleanup="1886" /><!-- duration: 6ms -->
+  </step><!-- duration: 36ms -->
+  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-08T04:23:08.560" /><!-- duration: 1353ms -->

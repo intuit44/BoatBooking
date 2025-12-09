@@ -1,0 +1,8 @@
+<step title="Incoming Request" date="2025-12-08T00:21:33.837" instance="77fee3" url="/logstream" method="GET" type="request" pid="768,1,65" Host="copiloto-semantico-func-us2.scm.azurewebsites.net" User-Agent="AZURECLI/2.79.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="d61d81d3-d3cb-11f0-9aa4-00155de90bfe" X-ARR-LOG-ID="d61d81d3-d3cb-11f0-9aa4-00155de90bfe" CLIENT-IP="75.51.31.10:51854" X-SITE-DEPLOYMENT-ID="copiloto-semantico-func-us2" WAS-DEFAULT-HOSTNAME="copiloto-semantico-func-us2.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="75.51.31.10" X-Client-Port="51854" >
+  <step title="Cleanup Xml Logs" date="2025-12-08T00:21:33.839" >
+    <step title="Cleanup Infos" date="2025-12-08T00:21:33.867" totalFiles="1936" totalCleanup="1776" /><!-- duration: 5ms -->
+  </step><!-- duration: 35ms -->
+  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-08T00:21:33.881" /><!-- duration: 1500ms -->
+  <step title="Error occurred" date="2025-12-08T00:22:35.378" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 4ms -->
+  <step title="Outgoing response" date="2025-12-08T00:22:35.390" type="response" statusCode="200" statusText="OK" /><!-- duration: 3ms -->
+</step><!-- duration: 61560ms -->

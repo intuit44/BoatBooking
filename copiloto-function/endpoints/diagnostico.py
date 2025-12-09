@@ -89,7 +89,8 @@ def diagnostico_http(req: func.HttpRequest) -> func.HttpResponse:
         for item in resultados:
             exito = item.get("exito", True)
             endpoint = item.get("endpoint", "unknown")
-            texto = item.get("texto_semantico", "")
+            texto = safe_cosmos_get(item, "texto_semantico") or safe_cosmos_get(
+                item, "content") or safe_cosmos_get(item, "message")
 
             if exito:
                 diagnostico["exitosas"] += 1

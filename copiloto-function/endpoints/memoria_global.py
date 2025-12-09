@@ -59,8 +59,8 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
                 # Limpiar emojis de documentos vectoriales
                 import re
                 for doc in docs_vectoriales:
-                    if "texto_semantico" in doc:
-                        texto = doc["texto_semantico"]
+                    texto = doc.get("texto_semantico", "")
+                    if texto:
                         texto_limpio = re.sub(
                             r'[\U0001F300-\U0001F9FF\u2600-\u26FF\u2700-\u27BF]', '', texto)
                         texto_limpio = texto_limpio.replace(
@@ -77,8 +77,18 @@ def memoria_global_http(req: func.HttpRequest) -> func.HttpResponse:
         vistos = set()
         deduplicados = []
 
+        # Guard para campos faltantes en Cosmos
+        def safe_get_texto(item):
+            try:
+                return (item.get("texto_semantico", "") or
+                        item.get("content", "") or
+                        item.get("message", "") or
+                        str(item.get("id", "")))
+            except Exception:
+                return ""
+
         for item in resultados:
-            texto = item.get("texto_semantico", "")
+            texto = safe_get_texto(item)
             # Hash completo: solo elimina duplicados 100% idénticos
             clave = hashlib.sha256(
                 texto.strip().lower().encode('utf-8')).hexdigest()
