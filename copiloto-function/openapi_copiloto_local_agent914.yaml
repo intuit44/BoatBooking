@@ -4136,11 +4136,11 @@
         }
       }
     },
-    "/api/buscar-memoria": {
+    "/api/buscar-memoria-endpoint": {
       "post": {
-        "operationId": "buscarMemoriaSematica",
-        "summary": "Buscar en memoria semántica usando Azure AI Search",
-        "description": "Busca documentos en el índice de memoria semántica usando Managed Identity. No requiere claves en el payload.",
+        "operationId": "buscar_memoria_endpoint",
+        "summary": "🧠 Búsqueda Semántica Inteligente con Enhancement LLM",
+        "description": "Busca documentos en memoria semántica con múltiples estrategias: búsqueda vectorial (Azure AI Search), detección técnica (UUIDs/IDs) con búsqueda literal en Cosmos DB, y session widening (cascada sesión→agente→universal). Soporta enhancement para LLM con contexto narrativo, extractos textuales y formatos optimizados. Usa Managed Identity - no requiere claves en payload.",
         "tags": [
           "🧠 Memoria Semántica"
         ],
@@ -4151,31 +4151,50 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "query"
-                ],
+                "required": ["query"],
                 "properties": {
                   "query": {
                     "type": "string",
-                    "description": "Texto de búsqueda semántica",
+                    "description": "Texto de búsqueda semántica (REQUERIDO). Para activar enhancement LLM use include_context=true e include_narrative=true",
                     "example": "errores recientes en ejecutar_cli"
                   },
                   "agent_id": {
                     "type": "string",
-                    "description": "Filtrar por agente específico"
+                    "description": "ID del agente para filtrar resultados por agente específico",
+                    "example": "GlobalAgent"
                   },
                   "session_id": {
-                    "type": "string",
-                    "description": "Filtrar por sesión específica"
+                    "type": "string", 
+                    "description": "ID de sesión para filtrar resultados por sesión específica",
+                    "example": "temp_1765487255"
                   },
                   "top": {
                     "type": "integer",
-                    "description": "Número máximo de resultados",
-                    "default": 10
+                    "description": "Número máximo de resultados a retornar",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": 50
                   },
                   "tipo": {
                     "type": "string",
-                    "description": "Filtrar por tipo de documento"
+                    "description": "Filtrar por tipo específico de documento en memoria",
+                    "example": "cognitive_memory"
+                  },
+                  "include_context": {
+                    "type": "boolean",
+                    "description": "Incluir contextos textuales extraídos en la respuesta para enriquecimiento LLM (opcional, requiere activación explícita)",
+                    "default": false
+                  },
+                  "include_narrative": {
+                    "type": "boolean", 
+                    "description": "Generar narrativa descriptiva optimizada para LLM en la respuesta (opcional, requiere activación explícita)",
+                    "default": false
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Formato de respuesta deseado",
+                    "enum": ["json", "narrative"],
+                    "default": "json"
                   }
                 }
               }
@@ -4191,16 +4210,72 @@
                   "type": "object",
                   "properties": {
                     "exito": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Indica si la búsqueda fue exitosa"
                     },
                     "total": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Número total de documentos encontrados"
                     },
                     "documentos": {
-                      "type": "array"
+                      "type": "array",
+                      "description": "Lista de documentos encontrados en memoria semántica",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "texto_semantico": {"type": "string"},
+                          "timestamp": {"type": "string"},
+                          "session_id": {"type": "string"},
+                          "agent_id": {"type": "string"},
+                          "score": {"type": "number"}
+                        }
+                      }
                     },
                     "metadata": {
-                      "type": "object"
+                      "type": "object",
+                      "description": "Metadatos de la búsqueda realizada",
+                      "properties": {
+                        "query_original": {"type": "string"},
+                        "modo_busqueda": {"type": "string"},
+                        "session_widening_activo": {"type": "boolean"},
+                        "tiempo_busqueda": {"type": "string"}
+                      }
+                    },
+                    "enhanced_response": {
+                      "type": "object",
+                      "description": "Respuesta enriquecida para LLM (solo cuando include_context o include_narrative = true)",
+                      "properties": {
+                        "resumen_busqueda": {"type": "string"},
+                        "modo_busqueda_usado": {"type": "string"},
+                        "query_procesada": {"type": "string"},
+                        "timestamp": {"type": "string"},
+                        "contextos_extraidos": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "fuente": {"type": "string"},
+                              "contenido": {"type": "string"},
+                              "timestamp": {"type": "string"},
+                              "session_id": {"type": "string"}
+                            }
+                          }
+                        },
+                        "narrativa_llm": {"type": "string"}
+                      }
+                    },
+                    "llm_ready": {
+                      "type": "boolean",
+                      "description": "Indica si la respuesta incluye enhancement para LLM"
+                    },
+                    "format_requested": {
+                      "type": "string",
+                      "description": "Formato de respuesta solicitado"
+                    },
+                    "response_text": {
+                      "type": "string",
+                      "description": "Texto de respuesta (solo cuando format=narrative)"
                     }
                   }
                 }

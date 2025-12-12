@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -37,22 +38,36 @@ class CosmosMemoryStore:
         self.database = None
         self.container = None
         self.enabled = bool(COSMOS_AVAILABLE and self.endpoint)
-        
-        logging.info(f"[COSMOS_DEBUG] enabled = {self.enabled}")
+        self._initialized = False
+        self._init_lock = threading.Lock()
 
-        if self.enabled:
-            logging.info("[COSMOS_DEBUG] Calling _initialize()...")
-            self._initialize()
-        elif not COSMOS_AVAILABLE:
+        if not COSMOS_AVAILABLE:
             logging.warning(
                 "Azure Cosmos SDK not available - Cosmos DB logging disabled.")
-        else:
+        elif not self.endpoint:
             logging.warning(
                 "COSMOSDB_ENDPOINT not configured - Cosmos DB logging disabled.")
+
+    def _ensure_initialized(self) -> bool:
+        """Lazy initializer to avoid blocking the import path."""
+        if not COSMOS_AVAILABLE or not self.endpoint:
+            self.enabled = False
+            return False
+
+        if self._initialized and self.container:
+            return True
+
+        with self._init_lock:
+            if self._initialized and self.container:
+                return True
+            self._initialize()
+
+        return self._initialized and self.container is not None
 
     def _initialize(self):
         if not COSMOS_AVAILABLE or not self.endpoint:
             self.enabled = False
+            self._initialized = False
             return
 
         try:
@@ -69,15 +84,18 @@ class CosmosMemoryStore:
             )
             logging.info(
                 "Cosmos DB initialized successfully using Managed Identity.")
+            self.enabled = True
+            self._initialized = True
         except (ClientAuthenticationError, Exception) as e:
             logging.error(f"Error initializing Cosmos DB: {e}")
             self.enabled = False
+            self._initialized = False
             self.client = None
             self.database = None
             self.container = None
 
     def upsert(self, data: Dict[str, Any]) -> bool:
-        if not self.enabled or not self.container:
+        if not self._ensure_initialized():
             return False
 
         try:
@@ -96,8 +114,9 @@ class CosmosMemoryStore:
             return False
 
     def query_all(self, limit=5):
-        if not self.enabled or not self.container:
-            logging.warning("[COSMOS_DEBUG] Cosmos DB not enabled or container missing.")
+        if not self._ensure_initialized():
+            logging.warning(
+                "[COSMOS_DEBUG] Cosmos DB not enabled or container missing.")
             return []
         try:
             query = f"SELECT TOP {limit} * FROM c ORDER BY c._ts DESC"
@@ -108,4 +127,3 @@ class CosmosMemoryStore:
         except Exception as e:
             logging.error(f"Error querying Cosmos DB (global): {e}")
             return []
-

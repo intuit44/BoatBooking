@@ -1,12 +1,14 @@
-# -*- coding: utf-8 -*-
 """
+Endpoint: /api/buscar-memoria
 Endpoints de Búsqueda Semántica - Azure AI Search con Managed Identity
 """
 
+from function_app import app
 import logging
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
+import azure.functions as func
 
 
 def _sanitize_filter_string(filter_str: Optional[str]) -> Optional[str]:
@@ -43,6 +45,75 @@ def _filtrar_ruido_docs(docs: Any) -> list:
     return [d for d in docs if not _doc_es_ruido(d)]
 
 
+def _enriquecer_respuesta_llm(resultado: Dict[str, Any], include_context: bool, include_narrative: bool, format_type: str, req_body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enriquece la respuesta con contexto narrativo para LLM
+    """
+    try:
+        documentos = resultado.get("documentos", [])
+        total = resultado.get("total", 0)
+
+        # Crear contexto narrativo
+        contexto_narrativo = {
+            "resumen_busqueda": f"Se encontraron {total} documentos relevantes en memoria semántica",
+            "modo_busqueda_usado": resultado.get("metadata", {}).get("modo_busqueda", "desconocido"),
+            "query_procesada": resultado.get("metadata", {}).get("query_original", ""),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        if include_context and documentos:
+            # Extraer contextos textuales de los documentos
+            contextos = []
+            # Límite de 5 para evitar respuestas demasiado largas
+            for doc in documentos[:5]:
+                if doc.get("texto_semantico"):
+                    contextos.append({
+                        "fuente": doc.get("id", "desconocida"),
+                        "contenido": doc.get("texto_semantico")[:500] + "..." if len(doc.get("texto_semantico", "")) > 500 else doc.get("texto_semantico", ""),
+                        "timestamp": doc.get("timestamp", "desconocido"),
+                        "session_id": doc.get("session_id", "desconocida")
+                    })
+            contexto_narrativo["contextos_extraidos"] = contextos
+
+        if include_narrative:
+            # Generar narrativa para LLM
+            if total > 0:
+                contexto_narrativo["narrativa_llm"] = f"""
+                Encontré {total} elementos relevantes en la memoria semántica. Los documentos contienen información 
+                relacionada con la consulta realizada. El modo de búsqueda utilizado fue '{resultado.get('metadata', {}).get('modo_busqueda', 'desconocido')}'.
+                
+                {'Esta información puede ser utilizada como contexto para generar respuestas más informadas.' if include_context else ''}
+                
+                Los resultados están ordenados por relevancia semántica.
+                """.strip()
+            else:
+                contexto_narrativo["narrativa_llm"] = """
+                No se encontraron documentos específicamente relevantes para esta consulta en la memoria semántica.
+                Esto podría significar que es una consulta nueva o que requiere información externa.
+                """.strip()
+
+        # Agregar enhanced info al resultado
+        resultado["enhanced_response"] = contexto_narrativo
+        resultado["llm_ready"] = True
+        resultado["format_requested"] = format_type
+
+        # Si se pidió formato específico
+        if format_type == "narrative" and include_narrative:
+            resultado["response_text"] = contexto_narrativo.get(
+                "narrativa_llm", "")
+
+        logging.info(
+            f"🤖 Respuesta enriquecida para LLM: {len(contexto_narrativo)} elementos agregados")
+
+    except Exception as e:
+        logging.warning(f"⚠️ Error enriqueciendo respuesta para LLM: {e}")
+        # No fallar, solo agregar info básica
+        resultado["enhanced_response"] = {"error": str(e), "fallback": True}
+        resultado["llm_ready"] = False
+
+    return resultado
+
+
 def _search_with_fallback(service, query: str, top: int, filter_str: Optional[str]):
     try:
         result = service.search(query=query, top=top, filters=filter_str)
@@ -60,22 +131,77 @@ def _search_with_fallback(service, query: str, top: int, filter_str: Optional[st
         raise
 
 
+@app.function_name(name="buscar_memoria_endpoint")
+@app.route(route="buscar-memoria", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def buscar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function: Buscar en memoria semántica
+    Endpoint HTTP que expone buscar_memoria_endpoint
+    """
+    try:
+        # Obtener payload del request
+        try:
+            req_body = req.get_json() or {}
+        except Exception:
+            req_body = {}
+
+        # Procesar búsqueda usando la función interna
+        resultado = buscar_memoria_endpoint(req_body)
+
+        # Siempre HTTP 200 para LLM compatibility
+        return func.HttpResponse(
+            json.dumps(resultado, default=str, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+
+    except Exception as e:
+        error_response = {
+            "exito": False,
+            "error": str(e),
+            "mensaje": "Error procesando búsqueda de memoria",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        logging.error(f"Error en buscar_memoria_http: {str(e)}", exc_info=True)
+
+        return func.HttpResponse(
+            json.dumps(error_response, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200
+        )
+
+
 def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Endpoint: /api/buscar-memoria
     Busca en memoria semántica usando Azure AI Search
     🔥 SESSION WIDENING: Cascada de búsqueda (sesión → agente → universal)
     🔧 DETECCIÓN TÉCNICA: Búsqueda literal para UUIDs e IDs
+    🤖 LLM ENHANCED: Soporta parámetros para respuestas narrativas
     """
     try:
         from services.azure_search_client import get_search_service
         from semantic_query_builder import detectar_query_tecnica, buscar_literal_cosmos
         from services.cosmos_store import CosmosMemoryStore
 
-        # Validar payload
-        query = req_body.get("query")
+        # Extraer parámetros enhanced para LLM
+        # 🤖 ENHANCEMENT OPCIONAL - solo cuando se solicite explícitamente
+        include_context = req_body.get(
+            "include_context", False)  # Por defecto False
+        include_narrative = req_body.get(
+            "include_narrative", False)  # Por defecto False
+        format_type = req_body.get("format", "json")
+
+        # Validar payload - con defaults enhanced activados, query sigue siendo requerido
+        query = req_body.get("query", "").strip()
         if not query:
-            return {"exito": False, "error": "Campo 'query' requerido"}
+            return {"exito": False, "error": "Campo 'query' requerido para búsqueda semántica"}
+
+        # 🤖 LOG enhancement activado por defecto
+        if include_context or include_narrative:
+            logging.info(
+                f"🤖 Enhancement LLM activado - context:{include_context}, narrative:{include_narrative}, format:{format_type}")
 
         session_id = req_body.get("session_id")
         agent_id = req_body.get("agent_id")
@@ -237,11 +363,50 @@ def buscar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:
         if resultado:
             logging.info(
                 f"🔍 Búsqueda '{query}' → {resultado.get('total', 0)} resultados [modo: {modo_usado}]")
+
+            # 🤖 ENRIQUECER RESPUESTA PARA LLM si se solicitaron parámetros enhanced
+            if any([include_context, include_narrative, format_type != "json"]):
+                resultado = _enriquecer_respuesta_llm(
+                    resultado, include_context, include_narrative, format_type, req_body)
+
         return resultado or {"exito": False, "error": "No se pudo completar la búsqueda"}
 
     except Exception as e:
         logging.error(f"Error en buscar_memoria: {e}")
         return {"exito": False, "error": str(e)}
+
+
+@app.function_name(name="indexar_memoria_endpoint")
+@app.route(route="indexar-memoria-search", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def indexar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Azure Function: Indexar documentos en memoria semántica
+    """
+    try:
+        req_body = req.get_json() or {}
+        resultado = indexar_memoria_endpoint(req_body)
+
+        return func.HttpResponse(
+            json.dumps(resultado, default=str, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=200 if resultado.get("exito") else 400
+        )
+
+    except Exception as e:
+        error_response = {
+            "exito": False,
+            "error": str(e),
+            "mensaje": "Error indexando memoria"
+        }
+
+        logging.error(
+            f"Error en indexar_memoria_http: {str(e)}", exc_info=True)
+
+        return func.HttpResponse(
+            json.dumps(error_response, ensure_ascii=False),
+            mimetype="application/json",
+            status_code=500
+        )
 
 
 def indexar_memoria_endpoint(req_body: Dict[str, Any]) -> Dict[str, Any]:

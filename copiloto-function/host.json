@@ -14,5 +14,6 @@
             "maxConcurrentRequests": 100,
             "dynamicThrottlesEnabled": true
         }
-    }
+    },
+    "functionTimeout": "00:10:00"
 }

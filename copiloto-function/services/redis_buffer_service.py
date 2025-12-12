@@ -112,11 +112,31 @@ class RedisBufferService:
         self._socket_connect_timeout = int(
             os.getenv("REDIS_CONNECT_TIMEOUT", "10"))
 
-        self._connect()
+        self._connect_lock = threading.Lock()
 
     # ------------------------------------------------------------------ #
     # Conexión (AAD vía MSI/CLI / fallback por clave)
     # ------------------------------------------------------------------ #
+    def _ensure_client(self) -> bool:
+        """Garantiza que exista un cliente Redis antes de usarlo."""
+        if not self._enabled:
+            return False
+
+        if self._client is not None:
+            return True
+
+        with self._connect_lock:
+            if self._client is not None:
+                return True
+            try:
+                self._connect()
+            except Exception as exc:  # pragma: no cover
+                logging.error(f"[RedisBuffer] Error inesperado inicializando Redis: {exc}")
+                self._client = None
+                self._enabled = False
+
+        return self._client is not None
+
     def _connect(self) -> None:
         # Si ya hay cliente, no hacer nada
         if self._client is not None:
@@ -274,7 +294,11 @@ class RedisBufferService:
 
     @property
     def is_enabled(self) -> bool:
-        return bool(self._enabled and self._client is not None)
+        if not self._enabled:
+            return False
+        if self._client is None:
+            return self._ensure_client()
+        return True
 
     def _reset_failures(self) -> None:
         self._failure_streak = 0

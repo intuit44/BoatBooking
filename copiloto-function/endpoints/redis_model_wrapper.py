@@ -14,23 +14,28 @@ import os
 import time
 import azure.functions as func
 from openai import AzureOpenAI
-
 from function_app import app
 from services.redis_buffer_service import redis_buffer
+from azure.storage.queue import QueueClient
 
-# Cliente OpenAI (reutiliza env existentes)
-azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
-azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+# Cliente OpenAI (lazy loading para evitar errores en import time)
 
-if not azure_openai_key or not azure_openai_endpoint:
-    raise ValueError(
-        "AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables must be set")
 
-openai_client = AzureOpenAI(
-    api_key=azure_openai_key,
-    api_version="2024-02-01",
-    azure_endpoint=azure_openai_endpoint,
-)
+def _get_openai_client():
+    """Lazy loading del cliente OpenAI para evitar errores durante import"""
+    azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
+    azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+
+    if not azure_openai_key or not azure_openai_endpoint:
+        raise ValueError(
+            "AZURE_OPENAI_KEY and AZURE_OPENAI_ENDPOINT environment variables must be set")
+
+    return AzureOpenAI(
+        api_key=azure_openai_key,
+        api_version="2024-02-01",
+        azure_endpoint=azure_openai_endpoint,
+    )
+
 
 DEFAULT_MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME") or os.getenv(
     "OPENAI_CHAT_MODEL") or "gpt-4o-mini"
@@ -124,6 +129,7 @@ def redis_model_wrapper_http(req: func.HttpRequest) -> func.HttpResponse:
         if not cache_hit:
             try:
                 logging.info(f"[RedisWrapper] 🤖 Calling model: {model}")
+                openai_client = _get_openai_client()
                 completion = openai_client.chat.completions.create(
                     model=model,
                     messages=[{"role": "user", "content": mensaje}],

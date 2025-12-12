@@ -11,44 +11,104 @@ import time
 import re
 from typing import Any, Callable, Dict, Optional
 from datetime import datetime
-from azure.storage.queue import QueueClient
 
-from services.redis_buffer_service import redis_buffer
+# Lazy loading para evitar timeouts en Azure Functions startup
+_queue_client = None
+_redis_buffer = None
+_enrich_user_query_before_response = None
+_get_intelligence_context = None
 
-# Importar interceptor inteligente pre-respuesta
-try:
-    from pre_response_intelligence import enrich_user_query_before_response, get_intelligence_context
-except Exception:
-    enrich_user_query_before_response = None
-    get_intelligence_context = None
 
-try:
-    from semantic_intent_classifier import classify_user_intent, preprocess_text
-except Exception:  # pragma: no cover
-    classify_user_intent = None
-    preprocess_text = None
+def _get_queue_client():
+    """Lazy loading de QueueClient."""
+    global _queue_client
+    if _queue_client is None:
+        from azure.storage.queue import QueueClient
+        # Inicializar según necesidad
+        _queue_client = True  # Placeholder, ajustar según uso real
+    return _queue_client
 
-# Importar router de agentes para optimización de modelos
-try:
-    from router_agent import route_by_semantic_intent, get_agent_for_message
-except Exception:  # pragma: no cover
-    route_by_semantic_intent = None
-    get_agent_for_message = None
 
-try:
-    from skills.log_query_skill import (
-        LogQuerySkill,
-        extract_function_hint,
-        analyze_logs_semantic,
-        get_cached_analysis,
-        cache_log_analysis,
-    )
-except Exception:  # pragma: no cover
-    LogQuerySkill = None
-    extract_function_hint = None
-    analyze_logs_semantic = None
-    get_cached_analysis = None
-    cache_log_analysis = None
+def _get_redis_buffer():
+    """Lazy loading de redis_buffer_service."""
+    global _redis_buffer
+    if _redis_buffer is None:
+        from services.redis_buffer_service import redis_buffer
+        _redis_buffer = redis_buffer
+    return _redis_buffer
+
+
+def _get_intelligence_functions():
+    """Lazy loading de pre_response_intelligence."""
+    global _enrich_user_query_before_response, _get_intelligence_context
+    if _enrich_user_query_before_response is None:
+        try:
+            from pre_response_intelligence import enrich_user_query_before_response, get_intelligence_context
+            _enrich_user_query_before_response = enrich_user_query_before_response
+            _get_intelligence_context = get_intelligence_context
+        except Exception:
+            _enrich_user_query_before_response = False
+            _get_intelligence_context = False
+    return _enrich_user_query_before_response, _get_intelligence_context
+
+
+# Lazy loading globals para módulos pesados
+_semantic_intent_classifier = None
+_router_agent = None
+_log_query_skill = None
+
+
+def _get_semantic_intent_classifier():
+    """Lazy loading de semantic_intent_classifier."""
+    global _semantic_intent_classifier
+    if _semantic_intent_classifier is None:
+        try:
+            from semantic_intent_classifier import classify_user_intent, preprocess_text
+            _semantic_intent_classifier = {
+                'classify_user_intent': classify_user_intent, 'preprocess_text': preprocess_text}
+        except Exception:
+            _semantic_intent_classifier = {
+                'classify_user_intent': None, 'preprocess_text': None}
+    return _semantic_intent_classifier
+
+
+def _get_router_agent():
+    """Lazy loading de router_agent."""
+    global _router_agent
+    if _router_agent is None:
+        try:
+            from router_agent import route_by_semantic_intent, get_agent_for_message
+            _router_agent = {'route_by_semantic_intent': route_by_semantic_intent,
+                             'get_agent_for_message': get_agent_for_message}
+        except Exception:
+            _router_agent = {'route_by_semantic_intent': None,
+                             'get_agent_for_message': None}
+    return _router_agent
+
+
+def _get_log_query_skill():
+    """Lazy loading de log_query_skill."""
+    global _log_query_skill
+    if _log_query_skill is None:
+        try:
+            from skills.log_query_skill import LogQuerySkill, extract_function_hint, analyze_logs_semantic, get_cached_analysis, cache_log_analysis
+            _log_query_skill = {
+                'LogQuerySkill': LogQuerySkill,
+                'extract_function_hint': extract_function_hint,
+                'analyze_logs_semantic': analyze_logs_semantic,
+                'get_cached_analysis': get_cached_analysis,
+                'cache_log_analysis': cache_log_analysis
+            }
+        except Exception:
+            _log_query_skill = {
+                'LogQuerySkill': None,
+                'extract_function_hint': None,
+                'analyze_logs_semantic': None,
+                'get_cached_analysis': None,
+                'cache_log_analysis': None
+            }
+    return _log_query_skill
+
 
 # Constantes globales de control de tamaño
 MAX_MENSAJE_CHARS = 600
@@ -94,18 +154,20 @@ def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") 
     Maneja la intencion revisar_logs sin exponer endpoint dedicado.
     Retorna payload listo para HttpResponse o None si no aplica.
     """
-    if not user_message or not classify_user_intent:
+    semantic_classifier = _get_semantic_intent_classifier()
+    if not user_message or not semantic_classifier['classify_user_intent']:
         return None
 
-    intent = classify_user_intent(user_message)
+    intent = semantic_classifier['classify_user_intent'](user_message)
     if intent.get("intent") != "revisar_logs":
         return None
 
-    funcion = extract_function_hint(
-        user_message) if extract_function_hint else None
+    log_skill = _get_log_query_skill()
+    funcion = log_skill['extract_function_hint'](
+        user_message) if log_skill['extract_function_hint'] else None
 
-    if get_cached_analysis:
-        cached = get_cached_analysis(user_message, funcion)
+    if log_skill['get_cached_analysis']:
+        cached = log_skill['get_cached_analysis'](user_message, funcion)
         if cached:
             cached = dict(cached)
             cached["cached"] = True
@@ -117,7 +179,7 @@ def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") 
                 "source": "cache",
             }
 
-    if not LogQuerySkill:
+    if not log_skill['LogQuerySkill']:
         return {
             "exito": False,
             "error": "LogQuerySkill no disponible (dependencias faltantes)",
@@ -125,14 +187,15 @@ def _resolver_intencion_logs(user_message: Optional[str], route_path: str = "") 
         }
 
     try:
-        skill = LogQuerySkill()
+        skill = log_skill['LogQuerySkill']()
         logs = skill.query_logs(funcion)
-        analisis = analyze_logs_semantic(logs, funcion) if analyze_logs_semantic else {
+        analisis = log_skill['analyze_logs_semantic'](logs, funcion) if log_skill['analyze_logs_semantic'] else {
             "exito": False, "error": "Analizador no disponible"}
 
-        if analisis.get("exito") and cache_log_analysis:
+        if analisis.get("exito") and log_skill['cache_log_analysis']:
             try:
-                cache_log_analysis(user_message, funcion, analisis)
+                log_skill['cache_log_analysis'](
+                    user_message, funcion, analisis)
             except Exception:
                 logging.debug(
                     "[logs-intent] No se pudo cachear analisis.", exc_info=True)
@@ -260,8 +323,9 @@ def guardar_thread_en_blob(req: func.HttpRequest, route_path: str, response_data
     """
     Persiste el thread completo (mensajes + metadata) en Blob Storage para historiales reales.
     """
+    redis_buffer = _get_redis_buffer()
     try:
-        from blob_service import get_blob_client
+        from utils_helpers import get_blob_client
     except Exception:
         logging.debug(
             "Blob client no disponible; se omite guardado de thread.")
@@ -278,6 +342,9 @@ def guardar_thread_en_blob(req: func.HttpRequest, route_path: str, response_data
 
     try:
         client = get_blob_client()
+        if not client:
+            logging.debug("Blob client is None; skipping thread storage.")
+            return
         container = client.get_container_client(THREADS_CONTAINER_NAME)
         blob_name = f"{THREADS_BLOB_PREFIX}{thread_id}.json"
         blob_client = container.get_blob_client(blob_name)
@@ -425,11 +492,12 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                         # 🤖 ROUTING SEMÁNTICO - Determinar agente y modelo óptimo
                         routing_result = None
-                        if user_message and route_by_semantic_intent:
+                        router_agent = _get_router_agent()
+                        if user_message and router_agent['route_by_semantic_intent']:
                             try:
                                 _, session_id, _ = _hydrate_request_identificadores(
                                     req)
-                                routing_result = route_by_semantic_intent(
+                                routing_result = router_agent['route_by_semantic_intent'](
                                     user_message, session_id=session_id
                                 )
 
@@ -456,7 +524,8 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                         # 🧠 PRE-RESPONSE INTELLIGENCE: Interceptor universal que reutiliza TODA la lógica existente
                         intelligence_context = None
-                        if user_message and len(user_message) > 5 and enrich_user_query_before_response and get_intelligence_context:
+                        enrich_func, get_context_func = _get_intelligence_functions()
+                        if user_message and len(user_message) > 5 and callable(enrich_func) and callable(get_context_func):
                             try:
                                 # CAPTURA AUTOMÁTICA DE THREAD para Pre-Intelligence
                                 _, session_id, agent_id = _hydrate_request_identificadores(
@@ -465,7 +534,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                                     "agent_id") if routing_result else (agent_id or "foundry_user")
 
                                 # Obtener contexto completo de inteligencia (con validaciones)
-                                intelligence_context = get_intelligence_context(
+                                intelligence_context = get_context_func(
                                     user_query=user_message,
                                     session_id=session_id or "fallback_session",
                                     agent_id=agente_asignado
@@ -645,6 +714,9 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         thread_id_cache, session_id, agent_id = _hydrate_request_identificadores(
                             req)
 
+                        # Lazy load redis_buffer
+                        redis_buffer = _get_redis_buffer()
+
                         cache_dimensions = {
                             "cache_scope": "memoria_contexto",
                             "route": source_name,
@@ -745,6 +817,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
                         }
 
                         search_material = f"{route_path}|{getattr(req, '_session_id', '')}|{query_busqueda}"
+                        redis_buffer = _get_redis_buffer()
                         search_hash = redis_buffer.stable_hash(search_material)
                         search_metrics = {
                             "cache_scope": "search_vectorial",
@@ -831,6 +904,7 @@ def memory_route(app: func.FunctionApp) -> Callable:
 
                     # Guardar contexto caliente después de la ejecución
                     try:
+                        redis_buffer = _get_redis_buffer()
                         session_cache = getattr(req, "_session_id", None)
                         thread_cache, _, _ = _resolver_identificadores_thread(
                             req)
@@ -1121,9 +1195,14 @@ def memory_route(app: func.FunctionApp) -> Callable:
     return route_with_memory
 
 
-def apply_memory_wrapper(app: func.FunctionApp) -> None:
+def apply_memory_wrapper(app: Optional[func.FunctionApp] = None) -> None:
     """Aplica el wrapper de memoria a una instancia de FunctionApp."""
     try:
+        if app is None:
+            logging.warning(
+                "apply_memory_wrapper llamado sin FunctionApp; se omite.")
+            return
+
         if not hasattr(app, "route") or not callable(app.route):
             logging.error("❌ app.route no existe o no es callable")
             return
@@ -1150,7 +1229,8 @@ def apply_pre_response_intelligence(request) -> Optional[Dict[str, Any]]:
     Simula la aplicación del interceptor para pruebas unitarias
     """
     try:
-        if not enrich_user_query_before_response or not get_intelligence_context:
+        enrich_func, get_context_func = _get_intelligence_functions()
+        if not callable(enrich_func) or not callable(get_context_func):
             return None
 
         # Extraer query de request
@@ -1168,7 +1248,7 @@ def apply_pre_response_intelligence(request) -> Optional[Dict[str, Any]]:
             return None
 
         # Aplicar intelligence
-        context = get_intelligence_context(query, session_id, "test_agent")
+        context = get_context_func(query, session_id, "test_agent")
 
         return {
             "original_query": query,

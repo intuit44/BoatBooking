@@ -222,10 +222,18 @@ def route_by_semantic_intent(user_message: str, session_id: Optional[str] = None
         Dict con agente seleccionado e información de routing
     """
     try:
-        # 1. Clasificar intención usando el clasificador existente
+        # 1. Sanitizar user_message para evitar errores de encoding
+        if user_message:
+            # Limpiar caracteres problemáticos que causan charmap errors
+            user_message_clean = user_message.encode('ascii', 'replace').decode('ascii')
+            user_message_clean = user_message_clean.replace('?', '')  # Remove replacement chars
+        else:
+            user_message_clean = user_message
+            
+        # 2. Clasificar intención usando el clasificador existente
         from semantic_intent_classifier import classify_user_intent
 
-        intent_result = classify_user_intent(user_message)
+        intent_result = classify_user_intent(user_message_clean)
         intent = intent_result.get("intent", "conversacion_general")
         confidence = intent_result.get("confidence", 0.0)
 

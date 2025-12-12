@@ -27,20 +27,44 @@ STOPWORDS = {
 
 def normalize_text(text: str) -> str:
     """Normaliza texto: minusculas, elimina acentos y colapsa espacios."""
-    normalized = unicodedata.normalize("NFKD", text or "")
-    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
-    ascii_text = ascii_text.lower()
-    ascii_text = re.sub(r"\s+", " ", ascii_text)
-    return ascii_text.strip()
+    if not text:
+        return ""
+
+    try:
+        # Asegurar que el texto es string válido
+        if isinstance(text, bytes):
+            text = text.decode('utf-8', errors='replace')
+
+        # Normalizar unicode y convertir a ASCII seguro
+        normalized = unicodedata.normalize("NFKD", str(text))
+        ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+        ascii_text = ascii_text.lower()
+        ascii_text = re.sub(r"\s+", " ", ascii_text)
+        return ascii_text.strip()
+    except (UnicodeError, UnicodeEncodeError, UnicodeDecodeError) as e:
+        # Fallback seguro en caso de problemas de encoding
+        logging.warning(f"Error de encoding en normalize_text: {e}")
+        safe_text = str(text).encode(
+            'utf-8', errors='replace').decode('utf-8', errors='replace')
+        safe_text = re.sub(r'[^\x00-\x7F]+', '', safe_text)  # Solo ASCII
+        return safe_text.lower().strip()
 
 
 def preprocess_text(text: str) -> str:
     """Limpia texto eliminando puntuacion y stopwords para mejorar senal semantica."""
-    normalized = normalize_text(text)
-    tokens = re.findall(r"[a-z0-9_/\-]+", normalized)
-    filtered = [token for token in tokens if len(
-        token) > 2 and token not in STOPWORDS]
-    return " ".join(filtered)
+    try:
+        normalized = normalize_text(text)
+        tokens = re.findall(r"[a-z0-9_/\-]+", normalized)
+        filtered = [token for token in tokens if len(
+            token) > 2 and token not in STOPWORDS]
+        return " ".join(filtered)
+    except Exception as e:
+        logging.warning(f"Error en preprocess_text: {e}")
+        # Fallback seguro
+        safe_text = str(text or "").lower()
+        safe_text = re.sub(r'[^\w\s\-/]', ' ', safe_text)
+        tokens = safe_text.split()
+        return " ".join(token for token in tokens if len(token) > 2)
 
 
 def _looks_like_log_request(cleaned_text: str) -> bool:
@@ -139,140 +163,77 @@ class SemanticIntentClassifier:
     """Clasificador de intencion basado en similitud semantica."""
 
     def __init__(self, threshold: float = 0.45, high_confidence: float = 0.75):
-        # Intenciones base con ejemplos semanticos diversos
+        # Ejemplos semanticos base para cada intencion
         self.intent_examples = {
-            "correccion": [
-                "aplicar corrección al archivo config.py línea 45",
-                "fix error de tipo en función validate",
-                "arreglar deprecated datetime warning",
-                "corregir import missing en services",
-                "aplicar fix para resolver type annotation error",
-                "reparar función async que no retorna awaitable",
-                "fix error max() argument must be non-empty sequence",
-                "corregir redis connection timeout deprecated parameter",
-                "aplicar corrección para NameError en variable no definida",
-                "fix syntax error en línea 127",
-                "reparar attribute error en objeto response",
-                "corregir logical error en conditional statement",
-                "rollback cambios en archivo main.py",
-                "deshacer modificación incorrecta en config",
-                "parche para el error de indentación",
-                "ajustar parámetros incorrectos en función",
-                "restaurar versión anterior del código",
-                "aplicar hotfix urgente para bug crítico",
-                "resolver issue #123 reportado en GitHub",
-                "arreglar configuración rota en settings.json"
-            ],
-            "diagnostico": [
-                "diagnosticar el sistema completo de la aplicación",
-                "verificar estado de salud de todos los servicios",
-                "comprobar funcionamiento de base de datos",
-                "revisar conectividad con Azure Cosmos DB",
-                "analizar métricas de rendimiento del sistema",
-                "evaluar uso de memoria y CPU",
-                "inspeccionar logs de errores recientes",
-                "validar configuración de servicios Azure",
-                "monitorear recursos activos en la nube",
-                "auditar infraestructura de producción",
-                "verificar status de Azure Functions",
-                "comprobar health check de la API"
-            ],
-            "operacion_archivo": [
-                "escribir archivo de configuración settings.json",
-                "leer contenido del archivo package.json",
-                "modificar archivo requirements.txt",
-                "actualizar archivo .env con nuevas variables",
-                "crear nuevo archivo de configuración",
-                "eliminar archivo temporal logs.txt",
-                "sobrescribir archivo config.yml existente",
-                "copiar archivo de backup a producción",
-                "guardar cambios en documento README.md",
-                "editar archivo de configuración local",
-                "generar nuevo archivo de datos CSV",
-                "actualizar contenido del archivo manifest.json"
-            ],
-            "ejecucion_cli": [
-                "ejecutar comando azure cli",
-                "correr script powershell",
-                "lanzar comando bash",
-                "ejecutar az group list",
-                "correr pipeline automatizado",
-                "usar terminal para comando",
-                "ejecutar script de deploy"
-            ],
-            "boat_management": [
-                "gestionar reserva de embarcación para cliente",
-                "crear nueva reserva de barco para alquiler",
-                "procesar booking de yate premium",
-                "confirmar alquiler de lancha deportiva",
-                "cancelar reserva de embarcación marina",
-                "actualizar datos del cliente en booking",
-                "modificar fecha de alquiler de barco",
-                "procesar pago para reserva de embarcación",
-                "enviar confirmación de booking por email",
-                "verificar disponibilidad de yate en fecha",
-                "generar contrato de alquiler de embarcación",
-                "registrar entrega de barco al cliente",
-                "procesar devolución de embarcación alquilada",
-                "calcular precio total del alquiler",
-                "enviar recordatorio de reserva próxima",
-                "actualizar estado de embarcación en sistema"
-            ],
             "listar_storage": [
                 "mostrar cuentas de almacenamiento",
                 "ver storage accounts",
-                "listar almacenamiento azure",
-                "que cuentas de storage tengo",
-                "mostrar mis storages",
-                "ver todas las cuentas de almacenamiento"
+                "listar mis storages en azure",
+                "que cuentas de storage tengo configuradas",
+                "necesito revisar los recursos de almacenamiento en la suscripcion"
             ],
             "listar_cosmos": [
                 "mostrar bases de datos cosmos",
                 "ver cuentas cosmos db",
-                "listar cosmos database",
-                "que bases cosmos tengo",
-                "mostrar mis cosmos",
-                "ver todas las cuentas de cosmos"
+                "listar mis instancias de cosmos",
+                "que bases cosmos tengo disponibles",
+                "cosmos db disponibles en mi suscripcion"
             ],
             "listar_functions": [
-                "mostrar function apps",
-                "ver aplicaciones de funcion",
-                "listar functions azure",
-                "que functions tengo corriendo",
-                "mostrar mis funciones",
-                "ver todas las function apps"
+                "mostrar mis function apps",
+                "que aplicaciones de funcion estan corriendo",
+                "listar los azure functions desplegados",
+                "ver las functions activas",
+                "apps de funcion registradas"
             ],
-            "listar_resources": [
-                "mostrar recursos azure",
-                "ver todos mis recursos",
-                "listar resource groups",
-                "que recursos tengo",
-                "mostrar mis grupos de recursos",
-                "ver toda mi infraestructura"
+            "diagnostico": [
+                "diagnosticar el estado del sistema",
+                "revisar salud de recursos",
+                "hay algun problema con los servicios",
+                "verificar infraestructura completa",
+                "hacer chequeo general"
             ],
-            "diagnosticar_sistema": [
-                "hay problemas en mi sistema",
-                "verificar estado de recursos",
-                "diagnosticar mi infraestructura",
-                "revisar salud de servicios",
-                "comprobar si todo funciona",
-                "analizar estado general"
+            "correccion": [
+                "aplicar correccion en archivo",
+                "arreglar bug en el codigo",
+                "reparar configuracion que falla",
+                "necesito un fix para este error",
+                "solicitar correccion puntual"
+            ],
+            "operacion_archivo": [
+                "escribir archivo en blob",
+                "leer archivo de configuracion",
+                "actualizar requirements txt",
+                "crear script en scripts folder",
+                "modificar settings json"
+            ],
+            "ejecucion_cli": [
+                "ejecutar comando az",
+                "necesito correr script en cli",
+                "lanzar comando en terminal",
+                "usar ejecutar cli endpoint",
+                "mandar instruccion bash"
             ],
             "revisar_logs": [
-                "ver errores recientes",
-                "revisar logs de la funcion",
-                "muestrame fallos en app insights",
-                "analizar trazas de la aplicacion",
-                "logs de ejecucion con errores",
-                "que paso con la ultima caida"
+                "ver logs recientes",
+                "revisar errores en app insights",
+                "traer logs de function app",
+                "consultar stacktrace reciente",
+                "buscar trazas de error"
+            ],
+            "boat_management": [
+                "gestionar reservas de embarcaciones",
+                "ver alquileres de barcos",
+                "administrar yates y lanchas",
+                "clientes con reservas activas",
+                "actualizar booking de embarcacion"
             ],
             "ayuda_general": [
-                "no se que hacer",
-                "necesito ayuda con azure",
-                "no tengo idea como empezar",
-                "ayudame con comandos",
-                "que puedo hacer aqui",
-                "guiame por favor"
+                "necesito ayuda general",
+                "no se que comando usar",
+                "ayudame con algo",
+                "tengo una duda generica",
+                "me puedes orientar"
             ]
         }
 
@@ -296,18 +257,24 @@ class SemanticIntentClassifier:
         self.high_confidence = high_confidence
         self.max_examples_per_intent = 40
 
-        # Pre-calcular embeddings de ejemplos
+        # Lazy loading de embeddings - solo calcular cuando se necesiten
         self.intent_embeddings: Dict[str, List[List[float]]] = {}
-        self._precompute_embeddings()
+        self._embeddings_computed = False
 
-    def _precompute_embeddings(self):
-        """Pre-calcula embeddings de todos los ejemplos."""
-        for intent, examples in self.intent_examples.items():
-            self.intent_embeddings[intent] = []
-            for example in examples:
-                cleaned = preprocess_text(example)
-                self.intent_embeddings[intent].append(
-                    get_text_embedding(cleaned))
+    def _ensure_embeddings_computed(self):
+        """Lazy loading: calcula embeddings solo cuando se necesitan por primera vez."""
+        if not self._embeddings_computed:
+            logging.info(
+                "[SemanticIntent] Calculando embeddings por primera vez (lazy loading)...")
+            for intent, examples in self.intent_examples.items():
+                self.intent_embeddings[intent] = []
+                for example in examples:
+                    cleaned = preprocess_text(example)
+                    self.intent_embeddings[intent].append(
+                        get_text_embedding(cleaned))
+            self._embeddings_computed = True
+            logging.info(
+                f"[SemanticIntent] Embeddings calculados: {len(self.intent_examples)} intents, {sum(len(examples) for examples in self.intent_examples.values())} ejemplos")
 
     def classify_intent(self, user_input: str, threshold: Optional[float] = None) -> Dict[str, Any]:
         """
@@ -322,10 +289,51 @@ class SemanticIntentClassifier:
                 "requires_grounding": True
             }
 
+        # 🛡️ PROTECCIÓN CONTRA ERRORES DE ENCODING
+        try:
+            # Sanitizar input para evitar errores charmap
+            if isinstance(user_input, bytes):
+                user_input = user_input.decode('utf-8', errors='replace')
+
+            # Asegurar string válido y limpio
+            user_input = str(user_input).strip()
+
+            # Remover caracteres problemáticos que pueden causar charmap errors
+            user_input = user_input.encode(
+                'utf-8', errors='replace').decode('utf-8', errors='replace')
+
+        except (UnicodeError, UnicodeEncodeError, UnicodeDecodeError) as e:
+            # 🛡️ PROTECCIÓN CONTRA CHARMAP EN LOGGING
+            try:
+                logging.error(f"Error en clasificacion semantica: {e}")
+            except (UnicodeError, UnicodeEncodeError):
+                safe_error = str(e).encode(
+                    'utf-8', errors='replace').decode('utf-8', errors='replace')
+                logging.error(
+                    f"Error en clasificacion semantica: {safe_error}")
+
+            safe_error_str = str(e).encode(
+                'utf-8', errors='replace').decode('utf-8', errors='replace')
+            return {
+                "intent": "ayuda_general",
+                "confidence": 0.3,
+                "command": self.intent_to_command["ayuda_general"],
+                "method": "encoding_error_fallback",
+                "requires_grounding": True,
+                "error": f"Encoding error: {safe_error_str}"
+            }
+
         threshold = self.threshold if threshold is None else threshold
 
+        # Asegurar que los embeddings estén calculados (lazy loading)
+        self._ensure_embeddings_computed()
+
         # 🔥 DETECCIÓN PREVIA DE PALABRAS CLAVE SÓLIDAS
-        input_lower = user_input.lower()
+        try:
+            input_lower = user_input.lower()
+        except Exception as e:
+            logging.error(f"Error al convertir a minúsculas: {e}")
+            input_lower = str(user_input).lower()
 
         # Palabras clave de diagnóstico (PRIORIDAD ALTA - antes que corrección)
         if any(kw in input_lower for kw in ["diagnosticar", "diagnóstico", "verificar estado", "comprobar funcionamiento", "revisar salud"]):
@@ -368,17 +376,40 @@ class SemanticIntentClassifier:
                 "requires_grounding": False
             }
 
-        cleaned_text = preprocess_text(user_input)
-        if not cleaned_text:
+        # 🛡️ PROCESAMIENTO SEGURO DE TEXTO
+        try:
+            cleaned_text = preprocess_text(user_input)
+            if not cleaned_text:
+                return {
+                    "intent": "ayuda_general",
+                    "confidence": 0.4,
+                    "command": self.intent_to_command["ayuda_general"],
+                    "method": "empty_after_preprocess",
+                    "requires_grounding": True
+                }
+        except Exception as e:
+            logging.error(f"Error en procesamiento de texto: {e}")
             return {
                 "intent": "ayuda_general",
-                "confidence": 0.4,
+                "confidence": 0.3,
                 "command": self.intent_to_command["ayuda_general"],
-                "method": "empty_after_preprocess",
-                "requires_grounding": True
+                "method": "text_processing_error",
+                "requires_grounding": True,
+                "error": f"Text processing error: {str(e)}"
             }
 
-        user_embedding = get_text_embedding(cleaned_text)
+        try:
+            user_embedding = get_text_embedding(cleaned_text)
+        except Exception as e:
+            logging.error(f"Error al obtener embedding: {e}")
+            return {
+                "intent": "ayuda_general",
+                "confidence": 0.3,
+                "command": self.intent_to_command["ayuda_general"],
+                "method": "embedding_error",
+                "requires_grounding": True,
+                "error": f"Embedding error: {str(e)}"
+            }
 
         # Heuristica: si el texto parece peticion de logs, favorecer revisar_logs
         if _looks_like_log_request(cleaned_text):
@@ -396,7 +427,18 @@ class SemanticIntentClassifier:
         best_confidence = 0.0
         intent_scores: Dict[str, float] = {}
 
-        # Calcular similitud con cada intencion
+        # ⚡ Si no hay ejemplos (diccionario vacío), usar solo keywords detection
+        if not self.intent_embeddings:
+            return {
+                "intent": "ayuda_general",
+                "confidence": 0.6,
+                "command": self.intent_to_command["ayuda_general"],
+                "method": "keywords_only_no_examples",
+                "requires_grounding": True,
+                "preprocessed_input": cleaned_text
+            }
+
+        # Calcular similitud con cada intencion (solo si hay ejemplos)
         for intent, embeddings in self.intent_embeddings.items():
             max_similarity = 0.0
 
@@ -453,12 +495,13 @@ class SemanticIntentClassifier:
             if command_used and command_used != self.intent_to_command.get(correct_intent):
                 self.intent_to_command[correct_intent] = command_used
 
-            # Re-calcular embeddings para esta intencion
-            self.intent_embeddings[correct_intent] = []
-            for example in self.intent_examples[correct_intent]:
-                cleaned_example = preprocess_text(example)
-                self.intent_embeddings[correct_intent].append(
-                    get_text_embedding(cleaned_example))
+            # Re-calcular embeddings para este intent específico (solo si ya estaban calculados)
+            if self._embeddings_computed:
+                self.intent_embeddings[correct_intent] = []
+                for example in self.intent_examples[correct_intent]:
+                    cleaned_example = preprocess_text(example)
+                    self.intent_embeddings[correct_intent].append(
+                        get_text_embedding(cleaned_example))
 
             logging.info(
                 f"Aprendizaje anadido: '{user_input}' -> {correct_intent}")
@@ -470,10 +513,21 @@ class SemanticIntentClassifier:
 # Instancia global del clasificador
 semantic_classifier = SemanticIntentClassifier()
 
-# Forzar regeneración de embeddings con los nuevos ejemplos
-logging.info("🔄 Regenerando embeddings con ejemplos mejorados...")
-semantic_classifier._precompute_embeddings()
-logging.info("✅ Embeddings regenerados con nuevos ejemplos específicos")
+# 🚀 Variable global para controlar si ya se pre-computaron los embeddings
+_embeddings_precomputed = False
+
+
+def _ensure_global_embeddings():
+    """Asegura que los embeddings se calculen solo una vez globalmente."""
+    global _embeddings_precomputed
+    if not _embeddings_precomputed:
+        try:
+            semantic_classifier._ensure_embeddings_computed()
+            _embeddings_precomputed = True
+            print("[SemanticIntent] Embeddings pre-computados exitosamente")
+        except Exception as e:
+            print(f"⚠️ Error pre-computando embeddings: {e}")
+            # Los embeddings se calcularán en el primer uso si hay error
 
 
 def classify_user_intent(user_input: str) -> Dict[str, Any]:
@@ -481,6 +535,12 @@ def classify_user_intent(user_input: str) -> Dict[str, Any]:
     Funcion principal para clasificar intencion del usuario.
     """
     try:
+        # Sanitizar input para evitar problemas de encoding
+        if user_input:
+            user_input = user_input.encode('utf-8', 'replace').decode('utf-8')
+
+        # Asegurar que los embeddings estén pre-computados antes de usar
+        _ensure_global_embeddings()
         result = semantic_classifier.classify_intent(user_input)
 
         # Anadir metadata
@@ -490,21 +550,36 @@ def classify_user_intent(user_input: str) -> Dict[str, Any]:
             "classification_method": "semantic_embeddings"
         })
 
-        logging.info(
-            f"Intencion clasificada: {result['intent']} (confianza: {result['confidence']:.3f})")
+        # Log con encoding seguro para evitar errores de charmap
+        try:
+            logging.info(
+                f"Intencion clasificada: {result['intent']} (confianza: {result['confidence']:.3f})")
+        except UnicodeEncodeError:
+            logging.info(f"Intencion clasificada: {result['intent']} (confianza: {result['confidence']:.3f})".encode(
+                'utf-8', 'replace').decode('utf-8'))
 
         return result
 
     except Exception as exc:
-        logging.error(f"Error en clasificacion semantica: {exc}")
+        # 🛡️ PROTECCIÓN CONTRA CHARMAP EN LOGGING
+        try:
+            error_msg = str(exc)
+            logging.error(f"Error en clasificacion semantica: {error_msg}")
+        except (UnicodeError, UnicodeEncodeError):
+            # Fallback seguro para logging
+            safe_error = str(exc).encode(
+                'utf-8', errors='replace').decode('utf-8', errors='replace')
+            logging.error(f"Error en clasificacion semantica: {safe_error}")
 
-        # Fallback seguro
+        # Fallback seguro con error sanitizado
+        safe_error_str = str(exc).encode(
+            'utf-8', errors='replace').decode('utf-8', errors='replace')
         return {
             "intent": "ayuda_general",
             "confidence": 0.1,
             "command": "az --help",
             "method": "error_fallback",
-            "error": str(exc),
+            "error": safe_error_str,
             "requires_grounding": True
         }
 
