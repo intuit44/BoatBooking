@@ -4523,7 +4523,9 @@ def copiloto(req: func.HttpRequest) -> func.HttpResponse:
                 # evitamos recursión llamando a esta misma función
                 if fn is not _inyectar_narrativa:
                     try:
-                        return fn(payload)
+                        result = fn(payload)
+                        # Asegurar que el resultado es un dict
+                        return result if isinstance(result, dict) else payload
                     except Exception:
                         # seguir a fallback
                         logging.warning(
@@ -7110,9 +7112,11 @@ def precalentar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
             status_code=404
         )
 
-    redis_snapshot = {
+    redis_snapshot: Dict[str, Any] = {
         "enabled": redis_buffer.is_enabled,
         "cached": False,
+        "error": None,
+        "disabled": False,
     }
 
     if redis_buffer.is_enabled:
@@ -7122,7 +7126,7 @@ def precalentar_memoria_http(req: func.HttpRequest) -> func.HttpResponse:
         if not cache_ok:
             redis_snapshot["error"] = getattr(
                 redis_buffer, "last_error", None)
-            redis_snapshot["disabled"] = not redis_buffer.is_enabled
+            redis_snapshot["disabled"] = bool(not redis_buffer.is_enabled)
 
     total_interacciones = memoria.get("total_interacciones", 0)
 
@@ -12723,27 +12727,35 @@ def _deploy_foundry_models(req, body, memory_service, aplicar_memoria_cosmos_dir
         deployment_details = []
 
         for model in requested_models:
+            model_name = str(model or "").strip()
+            if not model_name:
+                failed.append({
+                    "model": model,
+                    "error": "Nombre de modelo vacío o inválido"
+                })
+                continue
+
             try:
-                if model not in registry_models:
+                if model_name not in registry_models:
                     failed.append({
-                        "model": model,
+                        "model": model_name,
                         "error": "Modelo no encontrado en AGENT_REGISTRY",
                         "available_models": list(registry_models.keys())
                     })
                     continue
 
-                intent = registry_models[model]
+                intent = registry_models[model_name]
                 agent_config = AGENT_REGISTRY[intent]
 
                 # Simular verificación de estado del modelo
                 # TODO: Reemplazar con llamada real al Foundry SDK
                 is_deployed = _check_model_deployment_status(
-                    model, agent_config)
+                    model_name, agent_config)
 
                 if is_deployed:
-                    already_active.append(model)
+                    already_active.append(model_name)
                     deployment_details.append({
-                        "model": model,
+                        "model": model_name,
                         "intent": intent,
                         "agent": agent_config.get("agent_id"),
                         "status": "already_active",
@@ -12751,16 +12763,16 @@ def _deploy_foundry_models(req, body, memory_service, aplicar_memoria_cosmos_dir
                         "project_id": agent_config.get("project_id")
                     })
                     logging.info(
-                        f"✅ [FoundryDeploy] Modelo {model} ya está activo")
+                        f"✅ [FoundryDeploy] Modelo {model_name} ya está activo")
                 else:
                     # Simular deployment del modelo
                     # TODO: Reemplazar con llamada real al Foundry SDK
-                    success = _deploy_model_to_foundry(model, agent_config)
+                    success = _deploy_model_to_foundry(model_name, agent_config)
 
                     if success:
-                        models_deployed.append(model)
+                        models_deployed.append(model_name)
                         deployment_details.append({
-                            "model": model,
+                            "model": model_name,
                             "intent": intent,
                             "agent": agent_config.get("agent_id"),
                             "status": "deployed",
@@ -12769,24 +12781,24 @@ def _deploy_foundry_models(req, body, memory_service, aplicar_memoria_cosmos_dir
                             "deployment_time": datetime.now().isoformat()
                         })
                         logging.info(
-                            f"🚀 [FoundryDeploy] Modelo {model} desplegado exitosamente")
+                            f"🚀 [FoundryDeploy] Modelo {model_name} desplegado exitosamente")
                     else:
                         failed.append({
-                            "model": model,
+                            "model": model_name,
                             "error": "Falló el deployment en Foundry",
                             "intent": intent
                         })
                         logging.error(
-                            f"❌ [FoundryDeploy] Falló deployment de {model}")
+                            f"❌ [FoundryDeploy] Falló deployment de {model_name}")
 
             except Exception as e:
                 failed.append({
-                    "model": model,
+                    "model": model_name or model,
                     "error": str(e),
                     "traceback": str(e)
                 })
                 logging.error(
-                    f"❌ [FoundryDeploy] Error procesando modelo {model}: {e}")
+                    f"❌ [FoundryDeploy] Error procesando modelo {model_name}: {e}")
 
         # Preparar respuesta
         all_successful = len(failed) == 0
