@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 
-def ejecutar_bing_grounding_fallback(query: str, contexto: str, error_info: Dict[str, Any] = None) -> Dict[str, Any]:
+def ejecutar_bing_grounding_fallback(query: str, contexto: str, error_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Ejecuta Bing Grounding como fallback para consultas ambiguas
     """
@@ -161,7 +161,7 @@ def simular_bing_grounding(query: str, contexto: str) -> Dict[str, Any]:
     return {"exito": False, "error": "No se encontró mapeo para la consulta"}
 
 
-def generar_fallback_local(query: str, contexto: str, error_info: Dict[str, Any] = None) -> Dict[str, Any]:
+def generar_fallback_local(query: str, contexto: str, error_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Genera respuesta de fallback local cuando Bing Grounding no está disponible
     """
