@@ -42,7 +42,7 @@ def get_blob_client():
     except Exception:
         return None
 
-def get_run_id(req: func.HttpRequest = None) -> str:
+def get_run_id(req: Optional[func.HttpRequest] = None) -> str:
     """Genera un ID único para la request"""
     return uuid.uuid4().hex[:8]
 
