@@ -32,10 +32,11 @@ async def _fetch_json(url: str) -> Dict[str, Any]:
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         resp = await client.get(url)
         try:
-            data = resp.json()
+            data: Dict[str, Any] = resp.json()
         except Exception:
-            data = {"error": f"Respuesta no JSON: {resp.text}"}
-        data.setdefault("status_code", resp.status_code)
+            data: Dict[str, Any] = {"error": f"Respuesta no JSON: {resp.text}"}
+        if "status_code" not in data:
+            data["status_code"] = resp.status_code
         return data
 
 
