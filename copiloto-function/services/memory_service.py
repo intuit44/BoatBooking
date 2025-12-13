@@ -6,7 +6,7 @@ import threading
 from datetime import timezone, datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Sequence
-from azure.cosmos import CosmosClient
+from azure.cosmos import CosmosClient, ContainerProxy
 from azure.identity import DefaultAzureCredential
 from services.cosmos_store import CosmosMemoryStore
 from services.redis_buffer_service import redis_buffer
@@ -67,7 +67,7 @@ class MemoryService:
         self._cosmos_container_name = os.environ.get(
             'COSMOSDB_CONTAINER', 'memory')
         self._cosmos_client: Optional[CosmosClient] = None
-        self.memory_container = None
+        self.memory_container: Optional[ContainerProxy] = None
         self.cosmos_available = False
         self._cosmos_lock = threading.Lock()
 
@@ -114,6 +114,12 @@ class MemoryService:
                 self.memory_container = None
                 self._cosmos_client = None
                 return False
+
+    def _get_cosmos_container(self) -> Optional[ContainerProxy]:
+        """Helper para obtener el contenedor de Cosmos ya inicializado."""
+        if not self._ensure_cosmos_container():
+            return None
+        return self.memory_container
 
     def log_event(self, event_type: str, data: Dict[str, Any], session_id: Optional[str] = None) -> bool:
         """Registra evento en local + Cosmos DB"""
@@ -173,7 +179,8 @@ class MemoryService:
 
     def _log_cosmos(self, event: Dict[str, Any]) -> bool:
         """Escribe en Cosmos DB contenedor memory con clasificación semántica y anti-duplicados"""
-        if not self._ensure_cosmos_container():
+        container = self._get_cosmos_container()
+        if not container:
             logging.warning("Cosmos DB no disponible para escritura")
             return False
 
@@ -266,7 +273,7 @@ class MemoryService:
             event["indice_destino"] = target_index
 
             # Intentar upsert
-            result = self.memory_container.upsert_item(event)
+            result = container.upsert_item(event)
             logging.info(
                 f"[OK] Guardado exitoso en Cosmos DB - ID: {result.get('id', 'unknown')}")
             # Log detallado del texto semántico
@@ -392,7 +399,8 @@ class MemoryService:
             except Exception as e:
                 logging.warning(f"[CACHE ERROR] Redis no disponible: {e}")
 
-        if not self._ensure_cosmos_container():
+        container = self._get_cosmos_container()
+        if not container:
             return []
 
         query = "SELECT * FROM c WHERE c.session_id = @session_id ORDER BY c._ts DESC"
@@ -403,7 +411,7 @@ class MemoryService:
             logging.debug(
                 f"[COSMOS] Ejecutando consulta con session_id: {repr(session_id)}")
 
-            items = list(self.memory_container.query_items(
+            items = list(container.query_items(
                 query=query,
                 parameters=parameters,
                 max_item_count=limit,
@@ -986,7 +994,8 @@ class MemoryService:
     def obtener_estadisticas(self, source_name: Optional[str] = None) -> Dict[str, Any]:
         """Obtiene estadísticas del sistema de memoria"""
         try:
-            if not self._ensure_cosmos_container():
+            container = self._get_cosmos_container()
+            if not container:
                 return {
                     "total_llamadas": 0,
                     "llamadas_exitosas": 0,
@@ -1004,7 +1013,7 @@ class MemoryService:
                 query += " AND c.data.source = @source_name"
                 params.append({"name": "@source_name", "value": source_name})
 
-            items = list(self.memory_container.query_items(
+            items = list(container.query_items(
                 query=query,
                 parameters=params,
                 enable_cross_partition_query=True
@@ -1040,7 +1049,8 @@ class MemoryService:
     def limpiar_registros(self, source_name: Optional[str] = None) -> bool:
         """Limpia registros de memoria"""
         try:
-            if not self._ensure_cosmos_container():
+            container = self._get_cosmos_container()
+            if not container:
                 # Limpiar archivo local
                 if self.semantic_log_file.exists():
                     self.semantic_log_file.unlink()
@@ -1055,7 +1065,7 @@ class MemoryService:
                 query += " AND c.data.source = @source_name"
                 params.append({"name": "@source_name", "value": source_name})
 
-            items = list(self.memory_container.query_items(
+            items = list(container.query_items(
                 query=query,
                 parameters=params,
                 enable_cross_partition_query=True
@@ -1065,7 +1075,7 @@ class MemoryService:
             deleted_count = 0
             for item in items:
                 try:
-                    self.memory_container.delete_item(
+                    container.delete_item(
                         item["id"],
                         partition_key=item["session_id"]
                     )
@@ -1108,7 +1118,8 @@ class MemoryService:
     def existe_texto_en_sesion(self, session_id: str, texto_hash: str) -> bool:
         """Verifica si un texto_hash ya existe en la sesión (barrera anti-duplicados)"""
         try:
-            if not self._ensure_cosmos_container():
+            container = self._get_cosmos_container()
+            if not container:
                 return False
 
             query = "SELECT TOP 1 c.id FROM c WHERE c.session_id = @session_id AND c.texto_hash = @hash"
@@ -1116,7 +1127,7 @@ class MemoryService:
                 {"name": "@session_id", "value": session_id},
                 {"name": "@hash", "value": texto_hash}
             ]
-            items = list(self.memory_container.query_items(
+            items = list(container.query_items(
                 query=query,
                 parameters=parameters,
                 enable_cross_partition_query=True
@@ -1130,7 +1141,8 @@ class MemoryService:
     def _es_evento_repetitivo(self, endpoint: str, response_data: Any, session_id: str, ventana: int = 5) -> bool:
         """Detecta si el mismo endpoint se ejecutó recientemente con respuesta similar"""
         try:
-            if not self._ensure_cosmos_container():
+            container = self._get_cosmos_container()
+            if not container:
                 return False
 
             query = f"SELECT TOP {ventana} * FROM c WHERE c.session_id = @session_id AND c.data.endpoint = @endpoint ORDER BY c.timestamp DESC"
@@ -1138,7 +1150,7 @@ class MemoryService:
                 {"name": "@session_id", "value": session_id},
                 {"name": "@endpoint", "value": endpoint}
             ]
-            items = list(self.memory_container.query_items(
+            items = list(container.query_items(
                 query=query,
                 parameters=parameters,
                 enable_cross_partition_query=True
