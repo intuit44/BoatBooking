@@ -655,6 +655,13 @@ class MemoryService:
         }
         llamada_data["es_conversacion_humana"] = bool(
             mensaje_usuario or mensaje_asistente)
+        if mensaje_usuario or mensaje_asistente:
+            resumen_dialogo = " | ".join(filter(None, [
+                f"Usuario: {str(mensaje_usuario).strip()[:250]}" if mensaje_usuario else "",
+                f"Agente: {str(mensaje_asistente).strip()[:250]}" if mensaje_asistente else ""
+            ]))
+            if resumen_dialogo:
+                llamada_data["resumen_conversacion"] = resumen_dialogo
 
         # ❌ FILTRAR EVENTOS BASURA: No guardar eventos genéricos sin valor
         if endpoint == "unknown" and not params.get("respuesta_usuario"):
@@ -856,7 +863,8 @@ class MemoryService:
             return "interaccion"
 
         # === GENERADOR SEMÁNTICO ENRIQUECIDO ===
-        def _construir_texto_semantico_rico(response_data, endpoint, agent_id, success, params):
+        def _construir_texto_semantico_rico(response_data, endpoint, agent_id, success, params,
+                                            mensaje_usuario=None, mensaje_asistente=None):
             """Construye texto semántico útil, contextual y rico como lo haría un asistente inteligente."""
 
             # 1️⃣ PRIORIDAD MÁXIMA: respuesta_usuario (voz del agente)
@@ -870,6 +878,13 @@ class MemoryService:
             # 3️⃣ CONSTRUCCIÓN ENRIQUECIDA: Combinar múltiples fuentes
             if isinstance(response_data, dict):
                 bloques = []
+
+                if mensaje_usuario:
+                    bloques.append(
+                        f"👤 Usuario: {str(mensaje_usuario).strip()[:400]}")
+                if mensaje_asistente:
+                    bloques.append(
+                        f"🤖 Agente: {str(mensaje_asistente).strip()[:400]}")
 
                 # Mensaje principal
                 if response_data.get("mensaje"):
@@ -951,7 +966,8 @@ class MemoryService:
             return f"🔧 {endpoint_readable} {estado} por {agent_id}", True
 
         texto_semantico_final, auto_generated = _construir_texto_semantico_rico(
-            response_data, endpoint, agent_id, success, params
+            response_data, endpoint, agent_id, success, params,
+            mensaje_usuario=mensaje_usuario, mensaje_asistente=mensaje_asistente
         )
 
         # 🔧 ENRIQUECER con campos técnicos extraídos

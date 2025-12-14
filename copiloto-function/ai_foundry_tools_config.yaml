@@ -79,6 +79,24 @@ tools:
               required: false
               description: Metadata adicional del contenedor
 
+  - name: redis_cache_health
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/redis-cache-health
+          method: GET
+          description: Chequea rápidamente la salud de la caché Redis y devuelve conteos avanzados de llaves LLM
+
+  - name: redis_cache_monitor
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/redis-cache-monitor
+          method: GET
+          description: Consulta métricas detalladas del rendimiento de cache dual (session + global) en Redis
+
   - name: autocorrector_agent
     type: http
     config:
@@ -163,6 +181,12 @@ agents:
       revertir:
         tool: fix_promoter:/api/rollback
         description: "Rollback automático si falla la ejecución"
+      redis_health_insight:
+        tool: redis_cache_health:/api/redis-cache-health
+        description: "Confirma que Redis responde y tiene datos cacheados antes de diagnosticar"
+      redis_monitoring_snapshot:
+        tool: redis_cache_monitor:/api/redis-cache-monitor
+        description: "Reúne métricas detalladas de cache antes y después del diagnóstico"
     policies:
       - rule: "Siempre entregar Diagnóstico + Pasos sugeridos + Comando propuesto"
       - rule: "Solo ejecutar si se cumplen criterios de validación (prioridad alta, correcciones críticas)"
@@ -176,6 +200,14 @@ agents:
         tool: azure_cli_executor:/api/status
         condition: "always"
         description: "Log estado inicial"
+      - step: "redis_health_check"
+        tool: redis_cache_health:/api/redis-cache-health
+        condition: "always"
+        description: "Verifica la salud de Redis antes de iniciar diagnósticos"
+      - step: "redis_monitor"
+        tool: redis_cache_monitor:/api/redis-cache-monitor
+        condition: "if redis_health_check.status == 'healthy'"
+        description: "Recolecta métricas duales para enriquecer el diagnóstico"
       - step: "diagnosticar"
         tool: azure_cli_executor:/api/diagnostico-recursos
         condition: "always"

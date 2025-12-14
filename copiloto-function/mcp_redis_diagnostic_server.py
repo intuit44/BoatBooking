@@ -147,10 +147,10 @@ tool = RedisCacheDiagnosticTool(FUNCTION_APP_URL)
 
 
 @mcp.tool()
-async def diagnosticar_cache_redis(detailed_analysis: bool = False) -> str:
+async def redis_full_diagnostic(detailed_analysis: bool = False) -> str:
     """
-    Diagnóstico inteligente de cache Redis (NO para chat).
-    Retorna análisis semántico y recomendaciones.
+    Ejecuta el flujo completo de diagnóstico de Redis combinando health + monitor.
+    Retorna análisis consolidado y recomendaciones priorizadas.
     """
     try:
         result = await tool.diagnose_cache(detailed_analysis=detailed_analysis)
@@ -164,15 +164,81 @@ async def diagnosticar_cache_redis(detailed_analysis: bool = False) -> str:
 
 
 @mcp.tool()
+async def redis_health_check() -> str:
+    """
+    Verifica el estado básico de la conexión Redis y disponibilidad de datos.
+    Realiza ping, valida credenciales y cuenta claves disponibles.
+    """
+    logging.info("[MCP] Ejecutando redis_health_check")
+    try:
+        health = await _fetch_json(f"{FUNCTION_APP_URL}/api/redis-cache-health")
+        logging.info(
+            f"[MCP] redis_health_check completado - status: {health.get('status')}")
+        return json.dumps(health, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        logging.error(f"[MCP] Error en redis_health_check: {exc}")
+        return json.dumps({"status": "error", "error": str(exc)}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+async def redis_cache_monitor() -> str:
+    """
+    Obtiene métricas detalladas del rendimiento de Redis cache.
+    Incluye hit ratio, conteo de claves, TTLs y análisis de efectividad.
+    """
+    logging.info("[MCP] Ejecutando redis_cache_monitor")
+    try:
+        metrics = await _fetch_json(f"{FUNCTION_APP_URL}/api/redis-cache-monitor")
+        logging.info(
+            f"[MCP] redis_cache_monitor completado - hit_ratio: {metrics.get('cache_effectiveness', {}).get('hit_ratio', 'N/A')}")
+        return json.dumps(metrics, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        logging.error(f"[MCP] Error en redis_cache_monitor: {exc}")
+        return json.dumps({"status": "error", "error": str(exc)}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
+async def redis_buscar_memoria(query: str = "", limit: int = 10) -> str:
+    """
+    Busca y recupera entradas de memoria almacenadas en Redis.
+    Permite inspeccionar contenido de cache y patrones de almacenamiento.
+
+    Args:
+        query: Término de búsqueda opcional para filtrar resultados
+        limit: Número máximo de resultados a retornar (default: 10)
+    """
+    logging.info(
+        f"[MCP] Ejecutando redis_buscar_memoria - query: '{query}', limit: {limit}")
+    try:
+        params = {"q": query, "limit": limit} if query else {"limit": limit}
+        url = f"{FUNCTION_APP_URL}/api/buscar-memoria"
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+            try:
+                data = resp.json() if resp.headers.get(
+                    "content-type", "").startswith("application/json") else {"error": resp.text}
+            except Exception:
+                data = {"error": resp.text}
+            if not isinstance(data, dict):
+                data = {"error": str(data)}
+            data["http_status"] = str(resp.status_code)
+
+        logging.info(
+            f"[MCP] redis_buscar_memoria completado - resultados: {len(data.get('resultados', []))}")
+        return json.dumps(data, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        logging.error(f"[MCP] Error en redis_buscar_memoria: {exc}")
+        return json.dumps({"status": "error", "error": str(exc)}, indent=2, ensure_ascii=False)
+
+
+@mcp.tool()
 async def verificar_health_cache() -> str:
     """
     Health check rápido de Redis cache (ping + presencia de llaves).
+    Alias para redis_health_check para compatibilidad.
     """
-    try:
-        health = await _fetch_json(f"{FUNCTION_APP_URL}/api/redis-cache-health")
-        return json.dumps(health, indent=2, ensure_ascii=False)
-    except Exception as exc:  # pragma: no cover
-        return json.dumps({"status": "error", "error": str(exc)}, indent=2, ensure_ascii=False)
+    return await redis_health_check()
 
 
 def main() -> None:

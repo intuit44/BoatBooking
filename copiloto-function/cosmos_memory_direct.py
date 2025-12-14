@@ -255,6 +255,13 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
                     item.get("resumen_conversacion", "") or
                     ""
                 )
+                conversacion_humana = (
+                    item.get("conversacion_humana")
+                    or data_section.get("conversacion_humana")
+                    or {}
+                )
+                if conversacion_humana.get("mensaje_usuario"):
+                    consulta_text = conversacion_humana["mensaje_usuario"]
 
                 # Ô£à PRIORIZAR respuesta_resumen si existe
                 respuesta_text = (
@@ -266,6 +273,8 @@ def consultar_memoria_cosmos_directo(req: func.HttpRequest, session_override: Op
                     str(data_section.get("response_data", {}).get("respuesta_usuario", "")) or
                     item.get("resumen_conversacion", "")
                 )
+                if conversacion_humana.get("mensaje_asistente"):
+                    respuesta_text = conversacion_humana["mensaje_asistente"]
 
                 # Ô£à EXTRAER CONTEXTO INTELIGENTE si existe
                 contexto_extra = None

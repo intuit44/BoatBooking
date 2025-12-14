@@ -234,6 +234,27 @@ class SemanticIntentClassifier:
                 "ayudame con algo",
                 "tengo una duda generica",
                 "me puedes orientar"
+            ],
+            "redis_ping": [
+                "haz ping a redis",
+                "verifica que redis responda",
+                "asegura que el cache redis esta vivo",
+                "comprueba la conexion con redis",
+                "ping al buffer redis"
+            ],
+            "redis_info": [
+                "muestrame informacion de redis",
+                "estado del cache redis",
+                "detalles del cluster redis",
+                "diagnostico del buffer redis",
+                "metricas internas de redis"
+            ],
+            "redis_keys": [
+                "lista llaves en redis",
+                "que claves existen en redis",
+                "mostrar keys del cache",
+                "buscar llaves en redis",
+                "explorar claves almacenadas en redis"
             ]
         }
 
@@ -250,7 +271,10 @@ class SemanticIntentClassifier:
             "listar_resources": "az group list --output json",
             "diagnosticar_sistema": "az resource list --output json",
             "revisar_logs": "intent:revisar_logs",
-            "ayuda_general": "az --help"
+            "ayuda_general": "az --help",
+            "redis_ping": "intent:redis_ping",
+            "redis_info": "intent:redis_info",
+            "redis_keys": "intent:redis_keys"
         }
 
         self.threshold = threshold
@@ -355,7 +379,39 @@ class SemanticIntentClassifier:
                     "command": self.intent_to_command.get("correccion", "apply_fix"),
                     "method": "keyword_detection_strong",
                     "requires_grounding": False
-                }        # Palabras clave de boat management específicas
+                }
+
+        # 🛡️ EXCLUSIÓN: No clasificar como Redis si es comando curl/wget/http
+        is_http_command = any(cmd in input_lower for cmd in [
+                              "curl ", "wget ", "http://", "https://", "invoke-restmethod", "invoke-webrequest"])
+
+        if ("redis" in input_lower or "cache" in input_lower) and not is_http_command:
+            if any(kw in input_lower for kw in ["ping", "latido", "responde", "alive", "salud"]):
+                return {
+                    "intent": "redis_ping",
+                    "confidence": 0.93,
+                    "command": self.intent_to_command.get("redis_ping"),
+                    "method": "keyword_detection_redis",
+                    "requires_grounding": False
+                }
+            if any(kw in input_lower for kw in ["info", "estado", "status", "detalles", "diagnostico", "metrics", "metricas"]):
+                return {
+                    "intent": "redis_info",
+                    "confidence": 0.9,
+                    "command": self.intent_to_command.get("redis_info"),
+                    "method": "keyword_detection_redis",
+                    "requires_grounding": False
+                }
+            if any(kw in input_lower for kw in ["keys", "llaves", "claves", "entries", "elementos"]):
+                return {
+                    "intent": "redis_keys",
+                    "confidence": 0.88,
+                    "command": self.intent_to_command.get("redis_keys"),
+                    "method": "keyword_detection_redis",
+                    "requires_grounding": False
+                }
+
+        # Palabras clave de boat management específicas
         if any(kw in input_lower for kw in ["reserva", "booking", "alquiler", "embarcación", "barco", "yate", "lancha"]):
             if any(kw in input_lower for kw in ["gestionar", "crear", "procesar", "confirmar", "cancelar", "cliente"]):
                 return {

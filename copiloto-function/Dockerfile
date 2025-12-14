@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/azure-functions/python:4-python3.11
 
-# 🔧 Herramientas esenciales de diagnóstico y operaciones
+# 🔧 Herramientas esenciales de diagnóstico y operaciones + Redis CLI
 RUN apt-get update && \
   apt-get install -y \
   bash \
@@ -25,6 +25,7 @@ RUN apt-get update && \
   file \
   lsof \
   strace \
+  redis-tools \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
