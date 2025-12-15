@@ -1505,7 +1505,7 @@
     "/api/ejecutar-cli": {
       "post": {
         "summary": "🚀 HERRAMIENTA PRIMARIA UNIVERSAL - Búsqueda, listado, análisis y ejecución de comandos",
-        "description": "⭐ USAR ESTE ENDPOINT COMO PRIMERA OPCIÓN para: \n\n🔍 BÚSQUEDAS:\n- Buscar archivos: Get-ChildItem, ls, find, dir\n- Buscar funciones en código: grep, Select-String\n- Buscar patrones: grep -r, Select-String -Recurse\n- Listar directorios: ls, dir, Get-ChildItem\n- Buscar en contenido: cat + grep, Get-Content + Select-String\n\n📂 OPERACIONES DE ARCHIVOS:\n- Listar archivos con wildcards: ls *.py, Get-ChildItem *.json\n- Buscar recursivamente: find . -name, Get-ChildItem -Recurse\n- Ver contenido: cat, Get-Content, type\n- Información de archivos: stat, Get-Item\n\n⚙️ COMANDOS SISTEMA:\n- Azure CLI: az storage, az functionapp, az group\n- Python: python script.py, pip install\n- PowerShell: Get-Process, Set-Location, New-Item\n- NPM/Docker: npm install, docker ps\n\n✅ CARACTERÍSTICAS:\n- Conversión automática Unix→PowerShell en Windows\n- Detección inteligente de tipo de comando\n- Autocorrección con memoria de sesión\n- Siempre HTTP 200 (nunca falla)\n- Respuestas estructuradas para agentes AI\n\n💡 EJEMPLOS DE USO:\n- Buscar tests: {\"comando\": \"Get-ChildItem -Path C:\\\\proyecto -Include *_test.py -Recurse\"}\n- Buscar función: {\"comando\": \"grep -n 'def mi_funcion' archivo.py\"}\n- Listar archivos: {\"comando\": \"ls -la /proyecto/scripts\"}\n- Ver contenido: {\"comando\": \"cat README.md\"}\n\n🔁 FLUJO BUSCAR+LEER: Antes de usar /api/leer-archivo cuando la ruta no es exacta, usa este endpoint para ubicarla (rg --files, dir /s, Get-ChildItem -Recurse). Documenta en la respuesta la ruta encontrada para que el agente la reutilice.",
+        "description": "⭐ USAR ESTE ENDPOINT COMO PRIMERA OPCIÓN para: \n\n🔍 BÚSQUEDAS:\n- Buscar archivos: Get-ChildItem, ls, find, dir\n- Buscar funciones en código: grep, Select-String\n- Buscar patrones: grep -r, Select-String -Recurse\n- Listar directorios: ls, dir, Get-ChildItem\n- Buscar en contenido: cat + grep, Get-Content + Select-String\n\n📂 OPERACIONES DE ARCHIVOS:\n- Listar archivos con wildcards: ls *.py, Get-ChildItem *.json\n- Buscar recursivamente: find . -name, Get-ChildItem -Recurse\n- Ver contenido: cat, Get-Content, type\n- Información de archivos: stat, Get-Item\n\n⚙️ COMANDOS SISTEMA:\n- Azure CLI: az storage, az functionapp, az group\n- Python: python script.py, pip install\n- PowerShell: Get-Process, Set-Location, New-Item\n- NPM/Docker: npm install, docker ps\n- Redis CLI: redis-cli PING/INFO/KEYS con enriquecimiento automático de host/puerto/TLS\n\n✅ CARACTERÍSTICAS:\n- Conversión automática Unix→PowerShell en Windows\n- Detección inteligente de tipo de comando + normalización por intención (e.g. redis-cli)\n- Autocorrección con memoria de sesión\n- Siempre HTTP 200 (nunca falla)\n- Respuestas estructuradas para agentes AI\n\n💡 EJEMPLOS DE USO:\n- Buscar tests: {\"comando\": \"Get-ChildItem -Path C:\\\\proyecto -Include *_test.py -Recurse\"}\n- Buscar función: {\"comando\": \"grep -n 'def mi_funcion' archivo.py\"}\n- Listar archivos: {\"comando\": \"ls -la /proyecto/scripts\"}\n- Ver contenido: {\"comando\": \"cat README.md\"}\n- Ping a Redis: {\"comando\": \"redis-cli PING\"}\n\n🔁 FLUJO BUSCAR+LEER: Antes de usar /api/leer-archivo cuando la ruta no es exacta, usa este endpoint para ubicarla (rg --files, dir /s, Get-ChildItem -Recurse). Documenta en la respuesta la ruta encontrada para que el agente la reutilice.",
         "operationId": "ejecutarCli",
         "tags": [
           "🚀 Universal CLI Executor"
@@ -1546,7 +1546,7 @@
                 "properties": {
                   "comando": {
                     "type": "string",
-                    "description": "Cualquier comando a ejecutar. Si faltan argumentos, el sistema los buscará automáticamente en la memoria de sesión.",
+                    "description": "Cualquier comando a ejecutar. La capa de intención puede enriquecer automáticamente parámetros (ej. redis-cli ➜ agrega host/puerto/TLS a partir de las variables de entorno) y aprovecha memoria de sesión cuando falten datos.",
                     "examples": [
                       "az group list",
                       "az storage account create",
@@ -4136,7 +4136,155 @@
         }
       }
     },
-
+    "/api/buscar-memoria-endpoint": {
+      "post": {
+        "operationId": "buscar_memoria_endpoint",
+        "summary": "🧠 Búsqueda Semántica Inteligente con Enhancement LLM",
+        "description": "Busca documentos en memoria semántica con múltiples estrategias: búsqueda vectorial (Azure AI Search), detección técnica (UUIDs/IDs) con búsqueda literal en Cosmos DB, y session widening (cascada sesión→agente→universal). Soporta enhancement para LLM con contexto narrativo, extractos textuales y formatos optimizados. Usa Managed Identity - no requiere claves en payload.",
+        "tags": [
+          "🧠 Memoria Semántica"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Texto de búsqueda semántica (REQUERIDO). Para activar enhancement LLM use include_context=true e include_narrative=true",
+                    "example": "errores recientes en ejecutar_cli"
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "ID del agente para filtrar resultados por agente específico",
+                    "example": "GlobalAgent"
+                  },
+                  "session_id": {
+                    "type": "string", 
+                    "description": "ID de sesión para filtrar resultados por sesión específica",
+                    "example": "temp_1765487255"
+                  },
+                  "top": {
+                    "type": "integer",
+                    "description": "Número máximo de resultados a retornar",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "tipo": {
+                    "type": "string",
+                    "description": "Filtrar por tipo específico de documento en memoria",
+                    "example": "cognitive_memory"
+                  },
+                  "include_context": {
+                    "type": "boolean",
+                    "description": "Incluir contextos textuales extraídos en la respuesta para enriquecimiento LLM (opcional, requiere activación explícita)",
+                    "default": false
+                  },
+                  "include_narrative": {
+                    "type": "boolean", 
+                    "description": "Generar narrativa descriptiva optimizada para LLM en la respuesta (opcional, requiere activación explícita)",
+                    "default": false
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Formato de respuesta deseado",
+                    "enum": ["json", "narrative"],
+                    "default": "json"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Búsqueda exitosa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exito": {
+                      "type": "boolean",
+                      "description": "Indica si la búsqueda fue exitosa"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Número total de documentos encontrados"
+                    },
+                    "documentos": {
+                      "type": "array",
+                      "description": "Lista de documentos encontrados en memoria semántica",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {"type": "string"},
+                          "texto_semantico": {"type": "string"},
+                          "timestamp": {"type": "string"},
+                          "session_id": {"type": "string"},
+                          "agent_id": {"type": "string"},
+                          "score": {"type": "number"}
+                        }
+                      }
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "description": "Metadatos de la búsqueda realizada",
+                      "properties": {
+                        "query_original": {"type": "string"},
+                        "modo_busqueda": {"type": "string"},
+                        "session_widening_activo": {"type": "boolean"},
+                        "tiempo_busqueda": {"type": "string"}
+                      }
+                    },
+                    "enhanced_response": {
+                      "type": "object",
+                      "description": "Respuesta enriquecida para LLM (solo cuando include_context o include_narrative = true)",
+                      "properties": {
+                        "resumen_busqueda": {"type": "string"},
+                        "modo_busqueda_usado": {"type": "string"},
+                        "query_procesada": {"type": "string"},
+                        "timestamp": {"type": "string"},
+                        "contextos_extraidos": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "fuente": {"type": "string"},
+                              "contenido": {"type": "string"},
+                              "timestamp": {"type": "string"},
+                              "session_id": {"type": "string"}
+                            }
+                          }
+                        },
+                        "narrativa_llm": {"type": "string"}
+                      }
+                    },
+                    "llm_ready": {
+                      "type": "boolean",
+                      "description": "Indica si la respuesta incluye enhancement para LLM"
+                    },
+                    "format_requested": {
+                      "type": "string",
+                      "description": "Formato de respuesta solicitado"
+                    },
+                    "response_text": {
+                      "type": "string",
+                      "description": "Texto de respuesta (solo cuando format=narrative)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/indexar-memoria": {
       "post": {
         "operationId": "indexarMemoriaSematica",
@@ -4539,6 +4687,288 @@
                       "redis_enabled": false,
                       "timestamp": "2025-12-05T20:30:45.123Z",
                       "message": "Redis cache is disabled"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/command": {
+      "post": {
+        "summary": "Ejecutar comando Redis con allowlist de seguridad",
+        "operationId": "redisAdminCommand",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Ejecuta comandos Redis seguros con allowlist y confirmación requerida para comandos peligrosos. Solo permite comandos de consulta (PING, INFO, KEYS, GET, etc.) y algunos comandos de datos con confirmación explícita.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "Comando Redis a ejecutar. Debe estar en la allowlist de comandos permitidos.",
+                    "examples": [
+                      "PING",
+                      "INFO",
+                      "DBSIZE",
+                      "KEYS *",
+                      "GET memoria:session:abc123",
+                      "TTL memoria:session:abc123"
+                    ]
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "ID del agente que ejecuta el comando (para auditoría)",
+                    "example": "GlobalAgent"
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "description": "Confirmación explícita requerida para comandos que requieren confirmación",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comando ejecutado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "description": "Resultado del comando Redis"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "execution_time_ms": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Comando requiere confirmación o parámetros inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "confirmation_required": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Comando no permitido por la allowlist de seguridad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "blocked_command": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/diagnostic": {
+      "get": {
+        "summary": "Diagnóstico completo de Redis",
+        "operationId": "redisAdminDiagnostic",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Ejecuta un diagnóstico completo de Redis incluyendo ping, RedisJSON, memoria, configuración y estadísticas del servidor.",
+        "responses": {
+          "200": {
+            "description": "Diagnóstico completado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "diagnostic": {
+                      "type": "object",
+                      "properties": {
+                        "overall": {
+                          "type": "string",
+                          "enum": ["PASSED", "FAILED", "PARTIAL"]
+                        },
+                        "ping": {
+                          "type": "object",
+                          "properties": {
+                            "status": {"type": "string"},
+                            "latency_ms": {"type": "number"}
+                          }
+                        },
+                        "memory": {
+                          "type": "object",
+                          "properties": {
+                            "used_memory": {"type": "string"},
+                            "used_memory_human": {"type": "string"}
+                          }
+                        },
+                        "keyspace": {
+                          "type": "object",
+                          "properties": {
+                            "total_keys": {"type": "number"},
+                            "databases": {"type": "object"}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/audit": {
+      "get": {
+        "summary": "Log de auditoría de comandos Redis",
+        "operationId": "redisAdminAudit",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Obtiene el log de auditoría de comandos Redis ejecutados recientemente con detalles de timestamp, agente y resultado.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Número máximo de entradas a retornar",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log de auditoría recuperado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "audit_log": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {"type": "string"},
+                          "command": {"type": "string"},
+                          "agent_id": {"type": "string"},
+                          "success": {"type": "boolean"},
+                          "execution_time_ms": {"type": "number"}
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/commands": {
+      "get": {
+        "summary": "Lista de comandos Redis permitidos",
+        "operationId": "redisAdminCommands",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Obtiene la allowlist completa de comandos Redis permitidos, categorizados por tipo y nivel de riesgo.",
+        "responses": {
+          "200": {
+            "description": "Lista de comandos permitidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "commands": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "command": {"type": "string"},
+                          "category": {"type": "string"},
+                          "description": {"type": "string"},
+                          "requires_confirmation": {"type": "boolean"}
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
                     }
                   }
                 }

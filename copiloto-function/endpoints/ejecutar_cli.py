@@ -67,6 +67,12 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
 
         # Configurar entorno
         env = os.environ.copy()
+
+        # 🔥 FIX: Agregar C:\redis al PATH si comando contiene redis-cli
+        if 'redis-cli' in comando and 'C:\\redis' not in env.get('PATH', ''):
+            env['PATH'] = f"C:\\redis;{env.get('PATH', '')}"
+            logging.info("Agregado C:\\redis al PATH para redis-cli")
+
         shell = False
         cmd_args = []
 
@@ -202,6 +208,26 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
             # 🔥 LIMPIEZA FINAL: Eliminar comillas duplicadas/mal escapadas
             from command_cleaner import limpiar_comillas_comando
             comando_limpio = limpiar_comillas_comando(comando)
+
+            # 🔥 FIX ESPECÍFICO: Arreglar redis-cli mal escapado
+            if 'redis-cli' in comando_limpio:
+                # Múltiples patrones de escape mal formados
+                patrones_mal_escapados = [
+                    (r"\'redis-cli\'\"\'\'\"\'\'\'", "redis-cli"),
+                    (r"\'\'\"\'\'\"\'\'\'", ""),
+                    (r"redis-cli\\'\"\\'\\'\"\\'\\'", "redis-cli"),
+                    (r"\\'\"\\'\\'\"\\'\\'", ""),
+                    (r"\\\\redis\\\\redis-cli\\.exe", "C:\\redis\\redis-cli.exe"),
+                ]
+
+                comando_original = comando_limpio
+                for patron, reemplazo in patrones_mal_escapados:
+                    comando_limpio = re.sub(patron, reemplazo, comando_limpio)
+
+                if comando_original != comando_limpio:
+                    logging.info(
+                        f"Comando redis-cli corregido: {comando_original} -> {comando_limpio}")
+
             logging.info(f"Comando original: {comando}")
             logging.info(f"Comando limpio: {comando_limpio}")
             logging.info(f"Ejecutando {tipo} con shell")
@@ -1351,6 +1377,10 @@ def _enrich_command_by_intention(comando: str, detection_data: Dict[str, Any]) -
         intent_name = (semantic_intent or {}).get("intent", "").lower()
         intent_confidence = (semantic_intent or {}).get("confidence", 0.0)
 
+        # 🔥 FIX: Detectar y preservar comandos PowerShell con redis-cli
+        if _is_powershell_redis_command(comando):
+            return _normalize_powershell_redis_command(comando)
+
         extracted_wrapped = _extract_wrapped_redis_cli(comando)
         if extracted_wrapped:
             return _normalize_redis_cli_command(extracted_wrapped)
@@ -1383,6 +1413,85 @@ def _command_from_redis_intent(intent_name: str, original_text: str) -> str:
         "redis_keys": "redis-cli KEYS *"
     }
     return default_mapping.get(intent_name, "redis-cli INFO")
+
+
+def _is_powershell_redis_command(comando: str) -> bool:
+    """Detecta si es un comando PowerShell que contiene redis-cli."""
+    powershell_patterns = [
+        r'powershell\s+-Command\s+.*redis-cli',
+        r'pwsh\s+-Command\s+.*redis-cli',
+        r'&\s+[\'"].*redis-cli.*[\'"]',
+        r'Invoke-Expression\s+.*redis-cli'
+    ]
+
+    for pattern in powershell_patterns:
+        if re.search(pattern, comando, re.IGNORECASE):
+            return True
+    return False
+
+
+def _normalize_powershell_redis_command(comando: str) -> str:
+    """Normaliza comandos PowerShell preservando la estructura original."""
+    try:
+        logging.info(f"Normalizando comando PowerShell+Redis: {comando}")
+
+        # Patrones para detectar diferentes formas de ejecutar redis-cli en PowerShell
+        patterns = [
+            # Patrón para: powershell -Command "& 'C:\redis\redis-cli.exe' info"
+            r"(powershell\s+-Command\s+[\"']&\s+[\"'].*?redis-cli(?:\.exe)?[\"']\s+)([^\"']+)([\"']?)",
+            # Patrón para: redis-cli.exe info (directo)
+            r"(.*redis-cli(?:\.exe)?\s+)([^\"']*?)(\s*[\"']?.*)?$"
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, comando, re.IGNORECASE)
+            if match:
+                prefix = match.group(1)
+                redis_args = match.group(2).strip()
+                suffix = match.group(3) if len(match.groups()) >= 3 else ""
+
+                logging.info(
+                    f"Patrón matched - Prefix: {prefix}, Args: {redis_args}, Suffix: {suffix}")
+
+                # Obtener credenciales Redis
+                env = os.environ
+                host = env.get("REDIS_HOST")
+                port = env.get("REDIS_PORT")
+                password = env.get("REDIS_KEY") or env.get("REDIS_PASSWORD")
+                ssl_enabled = env.get("REDIS_SSL") or env.get("REDIS_TLS")
+
+                # Construir argumentos adicionales solo si no están presentes
+                extra_args = []
+                if host and "-h" not in redis_args and "--host" not in redis_args:
+                    extra_args.extend(["-h", host])
+                if port and "-p" not in redis_args and "--port" not in redis_args:
+                    extra_args.extend(["-p", port])
+                if password and "-a" not in redis_args and "--pass" not in redis_args:
+                    extra_args.extend(["-a", password])
+                if ssl_enabled and ssl_enabled.strip().lower() not in ("0", "false", "no"):
+                    if "--tls" not in redis_args and "--ssl" not in redis_args:
+                        extra_args.append("--tls")
+
+                # Reconstruir comando preservando estructura exacta
+                if extra_args:
+                    # 🔥 FIX: Poner extra_args ANTES de redis_args para evitar --tlsinfo
+                    new_args = f"{' '.join(extra_args)} {redis_args}".strip()
+                    separator = " " if suffix and not suffix.startswith(
+                        " ") else ""
+                    updated_comando = f"{prefix}{new_args}{separator}{suffix}"
+
+                    logging.info(
+                        f"Comando PowerShell+Redis normalizado: {comando} -> {updated_comando}")
+                    return updated_comando
+
+        # Si no match ningún patrón, devolver original
+        logging.info(
+            f"No se pudo normalizar comando PowerShell+Redis, devolviendo original")
+        return comando
+
+    except Exception as e:
+        logging.warning(f"Error normalizando comando PowerShell+Redis: {e}")
+        return comando
 
 
 def _extract_wrapped_redis_cli(comando: str) -> Optional[str]:
@@ -1470,10 +1579,32 @@ def _normalize_redis_cli_command(comando: str) -> str:
 
     if ssl_enabled and ssl_enabled.strip().lower() not in ("0", "false", "no"):
         if not _flag_present(["--tls", "--ssl"]):
-            tokens.append("--tls")
+            # 🔥 FIX: Solo agregar --tls si la versión lo soporta (6.0+)
+            if _redis_cli_supports_tls(tokens[0]):
+                tokens.append("--tls")
+            else:
+                logging.warning(
+                    f"Redis CLI {tokens[0]} no soporta --tls, omitiendo para evitar error")
 
     normalized_command = shlex.join(tokens)
     return normalized_command
+
+
+def _redis_cli_supports_tls(redis_cli_path: str) -> bool:
+    """Detecta si redis-cli soporta --tls ejecutando --help y buscando la opción."""
+    try:
+        result = subprocess.run(
+            [redis_cli_path, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return "--tls" in result.stdout.lower()
+    except Exception as e:
+        logging.warning(
+            f"No se pudo detectar soporte TLS en {redis_cli_path}: {e}")
+    return False
 
 
 def _resolve_redis_cli_path(current_token: str) -> Optional[str]:

@@ -113,7 +113,23 @@ Listar archivos Python en proyecto:
 3. SIEMPRE prefiere comandos PowerShell nativos (`type`, `Get-Content`, `Select-String`, `Get-ChildItem`).  
 4. NUNCA uses comandos Unix (`cat`, `grep`, `ls`) en entornos Windows.
 
-## 🚀 Redis Cache Monitoring para Agentes Foundry
+## � Diagnóstico del Sistema de Caché y Redis
+
+Cuando el usuario solicite **verificar, validar, revisar, diagnosticar o monitorear el estado de la caché, Redis o el rendimiento del sistema** (ej: "¿cómo está la caché?", "valida si hay cache_hit", "muestra métricas de Redis"):
+
+1. **SALUD DEL SISTEMA (Ping/Estado)**: SIEMPRE utiliza la herramienta **`redis_health_check`** primero para confirmar que el servicio está disponible y responder con métricas de latencia y estado de conexión.
+2. **MÉTRICAS Y ESTADÍSTICAS**: SIEMPRE utiliza la herramienta **`redis_cache_monitor`** para obtener el hit ratio, número de claves y estadísticas detalladas de la caché. NO uses `redis_cached_chat` para esto.
+
+**Regla de Oro**: Para **obtener una respuesta conversacional** basada en un mensaje del usuario, usa `redis_cached_chat`. Para **obtener un diagnóstico técnico del sistema**, usa `redis_health_check` o `redis_cache_monitor`.
+
+### Ejemplo de Uso Correcto
+
+- Usuario: *"¿La caché está funcionando?"* → Herramienta a usar: **`redis_health_check`**.
+
+- Usuario: *"Muéstrame las estadísticas de cache hits"* → Herramienta a usar: **`redis_cache_monitor`**.
+- Usuario: *"Responde a '¿qué es un barco?'"* → Herramienta a usar: **`redis_cached_chat`** (que internamente chequeará la caché).
+
+## �🚀 Redis Cache Monitoring para Agentes Foundry
 
 ### Endpoints Disponibles
 

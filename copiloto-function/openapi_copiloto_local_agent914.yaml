@@ -4695,6 +4695,288 @@
           }
         }
       }
+    },
+    "/api/redis-admin/command": {
+      "post": {
+        "summary": "Ejecutar comando Redis con allowlist de seguridad",
+        "operationId": "redisAdminCommand",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Ejecuta comandos Redis seguros con allowlist y confirmación requerida para comandos peligrosos. Solo permite comandos de consulta (PING, INFO, KEYS, GET, etc.) y algunos comandos de datos con confirmación explícita.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "description": "Comando Redis a ejecutar. Debe estar en la allowlist de comandos permitidos.",
+                    "examples": [
+                      "PING",
+                      "INFO",
+                      "DBSIZE",
+                      "KEYS *",
+                      "GET memoria:session:abc123",
+                      "TTL memoria:session:abc123"
+                    ]
+                  },
+                  "agent_id": {
+                    "type": "string",
+                    "description": "ID del agente que ejecuta el comando (para auditoría)",
+                    "example": "GlobalAgent"
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "description": "Confirmación explícita requerida para comandos que requieren confirmación",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comando ejecutado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "description": "Resultado del comando Redis"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "execution_time_ms": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Comando requiere confirmación o parámetros inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "confirmation_required": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Comando no permitido por la allowlist de seguridad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "blocked_command": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/diagnostic": {
+      "get": {
+        "summary": "Diagnóstico completo de Redis",
+        "operationId": "redisAdminDiagnostic",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Ejecuta un diagnóstico completo de Redis incluyendo ping, RedisJSON, memoria, configuración y estadísticas del servidor.",
+        "responses": {
+          "200": {
+            "description": "Diagnóstico completado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "diagnostic": {
+                      "type": "object",
+                      "properties": {
+                        "overall": {
+                          "type": "string",
+                          "enum": ["PASSED", "FAILED", "PARTIAL"]
+                        },
+                        "ping": {
+                          "type": "object",
+                          "properties": {
+                            "status": {"type": "string"},
+                            "latency_ms": {"type": "number"}
+                          }
+                        },
+                        "memory": {
+                          "type": "object",
+                          "properties": {
+                            "used_memory": {"type": "string"},
+                            "used_memory_human": {"type": "string"}
+                          }
+                        },
+                        "keyspace": {
+                          "type": "object",
+                          "properties": {
+                            "total_keys": {"type": "number"},
+                            "databases": {"type": "object"}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/audit": {
+      "get": {
+        "summary": "Log de auditoría de comandos Redis",
+        "operationId": "redisAdminAudit",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Obtiene el log de auditoría de comandos Redis ejecutados recientemente con detalles de timestamp, agente y resultado.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Número máximo de entradas a retornar",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log de auditoría recuperado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "audit_log": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {"type": "string"},
+                          "command": {"type": "string"},
+                          "agent_id": {"type": "string"},
+                          "success": {"type": "boolean"},
+                          "execution_time_ms": {"type": "number"}
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redis-admin/commands": {
+      "get": {
+        "summary": "Lista de comandos Redis permitidos",
+        "operationId": "redisAdminCommands",
+        "tags": [
+          "Redis Cache"
+        ],
+        "security": [],
+        "description": "Obtiene la allowlist completa de comandos Redis permitidos, categorizados por tipo y nivel de riesgo.",
+        "responses": {
+          "200": {
+            "description": "Lista de comandos permitidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "commands": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "command": {"type": "string"},
+                          "category": {"type": "string"},
+                          "description": {"type": "string"},
+                          "requires_confirmation": {"type": "boolean"}
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
