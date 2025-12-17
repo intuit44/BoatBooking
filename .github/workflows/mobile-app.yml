@@ -1,0 +1,96 @@
+name: Mobile App CI
+
+on:
+  push:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-app.yml'
+  pull_request:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-app.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22.x'
+  EXPO_PUBLIC_GRAPHQL_ENDPOINT: ${{ secrets.EXPO_PUBLIC_GRAPHQL_ENDPOINT }}
+  EXPO_PUBLIC_API_KEY: ${{ secrets.EXPO_PUBLIC_API_KEY }}
+  EXPO_PUBLIC_USER_POOL_ID: ${{ secrets.EXPO_PUBLIC_USER_POOL_ID }}
+  EXPO_PUBLIC_USER_POOL_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_USER_POOL_CLIENT_ID }}
+  EXPO_PUBLIC_IDENTITY_POOL_ID: ${{ secrets.EXPO_PUBLIC_IDENTITY_POOL_ID }}
+  EXPO_PUBLIC_AWS_REGION: ${{ secrets.EXPO_PUBLIC_AWS_REGION }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: mobile-app/package-lock.json
+
+      - name: Install Amplify CLI
+        run: npm install -g @aws-amplify/cli
+
+      # IMPORTANTE: Ejecutar amplify pull DESDE LA RAÍZ
+      - name: Pull Amplify config (from root)
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Contents: $(ls -la)"
+          amplify pull --yes \
+            --amplify "{\"envName\":\"prod\"}" \
+            --providers "{\"awscloudformation\":{\"configLevel\":\"project\"}}" \
+            --no-code
+
+      # Copiar aws-exports.js a mobile-app
+      - name: Copy aws-exports.js to mobile-app
+        run: |
+          if [ -f aws-exports.js ]; then
+            cp aws-exports.js mobile-app/
+            echo "✅ Copied aws-exports.js to mobile-app"
+          else
+            echo "❌ aws-exports.js not found in root"
+            exit 1
+          fi
+
+      # AHORA sí trabajamos en mobile-app
+      - name: Install mobile app dependencies
+        working-directory: mobile-app
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Verify Expo configuration
+        working-directory: mobile-app
+        run: npx expo config --type public
+
+      - name: Verify Amplify configuration
+        working-directory: mobile-app
+        run: |
+          if [ -f aws-exports.js ]; then
+            node -e "const cfg=require('./aws-exports'); if(!cfg.aws_appsync_graphqlEndpoint) {throw new Error('Missing GraphQL endpoint');} console.log('✅ Amplify config is valid');"
+          else
+            echo "❌ aws-exports.js not found in mobile-app"
+            exit 1
+          fi
+
+      - name: Run tests
+        working-directory: mobile-app
+        run: npm test --if-present
+        env:
+          CI: true
+
+      - name: Build web artifacts
+        working-directory: mobile-app
+        run: npx expo export --output-dir dist --platform web
+
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-artifacts
+          path: mobile-app/dist
