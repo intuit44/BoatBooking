@@ -4136,7 +4136,7 @@
         }
       }
     },
-    "/api/buscar-memoria-endpoint": {
+    "/api/buscar-memoria": {
       "post": {
         "operationId": "buscar_memoria_endpoint",
         "summary": "🧠 Búsqueda Semántica Inteligente con Enhancement LLM",

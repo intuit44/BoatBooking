@@ -166,8 +166,12 @@ async def redis_full_diagnostic(detailed_analysis: bool = False) -> str:
 @mcp.tool()
 async def redis_health_check() -> str:
     """
-    Verifica el estado básico de la conexión Redis y disponibilidad de datos.
-    Realiza ping, valida credenciales y cuenta claves disponibles.
+    USAR PARA: "¿Está funcionando Redis?" o "¿Redis responde?"
+
+    Verifica conexión básica: ping, credenciales y si hay datos en cache.
+    - Si Redis no responde: status "error"
+    - Si funciona pero sin datos: status "no_data" 
+    - Si funciona con datos: status "healthy"
     """
     logging.info("[MCP] Ejecutando redis_health_check")
     try:
@@ -183,8 +187,13 @@ async def redis_health_check() -> str:
 @mcp.tool()
 async def redis_cache_monitor() -> str:
     """
-    Obtiene métricas detalladas del rendimiento de Redis cache.
-    Incluye hit ratio, conteo de claves, TTLs y análisis de efectividad.
+    USAR PARA: "¿Cómo está el rendimiento?" o "Muestra estadísticas de cache"
+
+    Métricas detalladas: hit ratio, memoria usada, claves por tipo, TTLs.
+    - hit_ratio: % de consultas que encuentran datos en cache
+    - key_counts: cuántas claves hay por categoría  
+    - memory_info: uso de memoria Redis
+    - cache_effectiveness: análisis de rendimiento
     """
     logging.info("[MCP] Ejecutando redis_cache_monitor")
     try:
@@ -200,12 +209,16 @@ async def redis_cache_monitor() -> str:
 @mcp.tool()
 async def redis_buscar_memoria(query: str = "", limit: int = 10) -> str:
     """
-    Busca y recupera entradas de memoria almacenadas en Redis.
-    Permite inspeccionar contenido de cache y patrones de almacenamiento.
+    USAR PARA: "¿Qué datos hay en cache?" o "Busca conversaciones sobre X"
+
+    Busca y muestra contenido real almacenado en Redis cache.
+    - Sin query: muestra las últimas entradas guardadas
+    - Con query: busca por término específico en conversaciones
+    - limit: controla cuántos resultados mostrar
 
     Args:
-        query: Término de búsqueda opcional para filtrar resultados
-        limit: Número máximo de resultados a retornar (default: 10)
+        query: Término de búsqueda (ej: "barco", "usuario123")
+        limit: Máximo resultados (default: 10, max: 50)
     """
     logging.info(
         f"[MCP] Ejecutando redis_buscar_memoria - query: '{query}', limit: {limit}")
@@ -235,8 +248,10 @@ async def redis_buscar_memoria(query: str = "", limit: int = 10) -> str:
 @mcp.tool()
 async def verificar_health_cache() -> str:
     """
-    Health check rápido de Redis cache (ping + presencia de llaves).
-    Alias para redis_health_check para compatibilidad.
+    USAR COMO ALTERNATIVA a redis_health_check si falla.
+
+    Mismo health check básico con diferente implementación.
+    Útil para troubleshooting cuando redis_health_check no responde.
     """
     return await redis_health_check()
 

@@ -201,6 +201,37 @@ def ejecutar_comando_sistema(comando: str, tipo: str) -> Dict[str, Any]:
                 env=env,
                 shell=False  # NUNCA usar shell=True para PowerShell
             )
+        elif "redis-cli" in comando.lower():
+            # 🔥 FIX: Redis CLI SIEMPRE con args_list para evitar problemas de comillas
+            execution_method = "redis_args_list"
+            try:
+                final_args = shlex.split(comando, posix=False)
+                logging.info(f"Ejecutando Redis CLI con args: {final_args}")
+
+                result = subprocess.run(
+                    final_args,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    encoding='utf-8',
+                    errors='replace',
+                    env=env,
+                    shell=False  # NUNCA usar shell para redis-cli
+                )
+            except Exception as e:
+                logging.warning(f"Error ejecutando Redis CLI con args: {e}")
+                # Fallback a shell como último recurso
+                execution_method = "redis_shell_fallback"
+                result = subprocess.run(
+                    comando,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    encoding='utf-8',
+                    errors='replace',
+                    env=env
+                )
         elif has_spaces_in_paths or has_quotes or has_pipes or shell:
             # Usar shell para comandos complejos
             execution_method = "shell"
@@ -866,66 +897,97 @@ def ejecutar_cli_http(req: func.HttpRequest) -> func.HttpResponse:
         comando = body.get("comando")
         comando_original = comando
 
-        # 🔥 DECODIFICAR HTML ENTITIES (corrige &#39; -> ')
-        if comando:
-            import html
-            comando_original = comando
-            comando = html.unescape(comando)
-            if comando != comando_original:
-                logging.info(
-                    f"🔧 HTML entities decodificadas: {comando_original} -> {comando}")
-
-        # 🔥 NORMALIZAR COMANDOS AWK AUTOMÁTICAMENTE
-        if comando and 'awk' in comando.lower():
-            from validate_awk_command import suggest_awk_fix
-            comando_original = comando
-            comando = suggest_awk_fix(comando)
-            if comando != comando_original:
-                logging.info(
-                    f"✅ AWK normalizado: {comando_original} -> {comando}")
-
-        # 🔍 AUTO-RESOLVER RUTAS DE ARCHIVOS EN EL COMANDO (ANTES DE CUALQUIER VALIDACIÓN)
-        comando_resuelto = comando
-        if comando:
-            comando_resuelto = _auto_resolve_file_paths(comando)
-            logging.info(f"✅ Comando con rutas resueltas: {comando_resuelto}")
-            comando = comando_resuelto
-
-        if not comando:
-            if body.get("intencion"):
-                # ✅ CAMBIO: HTTP 200 con redirección sugerida
+        # 🔥 FIX: Validación TEMPRANA para Redis CLI antes de cualquier procesamiento
+        if comando and "redis-cli" in comando.lower():
+            # Verificar si redis-cli está disponible antes de procesar el comando
+            redis_available = _resolve_redis_cli_path("redis-cli")
+            if not redis_available:
                 resultado = {
                     "exito": False,
-                    "error": "Este endpoint ejecuta comandos CLI, no intenciones semánticas",
-                    "sugerencia": "Usa /api/hybrid para intenciones semánticas",
-                    "alternativa": "O proporciona un comando CLI directo",
-                    "ejemplo": {"comando": "storage account list"}
+                    "error": "Redis CLI no encontrado en el sistema",
+                    "return_code": -1,
+                    "duration": "0.00s",
+                    "comando_ejecutado": comando,
+                    "tipo_comando": "redis",
+                    "diagnostico_error": {
+                        "tipo_error": "programa_no_encontrado",
+                        "programa_faltante": "redis-cli",
+                        "ubicaciones_buscadas": [
+                            "C:/redis/redis-cli.exe",
+                            "C:/Program Files/Redis/redis-cli.exe",
+                            "C:/Program Files (x86)/Redis/redis-cli.exe",
+                            "PATH del sistema"
+                        ]
+                    },
+                    "sugerencias_solucion": [
+                        "Instalar Redis en el sistema",
+                        "Agregar redis-cli al PATH del sistema",
+                        "Usar el endpoint /api/redis-health para diagnósticos Redis"
+                    ],
+                    "timestamp": datetime.now().isoformat()
                 }
                 return _responder_json(req, resultado)
 
-            # ✅ CAMBIO: HTTP 200 con solicitud de comando
+            # 🔥 VALIDACIÓN TLS: Verificar compatibilidad antes de intentar conexión
+            env = os.environ
+            ssl_enabled = env.get("REDIS_SSL") or env.get("REDIS_TLS")
+            if ssl_enabled and ssl_enabled.strip().lower() not in ("0", "false", "no"):
+                if not _redis_cli_supports_tls(redis_available):
+                    resultado = {
+                        "exito": False,
+                        "error": "Azure Redis requiere TLS, pero Redis CLI local no lo soporta",
+                        "return_code": -1,
+                        "duration": "0.00s",
+                        "comando_ejecutado": comando,
+                        "tipo_comando": "redis",
+                        "diagnostico_error": {
+                            "tipo_error": "version_incompatible",
+                            "redis_cli_path": redis_available,
+                            "version_detectada": "5.0.x o anterior",
+                            "version_requerida": "6.0.0 o superior",
+                            "razon": "Azure Redis Cache requiere conexión TLS"
+                        },
+                        "sugerencias_solucion": [
+                            "Actualizar Redis CLI a versión 6.0.0 o superior",
+                            "Usar los endpoints nativos /api/redis-health o /api/redis-cache-monitor",
+                            "Usar el contenedor Docker en producción que tiene Redis CLI 6.0.16",
+                            "Para diagnósticos locales: curl -X GET http://localhost:7071/api/redis-cache-health"
+                        ],
+                        "alternatives": {
+                            "health_check": "/api/redis-cache-health",
+                            "monitor": "/api/redis-cache-monitor",
+                            "production": "boatrentalacr.azurecr.io/copiloto-func-azcli:v411"
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    return _responder_json(req, resultado)
+
+        if not comando:
+            # ✅ CAMBIO: HTTP 200 con mensaje explicativo
             resultado = {
                 "exito": False,
-                "error": "Falta el parámetro 'comando'",
-                "accion_requerida": "¿Qué comando CLI quieres ejecutar?",
+                "error": "Request body must be valid JSON",
                 "ejemplo": {"comando": "storage account list"},
-                "comandos_comunes": [
-                    "storage account list",
-                    "group list",
-                    "functionapp list",
-                    "storage container list --account-name <nombre>"
-                ]
+                "accion_requerida": "Proporciona un comando válido en el campo 'comando'"
             }
             return _responder_json(req, resultado)
 
         # 🔍 Detectar tipo solo una vez (manual + detector externo)
         tipo_comando, detection_data = _detectar_tipo_comando(comando_original)
 
+        # 🔥 DECODIFICAR HTML ENTITIES (corrige &#39; -> ')
+        if comando:
+            try:
+                import html
+                comando = html.unescape(comando)
+            except Exception:
+                pass  # Si falla, continuar con el comando original
+
         # Para PowerShell usamos el comando original sin auto-resolver para evitar doble comillado
         if tipo_comando == "powershell":
             comando = comando_original
         else:
-            comando = comando_resuelto
+            comando = _auto_resolve_file_paths(comando)
 
         comando_enriquecido = _enrich_command_by_intention(
             comando, detection_data)
@@ -1564,29 +1626,49 @@ def _normalize_redis_cli_command(comando: str) -> str:
                 return True
         return False
 
-    def _append_flag(flag: str, value: Optional[str]) -> None:
-        if value:
-            tokens.extend([flag, value])
+    # 🔥 FIX: Separar redis-cli executable de los argumentos Redis
+    redis_executable = tokens[0]  # redis-cli o ruta completa
+    # Los argumentos del comando (ej: info server)
+    redis_command_args = tokens[1:]
+
+    # Construir argumentos de conexión
+    connection_args = []
 
     if host and not _flag_present(["-h", "--host"]):
-        _append_flag("-h", host)
+        connection_args.extend(["-h", host])
 
     if port and not _flag_present(["-p", "--port"]):
-        _append_flag("-p", port)
+        connection_args.extend(["-p", port])
 
     if password and not _flag_present(["-a", "--pass", "--password", "-u"]):
-        _append_flag("-a", password)
+        connection_args.extend(["-a", password])
 
     if ssl_enabled and ssl_enabled.strip().lower() not in ("0", "false", "no"):
         if not _flag_present(["--tls", "--ssl"]):
             # 🔥 FIX: Solo agregar --tls si la versión lo soporta (6.0+)
-            if _redis_cli_supports_tls(tokens[0]):
-                tokens.append("--tls")
+            if _redis_cli_supports_tls(redis_executable):
+                connection_args.append("--tls")
             else:
                 logging.warning(
-                    f"Redis CLI {tokens[0]} no soporta --tls, omitiendo para evitar error")
+                    f"Redis CLI {redis_executable} no soporta --tls, omitiendo para evitar error")
 
-    normalized_command = shlex.join(tokens)
+    # 🔥 FIX: Orden correcto: redis-cli [CONNECTION_ARGS] [REDIS_COMMAND]
+    final_tokens = [redis_executable] + connection_args + redis_command_args
+
+    # 🔥 FIX: Para Redis CLI, construir comando SIN comillas excesivas
+    # Usar comillas dobles solo si la ruta contiene espacios
+    if ' ' in redis_executable and not (redis_executable.startswith('"') and redis_executable.endswith('"')):
+        redis_part = f'"{redis_executable}"'
+    else:
+        redis_part = redis_executable.strip(
+            '\'"')  # Remover comillas existentes
+
+    # Construir el resto sin shlex.join para evitar comillas excesivas
+    other_parts = connection_args + redis_command_args
+    normalized_command = redis_part + ' ' + \
+        ' '.join(other_parts) if other_parts else redis_part
+
+    logging.info(f"Redis CLI normalizado: {comando} -> {normalized_command}")
     return normalized_command
 
 
@@ -1614,24 +1696,33 @@ def _resolve_redis_cli_path(current_token: str) -> Optional[str]:
     if env_path:
         possible_paths.append(Path(env_path))
 
-    # Windows ubicaciones comunes
+    # Windows ubicaciones comunes (incluyendo C:\redis)
     possible_paths.extend([
+        Path("C:/redis/redis-cli.exe"),  # 🔥 FIX: Agregar ubicación conocida
         Path("C:/Program Files/Redis/redis-cli.exe"),
         Path("C:/Program Files (x86)/Redis/redis-cli.exe"),
+        Path("C:/tools/redis/redis-cli.exe"),
+        Path("C:/Redis/redis-cli.exe"),
     ])
 
+    # Intentar which primero
     which_path = shutil.which("redis-cli")
     if which_path:
-        possible_paths.append(Path(which_path))
+        possible_paths.insert(0, Path(which_path))  # Priorizar which result
 
+    # Verificar si el token actual ya es una ruta válida
     current_path = Path(current_token.strip('"\''))
     if current_path.exists():
         return str(current_path)
 
+    # Buscar en las rutas posibles
     for candidate in possible_paths:
         if candidate and candidate.exists():
+            logging.info(f"Redis CLI encontrado en: {candidate}")
             return str(candidate)
 
+    # 🔥 FIX: Registrar cuando no se encuentra redis-cli
+    logging.warning("Redis CLI no encontrado en ninguna ubicación conocida")
     return None
 
 

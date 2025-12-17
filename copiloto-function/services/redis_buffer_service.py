@@ -29,10 +29,11 @@ CUSTOM_EVENT_LOGGER = logging.getLogger("appinsights.customEvents")
 
 # Intento de importar credenciales de Azure
 try:
-    from azure.identity import DefaultAzureCredential, AzureCliCredential
+    from azure.identity import DefaultAzureCredential, AzureCliCredential, ManagedIdentityCredential
 except Exception:  # pragma: no cover
     DefaultAzureCredential = None
     AzureCliCredential = None
+    ManagedIdentityCredential = None
 
 # Estrategia de TTLs (segundos) por tipo de payload
 CACHE_STRATEGY: Dict[str, Dict[str, int]] = {
@@ -131,7 +132,8 @@ class RedisBufferService:
             try:
                 self._connect()
             except Exception as exc:  # pragma: no cover
-                logging.error(f"[RedisBuffer] Error inesperado inicializando Redis: {exc}")
+                logging.error(
+                    f"[RedisBuffer] Error inesperado inicializando Redis: {exc}")
                 self._client = None
                 self._enabled = False
 
@@ -241,50 +243,120 @@ class RedisBufferService:
         # Si REDIS_KEY falló, intentar AAD
         def _try_token_credential(label: str, credential) -> bool:
             try:
+                logging.info(f"[RedisBuffer] 🔐 Intentando {label}...")
                 token = credential.get_token(self._aad_scope)
                 bearer = getattr(token, "token", None)
                 if not bearer:
                     raise ValueError(
                         "Token AAD vacío; no se puede autenticar contra Redis.")
 
-                username = os.getenv("REDIS_AAD_USERNAME", "") or None
+                logging.info(
+                    f"[RedisBuffer] ✅ Token obtenido para {label}: {len(bearer)} chars")
 
-                self._client = redis.Redis(
-                    host=self._host,
-                    port=self._port,
-                    username=username,
-                    password=bearer,
-                    db=self._db,
-                    ssl=self._ssl,
-                    ssl_cert_reqs=ssl.CERT_REQUIRED,
-                    socket_timeout=5,
-                    socket_connect_timeout=5,
-                    health_check_interval=30,
-                )
-                self._client.ping()
+                # Para Redis Enterprise con AAD, usar token como username y password vacío
+                # Referencia: https://docs.microsoft.com/en-us/azure/azure-cache-for-redis/cache-azure-active-directory-for-authentication
+
+                common_params = {
+                    "host": self._host,
+                    "port": self._port,
+                    "username": bearer,  # ⭐ Token como username
+                    "password": "",      # ⭐ Password vacío para AAD
+                    "db": self._db,
+                    "ssl": self._ssl,
+                    "ssl_cert_reqs": ssl.CERT_NONE,  # ⭐ Usar CERT_NONE para Azure
+                    "socket_timeout": 10,
+                    "socket_connect_timeout": 10,
+                    "health_check_interval": 30,
+                    "decode_responses": True
+                }
+
+                # Intentar conexión cluster primero (para Redis Enterprise)
+                try:
+                    self._client = RedisCluster(
+                        **common_params,
+                        skip_full_coverage_check=True,
+                        read_from_replicas=False
+                    )
+                    self._client.ping()
+                    self._is_cluster = True
+                    logging.info(
+                        f"[RedisBuffer] ✅ {label} - Conectado como RedisCluster")
+                except Exception:
+                    # Fallback a cliente simple
+                    self._client = redis.Redis(**common_params)
+                    self._client.ping()
+                    self._is_cluster = False
+                    logging.info(
+                        f"[RedisBuffer] ✅ {label} - Conectado como Redis simple")
+
+                # ⭐ Verificar RedisJSON
+                try:
+                    test_key = f"test:redisjson:{int(time.time())}"
+                    self._client.json().set(test_key, '$', {"test": True})
+                    result = self._client.json().get(test_key)
+                    self._client.delete(test_key)
+                    if result:
+                        self._has_redisjson = True
+                        logging.info(
+                            f"[RedisBuffer] ✅ RedisJSON disponible con {label}")
+                except Exception:
+                    self._has_redisjson = False
+
                 self._reset_failures()
                 self._enabled = True
                 logging.info(
-                    f"[RedisBuffer] ✅ Conectado usando {label}: {self._host}:{self._port}")
+                    f"[RedisBuffer] ✅ Conectado usando {label}: {self._host}:{self._port} (RedisJSON: {self._has_redisjson})")
                 return True
+
             except Exception as exc:
                 logging.warning(
                     f"[RedisBuffer] ⚠️ {label} falló: {exc}")
                 self._client = None
                 return False
 
-        # Intentar DefaultAzureCredential
-        if DefaultAzureCredential:
-            credential = DefaultAzureCredential(
-                exclude_interactive_browser_credential=True)
-            if _try_token_credential("DefaultAzureCredential", credential):
-                return
+        # Detectar si estamos en Azure Functions
+        is_azure_functions = bool(
+            os.environ.get('WEBSITE_INSTANCE_ID') or
+            os.environ.get('WEBSITE_SITE_NAME') or
+            os.environ.get('FUNCTIONS_WORKER_RUNTIME')
+        )
 
-        # Intentar Azure CLI para desarrollo local
-        if AzureCliCredential:
-            credential = AzureCliCredential()
-            if _try_token_credential("AzureCliCredential", credential):
-                return
+        if is_azure_functions:
+            logging.info(
+                "[RedisBuffer] 🏢 Detectado entorno Azure Functions - priorizando ManagedIdentity")
+
+            # En Azure Functions, usar explícitamente ManagedIdentityCredential
+            if ManagedIdentityCredential:
+                credential = ManagedIdentityCredential()
+                if _try_token_credential("ManagedIdentityCredential", credential):
+                    return
+
+            # Fallback a DefaultAzureCredential con configuración específica para Azure
+            if DefaultAzureCredential:
+                credential = DefaultAzureCredential(
+                    exclude_cli_credential=True,  # ⭐ CRÍTICO: Excluir CLI en Azure
+                    exclude_interactive_browser_credential=True,
+                    exclude_visual_studio_code_credential=True,
+                    exclude_shared_token_cache_credential=True
+                )
+                if _try_token_credential("DefaultAzureCredential (Azure-optimized)", credential):
+                    return
+        else:
+            logging.info(
+                "[RedisBuffer] 🏠 Detectado entorno local - usando credenciales de desarrollo")
+
+            # En desarrollo local, intentar CLI primero
+            if AzureCliCredential:
+                credential = AzureCliCredential()
+                if _try_token_credential("AzureCliCredential", credential):
+                    return
+
+            # Fallback a DefaultAzureCredential completo
+            if DefaultAzureCredential:
+                credential = DefaultAzureCredential(
+                    exclude_interactive_browser_credential=True)
+                if _try_token_credential("DefaultAzureCredential", credential):
+                    return
 
         # Si todo falló, deshabilitar Redis
         logging.error(

@@ -97,6 +97,42 @@ tools:
           method: GET
           description: Consulta métricas detalladas del rendimiento de cache dual (session + global) en Redis
 
+  - name: verificar_health_cache
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/redis-cache-health
+          method: GET
+          description: Verifica la salud de Redis como respaldo (misma data que redis-cache-health)
+
+  - name: redis_buscar_memoria
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/buscar-memoria
+          method: GET
+          description: Busca entradas guardadas en cache para inspeccionar contenido
+          parameters:
+            query:
+              type: string
+              required: false
+              description: Término opcional para filtrar resultados
+            limit:
+              type: integer
+              required: false
+              description: Máximo número de resultados (default: 10)
+
+  - name: redis_cached_chat
+    type: http
+    config:
+      base_url: https://copiloto-semantico-func-us2.azurewebsites.net
+      endpoints:
+        - path: /api/redis-model-wrapper
+          method: POST
+          description: Envía preguntas al chat basado en la cache Redis dual
+
   - name: autocorrector_agent
     type: http
     config:
@@ -181,6 +217,12 @@ agents:
       revertir:
         tool: fix_promoter:/api/rollback
         description: "Rollback automático si falla la ejecución"
+      buscar_memoria:
+        tool: redis_buscar_memoria:/api/buscar-memoria
+        description: "Explora los datos cacheados y extrae ejemplos de memoria"
+      chat_cache:
+        tool: redis_cached_chat:/api/redis-model-wrapper
+        description: "Responde preguntas usando la cache dual (hit/miss)"
       redis_health_insight:
         tool: redis_cache_health:/api/redis-cache-health
         description: "Confirma que Redis responde y tiene datos cacheados antes de diagnosticar"
@@ -204,10 +246,18 @@ agents:
         tool: redis_cache_health:/api/redis-cache-health
         condition: "always"
         description: "Verifica la salud de Redis antes de iniciar diagnósticos"
+      - step: "verificar_health_cache"
+        tool: verificar_health_cache:/api/redis-cache-health
+        condition: "if redis_health_check.status != 'healthy'"
+        description: "Validación secundaria cuando el health inicial no retorna healthy"
       - step: "redis_monitor"
         tool: redis_cache_monitor:/api/redis-cache-monitor
         condition: "if redis_health_check.status == 'healthy'"
         description: "Recolecta métricas duales para enriquecer el diagnóstico"
+      - step: "redis_buscar_memoria"
+        tool: redis_buscar_memoria:/api/buscar-memoria
+        condition: "always"
+        description: "Inspecciona entradas cacheadas para aportar contexto adicional"
       - step: "diagnosticar"
         tool: azure_cli_executor:/api/diagnostico-recursos
         condition: "always"
