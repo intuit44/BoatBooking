@@ -6,5 +6,6 @@
     "azureFunctions.projectRuntime": "~4",
     "debug.internalConsoleOptions": "neverOpen",
     "CodeGPT.apiKey": "Claude Code",
-    "chat.agent.maxRequests": 35
+    "chat.agent.maxRequests": 35,
+    "aws.telemetry": false
 }
