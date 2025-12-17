@@ -87,7 +87,11 @@ def _get_openai_client():
 # streamable_http_path=/mcp para handshake.
 mcp = FastMCP("redis-wrapper", host=MCP_HOST,
               port=MCP_PORT, streamable_http_path="/mcp")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(message)s',
+    datefmt='%m/%d/%y %H:%M:%S'
+)
 
 
 def _process_with_redis_cache(mensaje: str, session_id: str, agent_id: str, model: str = DEFAULT_MODEL) -> dict[str, Any]:
@@ -118,13 +122,11 @@ def _process_with_redis_cache(mensaje: str, session_id: str, agent_id: str, mode
         logging.info(f"[MCP-RedisCache] 🔑 Session key: {session_key[:80]}...")
         logging.info(f"[MCP-RedisCache] 🔑 Global key: {global_key[:80]}...")
 
-        cached, cache_source = redis_buffer.get_llm_cached_response(
-            agent_id=agent_id,
-            session_id=session_id,
-            message=mensaje,
-            model=model,
-            use_global_cache=True,
-        )
+        # FORZAR SOLO GLOBAL CACHE para consistencia total
+        global_key = redis_buffer.build_llm_global_key(
+            agent_id, mensaje, model)
+        cached = redis_buffer.get_cached_payload("llm", global_key)
+        cache_source = "global" if cached else "miss"
 
         if cached:
             cache_hit = True
@@ -156,19 +158,15 @@ def _process_with_redis_cache(mensaje: str, session_id: str, agent_id: str, mode
             # Guardar en cache
             if redis_buffer.is_enabled:
                 try:
-                    redis_buffer.cache_llm_response(
-                        agent_id=agent_id,
-                        session_id=session_id,
-                        message=mensaje,
-                        model=model,
-                        response_data={
-                            "respuesta": respuesta_texto,
-                            "session_id": session_id,
-                            "agent_id": agent_id,
-                            "model": model,
-                        },
-                        use_global_cache=True,
-                    )
+                    # GUARDAR SOLO en global cache para consistencia total
+                    global_key = redis_buffer.build_llm_global_key(
+                        agent_id, mensaje, model)
+                    redis_buffer.cache_response("llm", global_key, {
+                        "respuesta": respuesta_texto,
+                        "session_id": session_id,
+                        "agent_id": agent_id,
+                        "model": model,
+                    })
                     logging.info(
                         f"[MCP-RedisCache] 💾 Response cached successfully")
                 except Exception as cache_err:
@@ -247,6 +245,12 @@ async def redis_cached_chat(
     Returns:
         Respuesta de IA + metadata de cache performance
     """
+    print(f"[MCP-ENTRY] ===== FUNCIÓN REDIS_CACHED_CHAT INICIADA =====")
+    print(f"[MCP-ENTRY] Mensaje: {mensaje}")
+    print(f"[MCP-ENTRY] Session ID: {session_id}")
+    print(f"[MCP-ENTRY] Agent ID: {agent_id}")
+
+    logging.info(f"[MCP-ENTRY] ===== FUNCIÓN REDIS_CACHED_CHAT INICIADA =====")
     logging.info(
         f"[MCP] Ejecutando redis_cached_chat - mensaje: '{mensaje[:100]}{'...' if len(mensaje) > 100 else ''}'")
     logging.info(
@@ -262,14 +266,120 @@ async def redis_cached_chat(
         f"[MCP] Caché forzada. Original: ({session_id}, {agent_id}) -> Forzado: ({cache_session_id}, {cache_agent_id})")
 
     try:
-        # Usar cache directo de Redis en lugar de HTTP endpoint
+        logging.info(f"[MCP-DEBUG] ===== INICIO REDIS_CACHED_CHAT =====")
+        logging.info(f"[MCP-DEBUG] mensaje: {mensaje}")
+        logging.info(f"[MCP-DEBUG] cache_session_id: {cache_session_id}")
+        logging.info(f"[MCP-DEBUG] cache_agent_id: {cache_agent_id}")
+
+        # Cargar configuración local
+        logging.info(f"[MCP-DEBUG] Cargando configuración local...")
+        load_local_settings()
+        logging.info(f"[MCP-DEBUG] Configuración cargada OK")
+        # Importar servicio Redis
+        logging.info(f"[MCP-DEBUG] Importando redis_buffer_service...")
+        from services.redis_buffer_service import redis_buffer
+        logging.info(f"[MCP-DEBUG] Servicio importado OK")
+
+        # Usar funciones existentes del redis_buffer
+        logging.info(f"[MCP-DEBUG] Buscando en cache Redis...")
+        logging.info(f"[MCP-DEBUG] Parámetros de búsqueda:")
+        logging.info(f"[MCP-DEBUG] - agent_id: '{cache_agent_id}'")
+        logging.info(f"[MCP-DEBUG] - session_id: '{cache_session_id}'")
+        logging.info(f"[MCP-DEBUG] - message: '{mensaje}'")
+        logging.info(f"[MCP-DEBUG] - model: '{DEFAULT_MODEL}'")
+
+        cached, cache_source = redis_buffer.get_llm_cached_response(
+            agent_id=cache_agent_id,
+            session_id=cache_session_id,
+            message=mensaje,
+            model=DEFAULT_MODEL,
+            use_global_cache=True,
+        )
         logging.info(
-            f"[MCP] 🚀 Using direct Redis cache instead of HTTP endpoint")
-        data = _process_with_redis_cache(
-            mensaje, cache_session_id, cache_agent_id)
+            f"[MCP-DEBUG] Cache búsqueda completada - cached: {cached is not None}, source: {cache_source}")
+
+        if cached:
+            logging.info(f"[MCP-DEBUG] CACHE HIT! Source: {cache_source}")
+            result = cached.get("respuesta") if isinstance(
+                cached, dict) else cached
+        else:
+            logging.info(f"[MCP-DEBUG] CACHE MISS - llamando modelo OpenAI...")
+
+            # Mostrar claves existentes para debug
+            if redis_buffer.is_enabled:
+                try:
+                    existing_keys = redis_buffer.keys("llm:*")
+                    logging.info(
+                        f"[MCP-DEBUG] Claves LLM existentes ({len(existing_keys)}):")
+                    for key in existing_keys[:3]:  # Mostrar las primeras 3
+                        key_str = key.decode() if isinstance(key, bytes) else str(key)
+                        logging.info(f"[MCP-DEBUG] - {key_str}")
+
+                    # Mostrar las claves que estamos buscando
+                    session_key = redis_buffer.build_llm_session_key(
+                        cache_agent_id, cache_session_id, mensaje, DEFAULT_MODEL)
+                    global_key = redis_buffer.build_llm_global_key(
+                        cache_agent_id, mensaje, DEFAULT_MODEL)
+                    logging.info(
+                        f"[MCP-DEBUG] Buscando session_key: {session_key}")
+                    logging.info(
+                        f"[MCP-DEBUG] Buscando global_key: {global_key}")
+                except Exception as e:
+                    logging.error(f"[MCP-DEBUG] Error mostrando claves: {e}")
+
+            # Importar y usar cliente OpenAI
+            openai_client = _get_openai_client()
+            completion = openai_client.chat.completions.create(
+                model=DEFAULT_MODEL,
+                messages=[{"role": "user", "content": mensaje}],
+            )
+            result = completion.choices[0].message.content
+            logging.info(
+                f"[MCP-DEBUG] Respuesta de OpenAI recibida: {len(result or '')} chars")
+
+            # Guardar en cache para futuras consultas
+            if redis_buffer.is_enabled and result:
+                print(f"[MCP-DEBUG] Guardando respuesta en cache...")
+                # Usar la función cache_response que conocemos que existe
+                session_key = redis_buffer.build_llm_session_key(
+                    cache_agent_id, cache_session_id, mensaje, DEFAULT_MODEL)
+                global_key = redis_buffer.build_llm_global_key(
+                    cache_agent_id, mensaje, DEFAULT_MODEL)
+
+                response_data = {
+                    "respuesta": result,
+                    "session_id": cache_session_id,
+                    "agent_id": cache_agent_id,
+                    "model": DEFAULT_MODEL,
+                }
+
+                # Guardar en ambos: session y global cache
+                redis_buffer.cache_response("llm", session_key, response_data)
+                redis_buffer.cache_response("llm", global_key, response_data)
+                print(f"[MCP-DEBUG] Respuesta guardada en cache OK")
+
+        print(
+            f"[MCP-DEBUG] RESULTADO FINAL: {type(result)} - {str(result)[:100]}...")
+
+        logging.info(
+            f"[MCP-DEBUG] Resultado final: {type(result)} - {str(result)[:100]}...")
+
+        # Convertir a formato esperado
+        if isinstance(result, str):
+            # Ya es string, detectar si es respuesta de IA
+            if len(result) > 10 and not result.startswith("Error"):
+                data = {"ok": True, "respuesta": result,
+                        "cache_hit": True, "origen": "cache"}
+            else:
+                data = {"ok": False, "error": result}
+        else:
+            data = {"ok": False, "error": f"Tipo inesperado: {type(result)}"}
+
+        print(f"[MCP-DEBUG] DATA PROCESADA: {data}")
+        logging.info(f"[MCP-DEBUG] Data procesada: {data}")
 
         # Log del resultado
-        status = data.get('status', 'unknown')
+        status = data.get('status', 'success' if data.get('ok') else 'error')
         cache_hit = data.get('cache_hit', False)
         logging.info(
             f"[MCP] redis_cached_chat completado - status: {status}, cache_hit: {cache_hit}")
@@ -291,11 +401,23 @@ async def redis_cached_chat(
             f"[MCP] Respuesta exitosa - longitud: {len(respuesta)} chars, meta: {meta}")
 
         meta_str = f" [{' | '.join(meta)}]" if meta else ""
-        return f"{respuesta}{meta_str}"
+        final_response = f"{respuesta}{meta_str}"
+        logging.info(
+            f"[MCP-SUCCESS-PRE] Punto justo antes del return - respuesta: {len(respuesta)} chars, meta: {meta_str}")
+        logging.info(
+            f"[MCP-SUCCESS] ===== FIN EXITOSO REDIS_CACHED_CHAT ===== Response length: {len(final_response)}")
+        logging.info(
+            f"[MCP-SUCCESS-RETURN] Devolviendo: {final_response[:100]}...")
+        return final_response
 
     except Exception as exc:
-        logging.error(f"[MCP] Error en redis_cached_chat: {exc}")
-        return f"Error en MCP wrapper: {str(exc)}"
+        logging.error(f"[MCP-ERROR] ===== ERROR EN REDIS_CACHED_CHAT =====")
+        logging.error(f"[MCP-ERROR] Tipo de error: {type(exc).__name__}")
+        logging.error(f"[MCP-ERROR] Mensaje: {str(exc)}")
+        logging.error(f"[MCP-ERROR] Traceback: ", exc_info=True)
+        logging.error(f"[MCP-ERROR] ===== FIN ERROR =====")
+        # Devolver respuesta informativa en lugar de error crudo
+        return f"Lo siento, ocurrió un error técnico al procesar tu consulta. Por favor, intenta reformular tu pregunta. [Error: {type(exc).__name__}: {str(exc)}]"
 
 
 def main() -> None:

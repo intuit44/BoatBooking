@@ -18,6 +18,8 @@ import threading
 import time
 import hashlib
 import ssl
+import re
+import unicodedata
 from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
 import redis
 from redis.cluster import RedisCluster
@@ -35,46 +37,145 @@ except Exception:  # pragma: no cover
     AzureCliCredential = None
     ManagedIdentityCredential = None
 
+
+def normalize_message_for_cache(message: str) -> str:
+    """
+    Normaliza un mensaje para generar claves de cache consistentes.
+    Elimina variaciones triviales que no deberían afectar el cache hit.
+
+    Transformaciones aplicadas:
+    - Normalización Unicode (NFD -> NFC)
+    - Eliminar espacios extras
+    - Convertir a lowercase
+    - Normalizar signos de puntuación
+    - Eliminar caracteres de control/invisibles
+    """
+    if not message or not isinstance(message, str):
+        return str(message or "")
+
+    # 1. Normalización Unicode: NFD -> NFC (compatibilidad de acentos)
+    normalized = unicodedata.normalize('NFC', message)
+
+    # 2. Convertir a lowercase para case-insensitive matching
+    normalized = normalized.lower()
+
+    # 3. Normalizar espacios: múltiples espacios -> uno solo
+    normalized = re.sub(r'\s+', ' ', normalized)
+
+    # 4. Normalizar signos de interrogación y exclamación
+    normalized = normalized.replace('¿', '').replace('¡', '')
+
+    # 5. Eliminar caracteres de control invisibles
+    normalized = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', normalized)
+
+    # 6. Trim espacios al inicio/final
+    normalized = normalized.strip()
+
+    # 7. Normalizar caracteres comunes que pueden variar
+    # Comillas diferentes -> comilla estándar
+    normalized = re.sub(r'[""''`´]', '"', normalized)
+
+    # Guiones diferentes -> guión estándar
+    normalized = re.sub(r'[–—]', '-', normalized)
+
+    return normalized
+
+
+def generate_semantic_cache_key(message: str) -> str:
+    """
+    Genera un ID de cache semántico basado en la intención del mensaje.
+    Similar a como CDNs y navegadores generan claves canónicas.
+
+    Estrategia:
+    1. Extrae conceptos clave y entidades
+    2. Normaliza la intención semántica
+    3. Genera fingerprint estable de la intención
+
+    Ejemplos de equivalencia semántica:
+    - "¿Cómo funciona el motor fuera de borda?"
+    - "Explícame el funcionamiento de un motor fuera de borda"
+    - "Cómo opera el motor externo de un bote"
+    → Mismo cache key: "motor_fuera_borda_funcionamiento"
+    """
+    if not message or not isinstance(message, str):
+        return str(message or "")
+
+    # Normalización básica
+    normalized = normalize_message_for_cache(message)
+
+    # Extracción de conceptos clave (palabras importantes)
+    # Eliminar palabras vacías comunes
+    stop_words = {
+        'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'por', 'para',
+        'que', 'como', 'cuando', 'donde', 'cual', 'cuales', 'es', 'son', 'esta', 'estan',
+        'me', 'te', 'se', 'nos', 'le', 'les', 'lo', 'ha', 'he', 'han', 'has',
+        'puede', 'pueden', 'puedes', 'puedo', 'dime', 'explicame', 'explica', 'cuentame'
+    }
+
+    # Tokenizar y filtrar
+    tokens = normalized.split()
+    meaningful_tokens = [
+        token for token in tokens if token not in stop_words and len(token) > 2]
+
+    # Normalizar conceptos comunes a términos canónicos
+    concept_mapping = {
+        # Motor concepts
+        'motor': 'motor', 'motores': 'motor', 'engine': 'motor',
+        'fuera': 'fuera_borda', 'borda': 'fuera_borda', 'outboard': 'fuera_borda',
+        'externo': 'fuera_borda', 'exterior': 'fuera_borda',
+
+        # Funcionamiento concepts
+        'funciona': 'funcionamiento', 'funcionamiento': 'funcionamiento', 'opera': 'funcionamiento',
+        'operacion': 'funcionamiento', 'trabaja': 'funcionamiento', 'work': 'funcionamiento',
+
+        # Embarcation concepts
+        'lancha': 'embarcacion', 'bote': 'embarcacion', 'barco': 'embarcacion',
+        'boat': 'embarcacion', 'nave': 'embarcacion', 'pequena': 'pequena',
+
+        # Question concepts (normalize question intent)
+        'como': 'explicacion', 'que': 'definicion', 'cuales': 'listado',
+        'cuando': 'temporal', 'donde': 'ubicacion', 'por': 'razon'
+    }
+
+    # Aplicar mapeo de conceptos
+    canonical_tokens = []
+    for token in meaningful_tokens:
+        canonical_token = concept_mapping.get(token, token)
+        if canonical_token not in canonical_tokens:  # Evitar duplicados
+            canonical_tokens.append(canonical_token)
+
+    # Ordenar tokens para consistencia (independiente del orden)
+    canonical_tokens.sort()
+
+    # Generar clave semántica
+    if canonical_tokens:
+        semantic_key = '_'.join(canonical_tokens)
+    else:
+        # Fallback: usar hash del mensaje normalizado
+        semantic_key = f"generic_{abs(hash(normalized)) % 10000}"
+
+    return semantic_key
+
+
 # Estrategia de TTLs (segundos) por tipo de payload
-CACHE_STRATEGY: Dict[str, Dict[str, int]] = {
-    # 5 min
-    "memoria": {"ttl": int(os.getenv("REDIS_MEMORIA_TTL", "300"))},
-    # 5 min
-    "thread": {"ttl": int(os.getenv("REDIS_THREAD_TTL", "300"))},
-    # 1 h
-    "narrativa": {"ttl": int(os.getenv("REDIS_NARRATIVA_TTL", "3600"))},
+CACHE_STRATEGY = {
+    "memoria": {"ttl": int(os.getenv("REDIS_MEMORIA_TTL", "300"))},  # 5 min
+    "thread": {"ttl": int(os.getenv("REDIS_THREAD_TTL", "300"))},  # 5 min
+    "narrativa": {"ttl": int(os.getenv("REDIS_NARRATIVA_TTL", "3600"))},  # 1 h
     # 60 min
     "response": {"ttl": int(os.getenv("REDIS_RESPONSE_TTL", "3600"))},
-    # 30 min
-    "search": {"ttl": int(os.getenv("REDIS_SEARCH_TTL", "1800"))},
-    # 90 min
-    "llm": {"ttl": int(os.getenv("REDIS_LLM_TTL", "5400"))},
-    # 15 min
-    "logs_analysis": {"ttl": int(os.getenv("REDIS_LOGS_TTL", "900"))},
+    "search": {"ttl": int(os.getenv("REDIS_SEARCH_TTL", "1800"))},  # 30 min
+    "llm": {"ttl": int(os.getenv("REDIS_LLM_TTL", "5400"))},  # 90 min
 }
 
 
 class RedisBufferService:
-    """Pequeño wrapper sobre redis.Redis configurado para Azure Cache for Redis."""
-
-    _instance_lock = threading.Lock()
-    _instance: Optional["RedisBufferService"] = None
-
-    def __new__(cls, *args, **kwargs):
-        with cls._instance_lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-        return cls._instance
+    """
+    Singleton ligero que mantiene un cliente Redis TLS y helpers de caché para
+    memoria semántica, threads y resultados pesados (narrativas, respuestas, LLM).
+    """
 
     def __init__(self):
-        if getattr(self, "_initialized", False):
-            return
-
-        self._initialized = True
-        # Usamos Any para compatibilidad de tipado (RedisCluster no expone json() en stubs)
-        self._client: Optional[Union[redis.Redis, RedisCluster]] = None
-
-        # ⭐ ACTUALIZADO: Usar el host correcto de Redis Enterprise
         self._host = os.getenv(
             "REDIS_HOST",
             "managed-redis-copiloto.eastus2.redis.azure.net"  # Modificado
@@ -96,12 +197,12 @@ class RedisBufferService:
         # Cluster awareness y control de fallos RedisJSON
         self._is_cluster = False
         self._cluster_mode = os.getenv("REDIS_CLUSTER_MODE", "oss").lower()
-        self._json_failures: Dict[str, int] = {}
+        self._json_failures = {}
         self._failure_streak = 0
-        self._disable_after = int(os.getenv(
-            "REDIS_DISABLE_AFTER_FAILURES", "3"))
-        self._last_error: Optional[str] = None
-        self._errored_keys: set[str] = set()
+        self._disable_after = int(
+            os.getenv("REDIS_DISABLE_AFTER_FAILURES", "3"))
+        self._last_error = None
+        self._errored_keys = set()
 
         self._enabled = bool(redis and self._host)
         if not DefaultAzureCredential:
@@ -114,6 +215,10 @@ class RedisBufferService:
             os.getenv("REDIS_CONNECT_TIMEOUT", "10"))
 
         self._connect_lock = threading.Lock()
+
+        # ⭐ CRÍTICO: Inicializar cliente Redis y atributos
+        self._client = None
+        self._has_redisjson = False
 
     # ------------------------------------------------------------------ #
     # Conexión (AAD vía MSI/CLI / fallback por clave)
@@ -614,12 +719,26 @@ class RedisBufferService:
         return (value or "").strip()
 
     def build_llm_session_key(self, agent_id: str, session_id: str, message: str, model: str) -> str:
-        msg_hash = self.stable_hash(self._normalize_str(message))
-        return f"session:{self._normalize_str(agent_id) or 'anon'}:{self._normalize_str(session_id) or 'default'}:model:{self._normalize_str(model) or 'default'}:msg:{msg_hash}"
+        # Usar cache semántico con fallback robusto para evitar errores MCP
+        try:
+            semantic_id = generate_semantic_cache_key(message)
+        except Exception:
+            # Fallback: normalización simple + hash
+            normalized = normalize_message_for_cache(message)
+            semantic_id = f"fallback_{abs(hash(normalized)) % 10000}"
+
+        return f"session:{self._normalize_str(agent_id) or 'anon'}:{self._normalize_str(session_id) or 'default'}:model:{self._normalize_str(model) or 'default'}:intent:{semantic_id}"
 
     def build_llm_global_key(self, agent_id: str, message: str, model: str) -> str:
-        msg_hash = self.stable_hash(self._normalize_str(message))
-        return f"global:{self._normalize_str(agent_id) or 'anon'}:model:{self._normalize_str(model) or 'default'}:msg:{msg_hash}"
+        # Usar cache semántico con fallback robusto para evitar errores MCP
+        try:
+            semantic_id = generate_semantic_cache_key(message)
+        except Exception:
+            # Fallback: normalización simple + hash
+            normalized = normalize_message_for_cache(message)
+            semantic_id = f"fallback_{abs(hash(normalized)) % 10000}"
+
+        return f"global:{self._normalize_str(agent_id) or 'anon'}:model:{self._normalize_str(model) or 'default'}:intent:{semantic_id}"
 
     def get_llm_cached_response(
         self,
