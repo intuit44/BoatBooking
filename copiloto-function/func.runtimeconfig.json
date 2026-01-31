@@ -1,8 +1,0 @@
-{
-  "runtimeOptions": {
-    "configProperties": {
-      "System.Net.Http.UseSocketsHttpHandler": false,
-      "System.Net.ServicePointManager.SecurityProtocol": "Tls12"
-    }
-  }
-}
